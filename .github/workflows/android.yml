@@ -32,6 +32,9 @@ jobs:
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses || true
 
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
       - name: Run Unit & Robolectric Tests
         run: ./gradlew testDebugUnitTest --continue
 
