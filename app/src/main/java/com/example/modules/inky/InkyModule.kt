@@ -16,11 +16,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -44,6 +46,18 @@ import kotlinx.coroutines.launch
 data class TrackSetupRow(val track: String, val sayap: Int, val rem: Int, val suspensi: Int)
 data class TyreSetupRow(val durasi: Int, val konsumsi: Int, val perbedaan: Int)
 
+// Safe helper to find the ComponentActivity from any wrapped context
+fun android.content.Context.findActivity(): androidx.activity.ComponentActivity? {
+    var currentContext = this
+    while (currentContext is android.content.ContextWrapper) {
+        if (currentContext is androidx.activity.ComponentActivity) {
+            return currentContext
+        }
+        currentContext = currentContext.baseContext
+    }
+    return null
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InkyModule(
@@ -60,12 +74,32 @@ fun InkyModule(
     var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
-    var docTitle by remember { mutableStateOf("My Monoposto Settings") }
+    var docTitle by remember { mutableStateOf("Inky_Dokumen.odt") }
 
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
-    var documentContentTitle by remember { mutableStateOf("Monoposto Realistic Settings") }
-    var activeToolbarType by remember { mutableStateOf("Formatting") } // Formatting vs Standard
+    var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
+    var docBodyText by remember { mutableStateOf("") }
+    var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
+
+    // LibreOffice Kit Diagnostics Logs State
+    val lokitLogs = remember {
+        mutableStateListOf(
+            "LOKit Core: Connected (v7.6.2)",
+            "lok::Office::documentLoad(\"Inky_Dokumen.odt\") -> SUCCESS",
+            "lok::Document::registerCallback(LOK_CALLBACK_INVALIDATE_TILES)",
+            "lok::Document::paintTileList() -> Initialized 4 screen tiles"
+        )
+    }
+
+    fun addLokitLog(message: String) {
+        if (lokitLogs.size > 15) {
+            lokitLogs.removeAt(0)
+        }
+        lokitLogs.add(message)
+    }
+
+    var activeToolbarTypeState by remember { mutableStateOf("Standard") } // For compatibility or internal tracking
 
     val advSettings = remember {
         mutableStateListOf(
@@ -77,7 +111,7 @@ fun InkyModule(
         )
     }
 
-    val activity = LocalContext.current as? androidx.activity.ComponentActivity
+    val activity = remember(context) { context.findActivity() }
 
     // Text formatting state
     var activeFontFamily by remember { mutableStateOf("Aptos Display") }
@@ -178,7 +212,7 @@ fun InkyModule(
     }
 
     // Layout configuration variables
-    val docBgColor = if (isDarkDocument) Color(0xFF181A1B) else Color(0xFFF1F5F9)
+    val docBgColor = if (isDarkDocument) Color(0xFF181A1B) else Color(0xFFD0D5DD)
     val pageBgColor = if (isDarkDocument) Color(0xFF242627) else Color.White
     val textPrimaryColor = if (isDarkDocument) Color(0xFFE8E6E3) else fontColor
     val textSecondaryColor = if (isDarkDocument) Color(0xFFA8A6A3) else Color.DarkGray
@@ -206,7 +240,7 @@ fun InkyModule(
                             Column {
                                 Text(
                                     text = docTitle,
-                                    fontSize = 18.sp,
+                                    fontSize = 17.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -224,56 +258,108 @@ fun InkyModule(
                             }
                         },
                         actions = {
-                            IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                                Icon(Icons.Default.Search, contentDescription = "Find in Document")
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show()
+                                addLokitLog("Upload to Drive triggered")
+                            }) {
+                                Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
                             }
-                            IconButton(onClick = { Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Default.CloudUpload, contentDescription = "Upload to Drive")
+                            IconButton(onClick = { showFindReplace = !showFindReplace }) {
+                                Icon(Icons.Rounded.Search, contentDescription = "Find in Document")
                             }
                             IconButton(onClick = { 
                                 isWebView = !isWebView
                                 Toast.makeText(context, if (isWebView) "Tampilan Seluler Aktif" else "Tampilan Normal Aktif", Toast.LENGTH_SHORT).show()
+                                addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
                             }) {
                                 Icon(
-                                    imageVector = if (isWebView) Icons.Default.PhoneAndroid else Icons.Default.Web,
+                                    imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
                                     contentDescription = "Document View Mode"
                                 )
                             }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More Options")
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
                                 }
                                 DropdownMenu(
                                     expanded = showMoreMenu,
                                     onDismissRequest = { showMoreMenu = false }
                                 ) {
                                     DropdownMenuItem(
+                                        text = { Text("Share") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            Toast.makeText(context, "Membuka Share Sheet...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
+                                    )
+                                    DropdownMenuItem(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Mengekspor ke PDF...", Toast.LENGTH_SHORT).show()
-                                        }
+                                            addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Save as...") },
+                                        text = { Text("Save") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Menyimpan sebagai file baru...", Toast.LENGTH_SHORT).show()
-                                        }
+                                            triggerAutosave()
+                                            addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\")")
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Save as") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            Toast.makeText(context, "Menyimpan salinan...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
                                         onClick = {
                                             showMoreMenu = false
                                             isDarkDocument = !isDarkDocument
-                                        }
+                                        },
+                                        leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Read it Aloud") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            Toast.makeText(context, "Membacakan dokumen...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Open Navigator Bar") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showBottomBar = true
+                                            bottomBarDeck = "navigator"
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Document Version History") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showBottomBar = true
+                                            bottomBarDeck = "version_history"
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.History, contentDescription = "History") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Mempersiapkan printer...", Toast.LENGTH_SHORT).show()
-                                        }
+                                            Toast.makeText(context, "Mencetak dokumen...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
                                     )
                                 }
                             }
@@ -287,45 +373,18 @@ fun InkyModule(
                     TopAppBar(
                         title = {
                             Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = docTitle,
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (isSaved) {
-                                        Text(
-                                            text = " - Disimpan",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Normal,
-                                            color = Color(0xFF10B981),
-                                            modifier = Modifier.padding(start = 4.dp)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = " - Menyimpan...",
-                                            fontSize = 12.sp,
-                                            color = Color.LightGray,
-                                            modifier = Modifier.padding(start = 4.dp)
-                                        )
-                                    }
-                                }
-                                // QAT quick inline actions
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudQueue,
-                                        contentDescription = "Cloud synced",
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text("Local Sync Active", fontSize = 9.sp, color = Color.Gray)
-                                }
+                                Text(
+                                    text = docTitle,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (isSaved) "Tersimpan di perangkat ini" else "Menyimpan...",
+                                    fontSize = 11.sp,
+                                    color = if (isSaved) Color(0xFF10B981) else Color.LightGray
+                                )
                             }
                         },
                         navigationIcon = {
@@ -334,30 +393,35 @@ fun InkyModule(
                             }
                         },
                         actions = {
-                            IconButton(onClick = { Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Default.CloudUpload, contentDescription = "Upload to Drive")
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show()
+                                addLokitLog("Upload to Drive triggered")
+                            }) {
+                                Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
                             }
                             IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                                Icon(Icons.Default.FindReplace, contentDescription = "Find and Replace")
+                                Icon(Icons.Rounded.Search, contentDescription = "Find and Replace")
                             }
                             IconButton(onClick = { 
                                 isWebView = !isWebView
                                 Toast.makeText(context, if (isWebView) "Tampilan Seluler" else "Tampilan Normal", Toast.LENGTH_SHORT).show()
+                                addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
                             }) {
                                 Icon(
-                                    imageVector = if (isWebView) Icons.Default.PhoneAndroid else Icons.Default.Web,
+                                    imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
                                     contentDescription = "Document View Mode"
                                 )
                             }
                             IconButton(onClick = { 
                                 triggerAutosave()
                                 Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                addLokitLog("lok::Document::postWindow(event=UNDO)")
                             }) {
-                                Icon(Icons.Default.Undo, contentDescription = "Undo")
+                                Icon(Icons.Rounded.Undo, contentDescription = "Undo")
                             }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More Options")
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
                                 }
                                 DropdownMenu(
                                     expanded = showMoreMenu,
@@ -367,43 +431,51 @@ fun InkyModule(
                                         text = { Text("Share") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Membuka Android Share Sheet...", Toast.LENGTH_SHORT).show()
-                                        }
+                                            Toast.makeText(context, "Membuka Share Sheet...", Toast.LENGTH_SHORT).show()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Mengekspor ODF ke PDF...", Toast.LENGTH_SHORT).show()
-                                        }
+                                            addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Save") },
                                         onClick = {
                                             showMoreMenu = false
                                             triggerAutosave()
-                                        }
+                                            addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\")")
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Save as") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Menyimpan salinan...", Toast.LENGTH_SHORT).show()
-                                        }
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
                                         onClick = {
                                             showMoreMenu = false
                                             isDarkDocument = !isDarkDocument
-                                        }
+                                        },
+                                        leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Read it aloud") },
+                                        text = { Text("Read it Aloud") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Membacakan dokumen...", Toast.LENGTH_SHORT).show()
-                                        }
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Open Navigator Bar") },
@@ -411,7 +483,8 @@ fun InkyModule(
                                             showMoreMenu = false
                                             showBottomBar = true
                                             bottomBarDeck = "navigator"
-                                        }
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Document Version History") },
@@ -419,14 +492,16 @@ fun InkyModule(
                                             showMoreMenu = false
                                             showBottomBar = true
                                             bottomBarDeck = "version_history"
-                                        }
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.History, contentDescription = "History") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Menghubungkan printer...", Toast.LENGTH_SHORT).show()
-                                        }
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
                                     )
                                 }
                             }
@@ -515,244 +590,186 @@ fun InkyModule(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(scrollState)
+                        .background(docBgColor)
                         .padding(if (isWebView) 0.dp else 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Normal Document Page Canvas (styled as a paper layout)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight()
-                            .padding(bottom = 32.dp)
-                            .border(
-                                width = if (isWebView) 0.dp else 1.dp,
-                                color = borderStrokeColor,
-                                shape = if (isWebView) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
-                            )
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        showFct = true
-                                        fctContext = "text"
-                                    },
-                                    onLongPress = {
-                                        showFct = true
-                                        fctContext = "table"
-                                    },
-                                    onTap = {
-                                        // Tap outside dismisses Bottom Bar and FCT
-                                        showBottomBar = false
-                                        showFct = false
-                                    }
-                                )
-                            },
-                        elevation = CardDefaults.cardElevation(defaultElevation = if (isWebView) 0.dp else 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = pageBgColor),
-                        shape = if (isWebView) RoundedCornerShape(0.dp) else RoundedCornerShape(8.dp)
-                    ) {
-                        Column(
+                    
+                    if (!isWebView) {
+                        // --- A4 PORTRAIT VIEWPORT ---
+                        Card(
                             modifier = Modifier
+                                .padding(vertical = 24.dp, horizontal = 16.dp)
+                                .widthIn(max = 480.dp)
+                                .aspectRatio(1f / 1.414f) // Perfect A4 paper aspect ratio
                                 .fillMaxWidth()
-                                .padding(if (isWebView) 16.dp else 28.dp)
-                        ) {
-                            
-                            // Document Header / Title (Editable in Edit Mode)
-                            if (isEditMode) {
-                                androidx.compose.foundation.text.BasicTextField(
-                                     value = documentContentTitle,
-                                     onValueChange = {
-                                         documentContentTitle = it
-                                         triggerAutosave()
-                                     },
-                                     textStyle = androidx.compose.ui.text.TextStyle(
-                                         fontSize = if (isBold) (28 * zoomScale).sp else (24 * zoomScale).sp,
-                                         fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-                                         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                         textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                         fontFamily = when (activeFontFamily) {
-                                             "Aptos Display" -> FontFamily.SansSerif
-                                             "Calibri" -> FontFamily.SansSerif
-                                             "Arial" -> FontFamily.SansSerif
-                                             "Roboto" -> FontFamily.SansSerif
-                                             else -> FontFamily.Default
-                                         },
-                                         color = textPrimaryColor,
-                                         textAlign = textAlignment
-                                     ),
-                                     modifier = Modifier.fillMaxWidth().padding(bottom = (8 * zoomScale).dp)
-                                )
-                            } else {
-                                Text(
-                                     text = documentContentTitle,
-                                     fontSize = if (isBold) (28 * zoomScale).sp else (24 * zoomScale).sp,
-                                     fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-                                     fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                     textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                     fontFamily = when (activeFontFamily) {
-                                         "Aptos Display" -> FontFamily.SansSerif
-                                         "Calibri" -> FontFamily.SansSerif
-                                         "Arial" -> FontFamily.SansSerif
-                                         "Roboto" -> FontFamily.SansSerif
-                                         else -> FontFamily.Default
-                                     },
-                                     color = textPrimaryColor,
-                                     modifier = Modifier.fillMaxWidth().padding(bottom = (8 * zoomScale).dp),
-                                     textAlign = textAlignment
-                                )
-                            }
-
-                            // Track Setup Section
-                            Text(
-                                text = "Track Setup",
-                                fontSize = (18 * zoomScale).sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textAccentColor,
-                                modifier = Modifier.padding(top = (12 * zoomScale).dp, bottom = (8 * zoomScale).dp)
-                            )
-
-                            // Responsive custom bento-grid styled data table
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(8.dp))
-                                    .clip(RoundedCornerShape(8.dp))
-                            ) {
-                                // Header Row
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(textAccentColor.copy(alpha = 0.1f))
-                                        .padding((10 * zoomScale).dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Trek", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(2f), color = textPrimaryColor)
-                                    Text("Sayap", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Rem", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Suspensi", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                }
-
-                                HorizontalDivider(color = borderStrokeColor)
-
-                                // Dynamic Rows
-                                tracks.forEachIndexed { idx, item ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                fctContext = "table"
-                                                showFct = true
-                                            }
-                                            .background(
-                                                if (idx % 2 == 0) pageBgColor else textAccentColor.copy(alpha = 0.03f)
-                                            )
-                                            .padding(vertical = (8 * zoomScale).dp, horizontal = (10 * zoomScale).dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(item.track, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(2f), color = textPrimaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${item.sayap}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.rem}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.suspensi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    }
-                                    if (idx < tracks.size - 1) {
-                                        HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.5f))
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            // Tyre Setup Section
-                            Text(
-                                text = "Tyre Setup",
-                                fontSize = (18 * zoomScale).sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textAccentColor,
-                                modifier = Modifier.padding(bottom = (8 * zoomScale).dp)
-                            )
-
-                            // Tyre table
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(8.dp))
-                                    .clip(RoundedCornerShape(8.dp))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(textAccentColor.copy(alpha = 0.08f))
-                                        .padding((10 * zoomScale).dp)
-                                ) {
-                                    Text("Durasi Balapan (%)", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Perbedaan Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                }
-                                HorizontalDivider(color = borderStrokeColor)
-                                tyreSetups.forEachIndexed { idx, item ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = (8 * zoomScale).dp, horizontal = (10 * zoomScale).dp)
-                                    ) {
-                                        Text("${item.durasi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.konsumsi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.perbedaan}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    }
-                                    if (idx < tyreSetups.size - 1) {
-                                        HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.5f))
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height((24 * zoomScale).dp))
-
-                            // Advanced Options Section
-                            Text(
-                                text = "Pengaturan Lanjutan",
-                                fontSize = (16 * zoomScale).sp,
-                                fontWeight = FontWeight.Bold,
-                                color = textPrimaryColor,
-                                modifier = Modifier.padding(bottom = (8 * zoomScale).dp)
-                            )
-
-                            // Bulleted lists (Editable in Edit Mode)
-                            advSettings.forEachIndexed { idx, setting ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = (4 * zoomScale).dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(end = (8 * zoomScale).dp)
-                                            .size((5 * zoomScale).dp)
-                                            .background(textPrimaryColor, CircleShape)
+                                .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
+                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onDoubleTap = {
+                                            showFct = true
+                                            fctContext = "text"
+                                        },
+                                        onTap = {
+                                            // Tap outside dismisses toolbar decks
+                                            showBottomBar = false
+                                            showFct = false
+                                        }
                                     )
-                                    if (isEditMode) {
-                                        androidx.compose.foundation.text.BasicTextField(
-                                            value = setting,
-                                            onValueChange = { newValue ->
-                                                advSettings[idx] = newValue
-                                                triggerAutosave()
+                                },
+                            colors = CardDefaults.cardColors(containerColor = pageBgColor),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp)
+                            ) {
+                                // Main Text Viewport
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .border(
+                                            width = 1.dp,
+                                            color = borderStrokeColor.copy(alpha = 0.4f),
+                                            shape = RoundedCornerShape(2.dp)
+                                        )
+                                        .padding(16.dp)
+                                ) {
+                                    androidx.compose.foundation.text.BasicTextField(
+                                        value = docBodyText,
+                                        onValueChange = {
+                                            docBodyText = it
+                                            isSaved = false
+                                            triggerAutosave()
+                                            addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
+                                            addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
+                                        },
+                                        modifier = Modifier.fillMaxSize(),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            fontSize = (activeFontSize * zoomScale).sp,
+                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                            textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                            fontFamily = when (activeFontFamily) {
+                                                "Aptos Display" -> FontFamily.SansSerif
+                                                "Calibri" -> FontFamily.SansSerif
+                                                "Arial" -> FontFamily.SansSerif
+                                                "Roboto" -> FontFamily.SansSerif
+                                                else -> FontFamily.Default
                                             },
-                                            textStyle = androidx.compose.ui.text.TextStyle(
-                                                fontSize = (13 * zoomScale).sp,
-                                                color = textSecondaryColor
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    } else {
-                                        Text(
-                                            text = setting,
-                                            fontSize = (13 * zoomScale).sp,
-                                            color = textSecondaryColor
-                                        )
-                                    }
+                                            color = textPrimaryColor,
+                                            textAlign = textAlignment
+                                        ),
+                                        decorationBox = { innerTextField ->
+                                            if (docBodyText.isEmpty()) {
+                                                Text(
+                                                    text = "Mulai mengetik di dokumen kosong A4 ini...",
+                                                    color = Color.Gray.copy(alpha = 0.7f),
+                                                    fontSize = (activeFontSize * zoomScale).sp,
+                                                    fontFamily = FontFamily.SansSerif
+                                                )
+                                            }
+                                            innerTextField()
+                                        }
+                                    )
+                                }
+
+                                // Page Footer simulation
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Inky Writer • Page 1 of 1", fontSize = 9.sp, color = Color.Gray)
+                                    Text("LOKit Tile Rendering Active", fontSize = 9.sp, color = Color.Gray)
                                 }
                             }
                         }
+                    } else {
+                        // --- MOBILE/WEB VIEWPORT (Full Bleed) ---
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 8.dp)
+                                .border(1.dp, borderStrokeColor, RoundedCornerShape(12.dp))
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onDoubleTap = {
+                                            showFct = true
+                                            fctContext = "text"
+                                        },
+                                        onTap = {
+                                            showBottomBar = false
+                                            showFct = false
+                                        }
+                                    )
+                                },
+                            colors = CardDefaults.cardColors(containerColor = pageBgColor),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    text = "WEB / MOBILE VIEW MODE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = textAccentColor,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+
+                                androidx.compose.foundation.text.BasicTextField(
+                                    value = docBodyText,
+                                    onValueChange = {
+                                        docBodyText = it
+                                        isSaved = false
+                                        triggerAutosave()
+                                        addLokitLog("LOK_CALLBACK_INVALIDATE_TILES (Web mode edit)")
+                                        addLokitLog("lok::Document::renderTile() -> Web bounds")
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 350.dp),
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        fontSize = (activeFontSize * zoomScale).sp,
+                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                        textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                        fontFamily = when (activeFontFamily) {
+                                            "Aptos Display" -> FontFamily.SansSerif
+                                            "Calibri" -> FontFamily.SansSerif
+                                            "Arial" -> FontFamily.SansSerif
+                                            "Roboto" -> FontFamily.SansSerif
+                                            else -> FontFamily.Default
+                                        },
+                                        color = textPrimaryColor,
+                                        textAlign = textAlignment
+                                    ),
+                                    decorationBox = { innerTextField ->
+                                        if (docBodyText.isEmpty()) {
+                                            Text(
+                                                text = "Mulai mengetik di tampilan seluler ini...",
+                                                color = Color.Gray.copy(alpha = 0.7f),
+                                                fontSize = (activeFontSize * zoomScale).sp,
+                                                fontFamily = FontFamily.SansSerif
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                )
+                            }
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // --- FLOATING ACTION BUTTON (Viewer Mode Only) ---
@@ -855,108 +872,127 @@ fun InkyModule(
             ) {
                 Surface(
                     tonalElevation = 6.dp,
+                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    if (dragAmount.y < -6f) {
-                                        if (activeToolbarType != "Standard") {
-                                            activeToolbarType = "Standard"
-                                        }
-                                    } else if (dragAmount.y > 6f) {
-                                        if (activeToolbarType != "Formatting") {
-                                            activeToolbarType = "Formatting"
-                                        }
-                                    }
-                                }
-                            )
-                        }
+                        .height(64.dp)
                 ) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(6.dp),
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Switchable Toolbar Mode Indicator Pill
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .padding(start = 6.dp, end = 6.dp)
-                                .clickable {
-                                    activeToolbarType = if (activeToolbarType == "Formatting") "Standard" else "Formatting"
-                                }
-                        ) {
-                            Text(
-                                text = activeToolbarType,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
 
-                        // Switchable Scrollable Toolbars (Standard vs Formatting)
+                        // Left Side: Horizontal Scrollable Toolbar Area (1 toolbar at a time)
                         LazyRow(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(end = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                .fillMaxHeight(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (activeToolbarType == "Formatting") {
+                            if (activeToolbarType == "Standard") {
+                                // --- STANDARD TOOLBAR ---
+                                item {
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Dokumen disimpan otomatis!", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\") -> SUCCESS")
+                                    }) {
+                                        Icon(Icons.Rounded.Save, contentDescription = "Simpan", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Undo", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=UNDO) -> SUCCESS")
+                                    }) {
+                                        Icon(Icons.Rounded.Undo, contentDescription = "Undo", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Redo", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=REDO) -> SUCCESS")
+                                    }) {
+                                        Icon(Icons.Rounded.Redo, contentDescription = "Redo", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { showFindReplace = !showFindReplace }) {
+                                        Icon(Icons.Rounded.Search, contentDescription = "Cari & Ganti", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { showAiAssistant = true }) {
+                                        Icon(Icons.Rounded.AutoAwesome, contentDescription = "Asisten AI", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Mengekspor berkas ke PDF...", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.pdf\", \"pdf\") -> SUCCESS")
+                                    }) {
+                                        Icon(Icons.Rounded.PictureAsPdf, contentDescription = "Ekspor PDF", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Sinkronisasi cloud diaktifkan", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("Cloud upload triggered")
+                                    }) {
+                                        Icon(Icons.Rounded.CloudUpload, contentDescription = "Cloud Sync", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f }) {
+                                        Icon(Icons.Rounded.ZoomOut, contentDescription = "Zoom Out", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f }) {
+                                        Icon(Icons.Rounded.ZoomIn, contentDescription = "Zoom In", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            } else {
                                 // --- FORMATTING TOOLBAR ---
                                 item {
                                     IconButton(
-                                        onClick = { 
-                                            isBold = !isBold
-                                            triggerAutosave()
-                                        },
+                                        onClick = { isBold = !isBold; triggerAutosave() },
                                         colors = if (isBold) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Default.FormatBold, contentDescription = "Bold")
+                                        Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
                                     }
                                 }
                                 item {
                                     IconButton(
-                                        onClick = { 
-                                            isItalic = !isItalic
-                                            triggerAutosave()
-                                        },
+                                        onClick = { isItalic = !isItalic; triggerAutosave() },
                                         colors = if (isItalic) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Default.FormatItalic, contentDescription = "Italic")
+                                        Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
                                     }
                                 }
                                 item {
                                     IconButton(
-                                        onClick = { 
-                                            isUnderline = !isUnderline
-                                            triggerAutosave()
-                                        },
+                                        onClick = { isUnderline = !isUnderline; triggerAutosave() },
                                         colors = if (isUnderline) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline")
+                                        Icon(Icons.Rounded.FormatUnderlined, contentDescription = "Underline")
                                     }
                                 }
                                 item {
                                     IconButton(
-                                        onClick = { 
-                                            isStrikethrough = !isStrikethrough
-                                            triggerAutosave()
-                                        },
+                                        onClick = { isStrikethrough = !isStrikethrough; triggerAutosave() },
                                         colors = if (isStrikethrough) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Default.StrikethroughS, contentDescription = "Strikethrough")
+                                        Icon(Icons.Rounded.StrikethroughS, contentDescription = "Strikethrough")
                                     }
                                 }
                                 item {
-                                    IconButton(onClick = { 
+                                    IconButton(onClick = {
                                         textAlignment = when (textAlignment) {
                                             TextAlign.Left -> TextAlign.Center
                                             TextAlign.Center -> TextAlign.Right
@@ -967,117 +1003,106 @@ fun InkyModule(
                                     }) {
                                         Icon(
                                             imageVector = when (textAlignment) {
-                                                TextAlign.Center -> Icons.Default.FormatAlignCenter
-                                                TextAlign.Right -> Icons.Default.FormatAlignRight
-                                                TextAlign.Justify -> Icons.Default.FormatAlignJustify
-                                                else -> Icons.Default.FormatAlignLeft
+                                                TextAlign.Center -> Icons.Rounded.FormatAlignCenter
+                                                TextAlign.Right -> Icons.Rounded.FormatAlignRight
+                                                TextAlign.Justify -> Icons.Rounded.FormatAlignJustify
+                                                else -> Icons.Rounded.FormatAlignLeft
                                             },
                                             contentDescription = "Alignment"
                                         )
                                     }
                                 }
                                 item {
-                                    IconButton(onClick = { 
+                                    IconButton(onClick = {
                                         showBottomBar = true
                                         bottomBarDeck = "font_color"
                                     }) {
-                                        Icon(Icons.Default.FormatColorText, contentDescription = "Font Color", tint = fontColor)
+                                        Icon(Icons.Rounded.FormatColorText, contentDescription = "Font Color", tint = fontColor)
                                     }
                                 }
                                 item {
-                                    IconButton(onClick = { 
+                                    IconButton(onClick = {
                                         showBottomBar = true
                                         bottomBarDeck = "highlight_color"
                                     }) {
-                                        Icon(Icons.Default.BorderColor, contentDescription = "Highlight Color", tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
+                                        Icon(Icons.Rounded.BorderColor, contentDescription = "Highlight Color", tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
                                     }
                                 }
                                 item {
-                                    IconButton(onClick = { 
-                                        showEquationDialog = true
-                                    }) {
-                                        Icon(Icons.Default.Functions, contentDescription = "Equation Composer")
-                                    }
-                                }
-                            } else {
-                                // --- STANDARD TOOLBAR ---
-                                item {
-                                    IconButton(onClick = { 
-                                        Toast.makeText(context, "Dokumen Disimpan!", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Default.Save, contentDescription = "Simpan", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        Toast.makeText(context, "Batal tindakan terakhir", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Default.Undo, contentDescription = "Undo", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        Toast.makeText(context, "Ulangi tindakan terakhir", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Default.Redo, contentDescription = "Redo", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        showFindReplace = !showFindReplace
-                                    }) {
-                                        Icon(Icons.Default.Search, contentDescription = "Cari & Ganti", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        showAiAssistant = true
-                                    }) {
-                                        Icon(Icons.Default.AutoAwesome, contentDescription = "Asisten AI", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        Toast.makeText(context, "Mengekspor berkas ke PDF...", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Ekspor PDF", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { 
-                                        Toast.makeText(context, "Sinkronisasi cloud diaktifkan", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Default.CloudUpload, contentDescription = "Cloud Sync", tint = MaterialTheme.colorScheme.primary)
+                                    IconButton(onClick = { showEquationDialog = true }) {
+                                        Icon(Icons.Rounded.Functions, contentDescription = "Equation Composer")
                                     }
                                 }
                             }
                         }
 
-                        // Persistent control triggers on the rightmost area
+                        // Vertical Full-height Divider separating horizontal tools from persistent triggers
+                        Spacer(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .fillMaxHeight(0.7f)
+                                .background(borderStrokeColor)
+                                .padding(horizontal = 4.dp)
+                        )
+
+                        // Right Side: 4 Persistent Icons (Material Symbols Rounded)
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(1.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = { 
-                                documentContentTitle = documentContentTitle + "    "
-                                Toast.makeText(context, "Tab (Spasi Ganda) dimasukkan", Toast.LENGTH_SHORT).show() 
-                            }) {
-                                Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
-                            }
-                            IconButton(onClick = { 
-                                keyboardController?.show()
-                                Toast.makeText(context, "Keyboard virtual ditampilkan", Toast.LENGTH_SHORT).show() 
-                            }) {
-                                Icon(Icons.Default.Keyboard, contentDescription = "Show Keyboard", tint = MaterialTheme.colorScheme.primary)
-                            }
+                            // 1. Switch Toolbar
                             IconButton(
-                                onClick = { 
+                                onClick = {
+                                    activeToolbarType = if (activeToolbarType == "Standard") "Formatting" else "Standard"
+                                    Toast.makeText(context, "Toolbar beralih ke $activeToolbarType", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Cached,
+                                    contentDescription = "Switch Toolbar",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            // 2. Insert Tab Character
+                            IconButton(
+                                onClick = {
+                                    docBodyText = docBodyText + "\t"
+                                    triggerAutosave()
+                                    Toast.makeText(context, "Karakter Tab dimasukkan", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.KeyboardTab,
+                                    contentDescription = "Insert Tab",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            // 3. Show Keyboard
+                            IconButton(
+                                onClick = {
+                                    keyboardController?.show()
+                                    Toast.makeText(context, "Keyboard virtual dipicu", Toast.LENGTH_SHORT).show()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Keyboard,
+                                    contentDescription = "Show Keyboard",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            // 4. Open Standard Bottom Sheet (Simplified Ribbon Deck)
+                            IconButton(
+                                onClick = {
                                     showBottomBar = true
                                     bottomBarDeck = "ribbon"
                                 },
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             ) {
-                                Icon(Icons.Default.ViewAgenda, contentDescription = "Open Bottom Bar", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Icon(
+                                    imageVector = Icons.Rounded.ViewAgenda,
+                                    contentDescription = "Open Standard Bottom Sheet",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
                             }
                         }
                     }
