@@ -1,0 +1,6 @@
+{
+  "name": "Papirus Office",
+  "description": "An open-source office suite featuring Inky (Documents), Cellina (Spreadsheets), Slidia (Presentations), and Pagella (PDF), powered by Jetpack Compose and local integrations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
