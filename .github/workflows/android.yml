@@ -32,9 +32,6 @@ jobs:
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Download fresh Gradle Wrapper JAR
-        run: curl -sSLo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.5.0/gradle/wrapper/gradle-wrapper.jar
-
       - name: Make Gradle Wrapper Executable
         run: chmod +x gradlew
 
