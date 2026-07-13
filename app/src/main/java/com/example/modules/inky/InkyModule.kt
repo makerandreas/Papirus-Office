@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -52,6 +53,7 @@ fun InkyModule(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     // --- Inky Core States ---
     var isEditMode by remember { mutableStateOf(false) } // False = Viewer Mode, True = Edit Mode
@@ -59,6 +61,23 @@ fun InkyModule(
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
     var docTitle by remember { mutableStateOf("My Monoposto Settings") }
+
+    // Zoom and dynamic typing states
+    var zoomScale by remember { mutableStateOf(1.0f) }
+    var documentContentTitle by remember { mutableStateOf("Monoposto Realistic Settings") }
+    var activeToolbarType by remember { mutableStateOf("Formatting") } // Formatting vs Standard
+
+    val advSettings = remember {
+        mutableStateListOf(
+            "Driving Help: Mid",
+            "Opponent Level: Real",
+            "Bantuan Mengemudi: 27",
+            "Antispin: 22",
+            "Sensitivitas Kemudi: 115"
+        )
+    }
+
+    val activity = LocalContext.current as? androidx.activity.ComponentActivity
 
     // Text formatting state
     var activeFontFamily by remember { mutableStateOf("Aptos Display") }
@@ -87,6 +106,17 @@ fun InkyModule(
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
     var activeRibbonTab by remember { mutableStateOf("Beranda") } // File, Beranda, Sisipkan, Tata Letak, Ditinjau, Tampilan
     var showRibbonTabMenu by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showBottomBar) {
+        activity?.window?.let { win ->
+            val controller = androidx.core.view.WindowCompat.getInsetsController(win, win.decorView)
+            if (showBottomBar) {
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            } else {
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
 
     // FCT state
     var showFct by remember { mutableStateOf(false) }
@@ -526,32 +556,58 @@ fun InkyModule(
                                 .padding(if (isWebView) 16.dp else 28.dp)
                         ) {
                             
-                            // Document Header / Title
-                            Text(
-                                text = "Monoposto Realistic Settings",
-                                fontSize = if (isBold) 28.sp else 24.sp,
-                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
-                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                fontFamily = when (activeFontFamily) {
-                                    "Aptos Display" -> FontFamily.SansSerif
-                                    "Calibri" -> FontFamily.SansSerif
-                                    "Arial" -> FontFamily.SansSerif
-                                    "Roboto" -> FontFamily.SansSerif
-                                    else -> FontFamily.Default
-                                },
-                                color = textPrimaryColor,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                textAlign = textAlignment
-                            )
+                            // Document Header / Title (Editable in Edit Mode)
+                            if (isEditMode) {
+                                androidx.compose.foundation.text.BasicTextField(
+                                     value = documentContentTitle,
+                                     onValueChange = {
+                                         documentContentTitle = it
+                                         triggerAutosave()
+                                     },
+                                     textStyle = androidx.compose.ui.text.TextStyle(
+                                         fontSize = if (isBold) (28 * zoomScale).sp else (24 * zoomScale).sp,
+                                         fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
+                                         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                         textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                         fontFamily = when (activeFontFamily) {
+                                             "Aptos Display" -> FontFamily.SansSerif
+                                             "Calibri" -> FontFamily.SansSerif
+                                             "Arial" -> FontFamily.SansSerif
+                                             "Roboto" -> FontFamily.SansSerif
+                                             else -> FontFamily.Default
+                                         },
+                                         color = textPrimaryColor,
+                                         textAlign = textAlignment
+                                     ),
+                                     modifier = Modifier.fillMaxWidth().padding(bottom = (8 * zoomScale).dp)
+                                )
+                            } else {
+                                Text(
+                                     text = documentContentTitle,
+                                     fontSize = if (isBold) (28 * zoomScale).sp else (24 * zoomScale).sp,
+                                     fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
+                                     fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                     textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                     fontFamily = when (activeFontFamily) {
+                                         "Aptos Display" -> FontFamily.SansSerif
+                                         "Calibri" -> FontFamily.SansSerif
+                                         "Arial" -> FontFamily.SansSerif
+                                         "Roboto" -> FontFamily.SansSerif
+                                         else -> FontFamily.Default
+                                     },
+                                     color = textPrimaryColor,
+                                     modifier = Modifier.fillMaxWidth().padding(bottom = (8 * zoomScale).dp),
+                                     textAlign = textAlignment
+                                )
+                            }
 
                             // Track Setup Section
                             Text(
                                 text = "Track Setup",
-                                fontSize = 18.sp,
+                                fontSize = (18 * zoomScale).sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textAccentColor,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp)
+                                modifier = Modifier.padding(top = (12 * zoomScale).dp, bottom = (8 * zoomScale).dp)
                             )
 
                             // Responsive custom bento-grid styled data table
@@ -566,13 +622,13 @@ fun InkyModule(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(textAccentColor.copy(alpha = 0.1f))
-                                        .padding(10.dp),
+                                        .padding((10 * zoomScale).dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Trek", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(2f), color = textPrimaryColor)
-                                    Text("Sayap", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Rem", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Suspensi", fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Trek", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(2f), color = textPrimaryColor)
+                                    Text("Sayap", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Rem", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Suspensi", fontWeight = FontWeight.Bold, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
                                 }
 
                                 HorizontalDivider(color = borderStrokeColor)
@@ -589,13 +645,13 @@ fun InkyModule(
                                             .background(
                                                 if (idx % 2 == 0) pageBgColor else textAccentColor.copy(alpha = 0.03f)
                                             )
-                                            .padding(vertical = 8.dp, horizontal = 10.dp),
+                                            .padding(vertical = (8 * zoomScale).dp, horizontal = (10 * zoomScale).dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(item.track, fontSize = 12.sp, modifier = Modifier.weight(2f), color = textPrimaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${item.sayap}", fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.rem}", fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.suspensi}", fontSize = 12.sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text(item.track, fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(2f), color = textPrimaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${item.sayap}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text("${item.rem}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text("${item.suspensi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
                                     }
                                     if (idx < tracks.size - 1) {
                                         HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.5f))
@@ -608,10 +664,10 @@ fun InkyModule(
                             // Tyre Setup Section
                             Text(
                                 text = "Tyre Setup",
-                                fontSize = 18.sp,
+                                fontSize = (18 * zoomScale).sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textAccentColor,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(bottom = (8 * zoomScale).dp)
                             )
 
                             // Tyre table
@@ -625,22 +681,22 @@ fun InkyModule(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .background(textAccentColor.copy(alpha = 0.08f))
-                                        .padding(10.dp)
+                                        .padding((10 * zoomScale).dp)
                                 ) {
-                                    Text("Durasi Balapan (%)", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                    Text("Perbedaan Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Durasi Balapan (%)", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                    Text("Perbedaan Konsumsi Ban", fontWeight = FontWeight.Bold, fontSize = (11 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
                                 }
                                 HorizontalDivider(color = borderStrokeColor)
                                 tyreSetups.forEachIndexed { idx, item ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 8.dp, horizontal = 10.dp)
+                                            .padding(vertical = (8 * zoomScale).dp, horizontal = (10 * zoomScale).dp)
                                     ) {
-                                        Text("${item.durasi}", fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.konsumsi}", fontSize = 12.sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
-                                        Text("${item.perbedaan}", fontSize = 12.sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text("${item.durasi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text("${item.konsumsi}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1f), color = textPrimaryColor, textAlign = TextAlign.Center)
+                                        Text("${item.perbedaan}", fontSize = (12 * zoomScale).sp, modifier = Modifier.weight(1.2f), color = textPrimaryColor, textAlign = TextAlign.Center)
                                     }
                                     if (idx < tyreSetups.size - 1) {
                                         HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.5f))
@@ -648,43 +704,51 @@ fun InkyModule(
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height((24 * zoomScale).dp))
 
                             // Advanced Options Section
                             Text(
                                 text = "Pengaturan Lanjutan",
-                                fontSize = 16.sp,
+                                fontSize = (16 * zoomScale).sp,
                                 fontWeight = FontWeight.Bold,
                                 color = textPrimaryColor,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                modifier = Modifier.padding(bottom = (8 * zoomScale).dp)
                             )
 
-                            // Bulleted lists
-                            val advSettings = listOf(
-                                "Driving Help: Mid",
-                                "Opponent Level: Real",
-                                "Bantuan Mengemudi: 27",
-                                "Antispin: 22",
-                                "Sensitivitas Kemudi: 115"
-                            )
-                            advSettings.forEach { setting ->
+                            // Bulleted lists (Editable in Edit Mode)
+                            advSettings.forEachIndexed { idx, setting ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
+                                        .padding(vertical = (4 * zoomScale).dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .padding(end = 8.dp)
-                                            .size(5.dp)
+                                            .padding(end = (8 * zoomScale).dp)
+                                            .size((5 * zoomScale).dp)
                                             .background(textPrimaryColor, CircleShape)
                                     )
-                                    Text(
-                                        text = setting,
-                                        fontSize = 13.sp,
-                                        color = textSecondaryColor
-                                    )
+                                    if (isEditMode) {
+                                        androidx.compose.foundation.text.BasicTextField(
+                                            value = setting,
+                                            onValueChange = { newValue ->
+                                                advSettings[idx] = newValue
+                                                triggerAutosave()
+                                            },
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                                                fontSize = (13 * zoomScale).sp,
+                                                color = textSecondaryColor
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = setting,
+                                            fontSize = (13 * zoomScale).sp,
+                                            color = textSecondaryColor
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -756,14 +820,29 @@ fun InkyModule(
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
-                    Text(
-                        text = "Zoom: 100%",
-                        fontSize = 11.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.clickable {
-                            Toast.makeText(context, "Menyesuaikan zoom halaman...", Toast.LENGTH_SHORT).show()
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IconButton(
+                            onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
                         }
-                    )
+                        Text(
+                            text = "Zoom: ${(zoomScale * 100).toInt()}%",
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            modifier = Modifier.clickable { zoomScale = 1.0f }
+                        )
+                        IconButton(
+                            onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
+                        }
+                    }
                 }
             }
 
@@ -776,8 +855,24 @@ fun InkyModule(
             ) {
                 Surface(
                     tonalElevation = 6.dp,
-                    border = BorderStroke(1.dp, borderStrokeColor),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    if (dragAmount.y < -6f) {
+                                        if (activeToolbarType != "Standard") {
+                                            activeToolbarType = "Standard"
+                                        }
+                                    } else if (dragAmount.y > 6f) {
+                                        if (activeToolbarType != "Formatting") {
+                                            activeToolbarType = "Formatting"
+                                        }
+                                    }
+                                }
+                            )
+                        }
                 ) {
                     Row(
                         modifier = Modifier
@@ -785,6 +880,27 @@ fun InkyModule(
                             .padding(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Switchable Toolbar Mode Indicator Pill
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .padding(start = 6.dp, end = 6.dp)
+                                .clickable {
+                                    activeToolbarType = if (activeToolbarType == "Formatting") "Standard" else "Formatting"
+                                }
+                        ) {
+                            Text(
+                                text = activeToolbarType,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
                         // Switchable Scrollable Toolbars (Standard vs Formatting)
                         LazyRow(
                             modifier = Modifier
@@ -793,93 +909,146 @@ fun InkyModule(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Quick Swappable Actions Row
-                            item {
-                                IconButton(
-                                    onClick = { 
-                                        isBold = !isBold
-                                        triggerAutosave()
-                                    },
-                                    colors = if (isBold) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                ) {
-                                    Icon(Icons.Default.FormatBold, contentDescription = "Bold")
-                                }
-                            }
-                            item {
-                                IconButton(
-                                    onClick = { 
-                                        isItalic = !isItalic
-                                        triggerAutosave()
-                                    },
-                                    colors = if (isItalic) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                ) {
-                                    Icon(Icons.Default.FormatItalic, contentDescription = "Italic")
-                                }
-                            }
-                            item {
-                                IconButton(
-                                    onClick = { 
-                                        isUnderline = !isUnderline
-                                        triggerAutosave()
-                                    },
-                                    colors = if (isUnderline) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                ) {
-                                    Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline")
-                                }
-                            }
-                            item {
-                                IconButton(
-                                    onClick = { 
-                                        isStrikethrough = !isStrikethrough
-                                        triggerAutosave()
-                                    },
-                                    colors = if (isStrikethrough) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                ) {
-                                    Icon(Icons.Default.StrikethroughS, contentDescription = "Strikethrough")
-                                }
-                            }
-                            item {
-                                IconButton(onClick = { 
-                                    textAlignment = when (textAlignment) {
-                                        TextAlign.Left -> TextAlign.Center
-                                        TextAlign.Center -> TextAlign.Right
-                                        TextAlign.Right -> TextAlign.Justify
-                                        else -> TextAlign.Left
-                                    }
-                                    triggerAutosave()
-                                }) {
-                                    Icon(
-                                        imageVector = when (textAlignment) {
-                                            TextAlign.Center -> Icons.Default.FormatAlignCenter
-                                            TextAlign.Right -> Icons.Default.FormatAlignRight
-                                            TextAlign.Justify -> Icons.Default.FormatAlignJustify
-                                            else -> Icons.Default.FormatAlignLeft
+                            if (activeToolbarType == "Formatting") {
+                                // --- FORMATTING TOOLBAR ---
+                                item {
+                                    IconButton(
+                                        onClick = { 
+                                            isBold = !isBold
+                                            triggerAutosave()
                                         },
-                                        contentDescription = "Alignment"
-                                    )
+                                        colors = if (isBold) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
+                                    ) {
+                                        Icon(Icons.Default.FormatBold, contentDescription = "Bold")
+                                    }
                                 }
-                            }
-                            item {
-                                IconButton(onClick = { 
-                                    showBottomBar = true
-                                    bottomBarDeck = "font_color"
-                                }) {
-                                    Icon(Icons.Default.FormatColorText, contentDescription = "Font Color", tint = fontColor)
+                                item {
+                                    IconButton(
+                                        onClick = { 
+                                            isItalic = !isItalic
+                                            triggerAutosave()
+                                        },
+                                        colors = if (isItalic) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
+                                    ) {
+                                        Icon(Icons.Default.FormatItalic, contentDescription = "Italic")
+                                    }
                                 }
-                            }
-                            item {
-                                IconButton(onClick = { 
-                                    showBottomBar = true
-                                    bottomBarDeck = "highlight_color"
-                                }) {
-                                    Icon(Icons.Default.BorderColor, contentDescription = "Highlight Color", tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
+                                item {
+                                    IconButton(
+                                        onClick = { 
+                                            isUnderline = !isUnderline
+                                            triggerAutosave()
+                                        },
+                                        colors = if (isUnderline) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
+                                    ) {
+                                        Icon(Icons.Default.FormatUnderlined, contentDescription = "Underline")
+                                    }
                                 }
-                            }
-                            item {
-                                IconButton(onClick = { 
-                                    showEquationDialog = true
-                                }) {
-                                    Icon(Icons.Default.Functions, contentDescription = "Equation Composer")
+                                item {
+                                    IconButton(
+                                        onClick = { 
+                                            isStrikethrough = !isStrikethrough
+                                            triggerAutosave()
+                                        },
+                                        colors = if (isStrikethrough) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
+                                    ) {
+                                        Icon(Icons.Default.StrikethroughS, contentDescription = "Strikethrough")
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        textAlignment = when (textAlignment) {
+                                            TextAlign.Left -> TextAlign.Center
+                                            TextAlign.Center -> TextAlign.Right
+                                            TextAlign.Right -> TextAlign.Justify
+                                            else -> TextAlign.Left
+                                        }
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(
+                                            imageVector = when (textAlignment) {
+                                                TextAlign.Center -> Icons.Default.FormatAlignCenter
+                                                TextAlign.Right -> Icons.Default.FormatAlignRight
+                                                TextAlign.Justify -> Icons.Default.FormatAlignJustify
+                                                else -> Icons.Default.FormatAlignLeft
+                                            },
+                                            contentDescription = "Alignment"
+                                        )
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        showBottomBar = true
+                                        bottomBarDeck = "font_color"
+                                    }) {
+                                        Icon(Icons.Default.FormatColorText, contentDescription = "Font Color", tint = fontColor)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        showBottomBar = true
+                                        bottomBarDeck = "highlight_color"
+                                    }) {
+                                        Icon(Icons.Default.BorderColor, contentDescription = "Highlight Color", tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        showEquationDialog = true
+                                    }) {
+                                        Icon(Icons.Default.Functions, contentDescription = "Equation Composer")
+                                    }
+                                }
+                            } else {
+                                // --- STANDARD TOOLBAR ---
+                                item {
+                                    IconButton(onClick = { 
+                                        Toast.makeText(context, "Dokumen Disimpan!", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.Save, contentDescription = "Simpan", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        Toast.makeText(context, "Batal tindakan terakhir", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.Undo, contentDescription = "Undo", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        Toast.makeText(context, "Ulangi tindakan terakhir", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.Redo, contentDescription = "Redo", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        showFindReplace = !showFindReplace
+                                    }) {
+                                        Icon(Icons.Default.Search, contentDescription = "Cari & Ganti", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        showAiAssistant = true
+                                    }) {
+                                        Icon(Icons.Default.AutoAwesome, contentDescription = "Asisten AI", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        Toast.makeText(context, "Mengekspor berkas ke PDF...", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = "Ekspor PDF", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                item {
+                                    IconButton(onClick = { 
+                                        Toast.makeText(context, "Sinkronisasi cloud diaktifkan", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.CloudUpload, contentDescription = "Cloud Sync", tint = MaterialTheme.colorScheme.primary)
+                                    }
                                 }
                             }
                         }
@@ -890,12 +1059,14 @@ fun InkyModule(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(onClick = { 
-                                Toast.makeText(context, "Tab dimasukkan", Toast.LENGTH_SHORT).show() 
+                                documentContentTitle = documentContentTitle + "    "
+                                Toast.makeText(context, "Tab (Spasi Ganda) dimasukkan", Toast.LENGTH_SHORT).show() 
                             }) {
                                 Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
                             }
                             IconButton(onClick = { 
-                                Toast.makeText(context, "Virtual Keyboard Toggled", Toast.LENGTH_SHORT).show() 
+                                keyboardController?.show()
+                                Toast.makeText(context, "Keyboard virtual ditampilkan", Toast.LENGTH_SHORT).show() 
                             }) {
                                 Icon(Icons.Default.Keyboard, contentDescription = "Show Keyboard", tint = MaterialTheme.colorScheme.primary)
                             }

@@ -101,52 +101,54 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Global Header TopBar
-        TopAppBar(
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+        if (currentWorkspace != "Inky") {
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (currentWorkspace != "home") {
+                            IconButton(
+                                onClick = { currentWorkspace = "home" },
+                                modifier = Modifier.testTag("btn_back_home")
+                            ) {
+                                Icon(Icons.Default.Home, contentDescription = "Back to Start Center")
+                            }
+                        }
+                        Text(
+                            text = if (currentWorkspace == "home") "Papirus Office" else "Papirus — $currentWorkspace Workspace",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                },
+                actions = {
+                    // Quick shortcut to launch Find & Replace
                     if (currentWorkspace != "home") {
-                        IconButton(
-                            onClick = { currentWorkspace = "home" },
-                            modifier = Modifier.testTag("btn_back_home")
-                        ) {
-                            Icon(Icons.Default.Home, contentDescription = "Back to Start Center")
+                        IconButton(onClick = { showFindReplace = !showFindReplace }) {
+                            Icon(Icons.Default.Search, contentDescription = "Find & Replace")
                         }
                     }
-                    Text(
-                        text = if (currentWorkspace == "home") "Papirus Office" else "Papirus — $currentWorkspace Workspace",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
-            },
-            actions = {
-                // Quick shortcut to launch Find & Replace
-                if (currentWorkspace != "home") {
-                    IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                        Icon(Icons.Default.Search, contentDescription = "Find & Replace")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                )
+            )
+
+            // Quick Access Toolbar (QAT)
+            QuickAccessToolbar(
+                isTablet = isTablet,
+                onActionClick = { actionName ->
+                    when (actionName) {
+                        "Save" -> Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
+                        "Undo" -> Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                        "Redo" -> Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                        "Share" -> Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
+                        "Search" -> showFindReplace = !showFindReplace
+                        "AI" -> Toast.makeText(context, "AI features can be toggled in settings below.", Toast.LENGTH_LONG).show()
+                        else -> Toast.makeText(context, "Clicked: $actionName", Toast.LENGTH_SHORT).show()
                     }
                 }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
             )
-        )
-
-        // Quick Access Toolbar (QAT)
-        QuickAccessToolbar(
-            isTablet = isTablet,
-            onActionClick = { actionName ->
-                when (actionName) {
-                    "Save" -> Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
-                    "Undo" -> Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                    "Redo" -> Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                    "Share" -> Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
-                    "Search" -> showFindReplace = !showFindReplace
-                    "AI" -> Toast.makeText(context, "AI features can be toggled in settings below.", Toast.LENGTH_LONG).show()
-                    else -> Toast.makeText(context, "Clicked: $actionName", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
+        }
 
         // Find & Replace Overlay Bar (Mobile / Tablet adaptive formats)
         AnimatedVisibility(
@@ -194,7 +196,11 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 "Inky" -> InkyModule(
                     isTablet = isTablet,
                     onFormatAction = { act ->
-                        Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
+                        if (act == "Back to start center") {
+                            currentWorkspace = "home"
+                        } else {
+                            Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 )
                 "Cellina" -> CellinaModule(
@@ -232,7 +238,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
 
         // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-        if (currentWorkspace != "home") {
+        if (currentWorkspace != "home" && currentWorkspace != "Inky") {
             AdaptiveFormattingToolbar(
                 selectedObjectType = formattingObjectType,
                 onFormatClick = { formatAction ->
