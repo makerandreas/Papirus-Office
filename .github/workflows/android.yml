@@ -38,18 +38,25 @@ jobs:
       - name: Run Unit & Robolectric Tests
         run: ./gradlew testDebugUnitTest --continue
 
-      - name: Decode keystore
-        id: decode_keystore
+      # JALUR CEPAT: Robot membuat berkas Keystore dummy secara instan dan mandiri
+      - name: Generate Automated Testing Keystore
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/my-upload-key.jks
-            echo "KEYSTORE_DECODED=true" >> $GITHUB_ENV
-          else
-            echo "KEYSTORE_DECODED=false" >> $GITHUB_ENV
-          fi
+          keytool -genkeypair -v \
+            -keystore app/release.jks \
+            -alias papirus_key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "papirus123" \
+            -keypass "papirus123" \
+            -dname "CN=Andreas Maker, OU=Papirus Office, O=Anyum Software, L=Sorong, S=Southwest Papua, C=ID"
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          KEYSTORE_PASSWORD: "papirus123"
+          KEY_ALIAS: "papirus_key"
+          KEY_PASSWORD: "papirus123"
 
       - name: Build Release Bundle (AAB) & APK
         if: github.ref == 'refs/heads/main' && env.KEYSTORE_DECODED == 'true'

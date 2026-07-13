@@ -41,28 +41,30 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
-    }
-    create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+      val keyFile = file("release.jks")
+      if (keyFile.exists()) {
+        storeFile = keyFile
+        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "papirus123"
+        keyAlias = System.getenv("KEY_ALIAS") ?: "papirus_key"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: "papirus123"
+      } else {
+        storeFile = file("${rootDir}/debug.keystore")
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
     }
   }
 
   buildTypes {
     release {
-      isCrunchPngs = false
       isMinifyEnabled = false
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      isMinifyEnabled = false
+      signingConfig = signingConfigs.getByName("release") // Paksa mode debug ikut menggunakan kunci otomatis ini
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
