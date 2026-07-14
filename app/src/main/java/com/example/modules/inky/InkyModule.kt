@@ -90,20 +90,12 @@ fun InkyModule(
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
 
-    BackHandler {
-        if (showBottomBar) {
-            showBottomBar = false
-        } else if (isEditMode) {
-            isEditMode = false
-        } else {
-            onFormatAction("Back to start center")
-        }
-    }
+
 
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
-    var docBodyText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("Halo apa kabar semuanya\n\nSelamat datang di Papirus Office. Ini adalah dokumen draft ODT yang dikompilasi secara real-time menggunakan simulator LOKit.\n\nSilakan edit teks ini, gunakan asisten AI untuk proofreading, atau hitung formula matematika menggunakan Modular Equation Composer.")) }
+    var docBodyText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
 
     // LibreOffice Kit Diagnostics Logs State
@@ -200,6 +192,20 @@ fun InkyModule(
         }
     }
 
+    BackHandler {
+        if (showFct) {
+            showFct = false
+        } else if (showBottomBar) {
+            showBottomBar = false
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else if (isEditMode) {
+            isEditMode = false
+        } else {
+            onFormatAction("Back to start center")
+        }
+    }
+
     LaunchedEffect(scrollState.value) {
         val delta = scrollState.value - previousScrollValue
         if (delta > 8 && isControlsVisible && scrollState.isScrollInProgress) {
@@ -273,7 +279,7 @@ fun InkyModule(
             }
 
             override fun hide() {
-                // Keep FCT or hide it depending on needs
+                showFct = false
             }
 
             override val status: androidx.compose.ui.platform.TextToolbarStatus
@@ -725,7 +731,7 @@ fun InkyModule(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(24.dp)
+                                        .padding((24 * zoomScale).dp)
                                 ) {
                                     // Main Text Viewport
                                     Box(
@@ -737,11 +743,14 @@ fun InkyModule(
                                                 color = borderStrokeColor.copy(alpha = 0.4f),
                                                 shape = RoundedCornerShape(2.dp)
                                             )
-                                            .padding(16.dp)
+                                            .padding((16 * zoomScale).dp)
                                     ) {
                                         androidx.compose.foundation.text.BasicTextField(
                                             value = docBodyText,
                                             onValueChange = {
+                                                if (it.text == docBodyText.text && it.selection != docBodyText.selection) {
+                                                    showFct = false
+                                                }
                                                 docBodyText = it
                                                 isSaved = false
                                                 triggerAutosave()
@@ -844,6 +853,9 @@ fun InkyModule(
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = docBodyText,
                                     onValueChange = {
+                                        if (it.text == docBodyText.text && it.selection != docBodyText.selection) {
+                                            showFct = false
+                                        }
                                         docBodyText = it
                                         isSaved = false
                                         triggerAutosave()
@@ -1210,6 +1222,7 @@ fun InkyModule(
                                         keyboardController?.hide()
                                         Toast.makeText(context, "Keyboard virtual ditutup", Toast.LENGTH_SHORT).show()
                                     } else {
+                                        focusRequester.requestFocus()
                                         keyboardController?.show()
                                         Toast.makeText(context, "Keyboard virtual dipicu", Toast.LENGTH_SHORT).show()
                                     }
@@ -1350,7 +1363,11 @@ fun InkyModule(
                                 }) {
                                     Icon(Icons.Default.Redo, contentDescription = "Redo")
                                 }
-                                IconButton(onClick = { showBottomBar = false }) {
+                                IconButton(onClick = { 
+                                    showBottomBar = false 
+                                    focusRequester.requestFocus()
+                                    keyboardController?.show()
+                                }) {
                                     Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Hide Bottom Bar")
                                 }
                             }
