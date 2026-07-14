@@ -75,6 +75,14 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+
+}
+
+val isGitHubActions = System.getenv("GITHUB_ACTIONS") == "true"
+if (isGitHubActions) {
+  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    exclude("**/com/sun/star/**")
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
