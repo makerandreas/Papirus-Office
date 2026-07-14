@@ -25,15 +25,9 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install LibreOffice Java Common & Copy Real JARs
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libreoffice-java-common
-          mkdir -p app/libs
-          cp -L /usr/share/java/juh.jar app/libs/ || cp /usr/lib/libreoffice/program/classes/juh.jar app/libs/
-          cp -L /usr/share/java/jurt.jar app/libs/ || cp /usr/lib/libreoffice/program/classes/jurt.jar app/libs/
-          cp -L /usr/share/java/ridl.jar app/libs/ || cp /usr/lib/libreoffice/program/classes/ridl.jar app/libs/
-          cp -L /usr/share/java/unoil.jar app/libs/ || cp /usr/lib/libreoffice/program/classes/unoil.jar app/libs/
+      # Kompilasi sekarang menggunakan stub java/kotlin di src/compileOnly/java
+      # yang selalu disertakan dalam build.gradle.kts baik lokal maupun di GitHub Actions.
+      # Dengan begitu, kita tidak perlu menginstal LibreOffice yang sangat lambat dan tidak stabil di CI.
 
       # 1. KUNCI KONSISTENSI: Buat Keystore statis dengan tanggal kedaluwarsa panjang
       # Kunci ini akan selalu sama di setiap commit, sehingga Kamu bisa menimpa aplikasi tanpa uninstall!

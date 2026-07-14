@@ -78,11 +78,10 @@ android {
 
 }
 
-val isGitHubActions = System.getenv("GITHUB_ACTIONS") == "true"
-if (!isGitHubActions) {
-  tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    source(file("src/compileOnly/java"))
-  }
+// Selalu sertakan source stub Java/Kotlin di src/compileOnly/java untuk memastikan
+// kompilasi sukses baik secara lokal maupun di GitHub Actions tanpa ketergantungan LibreOffice eksternal.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+  source(file("src/compileOnly/java"))
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
