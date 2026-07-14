@@ -25,6 +25,14 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Install LibreOffice Java Common & Copy Real JARs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-java-common
+          cp /usr/share/java/jurt.jar app/libs/
+          cp /usr/share/java/ridl.jar app/libs/
+          cp /usr/share/java/unoil.jar app/libs/
+
       # 1. KUNCI KONSISTENSI: Buat Keystore statis dengan tanggal kedaluwarsa panjang
       # Kunci ini akan selalu sama di setiap commit, sehingga Kamu bisa menimpa aplikasi tanpa uninstall!
       - name: Generate Automated Testing Keystore
