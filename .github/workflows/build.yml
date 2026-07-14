@@ -42,9 +42,9 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
         env:
-          KEYSTORE_PASSWORD: "papirus123"
-          KEY_ALIAS: "papirus_key"
-          KEY_PASSWORD: "papirus123"
+          KEYSTORE_PASSWORD: papirus123
+          KEY_ALIAS: papirus_key
+          KEY_PASSWORD: papirus123
 
       # 2. ANTI ZIP: Unggah langsung sebagai file APK tunggal siap install
       - name: Upload Debug APK Directly
