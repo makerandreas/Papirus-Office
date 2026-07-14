@@ -597,96 +597,83 @@ fun InkyModule(
                     
                     if (!isWebView) {
                         // --- A4 PORTRAIT VIEWPORT ---
-                        Card(
+                        val horizScrollState = rememberScrollState()
+                        Box(
                             modifier = Modifier
-                                .padding(vertical = 24.dp, horizontal = 16.dp)
-                                .widthIn(max = 480.dp)
-                                .aspectRatio(1f / 1.414f) // Perfect A4 paper aspect ratio
                                 .fillMaxWidth()
-                                .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
-                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onDoubleTap = {
-                                            showFct = true
-                                            fctContext = "text"
-                                        },
-                                        onTap = {
-                                            // Tap outside dismisses toolbar decks
-                                            showBottomBar = false
-                                            showFct = false
-                                        }
-                                    )
-                                },
-                            colors = CardDefaults.cardColors(containerColor = pageBgColor),
-                            shape = RoundedCornerShape(4.dp)
+                                .horizontalScroll(horizScrollState),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Column(
+                            Card(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(24.dp)
-                            ) {
-                                // Main Text Viewport
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
-                                        .border(
-                                            width = 1.dp,
-                                            color = borderStrokeColor.copy(alpha = 0.4f),
-                                            shape = RoundedCornerShape(2.dp)
-                                        )
-                                        .padding(16.dp)
-                                ) {
-                                    androidx.compose.foundation.text.BasicTextField(
-                                        value = docBodyText,
-                                        onValueChange = {
-                                            docBodyText = it
-                                            isSaved = false
-                                            triggerAutosave()
-                                            addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
-                                            addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
-                                        },
-                                        modifier = Modifier.fillMaxSize(),
-                                        textStyle = androidx.compose.ui.text.TextStyle(
-                                            fontSize = (activeFontSize * zoomScale).sp,
-                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                            textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                            fontFamily = when (activeFontFamily) {
-                                                "Aptos Display" -> FontFamily.SansSerif
-                                                "Calibri" -> FontFamily.SansSerif
-                                                "Arial" -> FontFamily.SansSerif
-                                                "Roboto" -> FontFamily.SansSerif
-                                                else -> FontFamily.Default
+                                    .padding(vertical = 24.dp, horizontal = 16.dp)
+                                    .width((320 * zoomScale).dp)
+                                    .aspectRatio(1f / 1.414f) // Perfect A4 paper aspect ratio
+                                    .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
+                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onDoubleTap = {
+                                                showFct = true
+                                                fctContext = "text"
                                             },
-                                            color = textPrimaryColor,
-                                            textAlign = textAlignment
-                                        ),
-                                        decorationBox = { innerTextField ->
-                                            if (docBodyText.isEmpty()) {
-                                                Text(
-                                                    text = "Mulai mengetik di dokumen kosong A4 ini...",
-                                                    color = Color.Gray.copy(alpha = 0.7f),
-                                                    fontSize = (activeFontSize * zoomScale).sp,
-                                                    fontFamily = FontFamily.SansSerif
-                                                )
+                                            onTap = {
+                                                // Tap outside dismisses toolbar decks
+                                                showBottomBar = false
+                                                showFct = false
                                             }
-                                            innerTextField()
-                                        }
-                                    )
-                                }
-
-                                // Page Footer simulation
-                                Row(
+                                        )
+                                    },
+                                colors = CardDefaults.cardColors(containerColor = pageBgColor),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Column(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .fillMaxSize()
+                                        .padding(24.dp)
                                 ) {
-                                    Text("Inky Writer • Page 1 of 1", fontSize = 9.sp, color = Color.Gray)
-                                    Text("LOKit Tile Rendering Active", fontSize = 9.sp, color = Color.Gray)
+                                    // Main Text Viewport
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxWidth()
+                                            .border(
+                                                width = 1.dp,
+                                                color = borderStrokeColor.copy(alpha = 0.4f),
+                                                shape = RoundedCornerShape(2.dp)
+                                            )
+                                            .padding(16.dp)
+                                    ) {
+                                        androidx.compose.foundation.text.BasicTextField(
+                                            value = docBodyText,
+                                            onValueChange = {
+                                                docBodyText = it
+                                                isSaved = false
+                                                triggerAutosave()
+                                                addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
+                                                addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
+                                            },
+                                            modifier = Modifier.fillMaxSize(),
+                                            textStyle = androidx.compose.ui.text.TextStyle(
+                                                fontSize = (activeFontSize * zoomScale).sp,
+                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                fontFamily = when (activeFontFamily) {
+                                                    "Aptos Display" -> FontFamily.SansSerif
+                                                    "Calibri" -> FontFamily.SansSerif
+                                                    "Arial" -> FontFamily.SansSerif
+                                                    "Roboto" -> FontFamily.SansSerif
+                                                    else -> FontFamily.Default
+                                                },
+                                                color = textPrimaryColor,
+                                                textAlign = textAlignment
+                                            ),
+                                            decorationBox = { innerTextField ->
+                                                innerTextField()
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -866,7 +853,7 @@ fun InkyModule(
             // --- BOTTOM TOOLBAR HUB (Edit Mode Only) ---
             // Contains horizontal scrollable tools, togglable Standard/Formatting options
             AnimatedVisibility(
-                visible = isEditMode && !showBottomBar && isControlsVisible,
+                visible = isEditMode && !showBottomBar,
                 enter = expandVertically(),
                 exit = shrinkVertically()
             ) {
