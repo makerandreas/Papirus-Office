@@ -40,7 +40,10 @@ jobs:
             -dname "CN=Andreas Maker, OU=Papirus Office, O=Anyum Software, L=Sorong, S=Southwest Papua, C=ID"
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        # Menggunakan tanda pipa (|) agar kita bisa menjalankan dua perintah berurutan
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
         env:
           KEYSTORE_PASSWORD: papirus123
           KEY_ALIAS: papirus_key
