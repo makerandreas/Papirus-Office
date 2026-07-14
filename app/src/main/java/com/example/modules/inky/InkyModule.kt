@@ -6,6 +6,10 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -72,6 +76,7 @@ fun InkyModule(
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     val focusRequester = remember { FocusRequester() }
 
@@ -82,8 +87,13 @@ fun InkyModule(
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
     var docTitle by remember { mutableStateOf("Inky_Dokumen.odt") }
 
+    // Bottom Bar (Ribbon & sub-decks) States
+    var showBottomBar by remember { mutableStateOf(false) }
+
     BackHandler {
-        if (isEditMode) {
+        if (showBottomBar) {
+            showBottomBar = false
+        } else if (isEditMode) {
             isEditMode = false
         } else {
             onFormatAction("Back to start center")
@@ -93,7 +103,7 @@ fun InkyModule(
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
-    var docBodyText by remember { mutableStateOf("") }
+    var docBodyText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("Halo apa kabar semuanya\n\nSelamat datang di Papirus Office. Ini adalah dokumen draft ODT yang dikompilasi secara real-time menggunakan simulator LOKit.\n\nSilakan edit teks ini, gunakan asisten AI untuk proofreading, atau hitung formula matematika menggunakan Modular Equation Composer.")) }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
 
     // LibreOffice Kit Diagnostics Logs State
@@ -150,7 +160,6 @@ fun InkyModule(
     var isLoadingAi by remember { mutableStateOf(false) }
 
     // Bottom Bar (Ribbon & sub-decks) States
-    var showBottomBar by remember { mutableStateOf(false) }
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
     var activeRibbonTab by remember { mutableStateOf("Beranda") } // File, Beranda, Sisipkan, Tata Letak, Ditinjau, Tampilan
     var showRibbonTabMenu by remember { mutableStateOf(false) }
@@ -182,7 +191,11 @@ fun InkyModule(
     
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     LaunchedEffect(isKeyboardVisible) {
-        if (!isKeyboardVisible) {
+        if (isKeyboardVisible) {
+            if (showBottomBar) {
+                showBottomBar = false
+            }
+        } else {
             isControlsVisible = true
         }
     }
@@ -246,11 +259,36 @@ fun InkyModule(
     val textAccentColor = if (isDarkDocument) Color(0xFF60A5FA) else Color(0xFF2563EB)
     val borderStrokeColor = if (isDarkDocument) Color(0xFF3C3F41) else Color(0xFFE2E8F0)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(docBgColor)
+    val dummyTextToolbar = remember {
+        object : androidx.compose.ui.platform.TextToolbar {
+            override fun showMenu(
+                rect: androidx.compose.ui.geometry.Rect,
+                onCopy: (() -> Unit)?,
+                onPaste: (() -> Unit)?,
+                onCut: (() -> Unit)?,
+                onSelectAll: (() -> Unit)?
+            ) {
+                showFct = true
+                fctContext = "text"
+            }
+
+            override fun hide() {
+                // Keep FCT or hide it depending on needs
+            }
+
+            override val status: androidx.compose.ui.platform.TextToolbarStatus
+                get() = if (showFct) androidx.compose.ui.platform.TextToolbarStatus.Shown else androidx.compose.ui.platform.TextToolbarStatus.Hidden
+        }
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalTextToolbar provides dummyTextToolbar
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(docBgColor)
+        ) {
         Column(modifier = Modifier.fillMaxSize()) {
             
             // --- HEADER TOP APP BAR ---
@@ -629,7 +667,7 @@ fun InkyModule(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .horizontalScroll(horizScrollState),
-                            contentAlignment = Alignment.Center
+                            contentAlignment = if (zoomScale > 1f) Alignment.CenterStart else Alignment.Center
                         ) {
                             Card(
                                 modifier = Modifier
@@ -641,6 +679,10 @@ fun InkyModule(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = {
+                                                showFct = true
+                                                fctContext = "text"
+                                            },
+                                            onLongPress = {
                                                 showFct = true
                                                 fctContext = "text"
                                             },
@@ -656,10 +698,24 @@ fun InkyModule(
                                         )
                                     }
                                     .pointerInput(Unit) {
-                                        detectTransformGestures { _, _, zoom, _ ->
-                                            if (zoom != 1f) {
-                                                val newScale = zoomScale * zoom
-                                                zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                val canceled = event.changes.any { it.isConsumed }
+                                                if (!canceled) {
+                                                    if (event.changes.size >= 2) {
+                                                        val zoomChange = event.calculateZoom()
+                                                        if (zoomChange != 1f) {
+                                                            val newScale = zoomScale * zoomChange
+                                                            zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                                        }
+                                                        event.changes.forEach { change ->
+                                                            if (change.positionChanged()) {
+                                                                change.consume()
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     },
@@ -732,6 +788,10 @@ fun InkyModule(
                                             showFct = true
                                             fctContext = "text"
                                         },
+                                        onLongPress = {
+                                            showFct = true
+                                            fctContext = "text"
+                                        },
                                         onTap = {
                                             showBottomBar = false
                                             showFct = false
@@ -743,10 +803,24 @@ fun InkyModule(
                                     )
                                 }
                                 .pointerInput(Unit) {
-                                    detectTransformGestures { _, _, zoom, _ ->
-                                        if (zoom != 1f) {
-                                            val newScale = zoomScale * zoom
-                                            zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val canceled = event.changes.any { it.isConsumed }
+                                            if (!canceled) {
+                                                if (event.changes.size >= 2) {
+                                                    val zoomChange = event.calculateZoom()
+                                                    if (zoomChange != 1f) {
+                                                        val newScale = zoomScale * zoomChange
+                                                        zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                                    }
+                                                    event.changes.forEach { change ->
+                                                        if (change.positionChanged()) {
+                                                            change.consume()
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 },
@@ -797,7 +871,7 @@ fun InkyModule(
                                         textAlign = textAlignment
                                     ),
                                     decorationBox = { innerTextField ->
-                                        if (docBodyText.isEmpty()) {
+                                        if (docBodyText.text.isEmpty()) {
                                             Text(
                                                 text = "Mulai mengetik di tampilan seluler ini...",
                                                 color = Color.Gray.copy(alpha = 0.7f),
@@ -1109,7 +1183,16 @@ fun InkyModule(
                             // 2. Insert Tab Character
                             IconButton(
                                 onClick = {
-                                    docBodyText = docBodyText + "\t"
+                                    val currentText = docBodyText.text
+                                    val selection = docBodyText.selection
+                                    val start = selection.start
+                                    val end = selection.end
+                                    val newText = currentText.substring(0, start) + "\t" + currentText.substring(end)
+                                    val newSelection = androidx.compose.ui.text.TextRange(start + 1)
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = newText,
+                                        selection = newSelection
+                                    )
                                     triggerAutosave()
                                     Toast.makeText(context, "Karakter Tab dimasukkan", Toast.LENGTH_SHORT).show()
                                 }
@@ -1123,8 +1206,13 @@ fun InkyModule(
                             // 3. Show Keyboard
                             IconButton(
                                 onClick = {
-                                    keyboardController?.show()
-                                    Toast.makeText(context, "Keyboard virtual dipicu", Toast.LENGTH_SHORT).show()
+                                    if (isKeyboardVisible) {
+                                        keyboardController?.hide()
+                                        Toast.makeText(context, "Keyboard virtual ditutup", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        keyboardController?.show()
+                                        Toast.makeText(context, "Keyboard virtual dipicu", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             ) {
                                 Icon(
@@ -1136,8 +1224,13 @@ fun InkyModule(
                             // 4. Open Standard Bottom Sheet (Simplified Ribbon Deck)
                             IconButton(
                                 onClick = {
-                                    showBottomBar = true
-                                    bottomBarDeck = "ribbon"
+                                    coroutineScope.launch {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        delay(100)
+                                        showBottomBar = true
+                                        bottomBarDeck = "ribbon"
+                                    }
                                 },
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             ) {
@@ -1843,5 +1936,6 @@ fun InkyModule(
                 }
             }
         )
+    }
     }
 }
