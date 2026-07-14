@@ -8,13 +8,16 @@ import android.util.Log
  */
 object LibreOfficeCore {
     private const val TAG = "LibreOfficeCore"
+    private var isLibraryLoaded = false
 
     // Load native libraries if available. In prototype mode, we fail gracefully.
     init {
         try {
             System.loadLibrary("libreoffice-core")
+            isLibraryLoaded = true
             Log.i(TAG, "LibreOffice Core Native Library loaded successfully.")
         } catch (e: UnsatisfiedLinkError) {
+            isLibraryLoaded = false
             Log.w(TAG, "Native library 'libreoffice-core' not found. Running in mock/compatibility fallback mode.")
         }
     }
@@ -24,6 +27,10 @@ object LibreOfficeCore {
      */
     fun initialize(cacheDir: String, enableOoxml: Boolean, enableOmml: Boolean): Boolean {
         Log.d(TAG, "Initializing LibreOffice Core JNI. cacheDir=$cacheDir, enableOoxml=$enableOoxml, enableOmml=$enableOmml")
+        if (!isLibraryLoaded) {
+            Log.w(TAG, "Native library not loaded. Running JVM mock setup.")
+            return true
+        }
         return try {
             nativeInitialize(cacheDir, enableOoxml, enableOmml)
         } catch (e: UnsatisfiedLinkError) {
@@ -39,6 +46,10 @@ object LibreOfficeCore {
      */
     fun renderPageToBuffer(docPath: String, pageIndex: Int, outputBuffer: ByteArray, width: Int, height: Int): Boolean {
         Log.d(TAG, "Rendering page $pageIndex of $docPath to native buffer (${width}x${height})")
+        if (!isLibraryLoaded) {
+            Log.w(TAG, "Native library not loaded. Running fallback rendering simulation.")
+            return true
+        }
         return try {
             nativeRenderPage(docPath, pageIndex, outputBuffer, width, height)
         } catch (e: UnsatisfiedLinkError) {
@@ -51,6 +62,9 @@ object LibreOfficeCore {
      * Parse and export native spreadsheet calculations.
      */
     fun evaluateFormula(formula: String, sheetDataJson: String): String {
+        if (!isLibraryLoaded) {
+            return "MOCK_RESULT_FOR($formula)"
+        }
         return try {
             nativeEvaluateFormula(formula, sheetDataJson)
         } catch (e: UnsatisfiedLinkError) {

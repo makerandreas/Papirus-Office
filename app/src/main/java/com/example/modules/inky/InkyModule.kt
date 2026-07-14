@@ -5,6 +5,10 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -69,12 +73,22 @@ fun InkyModule(
     val scrollState = rememberScrollState()
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
+    val focusRequester = remember { FocusRequester() }
+
     // --- Inky Core States ---
     var isEditMode by remember { mutableStateOf(false) } // False = Viewer Mode, True = Edit Mode
     var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
     var docTitle by remember { mutableStateOf("Inky_Dokumen.odt") }
+
+    BackHandler {
+        if (isEditMode) {
+            isEditMode = false
+        } else {
+            onFormatAction("Back to start center")
+        }
+    }
 
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
@@ -142,6 +156,9 @@ fun InkyModule(
     var showRibbonTabMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(showBottomBar) {
+        if (showBottomBar) {
+            keyboardController?.hide()
+        }
         activity?.window?.let { win ->
             val controller = androidx.core.view.WindowCompat.getInsetsController(win, win.decorView)
             if (showBottomBar) {
@@ -159,6 +176,16 @@ fun InkyModule(
     // Scroll Control to hide AppBar and Toolbar Hub dynamically
     var previousScrollValue by remember { mutableStateOf(0) }
     var isControlsVisible by remember { mutableStateOf(true) }
+
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    val isKeyboardVisible = WindowInsets.isImeVisible
+    
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    LaunchedEffect(isKeyboardVisible) {
+        if (!isKeyboardVisible) {
+            isControlsVisible = true
+        }
+    }
 
     LaunchedEffect(scrollState.value) {
         val delta = scrollState.value - previousScrollValue
@@ -621,8 +648,20 @@ fun InkyModule(
                                                 // Tap outside dismisses toolbar decks
                                                 showBottomBar = false
                                                 showFct = false
+                                                if (isEditMode) {
+                                                    focusRequester.requestFocus()
+                                                    keyboardController?.show()
+                                                }
                                             }
                                         )
+                                    }
+                                    .pointerInput(Unit) {
+                                        detectTransformGestures { _, _, zoom, _ ->
+                                            if (zoom != 1f) {
+                                                val newScale = zoomScale * zoom
+                                                zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                            }
+                                        }
                                     },
                                 colors = CardDefaults.cardColors(containerColor = pageBgColor),
                                 shape = RoundedCornerShape(4.dp)
@@ -653,7 +692,10 @@ fun InkyModule(
                                                 addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
                                                 addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
                                             },
-                                            modifier = Modifier.fillMaxSize(),
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .focusRequester(focusRequester),
+                                            readOnly = !isEditMode,
                                             textStyle = androidx.compose.ui.text.TextStyle(
                                                 fontSize = (activeFontSize * zoomScale).sp,
                                                 fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
@@ -693,8 +735,20 @@ fun InkyModule(
                                         onTap = {
                                             showBottomBar = false
                                             showFct = false
+                                            if (isEditMode) {
+                                                focusRequester.requestFocus()
+                                                keyboardController?.show()
+                                            }
                                         }
                                     )
+                                }
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, _, zoom, _ ->
+                                        if (zoom != 1f) {
+                                            val newScale = zoomScale * zoom
+                                            zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                        }
+                                    }
                                 },
                             colors = CardDefaults.cardColors(containerColor = pageBgColor),
                             shape = RoundedCornerShape(12.dp),
@@ -724,7 +778,9 @@ fun InkyModule(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(min = 350.dp),
+                                        .heightIn(min = 350.dp)
+                                        .focusRequester(focusRequester),
+                                    readOnly = !isEditMode,
                                     textStyle = androidx.compose.ui.text.TextStyle(
                                         fontSize = (activeFontSize * zoomScale).sp,
                                         fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
