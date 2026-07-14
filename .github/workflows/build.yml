@@ -40,7 +40,6 @@ jobs:
             -dname "CN=Andreas Maker, OU=Papirus Office, O=Anyum Software, L=Sorong, S=Southwest Papua, C=ID"
 
       - name: Build Debug APK
-        # Menggunakan tanda pipa (|) agar kita bisa menjalankan dua perintah berurutan
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
@@ -49,10 +48,13 @@ jobs:
           KEY_ALIAS: papirus_key
           KEY_PASSWORD: papirus123
 
-      # 2. ANTI ZIP: Unggah langsung sebagai file APK tunggal siap install
-      - name: Upload Debug APK Directly
-        uses: actions/upload-artifact@v4
+      # SOLUSI JALUR APK MENTAH: Langsung bypass ke halaman GitHub Release Nightly
+      - name: Drop Papirus Nightly Release
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          name: Papirus-Office-Debug
-          path: app/build/outputs/apk/debug/*.apk # Mengunci target langsung ke file biner APK
-          if-no-files-found: error
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "nightly"
+          prerelease: true
+          title: "Papirus Office Nightly Build"
+          files: |
+            app/build/outputs/apk/debug/*.apk
