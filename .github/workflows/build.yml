@@ -1,0 +1,55 @@
+name: Papirus Office CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * *' # Daily nightly builds at 2:00 AM UTC
+
+jobs:
+  build:
+    name: Build & Test (SemVer & Nightly)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive # Retrieve C++ OOXML compatibility engines & LibreOffice core if bundled
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 1. KUNCI KONSISTENSI: Buat Keystore statis dengan tanggal kedaluwarsa panjang
+      # Kunci ini akan selalu sama di setiap commit, sehingga Kamu bisa menimpa aplikasi tanpa uninstall!
+      - name: Generate Automated Testing Keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore app/release.jks \
+            -alias papirus_key \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "papirus123" \
+            -keypass "papirus123" \
+            -dname "CN=Andreas Maker, OU=Papirus Office, O=Anyum Software, L=Sorong, S=Southwest Papua, C=ID"
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+        env:
+          KEYSTORE_PASSWORD: "papirus123"
+          KEY_ALIAS: "papirus_key"
+          KEY_PASSWORD: "papirus123"
+
+      # 2. ANTI ZIP: Unggah langsung sebagai file APK tunggal siap install
+      - name: Upload Debug APK Directly
+        uses: actions/upload-artifact@v4
+        with:
+          name: Papirus-Office-Debug
+          path: app/build/outputs/apk/debug/*.apk # Mengunci target langsung ke file biner APK
+          if-no-files-found: error
