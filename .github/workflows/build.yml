@@ -41,6 +41,9 @@ jobs:
 
       - name: Build Debug APK
         run: |
+          # HAPUS BERKAS STUB: Singkirkan kelas tiruan lokal agar tidak bentrok dengan .jar asli di peladen
+          rm -rf app/src/main/java/com/sun/star
+          
           chmod +x gradlew
           ./gradlew assembleDebug
         env:
