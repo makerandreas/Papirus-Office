@@ -79,9 +79,9 @@ android {
 }
 
 val isGitHubActions = System.getenv("GITHUB_ACTIONS") == "true"
-if (isGitHubActions) {
+if (!isGitHubActions) {
   tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    exclude("**/com/sun/star/**")
+    source(file("src/compileOnly/java"))
   }
 }
 
@@ -97,8 +97,8 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
-  // Membaca seluruh file .jar di dalam direktori app/libs/
-  implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar"))))
+  // Jalur langsung yang jauh lebih stabil untuk memuat folder libs
+  implementation(fileTree("libs"))
 
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
