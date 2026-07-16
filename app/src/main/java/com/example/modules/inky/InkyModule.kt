@@ -92,17 +92,23 @@ fun InkyModule(
 
 
 
+    // Density and screen width helpers for precise layout/FCT sizing
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    val isKeyboardVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
+
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
     var docBodyText by remember {
         mutableStateOf(
-            androidx.compose.ui.text.input.TextFieldValue(
-                "Buka Inky \u2192 Masuk Editor Mode \u2192 Keyboard tidak muncul otomatis \u2192 Buka Keyboard via tap viewfinder \u2192 Keyboard muncul \u2192 Scroll keatas \u2192 App Bar muncul. Perfect!"
-            )
+            androidx.compose.ui.text.input.TextFieldValue("")
         )
     }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
+    var wasKeyboardOpenBeforeBottomSheet by remember { mutableStateOf(false) }
 
     val wordCount = remember(docBodyText.text) {
         val text = docBodyText.text.trim()
@@ -116,8 +122,30 @@ fun InkyModule(
     }
 
     val pageCount = remember(wordCount) {
-        val calc = (wordCount + 15) / 16
+        val calc = (wordCount + 249) / 250
         if (calc < 1) 1 else calc
+    }
+
+    val wordsBeforeCursor = remember(docBodyText.text, docBodyText.selection) {
+        val selStart = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
+        val textBefore = docBodyText.text.substring(0, selStart).trim()
+        if (textBefore.isEmpty()) {
+            0
+        } else {
+            textBefore.split("\\s+".toRegex()).count { word ->
+                word.any { it.isLetterOrDigit() }
+            }
+        }
+    }
+
+    val currentPage = remember(wordsBeforeCursor, wordCount, pageCount) {
+        if (wordCount == 0 || pageCount <= 1) {
+            1
+        } else {
+            val ratio = wordsBeforeCursor.toFloat() / wordCount.toFloat()
+            val page = (ratio * pageCount).toInt() + 1
+            page.coerceIn(1, pageCount)
+        }
     }
 
     // LibreOffice Kit Diagnostics Logs State
@@ -180,15 +208,8 @@ fun InkyModule(
 
     LaunchedEffect(showBottomBar) {
         if (showBottomBar) {
+            wasKeyboardOpenBeforeBottomSheet = isKeyboardVisible
             keyboardController?.hide()
-        }
-        activity?.window?.let { win ->
-            val controller = androidx.core.view.WindowCompat.getInsetsController(win, win.decorView)
-            if (showBottomBar) {
-                controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-            } else {
-                controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-            }
         }
     }
 
@@ -200,8 +221,6 @@ fun InkyModule(
     var previousScrollValue by remember { mutableStateOf(0) }
     var isControlsVisible by remember { mutableStateOf(true) }
 
-    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-    val isKeyboardVisible = WindowInsets.isImeVisible
     
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     LaunchedEffect(isKeyboardVisible) {
@@ -219,8 +238,10 @@ fun InkyModule(
             showFct = false
         } else if (showBottomBar) {
             showBottomBar = false
-            focusRequester.requestFocus()
-            keyboardController?.show()
+            if (wasKeyboardOpenBeforeBottomSheet) {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+            }
         } else if (isEditMode) {
             isEditMode = false
         } else {
@@ -678,18 +699,32 @@ fun InkyModule(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
-                                                showFct = true
-                                                fctContext = "text"
-                                                val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
-                                                val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
-                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                if (!showBottomBar) {
+                                                    showFct = true
+                                                    fctContext = "text"
+                                                    val cardWidthPx = 320 * zoomScale * density
+                                                    val fctWidthPx = 220 * density
+                                                    val fctHeightPx = 60 * density
+                                                    val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
+                                                    val minX = 16 * density
+                                                    val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
+                                                    val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
+                                                    fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                }
                                             },
                                             onLongPress = { tapOffset ->
-                                                showFct = true
-                                                fctContext = "text"
-                                                val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
-                                                val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
-                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                if (!showBottomBar) {
+                                                    showFct = true
+                                                    fctContext = "text"
+                                                    val cardWidthPx = 320 * zoomScale * density
+                                                    val fctWidthPx = 220 * density
+                                                    val fctHeightPx = 60 * density
+                                                    val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
+                                                    val minX = 16 * density
+                                                    val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
+                                                    val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
+                                                    fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                }
                                             },
                                             onTap = {
                                                 if (!showBottomBar) {
@@ -698,8 +733,6 @@ fun InkyModule(
                                                         focusRequester.requestFocus()
                                                         keyboardController?.show()
                                                     }
-                                                } else {
-                                                    showFct = false
                                                 }
                                             }
                                         )
@@ -779,6 +812,20 @@ fun InkyModule(
                                             }
                                         )
 
+                                        if (showBottomBar) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .matchParentSize()
+                                                    .pointerInput(Unit) {
+                                                        detectTapGestures(
+                                                            onTap = { /* consume and do nothing */ },
+                                                            onDoubleTap = { /* consume and do nothing */ },
+                                                            onLongPress = { /* consume and do nothing */ }
+                                                        )
+                                                    }
+                                            )
+                                        }
+
                                         if (showFct) {
                                             FloatingContextualToolbar(
                                                 visible = true,
@@ -838,18 +885,32 @@ fun InkyModule(
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onDoubleTap = { tapOffset ->
-                                            showFct = true
-                                            fctContext = "text"
-                                            val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
-                                            val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
-                                            fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                            if (!showBottomBar) {
+                                                showFct = true
+                                                fctContext = "text"
+                                                val cardWidthPx = screenWidthDp * density
+                                                val fctWidthPx = 220 * density
+                                                val fctHeightPx = 60 * density
+                                                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
+                                                val minX = 16 * density
+                                                val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
+                                                val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
+                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                            }
                                         },
                                         onLongPress = { tapOffset ->
-                                            showFct = true
-                                            fctContext = "text"
-                                            val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
-                                            val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
-                                            fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                            if (!showBottomBar) {
+                                                showFct = true
+                                                fctContext = "text"
+                                                val cardWidthPx = screenWidthDp * density
+                                                val fctWidthPx = 220 * density
+                                                val fctHeightPx = 60 * density
+                                                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
+                                                val minX = 16 * density
+                                                val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
+                                                val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
+                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                            }
                                         },
                                         onTap = {
                                             if (!showBottomBar) {
@@ -858,8 +919,6 @@ fun InkyModule(
                                                     focusRequester.requestFocus()
                                                     keyboardController?.show()
                                                 }
-                                            } else {
-                                                showFct = false
                                             }
                                         }
                                     )
@@ -945,6 +1004,20 @@ fun InkyModule(
                                             innerTextField()
                                         }
                                     )
+
+                                    if (showBottomBar) {
+                                        Box(
+                                            modifier = Modifier
+                                                .matchParentSize()
+                                                .pointerInput(Unit) {
+                                                    detectTapGestures(
+                                                        onTap = { /* consume and do nothing */ },
+                                                        onDoubleTap = { /* consume and do nothing */ },
+                                                        onLongPress = { /* consume and do nothing */ }
+                                                    )
+                                                }
+                                        )
+                                    }
 
                                     if (showFct) {
                                         FloatingContextualToolbar(
@@ -1032,7 +1105,7 @@ fun InkyModule(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Halaman 1 dari $pageCount",
+                        text = "Halaman $currentPage dari $pageCount",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Gray
@@ -1433,8 +1506,10 @@ fun InkyModule(
                                 }
                                 IconButton(onClick = { 
                                     showBottomBar = false 
-                                    focusRequester.requestFocus()
-                                    keyboardController?.show()
+                                    if (wasKeyboardOpenBeforeBottomSheet) {
+                                        focusRequester.requestFocus()
+                                        keyboardController?.show()
+                                    }
                                 }) {
                                     Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Hide Bottom Bar")
                                 }
