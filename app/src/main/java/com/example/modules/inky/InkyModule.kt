@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +98,8 @@ fun InkyModule(
     val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     val screenHeightDp = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
     var isFctShownByTap by remember { mutableStateOf(false) }
+    var fctDismissedByScrollZoom by remember { mutableStateOf(false) }
+    var pageBoxCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     val isKeyboardVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
@@ -229,6 +232,9 @@ fun InkyModule(
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
+            isControlsVisible = true
+            showFct = false
+            fctDismissedByScrollZoom = true
             if (showBottomBar) {
                 keyboardController?.hide()
             }
@@ -254,6 +260,11 @@ fun InkyModule(
     }
 
     LaunchedEffect(scrollState.value) {
+        if (isKeyboardVisible) {
+            isControlsVisible = true
+            previousScrollValue = scrollState.value
+            return@LaunchedEffect
+        }
         val delta = scrollState.value - previousScrollValue
         if (delta > 8 && isControlsVisible && scrollState.isScrollInProgress) {
             isControlsVisible = false
@@ -310,60 +321,31 @@ fun InkyModule(
     fun calculateFctOffset(
         targetX: Float,
         targetY: Float,
-        isWebView: Boolean,
         zoomScale: Float,
         density: Float,
         screenWidthDp: Int,
-        horizScrollStateValue: Int,
-        paddingXPx: Float,
-        paddingYPx: Float,
-        positionBelow: Boolean = true
+        screenHeightDp: Int
     ): androidx.compose.ui.unit.IntOffset {
-        val screenWidthFloat = screenWidthDp.toFloat()
-        val boxWidthDp = if (isWebView) (screenWidthFloat - 48f) else (272f * zoomScale)
-        val cardWidthPx = boxWidthDp * density
         val fctWidthPx = 220 * density
-        val fctHeightPx = 60 * density
+        val fctHeightPx = 54 * density
 
-        val leftScreenPx = if (isWebView) 0f else (horizScrollStateValue - (16f + 40f * zoomScale) * density).coerceAtLeast(0f)
-        val rightScreenPx = if (isWebView) (screenWidthFloat * density) else (leftScreenPx + screenWidthFloat * density)
-        
-        val minX = (leftScreenPx + 16 * density).coerceAtLeast(16 * density)
-        val maxX = (rightScreenPx - fctWidthPx - 16 * density).safeCoerceIn(minX, cardWidthPx - fctWidthPx)
-
-        val localX = targetX - paddingXPx
-        val localY = targetY - paddingYPx
-        
-        val x = (localX - fctWidthPx / 2f).safeCoerceIn(minX, maxX)
-
-        // Calculate dynamic viewport heights and soft boundaries to avoid overlap with App Bar or status bar/dock/keyboard
-        val configScreenHeightDp = screenHeightDp.toFloat()
-        val topBarsHeightDp = if (!showBottomBar && isControlsVisible) 56f else 0f
-        val bottomBarsHeightDp = if (showBottomBar) 280f else (if (isEditMode) 64f else 0f)
-        val keyboardHeightDp = if (isKeyboardVisible) 280f else 0f
-        val estimatedViewportHeightPx = (configScreenHeightDp - topBarsHeightDp - bottomBarsHeightDp - keyboardHeightDp - 48f).coerceAtLeast(150f) * density
-
+        // Target coordinates are in root screen space.
+        val x = targetX - fctWidthPx / 2f
         val cursorHeight = activeFontSize * zoomScale * density
-        val yAbove = localY - fctHeightPx - 12 * density
-        val yBelow = localY + cursorHeight + 12 * density
+        val yAbove = targetY - fctHeightPx - 8 * density
+        val yBelow = targetY + cursorHeight + 8 * density
 
-        // Check if fits above/below the viewport
-        val scrollVal = scrollState.value.toFloat()
-        val fitsAbove = yAbove >= scrollVal + 4 * density
-        val fitsBelow = yBelow + fctHeightPx <= scrollVal + estimatedViewportHeightPx - 4 * density
+        // Place above by default. If too close to the top app bar, place below.
+        val topSafeArea = 80 * density
+        val y = if (yAbove < topSafeArea) yBelow else yAbove
 
-        val y = if (!fitsAbove && fitsBelow) {
-            yBelow
-        } else {
-            yAbove
-        }
+        // Bound FCT to screen visible area
+        val screenWidthPx = screenWidthDp * density
+        val screenHeightPx = screenHeightDp * density
+        val coercedX = x.coerceIn(8 * density, screenWidthPx - fctWidthPx - 8 * density)
+        val coercedY = y.coerceIn(topSafeArea, screenHeightPx - fctHeightPx - 8 * density)
 
-        // Coerce within visible viewport so it never cuts off
-        val minY = scrollVal + 8 * density
-        val maxY = (scrollVal + estimatedViewportHeightPx - fctHeightPx - 8 * density).coerceAtLeast(minY)
-        val finalY = y.coerceIn(minY, maxY)
-
-        return androidx.compose.ui.unit.IntOffset(x.toInt(), finalY.toInt())
+        return androidx.compose.ui.unit.IntOffset(coercedX.toInt(), coercedY.toInt())
     }
 
     // Layout configuration variables
@@ -389,29 +371,25 @@ fun InkyModule(
                 onCut: (() -> Unit)?,
                 onSelectAll: (() -> Unit)?
             ) {
+                if (fctDismissedByScrollZoom) {
+                    return
+                }
                 showFct = true
                 isFctShownByTap = true
                 fctContext = "text"
                 fctOffset = calculateFctOffset(
                     targetX = rect.left + rect.width / 2f,
                     targetY = rect.top,
-                    isWebView = isWebView,
                     zoomScale = zoomScale,
                     density = density,
                     screenWidthDp = screenWidthDp,
-                    horizScrollStateValue = if (isWebView) 0 else horizScrollState.value,
-                    paddingXPx = 0f,
-                    paddingYPx = 0f,
-                    positionBelow = false
+                    screenHeightDp = screenHeightDp
                 )
             }
 
             override fun hide() {
-                if (!isFctShownByTap) {
-                    showFct = false
-                } else {
-                    isFctShownByTap = false
-                }
+                showFct = false
+                isFctShownByTap = false
             }
 
             override val status: androidx.compose.ui.platform.TextToolbarStatus
@@ -423,14 +401,17 @@ fun InkyModule(
     var lastZoomScale by remember { mutableStateOf(zoomScale) }
     if (lastZoomScale != zoomScale) {
         showFct = false
+        fctDismissedByScrollZoom = true
         lastZoomScale = zoomScale
     }
     if (scrollState.isScrollInProgress || horizScrollState.isScrollInProgress) {
         showFct = false
+        fctDismissedByScrollZoom = true
     }
 
     LaunchedEffect(scrollState.value, horizScrollState.value, zoomScale) {
         showFct = false
+        fctDismissedByScrollZoom = true
     }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -804,6 +785,7 @@ fun InkyModule(
                                     .aspectRatio(1f / 1.414f) // Perfect A4 paper aspect ratio
                                     .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
                                     .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                    .onGloballyPositioned { pageBoxCoordinates = it }
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onDoubleTap = { tapOffset ->
@@ -811,17 +793,14 @@ fun InkyModule(
                                                     showFct = true
                                                     isFctShownByTap = true
                                                     fctContext = "text"
+                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                     fctOffset = calculateFctOffset(
-                                                        targetX = tapOffset.x,
-                                                        targetY = tapOffset.y,
-                                                        isWebView = false,
+                                                        targetX = rootOffset.x,
+                                                        targetY = rootOffset.y,
                                                         zoomScale = zoomScale,
                                                         density = density,
                                                         screenWidthDp = screenWidthDp,
-                                                        horizScrollStateValue = horizScrollState.value,
-                                                        paddingXPx = 40 * zoomScale * density,
-                                                        paddingYPx = 40 * zoomScale * density,
-                                                        positionBelow = false
+                                                        screenHeightDp = screenHeightDp
                                                     )
                                                 }
                                             },
@@ -830,17 +809,14 @@ fun InkyModule(
                                                     showFct = true
                                                     isFctShownByTap = true
                                                     fctContext = "text"
+                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                     fctOffset = calculateFctOffset(
-                                                        targetX = tapOffset.x,
-                                                        targetY = tapOffset.y,
-                                                        isWebView = false,
+                                                        targetX = rootOffset.x,
+                                                        targetY = rootOffset.y,
                                                         zoomScale = zoomScale,
                                                         density = density,
                                                         screenWidthDp = screenWidthDp,
-                                                        horizScrollStateValue = horizScrollState.value,
-                                                        paddingXPx = 40 * zoomScale * density,
-                                                        paddingYPx = 40 * zoomScale * density,
-                                                        positionBelow = false
+                                                        screenHeightDp = screenHeightDp
                                                     )
                                                 }
                                             },
@@ -852,17 +828,14 @@ fun InkyModule(
                                                         showFct = true
                                                         isFctShownByTap = true
                                                         fctContext = "text"
+                                                        val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                         fctOffset = calculateFctOffset(
-                                                            targetX = tapOffset.x,
-                                                            targetY = tapOffset.y,
-                                                            isWebView = false,
+                                                            targetX = rootOffset.x,
+                                                            targetY = rootOffset.y,
                                                             zoomScale = zoomScale,
                                                             density = density,
                                                             screenWidthDp = screenWidthDp,
-                                                            horizScrollStateValue = horizScrollState.value,
-                                                            paddingXPx = 40 * zoomScale * density,
-                                                            paddingYPx = 40 * zoomScale * density,
-                                                            positionBelow = false
+                                                            screenHeightDp = screenHeightDp
                                                         )
                                                     }
                                                     if (isEditMode) {
@@ -882,6 +855,7 @@ fun InkyModule(
                                                     val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
                                                     if (hasPressed) {
                                                         wasFctVisibleOnPress = showFct
+                                                        fctDismissedByScrollZoom = false
                                                         if (showFct) {
                                                             showFct = false
                                                         }
@@ -955,51 +929,7 @@ fun InkyModule(
                                             }
                                         )
 
-                                        if (showFct) {
-                                            FloatingContextualToolbar(
-                                                visible = true,
-                                                contextType = fctContext,
-                                                modifier = Modifier.offset { fctOffset },
-                                                onActionClick = { action ->
-                                                    showFct = false
-                                                    when (action) {
-                                                        "cut" -> {
-                                                            val currentText = docBodyText.text
-                                                            val sel = docBodyText.selection
-                                                            if (!sel.collapsed) {
-                                                                val selectedText = currentText.substring(sel.start, sel.end)
-                                                                val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
-                                                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                                                    text = newText,
-                                                                    selection = androidx.compose.ui.text.TextRange(sel.start)
-                                                                )
-                                                                triggerAutosave()
-                                                            }
-                                                        }
-                                                        "copy" -> {
-                                                            val sel = docBodyText.selection
-                                                            if (!sel.collapsed) {
-                                                                val selectedText = docBodyText.text.substring(sel.start, sel.end)
-                                                            }
-                                                        }
-                                                        "paste" -> {
-                                                            val currentText = docBodyText.text
-                                                            val sel = docBodyText.selection
-                                                            val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
-                                                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                                                text = newText,
-                                                                selection = androidx.compose.ui.text.TextRange(sel.start + 1)
-                                                            )
-                                                            triggerAutosave()
-                                                        }
-                                                        "ai_write" -> {
-                                                            aiPrompt = "Analyze and summarize this setup layout..."
-                                                            showAiAssistant = true
-                                                        }
-                                                    }
-                                                }
-                                            )
-                                        }
+
                                     }
                                 }
                             }
@@ -1011,6 +941,7 @@ fun InkyModule(
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp, vertical = 8.dp)
                                 .border(1.dp, borderStrokeColor, RoundedCornerShape(12.dp))
+                                .onGloballyPositioned { pageBoxCoordinates = it }
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onDoubleTap = { tapOffset ->
@@ -1018,17 +949,14 @@ fun InkyModule(
                                                 showFct = true
                                                 isFctShownByTap = true
                                                 fctContext = "text"
+                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                 fctOffset = calculateFctOffset(
-                                                    targetX = tapOffset.x,
-                                                    targetY = tapOffset.y,
-                                                    isWebView = true,
+                                                    targetX = rootOffset.x,
+                                                    targetY = rootOffset.y,
                                                     zoomScale = zoomScale,
                                                     density = density,
                                                     screenWidthDp = screenWidthDp,
-                                                    horizScrollStateValue = 0,
-                                                    paddingXPx = 16 * density,
-                                                    paddingYPx = 36 * density,
-                                                    positionBelow = false
+                                                    screenHeightDp = screenHeightDp
                                                 )
                                             }
                                         },
@@ -1037,17 +965,14 @@ fun InkyModule(
                                                 showFct = true
                                                 isFctShownByTap = true
                                                 fctContext = "text"
+                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                 fctOffset = calculateFctOffset(
-                                                    targetX = tapOffset.x,
-                                                    targetY = tapOffset.y,
-                                                    isWebView = true,
+                                                    targetX = rootOffset.x,
+                                                    targetY = rootOffset.y,
                                                     zoomScale = zoomScale,
                                                     density = density,
                                                     screenWidthDp = screenWidthDp,
-                                                    horizScrollStateValue = 0,
-                                                    paddingXPx = 16 * density,
-                                                    paddingYPx = 36 * density,
-                                                    positionBelow = false
+                                                    screenHeightDp = screenHeightDp
                                                 )
                                             }
                                         },
@@ -1059,17 +984,14 @@ fun InkyModule(
                                                     showFct = true
                                                     isFctShownByTap = true
                                                     fctContext = "text"
+                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
                                                     fctOffset = calculateFctOffset(
-                                                        targetX = tapOffset.x,
-                                                        targetY = tapOffset.y,
-                                                        isWebView = true,
+                                                        targetX = rootOffset.x,
+                                                        targetY = rootOffset.y,
                                                         zoomScale = zoomScale,
                                                         density = density,
                                                         screenWidthDp = screenWidthDp,
-                                                        horizScrollStateValue = 0,
-                                                        paddingXPx = 16 * density,
-                                                        paddingYPx = 36 * density,
-                                                        positionBelow = false
+                                                        screenHeightDp = screenHeightDp
                                                     )
                                                 }
                                                 if (isEditMode) {
@@ -1089,6 +1011,7 @@ fun InkyModule(
                                                 val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
                                                 if (hasPressed) {
                                                     wasFctVisibleOnPress = showFct
+                                                    fctDismissedByScrollZoom = false
                                                     if (showFct) {
                                                         showFct = false
                                                     }
@@ -1169,51 +1092,7 @@ fun InkyModule(
                                         }
                                     )
 
-                                    if (showFct) {
-                                        FloatingContextualToolbar(
-                                            visible = true,
-                                            contextType = fctContext,
-                                            modifier = Modifier.offset { fctOffset },
-                                            onActionClick = { action ->
-                                                showFct = false
-                                                when (action) {
-                                                    "cut" -> {
-                                                        val currentText = docBodyText.text
-                                                        val sel = docBodyText.selection
-                                                        if (!sel.collapsed) {
-                                                            val selectedText = currentText.substring(sel.start, sel.end)
-                                                            val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
-                                                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                                                text = newText,
-                                                                selection = androidx.compose.ui.text.TextRange(sel.start)
-                                                            )
-                                                            triggerAutosave()
-                                                        }
-                                                    }
-                                                    "copy" -> {
-                                                        val sel = docBodyText.selection
-                                                        if (!sel.collapsed) {
-                                                            val selectedText = docBodyText.text.substring(sel.start, sel.end)
-                                                        }
-                                                    }
-                                                    "paste" -> {
-                                                        val currentText = docBodyText.text
-                                                        val sel = docBodyText.selection
-                                                        val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
-                                                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                                            text = newText,
-                                                            selection = androidx.compose.ui.text.TextRange(sel.start + 1)
-                                                        )
-                                                        triggerAutosave()
-                                                    }
-                                                    "ai_write" -> {
-                                                        aiPrompt = "Analyze and summarize this setup layout..."
-                                                        showAiAssistant = true
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
+
                                 }
                             }
                         }
@@ -2392,6 +2271,52 @@ fun InkyModule(
             dismissButton = {
                 TextButton(onClick = { showEquationDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showFct) {
+        FloatingContextualToolbar(
+            visible = true,
+            contextType = fctContext,
+            modifier = Modifier.offset { fctOffset },
+            onActionClick = { action ->
+                showFct = false
+                when (action) {
+                    "cut" -> {
+                        val currentText = docBodyText.text
+                        val sel = docBodyText.selection
+                        if (!sel.collapsed) {
+                            val selectedText = currentText.substring(sel.start, sel.end)
+                            val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
+                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                text = newText,
+                                selection = androidx.compose.ui.text.TextRange(sel.start)
+                            )
+                            triggerAutosave()
+                        }
+                    }
+                    "copy" -> {
+                        val sel = docBodyText.selection
+                        if (!sel.collapsed) {
+                            val selectedText = docBodyText.text.substring(sel.start, sel.end)
+                        }
+                    }
+                    "paste" -> {
+                        val currentText = docBodyText.text
+                        val sel = docBodyText.selection
+                        val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                            text = newText,
+                            selection = androidx.compose.ui.text.TextRange(sel.start + 1)
+                        )
+                        triggerAutosave()
+                    }
+                    "ai_write" -> {
+                        aiPrompt = "Analyze and summarize this setup layout..."
+                        showAiAssistant = true
+                    }
                 }
             }
         )
