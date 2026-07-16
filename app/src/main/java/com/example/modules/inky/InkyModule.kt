@@ -95,6 +95,8 @@ fun InkyModule(
     // Density and screen width helpers for precise layout/FCT sizing
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val screenHeightDp = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    var isFctShownByTap by remember { mutableStateOf(false) }
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     val isKeyboardVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
@@ -216,6 +218,8 @@ fun InkyModule(
     // FCT state
     var showFct by remember { mutableStateOf(false) }
     var fctContext by remember { mutableStateOf("text") } // text, table, object
+    var wasFctVisibleOnPress by remember { mutableStateOf(false) }
+    val horizScrollState = rememberScrollState()
 
     // Scroll Control to hide AppBar and Toolbar Hub dynamically
     var previousScrollValue by remember { mutableStateOf(0) }
@@ -299,6 +303,69 @@ fun InkyModule(
         }
     }
 
+    fun Float.safeCoerceIn(min: Float, max: Float): Float {
+        return if (min >= max) min else this.coerceIn(min, max)
+    }
+
+    fun calculateFctOffset(
+        targetX: Float,
+        targetY: Float,
+        isWebView: Boolean,
+        zoomScale: Float,
+        density: Float,
+        screenWidthDp: Int,
+        horizScrollStateValue: Int,
+        paddingXPx: Float,
+        paddingYPx: Float,
+        positionBelow: Boolean = true
+    ): androidx.compose.ui.unit.IntOffset {
+        val screenWidthFloat = screenWidthDp.toFloat()
+        val boxWidthDp = if (isWebView) (screenWidthFloat - 48f) else (272f * zoomScale)
+        val cardWidthPx = boxWidthDp * density
+        val fctWidthPx = 220 * density
+        val fctHeightPx = 60 * density
+
+        val leftScreenPx = if (isWebView) 0f else (horizScrollStateValue - (16f + 40f * zoomScale) * density).coerceAtLeast(0f)
+        val rightScreenPx = if (isWebView) (screenWidthFloat * density) else (leftScreenPx + screenWidthFloat * density)
+        
+        val minX = (leftScreenPx + 16 * density).coerceAtLeast(16 * density)
+        val maxX = (rightScreenPx - fctWidthPx - 16 * density).safeCoerceIn(minX, cardWidthPx - fctWidthPx)
+
+        val localX = targetX - paddingXPx
+        val localY = targetY - paddingYPx
+        
+        val x = (localX - fctWidthPx / 2f).safeCoerceIn(minX, maxX)
+
+        // Calculate dynamic viewport heights and soft boundaries to avoid overlap with App Bar or status bar/dock/keyboard
+        val configScreenHeightDp = screenHeightDp.toFloat()
+        val topBarsHeightDp = if (!showBottomBar && isControlsVisible) 56f else 0f
+        val bottomBarsHeightDp = if (showBottomBar) 280f else (if (isEditMode) 64f else 0f)
+        val keyboardHeightDp = if (isKeyboardVisible) 280f else 0f
+        val estimatedViewportHeightPx = (configScreenHeightDp - topBarsHeightDp - bottomBarsHeightDp - keyboardHeightDp - 48f).coerceAtLeast(150f) * density
+
+        val cursorHeight = activeFontSize * zoomScale * density
+        val yAbove = localY - fctHeightPx - 12 * density
+        val yBelow = localY + cursorHeight + 12 * density
+
+        // Check if fits above/below the viewport
+        val scrollVal = scrollState.value.toFloat()
+        val fitsAbove = yAbove >= scrollVal + 4 * density
+        val fitsBelow = yBelow + fctHeightPx <= scrollVal + estimatedViewportHeightPx - 4 * density
+
+        val y = if (!fitsAbove && fitsBelow) {
+            yBelow
+        } else {
+            yAbove
+        }
+
+        // Coerce within visible viewport so it never cuts off
+        val minY = scrollVal + 8 * density
+        val maxY = (scrollVal + estimatedViewportHeightPx - fctHeightPx - 8 * density).coerceAtLeast(minY)
+        val finalY = y.coerceIn(minY, maxY)
+
+        return androidx.compose.ui.unit.IntOffset(x.toInt(), finalY.toInt())
+    }
+
     // Layout configuration variables
     val docBgColor = if (isDarkDocument) Color(0xFF181A1B) else Color(0xFFD0D5DD)
     val pageBgColor = if (isDarkDocument) Color(0xFF242627) else Color.White
@@ -309,7 +376,11 @@ fun InkyModule(
 
     var fctOffset by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset(16, 16)) }
 
-    val dummyTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp) {
+    var showFontMenuInToolbar by remember { mutableStateOf(false) }
+    var showSizeMenuInToolbar by remember { mutableStateOf(false) }
+    var showToolbarPagesMenu by remember { mutableStateOf(false) }
+
+    val dummyTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp, horizScrollState.value) {
         object : androidx.compose.ui.platform.TextToolbar {
             override fun showMenu(
                 rect: androidx.compose.ui.geometry.Rect,
@@ -319,24 +390,47 @@ fun InkyModule(
                 onSelectAll: (() -> Unit)?
             ) {
                 showFct = true
+                isFctShownByTap = true
                 fctContext = "text"
-                val cardWidthPx = if (isWebView) (screenWidthDp * density) else (320 * zoomScale * density)
-                val fctWidthPx = 220 * density
-                val fctHeightPx = 60 * density
-                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
-                val minX = 16 * density
-                val x = (rect.left + (rect.width - fctWidthPx) / 2f).coerceIn(minX, maxX)
-                val y = (rect.top - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
-                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                fctOffset = calculateFctOffset(
+                    targetX = rect.left + rect.width / 2f,
+                    targetY = rect.top,
+                    isWebView = isWebView,
+                    zoomScale = zoomScale,
+                    density = density,
+                    screenWidthDp = screenWidthDp,
+                    horizScrollStateValue = if (isWebView) 0 else horizScrollState.value,
+                    paddingXPx = 0f,
+                    paddingYPx = 0f,
+                    positionBelow = false
+                )
             }
 
             override fun hide() {
-                showFct = false
+                if (!isFctShownByTap) {
+                    showFct = false
+                } else {
+                    isFctShownByTap = false
+                }
             }
 
             override val status: androidx.compose.ui.platform.TextToolbarStatus
                 get() = if (showFct) androidx.compose.ui.platform.TextToolbarStatus.Shown else androidx.compose.ui.platform.TextToolbarStatus.Hidden
         }
+    }
+
+    // Immediate composition-based checks to completely eliminate flickering during zoom or scrolling
+    var lastZoomScale by remember { mutableStateOf(zoomScale) }
+    if (lastZoomScale != zoomScale) {
+        showFct = false
+        lastZoomScale = zoomScale
+    }
+    if (scrollState.isScrollInProgress || horizScrollState.isScrollInProgress) {
+        showFct = false
+    }
+
+    LaunchedEffect(scrollState.value, horizScrollState.value, zoomScale) {
+        showFct = false
     }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -354,7 +448,17 @@ fun InkyModule(
             AnimatedVisibility(
                 visible = !showBottomBar && isControlsVisible,
                 enter = expandVertically(),
-                exit = shrinkVertically()
+                exit = shrinkVertically(),
+                modifier = Modifier.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                showFct = false
+                            }
+                        }
+                    }
+                }
             ) {
                 if (!isEditMode) {
                     // --- VIEWER MODE APP BAR ---
@@ -687,7 +791,6 @@ fun InkyModule(
                     
                     if (!isWebView) {
                         // --- A4 PORTRAIT VIEWPORT ---
-                        val horizScrollState = rememberScrollState()
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -706,34 +809,62 @@ fun InkyModule(
                                             onDoubleTap = { tapOffset ->
                                                 if (!showBottomBar) {
                                                     showFct = true
+                                                    isFctShownByTap = true
                                                     fctContext = "text"
-                                                    val cardWidthPx = 320 * zoomScale * density
-                                                    val fctWidthPx = 220 * density
-                                                    val fctHeightPx = 60 * density
-                                                    val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
-                                                    val minX = 16 * density
-                                                    val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
-                                                    val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
-                                                    fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                    fctOffset = calculateFctOffset(
+                                                        targetX = tapOffset.x,
+                                                        targetY = tapOffset.y,
+                                                        isWebView = false,
+                                                        zoomScale = zoomScale,
+                                                        density = density,
+                                                        screenWidthDp = screenWidthDp,
+                                                        horizScrollStateValue = horizScrollState.value,
+                                                        paddingXPx = 40 * zoomScale * density,
+                                                        paddingYPx = 40 * zoomScale * density,
+                                                        positionBelow = false
+                                                    )
                                                 }
                                             },
                                             onLongPress = { tapOffset ->
                                                 if (!showBottomBar) {
                                                     showFct = true
+                                                    isFctShownByTap = true
                                                     fctContext = "text"
-                                                    val cardWidthPx = 320 * zoomScale * density
-                                                    val fctWidthPx = 220 * density
-                                                    val fctHeightPx = 60 * density
-                                                    val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
-                                                    val minX = 16 * density
-                                                    val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
-                                                    val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
-                                                    fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                    fctOffset = calculateFctOffset(
+                                                        targetX = tapOffset.x,
+                                                        targetY = tapOffset.y,
+                                                        isWebView = false,
+                                                        zoomScale = zoomScale,
+                                                        density = density,
+                                                        screenWidthDp = screenWidthDp,
+                                                        horizScrollStateValue = horizScrollState.value,
+                                                        paddingXPx = 40 * zoomScale * density,
+                                                        paddingYPx = 40 * zoomScale * density,
+                                                        positionBelow = false
+                                                    )
                                                 }
                                             },
-                                            onTap = {
+                                            onTap = { tapOffset ->
                                                 if (!showBottomBar) {
-                                                    showFct = false
+                                                    if (wasFctVisibleOnPress) {
+                                                        wasFctVisibleOnPress = false
+                                                    } else {
+                                                        showFct = true
+                                                        isFctShownByTap = true
+                                                        fctContext = "text"
+                                                        fctOffset = calculateFctOffset(
+                                                            targetX = tapOffset.x,
+                                                            targetY = tapOffset.y,
+                                                            isWebView = false,
+                                                            zoomScale = zoomScale,
+                                                            density = density,
+                                                            screenWidthDp = screenWidthDp,
+                                                            horizScrollStateValue = horizScrollState.value,
+                                                            paddingXPx = 40 * zoomScale * density,
+                                                            paddingYPx = 40 * zoomScale * density,
+                                                            positionBelow = false
+                                                        )
+                                                    }
                                                     if (isEditMode) {
                                                         focusRequester.requestFocus()
                                                         keyboardController?.show()
@@ -748,6 +879,13 @@ fun InkyModule(
                                                 val event = awaitPointerEvent()
                                                 val canceled = event.changes.any { it.isConsumed }
                                                 if (!canceled) {
+                                                    val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
+                                                    if (hasPressed) {
+                                                        wasFctVisibleOnPress = showFct
+                                                        if (showFct) {
+                                                            showFct = false
+                                                        }
+                                                    }
                                                     if (event.changes.size >= 2) {
                                                         val zoomChange = event.calculateZoom()
                                                         if (zoomChange != 1f) {
@@ -796,7 +934,7 @@ fun InkyModule(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .focusRequester(focusRequester),
-                                            readOnly = !isEditMode,
+                                            readOnly = !isEditMode || showBottomBar,
                                             textStyle = androidx.compose.ui.text.TextStyle(
                                                 fontSize = (activeFontSize * zoomScale).sp,
                                                 fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
@@ -878,34 +1016,62 @@ fun InkyModule(
                                         onDoubleTap = { tapOffset ->
                                             if (!showBottomBar) {
                                                 showFct = true
+                                                isFctShownByTap = true
                                                 fctContext = "text"
-                                                val cardWidthPx = screenWidthDp * density
-                                                val fctWidthPx = 220 * density
-                                                val fctHeightPx = 60 * density
-                                                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
-                                                val minX = 16 * density
-                                                val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
-                                                val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
-                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                fctOffset = calculateFctOffset(
+                                                    targetX = tapOffset.x,
+                                                    targetY = tapOffset.y,
+                                                    isWebView = true,
+                                                    zoomScale = zoomScale,
+                                                    density = density,
+                                                    screenWidthDp = screenWidthDp,
+                                                    horizScrollStateValue = 0,
+                                                    paddingXPx = 16 * density,
+                                                    paddingYPx = 36 * density,
+                                                    positionBelow = false
+                                                )
                                             }
                                         },
                                         onLongPress = { tapOffset ->
                                             if (!showBottomBar) {
                                                 showFct = true
+                                                isFctShownByTap = true
                                                 fctContext = "text"
-                                                val cardWidthPx = screenWidthDp * density
-                                                val fctWidthPx = 220 * density
-                                                val fctHeightPx = 60 * density
-                                                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
-                                                val minX = 16 * density
-                                                val x = (tapOffset.x - fctWidthPx / 2f).coerceIn(minX, maxX)
-                                                val y = (tapOffset.y - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
-                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
+                                                fctOffset = calculateFctOffset(
+                                                    targetX = tapOffset.x,
+                                                    targetY = tapOffset.y,
+                                                    isWebView = true,
+                                                    zoomScale = zoomScale,
+                                                    density = density,
+                                                    screenWidthDp = screenWidthDp,
+                                                    horizScrollStateValue = 0,
+                                                    paddingXPx = 16 * density,
+                                                    paddingYPx = 36 * density,
+                                                    positionBelow = false
+                                                )
                                             }
                                         },
-                                        onTap = {
+                                        onTap = { tapOffset ->
                                             if (!showBottomBar) {
-                                                showFct = false
+                                                if (wasFctVisibleOnPress) {
+                                                    wasFctVisibleOnPress = false
+                                                } else {
+                                                    showFct = true
+                                                    isFctShownByTap = true
+                                                    fctContext = "text"
+                                                    fctOffset = calculateFctOffset(
+                                                        targetX = tapOffset.x,
+                                                        targetY = tapOffset.y,
+                                                        isWebView = true,
+                                                        zoomScale = zoomScale,
+                                                        density = density,
+                                                        screenWidthDp = screenWidthDp,
+                                                        horizScrollStateValue = 0,
+                                                        paddingXPx = 16 * density,
+                                                        paddingYPx = 36 * density,
+                                                        positionBelow = false
+                                                    )
+                                                }
                                                 if (isEditMode) {
                                                     focusRequester.requestFocus()
                                                     keyboardController?.show()
@@ -920,6 +1086,13 @@ fun InkyModule(
                                             val event = awaitPointerEvent()
                                             val canceled = event.changes.any { it.isConsumed }
                                             if (!canceled) {
+                                                val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
+                                                if (hasPressed) {
+                                                    wasFctVisibleOnPress = showFct
+                                                    if (showFct) {
+                                                        showFct = false
+                                                    }
+                                                }
                                                 if (event.changes.size >= 2) {
                                                     val zoomChange = event.calculateZoom()
                                                     if (zoomChange != 1f) {
@@ -967,7 +1140,7 @@ fun InkyModule(
                                             .fillMaxWidth()
                                             .heightIn(min = 350.dp)
                                             .focusRequester(focusRequester),
-                                        readOnly = !isEditMode,
+                                        readOnly = !isEditMode || showBottomBar,
                                         textStyle = androidx.compose.ui.text.TextStyle(
                                             fontSize = (activeFontSize * zoomScale).sp,
                                             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
@@ -1072,7 +1245,18 @@ fun InkyModule(
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
                 shape = RoundedCornerShape(0.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                    showFct = false
+                                }
+                            }
+                        }
+                    }
             ) {
                 Row(
                     modifier = Modifier
@@ -1097,7 +1281,10 @@ fun InkyModule(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         IconButton(
-                            onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
+                            onClick = {
+                                showFct = false
+                                if (zoomScale > 0.5f) zoomScale -= 0.1f
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
@@ -1106,10 +1293,16 @@ fun InkyModule(
                             text = "Zoom: ${(zoomScale * 100).toInt()}%",
                             fontSize = 11.sp,
                             color = Color.Gray,
-                            modifier = Modifier.clickable { zoomScale = 1.0f }
+                            modifier = Modifier.clickable {
+                                showFct = false
+                                zoomScale = 1.0f
+                            }
                         )
                         IconButton(
-                            onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
+                            onClick = {
+                                showFct = false
+                                if (zoomScale < 2.0f) zoomScale += 0.1f
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
@@ -1123,7 +1316,17 @@ fun InkyModule(
             AnimatedVisibility(
                 visible = isEditMode && !showBottomBar,
                 enter = expandVertically(),
-                exit = shrinkVertically()
+                exit = shrinkVertically(),
+                modifier = Modifier.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                showFct = false
+                            }
+                        }
+                    }
+                }
             ) {
                 Surface(
                     tonalElevation = 6.dp,
@@ -1144,144 +1347,294 @@ fun InkyModule(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight(),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (activeToolbarType == "Standard") {
                                 // --- STANDARD TOOLBAR ---
+                                
+                                // 1. Font Style (Drop-down sepanjang ±3 ikon)
                                 item {
-                                    IconButton(onClick = {
-                                        triggerAutosave()
-                                        addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\") -> SUCCESS")
-                                    }) {
-                                        Icon(Icons.Rounded.Save, contentDescription = "Simpan", tint = MaterialTheme.colorScheme.primary)
+                                    Box {
+                                        Row(
+                                            modifier = Modifier
+                                                .width(110.dp)
+                                                .height(36.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                                .clickable { showFontMenuInToolbar = true }
+                                                .padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = activeFontFamily,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = "Font Style",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showFontMenuInToolbar,
+                                            onDismissRequest = { showFontMenuInToolbar = false }
+                                        ) {
+                                            val fonts = listOf("Aptos Display", "Calibri", "Arial", "Roboto", "Times New Roman", "Courier New")
+                                            fonts.forEach { f ->
+                                                DropdownMenuItem(
+                                                    text = { Text(f, style = MaterialTheme.typography.bodyMedium) },
+                                                    onClick = {
+                                                        activeFontFamily = f
+                                                        showFontMenuInToolbar = false
+                                                        triggerAutosave()
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
+
+                                // 2. Font Size (Drop-down sepanjang ±2 ikon)
                                 item {
-                                    IconButton(onClick = {
-                                        triggerAutosave()
-                                        addLokitLog("lok::Document::postWindow(event=UNDO) -> SUCCESS")
-                                    }) {
-                                        Icon(Icons.Rounded.Undo, contentDescription = "Undo", tint = MaterialTheme.colorScheme.primary)
+                                    Box {
+                                        Row(
+                                            modifier = Modifier
+                                                .width(72.dp)
+                                                .height(36.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                                .clickable { showSizeMenuInToolbar = true }
+                                                .padding(horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "$activeFontSize pt",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowDropDown,
+                                                contentDescription = "Font Size",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = showSizeMenuInToolbar,
+                                            onDismissRequest = { showSizeMenuInToolbar = false }
+                                        ) {
+                                            val sizes = listOf(10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36)
+                                            sizes.forEach { size ->
+                                                DropdownMenuItem(
+                                                    text = { Text("$size pt", style = MaterialTheme.typography.bodyMedium) },
+                                                    onClick = {
+                                                        activeFontSize = size
+                                                        showSizeMenuInToolbar = false
+                                                        triggerAutosave()
+                                                    }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
-                                item {
-                                    IconButton(onClick = {
-                                        triggerAutosave()
-                                        addLokitLog("lok::Document::postWindow(event=REDO) -> SUCCESS")
-                                    }) {
-                                        Icon(Icons.Rounded.Redo, contentDescription = "Redo", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                                        Icon(Icons.Rounded.Search, contentDescription = "Cari & Ganti", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { showAiAssistant = true }) {
-                                        Icon(Icons.Rounded.AutoAwesome, contentDescription = "Asisten AI", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = {
-                                        Toast.makeText(context, "Mengekspor berkas ke PDF...", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.pdf\", \"pdf\") -> SUCCESS")
-                                    }) {
-                                        Icon(Icons.Rounded.PictureAsPdf, contentDescription = "Ekspor PDF", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = {
-                                        addLokitLog("Cloud upload triggered")
-                                    }) {
-                                        Icon(Icons.Rounded.CloudUpload, contentDescription = "Cloud Sync", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f }) {
-                                        Icon(Icons.Rounded.ZoomOut, contentDescription = "Zoom Out", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f }) {
-                                        Icon(Icons.Rounded.ZoomIn, contentDescription = "Zoom In", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            } else {
-                                // --- FORMATTING TOOLBAR ---
+
+                                // 3. Bold
                                 item {
                                     IconButton(
                                         onClick = { isBold = !isBold; triggerAutosave() },
                                         colors = if (isBold) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
+                                        Icon(Icons.Rounded.FormatBold, contentDescription = "Bold", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
+
+                                // 4. Italic
                                 item {
                                     IconButton(
                                         onClick = { isItalic = !isItalic; triggerAutosave() },
                                         colors = if (isItalic) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
+                                        Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
+
+                                // 5. Underline
                                 item {
                                     IconButton(
                                         onClick = { isUnderline = !isUnderline; triggerAutosave() },
                                         colors = if (isUnderline) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Rounded.FormatUnderlined, contentDescription = "Underline")
+                                        Icon(Icons.Rounded.FormatUnderlined, contentDescription = "Underline", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
+
+                                // 6. Strikethrough
                                 item {
                                     IconButton(
                                         onClick = { isStrikethrough = !isStrikethrough; triggerAutosave() },
                                         colors = if (isStrikethrough) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
                                     ) {
-                                        Icon(Icons.Rounded.StrikethroughS, contentDescription = "Strikethrough")
+                                        Icon(Icons.Rounded.StrikethroughS, contentDescription = "Strikethrough", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
-                                item {
-                                    IconButton(onClick = {
-                                        textAlignment = when (textAlignment) {
-                                            TextAlign.Left -> TextAlign.Center
-                                            TextAlign.Center -> TextAlign.Right
-                                            TextAlign.Right -> TextAlign.Justify
-                                            else -> TextAlign.Left
-                                        }
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(
-                                            imageVector = when (textAlignment) {
-                                                TextAlign.Center -> Icons.Rounded.FormatAlignCenter
-                                                TextAlign.Right -> Icons.Rounded.FormatAlignRight
-                                                TextAlign.Justify -> Icons.Rounded.FormatAlignJustify
-                                                else -> Icons.Rounded.FormatAlignLeft
-                                            },
-                                            contentDescription = "Alignment"
-                                        )
-                                    }
-                                }
-                                item {
-                                    IconButton(onClick = {
-                                        showBottomBar = true
-                                        bottomBarDeck = "font_color"
-                                    }) {
-                                        Icon(Icons.Rounded.FormatColorText, contentDescription = "Font Color", tint = fontColor)
-                                    }
-                                }
+
+                                // 7. Text Highlight Color
                                 item {
                                     IconButton(onClick = {
                                         showBottomBar = true
                                         bottomBarDeck = "highlight_color"
                                     }) {
-                                        Icon(Icons.Rounded.BorderColor, contentDescription = "Highlight Color", tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
+                                        Icon(
+                                            imageVector = Icons.Rounded.BorderColor,
+                                            contentDescription = "Sorot Warna",
+                                            tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor
+                                        )
                                     }
                                 }
+
+                                // 8. Font Color
                                 item {
-                                    IconButton(onClick = { showEquationDialog = true }) {
-                                        Icon(Icons.Rounded.Functions, contentDescription = "Equation Composer")
+                                    IconButton(onClick = {
+                                        showBottomBar = true
+                                        bottomBarDeck = "font_color"
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.FormatColorText,
+                                            contentDescription = "Warna Font",
+                                            tint = fontColor
+                                        )
+                                    }
+                                }
+
+                                // 9. Insert Bulleted Lists
+                                item {
+                                    IconButton(onClick = {
+                                        val sel = docBodyText.selection
+                                        val currentText = docBodyText.text
+                                        val start = sel.start
+                                        val end = sel.end
+                                        val newText = currentText.substring(0, start) + "• " + currentText.substring(end)
+                                        docBodyText = docBodyText.copy(
+                                            text = newText,
+                                            selection = androidx.compose.ui.text.TextRange(start + 2)
+                                        )
+                                        addLokitLog("lok::Document::insertBulletedList() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.FormatListBulleted, contentDescription = "Insert Bulleted List", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 10. Insert Numbered Lists
+                                item {
+                                    IconButton(onClick = {
+                                        val sel = docBodyText.selection
+                                        val currentText = docBodyText.text
+                                        val start = sel.start
+                                        val end = sel.end
+                                        val newText = currentText.substring(0, start) + "1. " + currentText.substring(end)
+                                        docBodyText = docBodyText.copy(
+                                            text = newText,
+                                            selection = androidx.compose.ui.text.TextRange(start + 3)
+                                        )
+                                        addLokitLog("lok::Document::insertNumberedList() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.FormatListNumbered, contentDescription = "Insert Numbered List", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 11. Increase Indent
+                                item {
+                                    IconButton(onClick = {
+                                        val sel = docBodyText.selection
+                                        val currentText = docBodyText.text
+                                        val start = sel.start
+                                        val end = sel.end
+                                        val newText = currentText.substring(0, start) + "\t" + currentText.substring(end)
+                                        docBodyText = docBodyText.copy(
+                                            text = newText,
+                                            selection = androidx.compose.ui.text.TextRange(start + 1)
+                                        )
+                                        addLokitLog("lok::Document::increaseIndent() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 12. Decrease Indent
+                                item {
+                                    IconButton(onClick = {
+                                        addLokitLog("lok::Document::decreaseIndent() -> SUCCESS")
+                                        Toast.makeText(context, "Decrease Indent", Toast.LENGTH_SHORT).show()
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 13. Change Text Direction
+                                item {
+                                    IconButton(onClick = {
+                                        textAlignment = if (textAlignment == TextAlign.Left) TextAlign.Right else TextAlign.Left
+                                        addLokitLog("lok::Document::setTextDirection() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.FormatTextdirectionLToR, contentDescription = "Change text direction", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 14. Insert Pictures
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Menyisipkan Gambar...", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::insertImage() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.Image, contentDescription = "Insert Picture", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 15. Insert Tables
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Menyisipkan Tabel...", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::insertTable() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.GridOn, contentDescription = "Insert Table", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 16. Insert Links
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Menyisipkan Tautan...", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::insertLink() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.Link, contentDescription = "Insert Link", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+
+                                // 17. Add Comment
+                                item {
+                                    IconButton(onClick = {
+                                        Toast.makeText(context, "Menambahkan Komentar...", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::addComment() -> SUCCESS")
+                                        triggerAutosave()
+                                    }) {
+                                        Icon(Icons.Rounded.Comment, contentDescription = "Add Comment", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -1301,19 +1654,45 @@ fun InkyModule(
                             horizontalArrangement = Arrangement.spacedBy(1.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 1. Switch Toolbar
-                            IconButton(
-                                onClick = {
-                                    activeToolbarType = if (activeToolbarType == "Standard") "Formatting" else "Standard"
+                            val availableToolbarPages = listOf("Standard")
 
+                            // 1. Switch Toolbar (Dynamic based on page count)
+                            if (availableToolbarPages.size > 1) {
+                                Box {
+                                    IconButton(
+                                        onClick = {
+                                            if (availableToolbarPages.size == 2) {
+                                                activeToolbarType = if (activeToolbarType == "Standard") "Formatting" else "Standard"
+                                            } else {
+                                                showToolbarPagesMenu = true
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Cached,
+                                            contentDescription = "Switch Toolbar",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    if (availableToolbarPages.size >= 3) {
+                                        DropdownMenu(
+                                            expanded = showToolbarPagesMenu,
+                                            onDismissRequest = { showToolbarPagesMenu = false }
+                                        ) {
+                                            availableToolbarPages.forEach { page ->
+                                                DropdownMenuItem(
+                                                    text = { Text(page) },
+                                                    onClick = {
+                                                        activeToolbarType = page
+                                                        showToolbarPagesMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Cached,
-                                    contentDescription = "Switch Toolbar",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
                             }
+
                             // 2. Insert Tab Character
                             IconButton(
                                 onClick = {
@@ -1328,7 +1707,6 @@ fun InkyModule(
                                         selection = newSelection
                                     )
                                     triggerAutosave()
-
                                 }
                             ) {
                                 Icon(
@@ -1383,7 +1761,17 @@ fun InkyModule(
             AnimatedVisibility(
                 visible = showBottomBar,
                 enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it })
+                exit = slideOutVertically(targetOffsetY = { it }),
+                modifier = Modifier.pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                showFct = false
+                            }
+                        }
+                    }
+                }
             ) {
                 Surface(
                     modifier = Modifier

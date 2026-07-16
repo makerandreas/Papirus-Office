@@ -462,7 +462,9 @@ fun FloatingContextualToolbar(
             shape = RoundedCornerShape(8.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = modifier
+            modifier = Modifier
+                .wrapContentSize(align = Alignment.TopStart, unbounded = true)
+                .then(modifier)
                 .padding(8.dp)
                 .wrapContentWidth()
                 .testTag("fct_container")
