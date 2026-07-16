@@ -226,7 +226,7 @@ fun InkyModule(
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
             if (showBottomBar) {
-                showBottomBar = false
+                keyboardController?.hide()
             }
         } else {
             isControlsVisible = true
@@ -309,7 +309,7 @@ fun InkyModule(
 
     var fctOffset by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset(16, 16)) }
 
-    val dummyTextToolbar = remember {
+    val dummyTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp) {
         object : androidx.compose.ui.platform.TextToolbar {
             override fun showMenu(
                 rect: androidx.compose.ui.geometry.Rect,
@@ -320,8 +320,13 @@ fun InkyModule(
             ) {
                 showFct = true
                 fctContext = "text"
-                val x = (rect.left + (rect.width - 200f) / 2f).coerceIn(16f, 800f)
-                val y = (rect.top - 150f).coerceIn(16f, 1500f)
+                val cardWidthPx = if (isWebView) (screenWidthDp * density) else (320 * zoomScale * density)
+                val fctWidthPx = 220 * density
+                val fctHeightPx = 60 * density
+                val maxX = (cardWidthPx - fctWidthPx).coerceAtLeast(16 * density)
+                val minX = 16 * density
+                val x = (rect.left + (rect.width - fctWidthPx) / 2f).coerceIn(minX, maxX)
+                val y = (rect.top - fctHeightPx - 20 * density).coerceAtLeast(16 * density)
                 fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
             }
 
@@ -812,20 +817,6 @@ fun InkyModule(
                                             }
                                         )
 
-                                        if (showBottomBar) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .matchParentSize()
-                                                    .pointerInput(Unit) {
-                                                        detectTapGestures(
-                                                            onTap = { /* consume and do nothing */ },
-                                                            onDoubleTap = { /* consume and do nothing */ },
-                                                            onLongPress = { /* consume and do nothing */ }
-                                                        )
-                                                    }
-                                            )
-                                        }
-
                                         if (showFct) {
                                             FloatingContextualToolbar(
                                                 visible = true,
@@ -1004,20 +995,6 @@ fun InkyModule(
                                             innerTextField()
                                         }
                                     )
-
-                                    if (showBottomBar) {
-                                        Box(
-                                            modifier = Modifier
-                                                .matchParentSize()
-                                                .pointerInput(Unit) {
-                                                    detectTapGestures(
-                                                        onTap = { /* consume and do nothing */ },
-                                                        onDoubleTap = { /* consume and do nothing */ },
-                                                        onLongPress = { /* consume and do nothing */ }
-                                                    )
-                                                }
-                                        )
-                                    }
 
                                     if (showFct) {
                                         FloatingContextualToolbar(
