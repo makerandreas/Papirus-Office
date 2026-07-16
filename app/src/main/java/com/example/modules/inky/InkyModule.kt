@@ -95,8 +95,30 @@ fun InkyModule(
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
-    var docBodyText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue("")) }
+    var docBodyText by remember {
+        mutableStateOf(
+            androidx.compose.ui.text.input.TextFieldValue(
+                "Buka Inky \u2192 Masuk Editor Mode \u2192 Keyboard tidak muncul otomatis \u2192 Buka Keyboard via tap viewfinder \u2192 Keyboard muncul \u2192 Scroll keatas \u2192 App Bar muncul. Perfect!"
+            )
+        )
+    }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
+
+    val wordCount = remember(docBodyText.text) {
+        val text = docBodyText.text.trim()
+        if (text.isEmpty()) {
+            0
+        } else {
+            text.split("\\s+".toRegex()).count { word ->
+                word.any { it.isLetterOrDigit() }
+            }
+        }
+    }
+
+    val pageCount = remember(wordCount) {
+        val calc = (wordCount + 15) / 16
+        if (calc < 1) 1 else calc
+    }
 
     // LibreOffice Kit Diagnostics Logs State
     val lokitLogs = remember {
@@ -253,7 +275,6 @@ fun InkyModule(
         coroutineScope.launch {
             delay(1500)
             isSaved = true
-            Toast.makeText(context, "Dokumen disimpan otomatis ke local sync!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -264,6 +285,8 @@ fun InkyModule(
     val textSecondaryColor = if (isDarkDocument) Color(0xFFA8A6A3) else Color.DarkGray
     val textAccentColor = if (isDarkDocument) Color(0xFF60A5FA) else Color(0xFF2563EB)
     val borderStrokeColor = if (isDarkDocument) Color(0xFF3C3F41) else Color(0xFFE2E8F0)
+
+    var fctOffset by remember { mutableStateOf(androidx.compose.ui.unit.IntOffset(16, 16)) }
 
     val dummyTextToolbar = remember {
         object : androidx.compose.ui.platform.TextToolbar {
@@ -276,6 +299,9 @@ fun InkyModule(
             ) {
                 showFct = true
                 fctContext = "text"
+                val x = (rect.left + (rect.width - 200f) / 2f).coerceIn(16f, 800f)
+                val y = (rect.top - 150f).coerceIn(16f, 1500f)
+                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
             }
 
             override fun hide() {
@@ -357,14 +383,6 @@ fun InkyModule(
                                     onDismissRequest = { showMoreMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("Share") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Membuka Share Sheet...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
-                                    )
-                                    DropdownMenuItem(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
@@ -374,16 +392,7 @@ fun InkyModule(
                                         leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Save") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            triggerAutosave()
-                                            addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\")")
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Save as") },
+                                        text = { Text("Save as...") },
                                         onClick = {
                                             showMoreMenu = false
                                             Toast.makeText(context, "Menyimpan salinan...", Toast.LENGTH_SHORT).show()
@@ -397,32 +406,6 @@ fun InkyModule(
                                             isDarkDocument = !isDarkDocument
                                         },
                                         leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Read it Aloud") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Membacakan dokumen...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Open Navigator Bar") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showBottomBar = true
-                                            bottomBarDeck = "navigator"
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Document Version History") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showBottomBar = true
-                                            bottomBarDeck = "version_history"
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.History, contentDescription = "History") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Print") },
@@ -656,8 +639,18 @@ fun InkyModule(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                // Interactive document container
-                Column(
+                val currentDensity = androidx.compose.ui.platform.LocalDensity.current
+                val customDensity = remember(currentDensity) {
+                    androidx.compose.ui.unit.Density(
+                        density = currentDensity.density,
+                        fontScale = 1.0f
+                    )
+                }
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.ui.platform.LocalDensity provides customDensity
+                ) {
+                    // Interactive document container
+                    Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(scrollState)
@@ -684,21 +677,29 @@ fun InkyModule(
                                     .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
                                     .pointerInput(Unit) {
                                         detectTapGestures(
-                                            onDoubleTap = {
+                                            onDoubleTap = { tapOffset ->
                                                 showFct = true
                                                 fctContext = "text"
+                                                val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
+                                                val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
+                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
                                             },
-                                            onLongPress = {
+                                            onLongPress = { tapOffset ->
                                                 showFct = true
                                                 fctContext = "text"
+                                                val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
+                                                val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
+                                                fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
                                             },
                                             onTap = {
-                                                // Tap outside dismisses toolbar decks
-                                                showBottomBar = false
-                                                showFct = false
-                                                if (isEditMode) {
-                                                    focusRequester.requestFocus()
-                                                    keyboardController?.show()
+                                                if (!showBottomBar) {
+                                                    showFct = false
+                                                    if (isEditMode) {
+                                                        focusRequester.requestFocus()
+                                                        keyboardController?.show()
+                                                    }
+                                                } else {
+                                                    showFct = false
                                                 }
                                             }
                                         )
@@ -748,9 +749,6 @@ fun InkyModule(
                                         androidx.compose.foundation.text.BasicTextField(
                                             value = docBodyText,
                                             onValueChange = {
-                                                if (it.text == docBodyText.text && it.selection != docBodyText.selection) {
-                                                    showFct = false
-                                                }
                                                 docBodyText = it
                                                 isSaved = false
                                                 triggerAutosave()
@@ -780,6 +778,52 @@ fun InkyModule(
                                                 innerTextField()
                                             }
                                         )
+
+                                        if (showFct) {
+                                            FloatingContextualToolbar(
+                                                visible = true,
+                                                contextType = fctContext,
+                                                modifier = Modifier.offset { fctOffset },
+                                                onActionClick = { action ->
+                                                    showFct = false
+                                                    when (action) {
+                                                        "cut" -> {
+                                                            val currentText = docBodyText.text
+                                                            val sel = docBodyText.selection
+                                                            if (!sel.collapsed) {
+                                                                val selectedText = currentText.substring(sel.start, sel.end)
+                                                                val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
+                                                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                                                    text = newText,
+                                                                    selection = androidx.compose.ui.text.TextRange(sel.start)
+                                                                )
+                                                                triggerAutosave()
+                                                            }
+                                                        }
+                                                        "copy" -> {
+                                                            val sel = docBodyText.selection
+                                                            if (!sel.collapsed) {
+                                                                val selectedText = docBodyText.text.substring(sel.start, sel.end)
+                                                            }
+                                                        }
+                                                        "paste" -> {
+                                                            val currentText = docBodyText.text
+                                                            val sel = docBodyText.selection
+                                                            val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
+                                                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                                                text = newText,
+                                                                selection = androidx.compose.ui.text.TextRange(sel.start + 1)
+                                                            )
+                                                            triggerAutosave()
+                                                        }
+                                                        "ai_write" -> {
+                                                            aiPrompt = "Analyze and summarize this setup layout..."
+                                                            showAiAssistant = true
+                                                        }
+                                                    }
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -793,20 +837,29 @@ fun InkyModule(
                                 .border(1.dp, borderStrokeColor, RoundedCornerShape(12.dp))
                                 .pointerInput(Unit) {
                                     detectTapGestures(
-                                        onDoubleTap = {
+                                        onDoubleTap = { tapOffset ->
                                             showFct = true
                                             fctContext = "text"
+                                            val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
+                                            val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
+                                            fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
                                         },
-                                        onLongPress = {
+                                        onLongPress = { tapOffset ->
                                             showFct = true
                                             fctContext = "text"
+                                            val x = (tapOffset.x - 100f).coerceIn(16f, 800f)
+                                            val y = (tapOffset.y - 120f).coerceIn(16f, 1500f)
+                                            fctOffset = androidx.compose.ui.unit.IntOffset(x.toInt(), y.toInt())
                                         },
                                         onTap = {
-                                            showBottomBar = false
-                                            showFct = false
-                                            if (isEditMode) {
-                                                focusRequester.requestFocus()
-                                                keyboardController?.show()
+                                            if (!showBottomBar) {
+                                                showFct = false
+                                                if (isEditMode) {
+                                                    focusRequester.requestFocus()
+                                                    keyboardController?.show()
+                                                }
+                                            } else {
+                                                showFct = false
                                             }
                                         }
                                     )
@@ -850,55 +903,101 @@ fun InkyModule(
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
 
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = docBodyText,
-                                    onValueChange = {
-                                        if (it.text == docBodyText.text && it.selection != docBodyText.selection) {
-                                            showFct = false
-                                        }
-                                        docBodyText = it
-                                        isSaved = false
-                                        triggerAutosave()
-                                        addLokitLog("LOK_CALLBACK_INVALIDATE_TILES (Web mode edit)")
-                                        addLokitLog("lok::Document::renderTile() -> Web bounds")
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(min = 350.dp)
-                                        .focusRequester(focusRequester),
-                                    readOnly = !isEditMode,
-                                    textStyle = androidx.compose.ui.text.TextStyle(
-                                        fontSize = (activeFontSize * zoomScale).sp,
-                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                        textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                        fontFamily = when (activeFontFamily) {
-                                            "Aptos Display" -> FontFamily.SansSerif
-                                            "Calibri" -> FontFamily.SansSerif
-                                            "Arial" -> FontFamily.SansSerif
-                                            "Roboto" -> FontFamily.SansSerif
-                                            else -> FontFamily.Default
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    androidx.compose.foundation.text.BasicTextField(
+                                        value = docBodyText,
+                                        onValueChange = {
+                                            docBodyText = it
+                                            isSaved = false
+                                            triggerAutosave()
+                                            addLokitLog("LOK_CALLBACK_INVALIDATE_TILES (Web mode edit)")
+                                            addLokitLog("lok::Document::renderTile() -> Web bounds")
                                         },
-                                        color = textPrimaryColor,
-                                        textAlign = textAlignment
-                                    ),
-                                    decorationBox = { innerTextField ->
-                                        if (docBodyText.text.isEmpty()) {
-                                            Text(
-                                                text = "Mulai mengetik di tampilan seluler ini...",
-                                                color = Color.Gray.copy(alpha = 0.7f),
-                                                fontSize = (activeFontSize * zoomScale).sp,
-                                                fontFamily = FontFamily.SansSerif
-                                            )
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 350.dp)
+                                            .focusRequester(focusRequester),
+                                        readOnly = !isEditMode,
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            fontSize = (activeFontSize * zoomScale).sp,
+                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                            textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                            fontFamily = when (activeFontFamily) {
+                                                "Aptos Display" -> FontFamily.SansSerif
+                                                "Calibri" -> FontFamily.SansSerif
+                                                "Arial" -> FontFamily.SansSerif
+                                                "Roboto" -> FontFamily.SansSerif
+                                                else -> FontFamily.Default
+                                            },
+                                            color = textPrimaryColor,
+                                            textAlign = textAlignment
+                                        ),
+                                        decorationBox = { innerTextField ->
+                                            if (docBodyText.text.isEmpty()) {
+                                                Text(
+                                                    text = "Mulai mengetik di tampilan seluler ini...",
+                                                    color = Color.Gray.copy(alpha = 0.7f),
+                                                    fontSize = (activeFontSize * zoomScale).sp,
+                                                    fontFamily = FontFamily.SansSerif
+                                                )
+                                            }
+                                            innerTextField()
                                         }
-                                        innerTextField()
+                                    )
+
+                                    if (showFct) {
+                                        FloatingContextualToolbar(
+                                            visible = true,
+                                            contextType = fctContext,
+                                            modifier = Modifier.offset { fctOffset },
+                                            onActionClick = { action ->
+                                                showFct = false
+                                                when (action) {
+                                                    "cut" -> {
+                                                        val currentText = docBodyText.text
+                                                        val sel = docBodyText.selection
+                                                        if (!sel.collapsed) {
+                                                            val selectedText = currentText.substring(sel.start, sel.end)
+                                                            val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
+                                                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                                                text = newText,
+                                                                selection = androidx.compose.ui.text.TextRange(sel.start)
+                                                            )
+                                                            triggerAutosave()
+                                                        }
+                                                    }
+                                                    "copy" -> {
+                                                        val sel = docBodyText.selection
+                                                        if (!sel.collapsed) {
+                                                            val selectedText = docBodyText.text.substring(sel.start, sel.end)
+                                                        }
+                                                    }
+                                                    "paste" -> {
+                                                        val currentText = docBodyText.text
+                                                        val sel = docBodyText.selection
+                                                        val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
+                                                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                                            text = newText,
+                                                            selection = androidx.compose.ui.text.TextRange(sel.start + 1)
+                                                        )
+                                                        triggerAutosave()
+                                                    }
+                                                    "ai_write" -> {
+                                                        aiPrompt = "Analyze and summarize this setup layout..."
+                                                        showAiAssistant = true
+                                                    }
+                                                }
+                                            }
+                                        )
                                     }
-                                )
+                                }
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
+                }
                 }
 
                 // --- FLOATING ACTION BUTTON (Viewer Mode Only) ---
@@ -906,7 +1005,6 @@ fun InkyModule(
                     ExtendedFloatingActionButton(
                         onClick = { 
                             isEditMode = true
-                            Toast.makeText(context, "Beralih ke Mode Edit", Toast.LENGTH_SHORT).show()
                         },
                         icon = { Icon(Icons.Default.Edit, contentDescription = "Edit") },
                         text = { Text("Edit Document") },
@@ -918,28 +1016,6 @@ fun InkyModule(
                         contentColor = Color.White
                     )
                 }
-
-                // --- FLOATING CONTEXTUAL TOOLBAR (FCT Overlay) ---
-                FloatingContextualToolbar(
-                    visible = showFct,
-                    contextType = fctContext,
-                    onActionClick = { action ->
-                        showFct = false
-                        when (action) {
-                            "cut" -> Toast.makeText(context, "Teks dipotong ke clipboard", Toast.LENGTH_SHORT).show()
-                            "copy" -> Toast.makeText(context, "Teks disalin ke clipboard", Toast.LENGTH_SHORT).show()
-                            "paste" -> Toast.makeText(context, "Teks ditempel dari clipboard", Toast.LENGTH_SHORT).show()
-                            "delete" -> Toast.makeText(context, "Elemen dihapus", Toast.LENGTH_SHORT).show()
-                            "edit_data" -> {
-                                Toast.makeText(context, "Membuka editor tabel...", Toast.LENGTH_SHORT).show()
-                            }
-                            "ai_write" -> {
-                                aiPrompt = "Analyze and summarize this setup layout..."
-                                showAiAssistant = true
-                            }
-                        }
-                    }
-                )
             }
 
             // --- FOOTER STATS & STATUS BAR (Always visible in document workspaces) ---
@@ -956,13 +1032,13 @@ fun InkyModule(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Halaman 1 dari 2",
+                        text = "Halaman 1 dari $pageCount",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Gray
                     )
                     Text(
-                        text = "312 kata",
+                        text = "$wordCount kata",
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
@@ -1026,7 +1102,6 @@ fun InkyModule(
                                 item {
                                     IconButton(onClick = {
                                         triggerAutosave()
-                                        Toast.makeText(context, "Dokumen disimpan otomatis!", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\") -> SUCCESS")
                                     }) {
                                         Icon(Icons.Rounded.Save, contentDescription = "Simpan", tint = MaterialTheme.colorScheme.primary)
@@ -1035,7 +1110,6 @@ fun InkyModule(
                                 item {
                                     IconButton(onClick = {
                                         triggerAutosave()
-                                        Toast.makeText(context, "Undo", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=UNDO) -> SUCCESS")
                                     }) {
                                         Icon(Icons.Rounded.Undo, contentDescription = "Undo", tint = MaterialTheme.colorScheme.primary)
@@ -1044,7 +1118,6 @@ fun InkyModule(
                                 item {
                                     IconButton(onClick = {
                                         triggerAutosave()
-                                        Toast.makeText(context, "Redo", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=REDO) -> SUCCESS")
                                     }) {
                                         Icon(Icons.Rounded.Redo, contentDescription = "Redo", tint = MaterialTheme.colorScheme.primary)
@@ -1070,7 +1143,6 @@ fun InkyModule(
                                 }
                                 item {
                                     IconButton(onClick = {
-                                        Toast.makeText(context, "Sinkronisasi cloud diaktifkan", Toast.LENGTH_SHORT).show()
                                         addLokitLog("Cloud upload triggered")
                                     }) {
                                         Icon(Icons.Rounded.CloudUpload, contentDescription = "Cloud Sync", tint = MaterialTheme.colorScheme.primary)
@@ -1183,7 +1255,7 @@ fun InkyModule(
                             IconButton(
                                 onClick = {
                                     activeToolbarType = if (activeToolbarType == "Standard") "Formatting" else "Standard"
-                                    Toast.makeText(context, "Toolbar beralih ke $activeToolbarType", Toast.LENGTH_SHORT).show()
+
                                 }
                             ) {
                                 Icon(
@@ -1206,7 +1278,7 @@ fun InkyModule(
                                         selection = newSelection
                                     )
                                     triggerAutosave()
-                                    Toast.makeText(context, "Karakter Tab dimasukkan", Toast.LENGTH_SHORT).show()
+
                                 }
                             ) {
                                 Icon(
@@ -1220,11 +1292,9 @@ fun InkyModule(
                                 onClick = {
                                     if (isKeyboardVisible) {
                                         keyboardController?.hide()
-                                        Toast.makeText(context, "Keyboard virtual ditutup", Toast.LENGTH_SHORT).show()
                                     } else {
                                         focusRequester.requestFocus()
                                         keyboardController?.show()
-                                        Toast.makeText(context, "Keyboard virtual dipicu", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                             ) {
@@ -1353,13 +1423,11 @@ fun InkyModule(
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 IconButton(onClick = { 
                                     triggerAutosave()
-                                    Toast.makeText(context, "Undo", Toast.LENGTH_SHORT).show() 
                                 }) {
                                     Icon(Icons.Default.Undo, contentDescription = "Undo")
                                 }
                                 IconButton(onClick = { 
                                     triggerAutosave()
-                                    Toast.makeText(context, "Redo", Toast.LENGTH_SHORT).show() 
                                 }) {
                                     Icon(Icons.Default.Redo, contentDescription = "Redo")
                                 }
@@ -1580,7 +1648,7 @@ fun InkyModule(
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text("AI Proofread")
                                                 }
-                                                OutlinedButton(onClick = { Toast.makeText(context, "Word Count: 312 words, 2048 characters", Toast.LENGTH_LONG).show() }) {
+                                                OutlinedButton(onClick = { Toast.makeText(context, "Word Count: $wordCount words, ${docBodyText.text.length} characters", Toast.LENGTH_LONG).show() }) {
                                                     Text("Jumlah Kata")
                                                 }
                                             }

@@ -454,6 +454,7 @@ fun RibbonFullView(
 fun FloatingContextualToolbar(
     visible: Boolean,
     contextType: String, // "text", "calc_cell", "calc_multi", "image", "chart"
+    modifier: Modifier = Modifier,
     onActionClick: (String) -> Unit
 ) {
     if (visible) {
@@ -461,7 +462,7 @@ fun FloatingContextualToolbar(
             shape = RoundedCornerShape(8.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            modifier = Modifier
+            modifier = modifier
                 .padding(8.dp)
                 .wrapContentWidth()
                 .testTag("fct_container")
