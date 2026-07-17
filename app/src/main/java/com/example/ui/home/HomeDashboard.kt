@@ -86,20 +86,72 @@ fun HomeDashboard(
                     )
                 }
 
-                // Profile initials avatar "MA"
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(Color(0xFFE2E8F0), shape = RoundedCornerShape(20.dp))
-                        .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "MA",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF475569)
-                    )
+                // Profile initials avatar "MA" with context menu trigger
+                var showContextMenu by remember { mutableStateOf(false) }
+
+                Box {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color(0xFFE2E8F0), shape = RoundedCornerShape(20.dp))
+                                .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp))
+                                .clickable { showContextMenu = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "MA",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF475569)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { showContextMenu = true },
+                            modifier = Modifier.size(36.dp).testTag("btn_start_center_menu")
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Menu Konteks",
+                                tint = Color(0xFF475569)
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showContextMenu,
+                        onDismissRequest = { showContextMenu = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        "Diagnostic & Crash Reports",
+                                        color = Color(0xFF1E293B),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            },
+                            onClick = {
+                                showContextMenu = false
+                                onNavigateToModule("crash_logs")
+                            }
+                        )
+                    }
                 }
             }
 

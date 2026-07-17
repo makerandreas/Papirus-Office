@@ -32,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +69,36 @@ fun android.content.Context.findActivity(): androidx.activity.ComponentActivity?
     return null
 }
 
+fun partitionTextToPages(text: String, maxLinesPerPage: Int = 15): List<String> {
+    val rawText = text
+    if (rawText.isEmpty()) return listOf("")
+    
+    val rawParagraphs = rawText.split("\n")
+    val pages = mutableListOf<String>()
+    var currentPageLines = mutableListOf<String>()
+    var currentLinesCount = 0
+    
+    rawParagraphs.forEach { paragraph ->
+        // Estimate line wraps: assume ~40 characters per line
+        val approxLinesInParagraph = maxOf(1, (paragraph.length + 39) / 40)
+        
+        if (currentLinesCount + approxLinesInParagraph > maxLinesPerPage && currentPageLines.isNotEmpty()) {
+            pages.add(currentPageLines.joinToString("\n"))
+            currentPageLines = mutableListOf()
+            currentLinesCount = 0
+        }
+        
+        currentPageLines.add(paragraph)
+        currentLinesCount += approxLinesInParagraph
+    }
+    
+    if (currentPageLines.isNotEmpty() || pages.isEmpty()) {
+        pages.add(currentPageLines.joinToString("\n"))
+    }
+    
+    return pages
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InkyModule(
@@ -98,8 +130,11 @@ fun InkyModule(
     val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     val screenHeightDp = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
     var isFctShownByTap by remember { mutableStateOf(false) }
-    var fctDismissedByScrollZoom by remember { mutableStateOf(false) }
     var pageBoxCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    var previousScrollBeforeKeyboard by remember { mutableStateOf(0) }
+    var bodyTextLayoutResult by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    var bodyTextFieldCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    var viewportCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     val isKeyboardVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
@@ -126,9 +161,12 @@ fun InkyModule(
         }
     }
 
-    val pageCount = remember(wordCount) {
-        val calc = (wordCount + 249) / 250
-        if (calc < 1) 1 else calc
+    val pagesList = remember(docBodyText.text) {
+        partitionTextToPages(docBodyText.text)
+    }
+
+    val pageCount = remember(pagesList) {
+        pagesList.size
     }
 
     val wordsBeforeCursor = remember(docBodyText.text, docBodyText.selection) {
@@ -234,12 +272,15 @@ fun InkyModule(
         if (isKeyboardVisible) {
             isControlsVisible = true
             showFct = false
-            fctDismissedByScrollZoom = true
             if (showBottomBar) {
                 keyboardController?.hide()
+            } else {
+                // Restore scroll position to prevent autoscroll-up
+                scrollState.scrollTo(previousScrollBeforeKeyboard)
             }
         } else {
             isControlsVisible = true
+            previousScrollBeforeKeyboard = scrollState.value
         }
     }
 
@@ -260,6 +301,9 @@ fun InkyModule(
     }
 
     LaunchedEffect(scrollState.value) {
+        if (!isKeyboardVisible) {
+            previousScrollBeforeKeyboard = scrollState.value
+        }
         if (isKeyboardVisible) {
             isControlsVisible = true
             previousScrollValue = scrollState.value
@@ -362,6 +406,11 @@ fun InkyModule(
     var showSizeMenuInToolbar by remember { mutableStateOf(false) }
     var showToolbarPagesMenu by remember { mutableStateOf(false) }
 
+    var textToolbarCopyCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var textToolbarPasteCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var textToolbarCutCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var textToolbarSelectAllCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
+
     val dummyTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp, horizScrollState.value) {
         object : androidx.compose.ui.platform.TextToolbar {
             override fun showMenu(
@@ -371,15 +420,20 @@ fun InkyModule(
                 onCut: (() -> Unit)?,
                 onSelectAll: (() -> Unit)?
             ) {
-                if (fctDismissedByScrollZoom) {
-                    return
-                }
+                textToolbarCopyCallback = onCopy
+                textToolbarPasteCallback = onPaste
+                textToolbarCutCallback = onCut
+                textToolbarSelectAllCallback = onSelectAll
+
+                val textLocalOffset = androidx.compose.ui.geometry.Offset(rect.left + rect.width / 2f, rect.top)
+                val windowOffset = pageBoxCoordinates?.localToWindow(textLocalOffset) ?: textLocalOffset
+
                 showFct = true
                 isFctShownByTap = true
                 fctContext = "text"
                 fctOffset = calculateFctOffset(
-                    targetX = rect.left + rect.width / 2f,
-                    targetY = rect.top,
+                    targetX = windowOffset.x,
+                    targetY = windowOffset.y,
                     zoomScale = zoomScale,
                     density = density,
                     screenWidthDp = screenWidthDp,
@@ -401,17 +455,84 @@ fun InkyModule(
     var lastZoomScale by remember { mutableStateOf(zoomScale) }
     if (lastZoomScale != zoomScale) {
         showFct = false
-        fctDismissedByScrollZoom = true
         lastZoomScale = zoomScale
     }
     if (scrollState.isScrollInProgress || horizScrollState.isScrollInProgress) {
         showFct = false
-        fctDismissedByScrollZoom = true
     }
 
-    LaunchedEffect(scrollState.value, horizScrollState.value, zoomScale) {
+    LaunchedEffect(zoomScale) {
         showFct = false
-        fctDismissedByScrollZoom = true
+    }
+
+    var previousZoomScale by remember { mutableStateOf(zoomScale) }
+    LaunchedEffect(zoomScale) {
+        val oldScale = previousZoomScale
+        val newScale = zoomScale
+        if (oldScale != newScale) {
+            val ratio = newScale / oldScale
+            val halfScreenWidthPx = (screenWidthDp * density) / 2f
+            val halfScreenHeightPx = (screenHeightDp * density) / 2f
+            
+            val currentH = horizScrollState.value
+            val currentV = scrollState.value
+            
+            val targetH = ((currentH + halfScreenWidthPx) * ratio - halfScreenWidthPx).toInt()
+            val targetV = ((currentV + halfScreenHeightPx) * ratio - halfScreenHeightPx).toInt()
+            
+            horizScrollState.scrollTo(targetH.coerceAtLeast(0))
+            scrollState.scrollTo(targetV.coerceAtLeast(0))
+            
+            previousZoomScale = newScale
+        }
+    }
+
+    LaunchedEffect(docBodyText.selection, docBodyText.text) {
+        delay(50)
+        val cursorOffset = docBodyText.selection.start
+        if (cursorOffset >= 0 && cursorOffset <= docBodyText.text.length) {
+            val layoutResult = bodyTextLayoutResult
+            val localCursorRect = if (layoutResult != null && cursorOffset <= layoutResult.layoutInput.text.length) {
+                try {
+                    layoutResult.getCursorRect(cursorOffset)
+                } catch (e: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+            val textFieldCoords = bodyTextFieldCoordinates
+            val viewportCoords = viewportCoordinates
+            if (localCursorRect != null && textFieldCoords != null && viewportCoords != null && textFieldCoords.isAttached && viewportCoords.isAttached) {
+                val cursorTopLeftInViewport = viewportCoords.localPositionOf(textFieldCoords, localCursorRect.topLeft)
+                val cursorBottomRightInViewport = viewportCoords.localPositionOf(textFieldCoords, localCursorRect.bottomRight)
+                
+                val viewportWidth = viewportCoords.size.width
+                val viewportHeight = viewportCoords.size.height
+                
+                val paddingPx = 32 * density
+                
+                val cursorLeft = cursorTopLeftInViewport.x
+                val cursorRight = cursorBottomRightInViewport.x
+                if (cursorLeft < paddingPx) {
+                    val delta = (cursorLeft - paddingPx).toInt()
+                    horizScrollState.scrollTo((horizScrollState.value + delta).coerceAtLeast(0))
+                } else if (cursorRight > viewportWidth - paddingPx) {
+                    val delta = (cursorRight - (viewportWidth - paddingPx)).toInt()
+                    horizScrollState.scrollTo(horizScrollState.value + delta)
+                }
+                
+                val cursorTop = cursorTopLeftInViewport.y
+                val cursorBottom = cursorBottomRightInViewport.y
+                if (cursorTop < paddingPx) {
+                    val delta = (cursorTop - paddingPx).toInt()
+                    scrollState.scrollTo((scrollState.value + delta).coerceAtLeast(0))
+                } else if (cursorBottom > viewportHeight - paddingPx) {
+                    val delta = (cursorBottom - (viewportHeight - paddingPx)).toInt()
+                    scrollState.scrollTo(scrollState.value + delta)
+                }
+            }
+        }
     }
 
     androidx.compose.runtime.CompositionLocalProvider(
@@ -422,7 +543,7 @@ fun InkyModule(
                 .fillMaxSize()
                 .background(docBgColor)
         ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
             
             // --- HEADER TOP APP BAR ---
             // Hidden temporarily if bottom bar is opened or scrolling hides it
@@ -764,6 +885,7 @@ fun InkyModule(
                     Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onGloballyPositioned { viewportCoordinates = it }
                         .verticalScroll(scrollState)
                         .background(docBgColor)
                         .padding(if (isWebView) 0.dp else 16.dp),
@@ -778,158 +900,281 @@ fun InkyModule(
                                 .horizontalScroll(horizScrollState),
                             contentAlignment = if (zoomScale > 1f) Alignment.CenterStart else Alignment.Center
                         ) {
-                            Card(
-                                modifier = Modifier
-                                    .padding(vertical = 24.dp, horizontal = 16.dp)
-                                    .width((320 * zoomScale).dp)
-                                    .aspectRatio(1f / 1.414f) // Perfect A4 paper aspect ratio
-                                    .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
-                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                    .onGloballyPositioned { pageBoxCoordinates = it }
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onDoubleTap = { tapOffset ->
-                                                if (!showBottomBar) {
-                                                    showFct = true
-                                                    isFctShownByTap = true
-                                                    fctContext = "text"
-                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                    fctOffset = calculateFctOffset(
-                                                        targetX = rootOffset.x,
-                                                        targetY = rootOffset.y,
-                                                        zoomScale = zoomScale,
-                                                        density = density,
-                                                        screenWidthDp = screenWidthDp,
-                                                        screenHeightDp = screenHeightDp
-                                                    )
-                                                }
-                                            },
-                                            onLongPress = { tapOffset ->
-                                                if (!showBottomBar) {
-                                                    showFct = true
-                                                    isFctShownByTap = true
-                                                    fctContext = "text"
-                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                    fctOffset = calculateFctOffset(
-                                                        targetX = rootOffset.x,
-                                                        targetY = rootOffset.y,
-                                                        zoomScale = zoomScale,
-                                                        density = density,
-                                                        screenWidthDp = screenWidthDp,
-                                                        screenHeightDp = screenHeightDp
-                                                    )
-                                                }
-                                            },
-                                            onTap = { tapOffset ->
-                                                if (!showBottomBar) {
-                                                    if (wasFctVisibleOnPress) {
-                                                        wasFctVisibleOnPress = false
-                                                    } else {
-                                                        showFct = true
-                                                        isFctShownByTap = true
-                                                        fctContext = "text"
-                                                        val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                        fctOffset = calculateFctOffset(
-                                                            targetX = rootOffset.x,
-                                                            targetY = rootOffset.y,
-                                                            zoomScale = zoomScale,
-                                                            density = density,
-                                                            screenWidthDp = screenWidthDp,
-                                                            screenHeightDp = screenHeightDp
+                            if (!isEditMode) {
+                                // --- VIEWER MODE: MULTIPLE PAGES DISPLAYED VERTICALLY ---
+                                Column(
+                                    modifier = Modifier.padding(vertical = 16.dp),
+                                    verticalArrangement = Arrangement.spacedBy((16 * zoomScale).dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    pagesList.forEachIndexed { index, pageText ->
+                                        // Precise JNI-like render logging
+                                        androidx.compose.runtime.LaunchedEffect(zoomScale) {
+                                            com.example.core.jni.LibreOfficeCore.renderPageToBuffer(
+                                                docPath = "Inky_Dokumen.odt",
+                                                pageIndex = index,
+                                                outputBuffer = ByteArray(0),
+                                                width = (320 * zoomScale).toInt(),
+                                                height = (452 * zoomScale).toInt()
+                                            )
+                                        }
+
+                                        val pageHeight = 452
+                                        Box(
+                                            modifier = Modifier
+                                                .width((320 * zoomScale).dp)
+                                                .height((pageHeight * zoomScale).dp)
+                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                            contentAlignment = Alignment.TopStart
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .requiredSize(320.dp, pageHeight.dp)
+                                                    .graphicsLayer {
+                                                        scaleX = zoomScale
+                                                        scaleY = zoomScale
+                                                        transformOrigin = TransformOrigin(0f, 0f)
+                                                    }
+                                                    .background(pageBgColor)
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(24.dp)
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f)
+                                                            .fillMaxWidth()
+                                                            .border(
+                                                                width = 1.dp,
+                                                                color = borderStrokeColor.copy(alpha = 0.4f),
+                                                                shape = RoundedCornerShape(2.dp)
+                                                            )
+                                                            .padding(16.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = pageText,
+                                                            style = androidx.compose.ui.text.TextStyle(
+                                                                fontSize = activeFontSize.sp,
+                                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                                fontFamily = when (activeFontFamily) {
+                                                                    "Aptos Display" -> FontFamily.SansSerif
+                                                                    "Calibri" -> FontFamily.SansSerif
+                                                                    "Arial" -> FontFamily.SansSerif
+                                                                    "Roboto" -> FontFamily.SansSerif
+                                                                    else -> FontFamily.Default
+                                                                },
+                                                                color = textPrimaryColor,
+                                                                textAlign = textAlignment
+                                                            )
                                                         )
                                                     }
-                                                    if (isEditMode) {
-                                                        focusRequester.requestFocus()
-                                                        keyboardController?.show()
+                                                    
+                                                    // Page number footer inside page
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(top = 4.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "Halaman ${index + 1} dari ${pagesList.size}",
+                                                            fontSize = 10.sp,
+                                                            color = Color.Gray
+                                                        )
                                                     }
                                                 }
                                             }
-                                        )
+                                        }
                                     }
-                                    .pointerInput(Unit) {
-                                        awaitPointerEventScope {
-                                            while (true) {
-                                                val event = awaitPointerEvent()
-                                                val canceled = event.changes.any { it.isConsumed }
-                                                if (!canceled) {
-                                                    val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
-                                                    if (hasPressed) {
-                                                        wasFctVisibleOnPress = showFct
-                                                        fctDismissedByScrollZoom = false
-                                                        if (showFct) {
-                                                            showFct = false
+                                }
+                            } else {
+                                // --- EDITOR MODE: DYNAMIC EXPANDING CARD WITH PRINT PAGE BREAKS ---
+                                val linesCount = docBodyText.text.split("\n").size
+                                val baseEditorHeight = maxOf(452, 100 + linesCount * 22)
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .width((320 * zoomScale).dp)
+                                        .height((baseEditorHeight * zoomScale).dp)
+                                        .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
+                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                    contentAlignment = Alignment.TopStart
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .requiredSize(320.dp, baseEditorHeight.dp)
+                                            .graphicsLayer {
+                                                scaleX = zoomScale
+                                                scaleY = zoomScale
+                                                transformOrigin = TransformOrigin(0f, 0f)
+                                            }
+                                            .background(pageBgColor)
+                                            .onGloballyPositioned { pageBoxCoordinates = it }
+                                            .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onDoubleTap = { tapOffset ->
+                                                        if (!showBottomBar) {
+                                                            showFct = true
+                                                            isFctShownByTap = true
+                                                            fctContext = "text"
+                                                            val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
+                                                            fctOffset = calculateFctOffset(
+                                                                targetX = rootOffset.x,
+                                                                targetY = rootOffset.y,
+                                                                zoomScale = zoomScale,
+                                                                density = density,
+                                                                screenWidthDp = screenWidthDp,
+                                                                screenHeightDp = screenHeightDp
+                                                            )
+                                                        }
+                                                    },
+                                                    onLongPress = { tapOffset ->
+                                                        if (!showBottomBar) {
+                                                            showFct = true
+                                                            isFctShownByTap = true
+                                                            fctContext = "text"
+                                                            val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
+                                                            fctOffset = calculateFctOffset(
+                                                                targetX = rootOffset.x,
+                                                                targetY = rootOffset.y,
+                                                                zoomScale = zoomScale,
+                                                                density = density,
+                                                                screenWidthDp = screenWidthDp,
+                                                                screenHeightDp = screenHeightDp
+                                                            )
+                                                        }
+                                                    },
+                                                    onTap = { tapOffset ->
+                                                        if (!showBottomBar) {
+                                                            if (wasFctVisibleOnPress) {
+                                                                wasFctVisibleOnPress = false
+                                                            } else {
+                                                                showFct = true
+                                                                isFctShownByTap = true
+                                                                fctContext = "text"
+                                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
+                                                                fctOffset = calculateFctOffset(
+                                                                    targetX = rootOffset.x,
+                                                                    targetY = rootOffset.y,
+                                                                    zoomScale = zoomScale,
+                                                                    density = density,
+                                                                    screenWidthDp = screenWidthDp,
+                                                                    screenHeightDp = screenHeightDp
+                                                                )
+                                                            }
+                                                            if (isEditMode) {
+                                                                focusRequester.requestFocus()
+                                                                keyboardController?.show()
+                                                            }
                                                         }
                                                     }
-                                                    if (event.changes.size >= 2) {
-                                                        val zoomChange = event.calculateZoom()
-                                                        if (zoomChange != 1f) {
-                                                            val newScale = zoomScale * zoomChange
-                                                            zoomScale = newScale.coerceIn(0.5f, 2.0f)
-                                                        }
-                                                        event.changes.forEach { change ->
-                                                            if (change.positionChanged()) {
-                                                                change.consume()
+                                                )
+                                            }
+                                            .pointerInput(Unit) {
+                                                awaitPointerEventScope {
+                                                    while (true) {
+                                                        val event = awaitPointerEvent()
+                                                        val canceled = event.changes.any { it.isConsumed }
+                                                        if (!canceled) {
+                                                            val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
+                                                            if (hasPressed) {
+                                                                wasFctVisibleOnPress = showFct
+                                                                if (showFct) {
+                                                                    showFct = false
+                                                                }
+                                                            }
+                                                            if (event.changes.size >= 2) {
+                                                                val zoomChange = event.calculateZoom()
+                                                                if (zoomChange != 1f) {
+                                                                    val newScale = zoomScale * zoomChange
+                                                                    zoomScale = newScale.coerceIn(0.5f, 2.0f)
+                                                                }
+                                                                event.changes.forEach { change ->
+                                                                    if (change.positionChanged()) {
+                                                                        change.consume()
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
-                                        }
-                                    },
-                                colors = CardDefaults.cardColors(containerColor = pageBgColor),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding((24 * zoomScale).dp)
-                                ) {
-                                    // Main Text Viewport
-                                    Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxWidth()
-                                            .border(
-                                                width = 1.dp,
-                                                color = borderStrokeColor.copy(alpha = 0.4f),
-                                                shape = RoundedCornerShape(2.dp)
-                                            )
-                                            .padding((16 * zoomScale).dp)
                                     ) {
-                                        androidx.compose.foundation.text.BasicTextField(
-                                            value = docBodyText,
-                                            onValueChange = {
-                                                docBodyText = it
-                                                isSaved = false
-                                                triggerAutosave()
-                                                addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
-                                                addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
-                                            },
+                                        Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .focusRequester(focusRequester),
-                                            readOnly = !isEditMode || showBottomBar,
-                                            textStyle = androidx.compose.ui.text.TextStyle(
-                                                fontSize = (activeFontSize * zoomScale).sp,
-                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                fontFamily = when (activeFontFamily) {
-                                                    "Aptos Display" -> FontFamily.SansSerif
-                                                    "Calibri" -> FontFamily.SansSerif
-                                                    "Arial" -> FontFamily.SansSerif
-                                                    "Roboto" -> FontFamily.SansSerif
-                                                    else -> FontFamily.Default
+                                                .padding(24.dp)
+                                        ) {
+                                            androidx.compose.foundation.text.BasicTextField(
+                                                value = docBodyText,
+                                                onValueChange = {
+                                                    docBodyText = it
+                                                    isSaved = false
+                                                    triggerAutosave()
+                                                    addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
+                                                    addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
                                                 },
-                                                color = textPrimaryColor,
-                                                textAlign = textAlignment
-                                            ),
-                                            decorationBox = { innerTextField ->
-                                                innerTextField()
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .onGloballyPositioned { bodyTextFieldCoordinates = it }
+                                                    .focusRequester(focusRequester),
+                                                onTextLayout = { bodyTextLayoutResult = it },
+                                                readOnly = false,
+                                                textStyle = androidx.compose.ui.text.TextStyle(
+                                                    fontSize = activeFontSize.sp,
+                                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                    textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                    fontFamily = when (activeFontFamily) {
+                                                        "Aptos Display" -> FontFamily.SansSerif
+                                                        "Calibri" -> FontFamily.SansSerif
+                                                        "Arial" -> FontFamily.SansSerif
+                                                        "Roboto" -> FontFamily.SansSerif
+                                                        else -> FontFamily.Default
+                                                    },
+                                                    color = textPrimaryColor,
+                                                    textAlign = textAlignment
+                                                ),
+                                                decorationBox = { innerTextField ->
+                                                    innerTextField()
+                                                }
+                                            )
+                                        }
+
+                                        // Subtle print page break divider lines
+                                        val pageHeightThreshold = 452
+                                        if (baseEditorHeight > pageHeightThreshold) {
+                                            val estimatedPageBreakCount = baseEditorHeight / pageHeightThreshold
+                                            for (p in 1..estimatedPageBreakCount) {
+                                                val breakY = p * pageHeightThreshold
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(top = (breakY - 12).dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.Center
+                                                    ) {
+                                                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                                                        Text(
+                                                            text = " Halaman ${p + 1} (Page Break) ",
+                                                            fontSize = 9.sp,
+                                                            color = Color.Gray.copy(alpha = 0.5f),
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
+                                                    }
+                                                }
                                             }
-                                        )
-
-
+                                        }
                                     }
                                 }
                             }
@@ -1011,7 +1256,6 @@ fun InkyModule(
                                                 val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
                                                 if (hasPressed) {
                                                     wasFctVisibleOnPress = showFct
-                                                    fctDismissedByScrollZoom = false
                                                     if (showFct) {
                                                         showFct = false
                                                     }
@@ -1062,8 +1306,10 @@ fun InkyModule(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(min = 350.dp)
+                                            .onGloballyPositioned { bodyTextFieldCoordinates = it }
                                             .focusRequester(focusRequester),
-                                        readOnly = !isEditMode || showBottomBar,
+                                        onTextLayout = { bodyTextLayoutResult = it },
+                                        readOnly = !isEditMode,
                                         textStyle = androidx.compose.ui.text.TextStyle(
                                             fontSize = (activeFontSize * zoomScale).sp,
                                             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
@@ -2277,49 +2523,68 @@ fun InkyModule(
     }
 
     if (showFct) {
-        FloatingContextualToolbar(
-            visible = true,
-            contextType = fctContext,
-            modifier = Modifier.offset { fctOffset },
-            onActionClick = { action ->
-                showFct = false
-                when (action) {
-                    "cut" -> {
-                        val currentText = docBodyText.text
-                        val sel = docBodyText.selection
-                        if (!sel.collapsed) {
-                            val selectedText = currentText.substring(sel.start, sel.end)
-                            val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
-                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                text = newText,
-                                selection = androidx.compose.ui.text.TextRange(sel.start)
-                            )
-                            triggerAutosave()
+        val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+        androidx.compose.ui.window.Popup(
+            onDismissRequest = { showFct = false },
+            properties = androidx.compose.ui.window.PopupProperties(
+                focusable = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true
+            ),
+            offset = fctOffset
+        ) {
+            FloatingContextualToolbar(
+                visible = true,
+                contextType = fctContext,
+                onActionClick = { action ->
+                    showFct = false
+                    when (action) {
+                        "cut" -> {
+                            textToolbarCutCallback?.invoke() ?: run {
+                                val currentText = docBodyText.text
+                                val sel = docBodyText.selection
+                                if (!sel.collapsed) {
+                                    val selectedText = currentText.substring(sel.start, sel.end)
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedText))
+                                    val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = newText,
+                                        selection = androidx.compose.ui.text.TextRange(sel.start)
+                                    )
+                                    triggerAutosave()
+                                }
+                            }
                         }
-                    }
-                    "copy" -> {
-                        val sel = docBodyText.selection
-                        if (!sel.collapsed) {
-                            val selectedText = docBodyText.text.substring(sel.start, sel.end)
+                        "copy" -> {
+                            textToolbarCopyCallback?.invoke() ?: run {
+                                val sel = docBodyText.selection
+                                if (!sel.collapsed) {
+                                    val selectedText = docBodyText.text.substring(sel.start, sel.end)
+                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedText))
+                                }
+                            }
                         }
-                    }
-                    "paste" -> {
-                        val currentText = docBodyText.text
-                        val sel = docBodyText.selection
-                        val newText = currentText.substring(0, sel.start) + " " + currentText.substring(sel.end)
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                            text = newText,
-                            selection = androidx.compose.ui.text.TextRange(sel.start + 1)
-                        )
-                        triggerAutosave()
-                    }
-                    "ai_write" -> {
-                        aiPrompt = "Analyze and summarize this setup layout..."
-                        showAiAssistant = true
+                        "paste" -> {
+                            textToolbarPasteCallback?.invoke() ?: run {
+                                val clipText = clipboardManager.getText()?.text ?: ""
+                                val currentText = docBodyText.text
+                                val sel = docBodyText.selection
+                                val newText = currentText.substring(0, sel.start) + clipText + currentText.substring(sel.end)
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = newText,
+                                    selection = androidx.compose.ui.text.TextRange(sel.start + clipText.length)
+                                )
+                                triggerAutosave()
+                            }
+                        }
+                        "ai_write" -> {
+                            aiPrompt = "Analyze and summarize this setup layout..."
+                            showAiAssistant = true
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
 
     // --- OPT-IN GEMINI CO-AUTHOR ASSISTANT DIALOG ---

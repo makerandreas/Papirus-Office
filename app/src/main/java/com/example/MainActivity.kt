@@ -27,11 +27,40 @@ import com.example.modules.pagella.PagellaModule
 import com.example.modules.slidia.SlidiaModule
 import com.example.ui.components.*
 import com.example.ui.home.HomeDashboard
+import com.example.ui.home.CrashLogsScreen
 import com.example.ui.theme.PapirusTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Setup uncaught exception handler to capture real crashes in crash.log
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val file = java.io.File(filesDir, "crash.log")
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                val dateStr = sdf.format(java.util.Date())
+                val stackTraceString = android.util.Log.getStackTraceString(throwable)
+                
+                val content = """
+                    === CRASH REPORT ===
+                    Timestamp: $dateStr
+                    Thread: ${thread.name}
+                    Exception: ${throwable.javaClass.name}
+                    Message: ${throwable.message ?: "No message provided"}
+                    
+                    StackTrace:
+                    $stackTraceString
+                    === END CRASH REPORT ===
+                """.trimIndent()
+                
+                file.appendText(content + "\n\n")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
         
         // Initialize JNI LibreOffice Core configuration
         val cacheDir = cacheDir.absolutePath
@@ -101,7 +130,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Global Header TopBar
-        if (currentWorkspace != "Inky") {
+        if (currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -193,6 +222,9 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                         currentWorkspace = workspaceName
                     }
                 )
+                "crash_logs" -> CrashLogsScreen(
+                    onBack = { currentWorkspace = "home" }
+                )
                 "Inky" -> InkyModule(
                     isTablet = isTablet,
                     onFormatAction = { act ->
@@ -238,7 +270,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
 
         // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-        if (currentWorkspace != "home" && currentWorkspace != "Inky") {
+        if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
             AdaptiveFormattingToolbar(
                 selectedObjectType = formattingObjectType,
                 onFormatClick = { formatAction ->
