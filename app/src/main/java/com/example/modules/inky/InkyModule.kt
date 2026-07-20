@@ -246,7 +246,7 @@ fun InkyModule(
 
     // Bottom Bar (Ribbon & sub-decks) States
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
-    var activeRibbonTab by remember { mutableStateOf("Beranda") } // File, Beranda, Sisipkan, Tata Letak, Ditinjau, Tampilan
+    var activeRibbonTab by remember { mutableStateOf("Home") } // File, Home, Insert, Layout, References, Mailings, Review, View
     var showRibbonTabMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(showBottomBar) {
@@ -1879,595 +1879,129 @@ fun InkyModule(
                         }
                     }
                 }
-            }
-
-            // --- BOTTOM BAR DECK (Simplified Ribbon & Sub-Decks) ---
-            // Open bottom bar deck will overlay perfectly, hiding upper AppBars & Toolbars
+            // --- PERSISTENT STANDARD BOTTOM SHEET (Material 3 Expressive) ---
             AnimatedVisibility(
                 visible = showBottomBar,
-                enter = slideInVertically(initialOffsetY = { it }),
-                exit = slideOutVertically(targetOffsetY = { it }),
-                modifier = Modifier.pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                showFct = false
-                            }
-                        }
-                    }
-                }
+                enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
             ) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .wrapContentHeight(),
-                    tonalElevation = 12.dp,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    border = BorderStroke(1.dp, borderStrokeColor)
+                        .fillMaxHeight(0.40f), // occupies exactly 40% of the screen height
+                    tonalElevation = 8.dp,
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    border = BorderStroke(1.dp, borderStrokeColor),
+                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
                 ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        
-                        // --- BOTTOM BAR DECK HEADER ---
+                        // Header bar: tabs on left, 3 persistent buttons on right
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                // Context-dependent back button
-                                if (bottomBarDeck != "ribbon") {
-                                    IconButton(onClick = { bottomBarDeck = "ribbon" }) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Ribbon")
-                                    }
-                                }
-
-                                // Interactive Category / Menu Tab Selector
-                                if (bottomBarDeck == "ribbon") {
-                                    Box {
-                                        Row(
-                                            modifier = Modifier
-                                                .clickable { showRibbonTabMenu = true }
-                                                .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text(
-                                                text = activeRibbonTab,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            // 1. Baris tab (scrollable)
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val tabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
+                                tabs.forEach { tab ->
+                                    val isSelected = activeRibbonTab == tab
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(
+                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                                else Color.Transparent
                                             )
-                                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Select Ribbon Tab", tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                                        }
-
-                                        DropdownMenu(
-                                            expanded = showRibbonTabMenu,
-                                            onDismissRequest = { showRibbonTabMenu = false }
-                                        ) {
-                                            listOf("File", "Beranda", "Sisipkan", "Tata Letak", "Ditinjau", "Tampilan").forEach { tab ->
-                                                DropdownMenuItem(
-                                                    text = { Text(tab) },
-                                                    onClick = {
-                                                        activeRibbonTab = tab
-                                                        showRibbonTabMenu = false
-                                                    }
-                                                )
-                                            }
-                                        }
+                                            .clickable { activeRibbonTab = tab }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = tab,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        )
                                     }
-                                } else {
-                                    // Custom title for sub-decks
-                                    Text(
-                                        text = when (bottomBarDeck) {
-                                            "font_color" -> "Warna Font"
-                                            "font_size" -> "Ukuran Font"
-                                            "font_family" -> "Font Family"
-                                            "highlight_color" -> "Sorot Warna"
-                                            "navigator" -> "Navigator"
-                                            "version_history" -> "Riwayat Versi"
-                                            else -> "Pilihan Format"
-                                        },
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(start = 4.dp)
-                                    )
                                 }
                             }
 
-                            // Undo / Redo & Hide bottom deck
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                IconButton(onClick = { 
+                            // Vertical divider
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp)
+                                    .width(1.dp)
+                                    .height(24.dp)
+                                    .background(borderStrokeColor.copy(alpha = 0.3f))
+                            )
+
+                            // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(onClick = {
                                     triggerAutosave()
+                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
                                 }) {
-                                    Icon(Icons.Default.Undo, contentDescription = "Undo")
+                                    Icon(
+                                        imageVector = Icons.Rounded.Undo,
+                                        contentDescription = "Undo",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
                                 }
-                                IconButton(onClick = { 
+                                IconButton(onClick = {
                                     triggerAutosave()
+                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=REDO)")
                                 }) {
-                                    Icon(Icons.Default.Redo, contentDescription = "Redo")
+                                    Icon(
+                                        imageVector = Icons.Rounded.Redo,
+                                        contentDescription = "Redo",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
                                 }
-                                IconButton(onClick = { 
-                                    showBottomBar = false 
-                                    if (wasKeyboardOpenBeforeBottomSheet) {
-                                        focusRequester.requestFocus()
-                                        keyboardController?.show()
-                                    }
+                                IconButton(onClick = {
+                                    showBottomBar = false
                                 }) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Hide Bottom Bar")
+                                    Icon(
+                                        imageVector = Icons.Rounded.Close,
+                                        contentDescription = "Close Standard Bottom Sheet",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
                                 }
                             }
                         }
 
-                        HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 12.dp))
+                        HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.4f))
 
-                        // --- BOTTOM BAR DECK CONTENT CANVAS ---
+                        // Scrollable content area (empty for now)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 240.dp)
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp)
                         ) {
-                            when (bottomBarDeck) {
-                                "ribbon" -> {
-                                    // Render content according to active ribbon tab
-                                    when (activeRibbonTab) {
-                                        "Beranda" -> {
-                                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                // Font Family & Size selectors
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    Card(
-                                                        onClick = { bottomBarDeck = "font_family" },
-                                                        modifier = Modifier.weight(1.5f),
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(12.dp),
-                                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text(activeFontFamily, fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1)
-                                                            Icon(Icons.Default.ChevronRight, contentDescription = "Select font", modifier = Modifier.size(16.dp))
-                                                        }
-                                                    }
-
-                                                    Card(
-                                                        onClick = { bottomBarDeck = "font_size" },
-                                                        modifier = Modifier.weight(1f),
-                                                        shape = RoundedCornerShape(12.dp),
-                                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(12.dp),
-                                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text("$activeFontSize pt", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                                            Icon(Icons.Default.ChevronRight, contentDescription = "Select size", modifier = Modifier.size(16.dp))
-                                                        }
-                                                    }
-                                                }
-
-                                                // Inline Formatting Toggle Group
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                                ) {
-                                                    listOf(
-                                                        Triple(Icons.Default.FormatBold, isBold, "Bold"),
-                                                        Triple(Icons.Default.FormatItalic, isItalic, "Italic"),
-                                                        Triple(Icons.Default.FormatUnderlined, isUnderline, "Underline"),
-                                                        Triple(Icons.Default.StrikethroughS, isStrikethrough, "Strikethrough")
-                                                    ).forEach { item ->
-                                                        val isSelected = item.second
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .weight(1f)
-                                                                .clip(RoundedCornerShape(8.dp))
-                                                                .background(
-                                                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                                                                )
-                                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(8.dp))
-                                                                .clickable {
-                                                                    when (item.third) {
-                                                                        "Bold" -> isBold = !isBold
-                                                                        "Italic" -> isItalic = !isItalic
-                                                                        "Underline" -> isUnderline = !isUnderline
-                                                                        "Strikethrough" -> isStrikethrough = !isStrikethrough
-                                                                    }
-                                                                    triggerAutosave()
-                                                                }
-                                                                .padding(vertical = 10.dp),
-                                                            contentAlignment = Alignment.Center
-                                                        ) {
-                                                            Icon(
-                                                                imageVector = item.first,
-                                                                contentDescription = item.third,
-                                                                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                                            )
-                                                        }
-                                                    }
-                                                }
-
-                                                // Highlight & Color selection redirects
-                                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clickable { bottomBarDeck = "highlight_color" }
-                                                            .border(1.dp, borderStrokeColor, RoundedCornerShape(10.dp))
-                                                            .padding(12.dp),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Icon(Icons.Default.BorderColor, contentDescription = null, tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor)
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Text("Sorot", fontSize = 13.sp)
-                                                        }
-                                                        Icon(Icons.Default.ChevronRight, contentDescription = "Detail", modifier = Modifier.size(16.dp))
-                                                    }
-
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .clickable { bottomBarDeck = "font_color" }
-                                                            .border(1.dp, borderStrokeColor, RoundedCornerShape(10.dp))
-                                                            .padding(12.dp),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Box(modifier = Modifier.size(20.dp).background(fontColor, CircleShape))
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Text("Warna Font", fontSize = 13.sp)
-                                                        }
-                                                        Icon(Icons.Default.ChevronRight, contentDescription = "Detail", modifier = Modifier.size(16.dp))
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "File" -> {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Button(onClick = { triggerAutosave() }, modifier = Modifier.weight(1f)) {
-                                                        Icon(Icons.Default.Save, contentDescription = null)
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("Simpan")
-                                                    }
-                                                    Button(onClick = { Toast.makeText(context, "Mengekspor PDF...", Toast.LENGTH_SHORT).show() }, modifier = Modifier.weight(1f)) {
-                                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null)
-                                                        Spacer(modifier = Modifier.width(4.dp))
-                                                        Text("PDF")
-                                                    }
-                                                }
-                                                OutlinedButton(onClick = { Toast.makeText(context, "Membuka printer...", Toast.LENGTH_SHORT).show() }, modifier = Modifier.fillMaxWidth()) {
-                                                    Icon(Icons.Default.Print, contentDescription = null)
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("Cetak Dokumen")
-                                                }
-                                            }
-                                        }
-                                        "Sisipkan" -> {
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                            ) {
-                                                listOf(
-                                                    Triple(Icons.Default.GridOn, "Tabel", "table"),
-                                                    Triple(Icons.Default.Image, "Gambar", "image"),
-                                                    Triple(Icons.Default.Functions, "Formula", "equation")
-                                                ).forEach { item ->
-                                                    Card(
-                                                        onClick = {
-                                                            if (item.third == "equation") {
-                                                                showEquationDialog = true
-                                                            } else {
-                                                                Toast.makeText(context, "Menyisipkan ${item.second}...", Toast.LENGTH_SHORT).show()
-                                                            }
-                                                        },
-                                                        modifier = Modifier.weight(1f)
-                                                    ) {
-                                                        Column(
-                                                            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-                                                            horizontalAlignment = Alignment.CenterHorizontally
-                                                        ) {
-                                                            Icon(item.first, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                            Spacer(modifier = Modifier.height(4.dp))
-                                                            Text(item.second, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "Tata Letak" -> {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Text("Tata Letak Halaman (ODF/LibreOffice)", fontSize = 11.sp, color = Color.Gray)
-                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    OutlinedButton(onClick = { Toast.makeText(context, "Margin diubah ke Standard", Toast.LENGTH_SHORT).show() }, modifier = Modifier.weight(1f)) {
-                                                        Text("Margin Normal")
-                                                    }
-                                                    OutlinedButton(onClick = { Toast.makeText(context, "Orientasi diubah ke Lanskap", Toast.LENGTH_SHORT).show() }, modifier = Modifier.weight(1f)) {
-                                                        Text("Lanskap")
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "Ditinjau" -> {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                                Button(onClick = { 
-                                                    showAiAssistant = true
-                                                    aiPrompt = "Periksa ejaan & tata bahasa dokumen ini."
-                                                }) {
-                                                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text("AI Proofread")
-                                                }
-                                                OutlinedButton(onClick = { Toast.makeText(context, "Word Count: $wordCount words, ${docBodyText.text.length} characters", Toast.LENGTH_LONG).show() }) {
-                                                    Text("Jumlah Kata")
-                                                }
-                                            }
-                                        }
-                                        "Tampilan" -> {
-                                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text("Tampilan Seluler (Web view)", fontSize = 13.sp)
-                                                    Switch(checked = isWebView, onCheckedChange = { isWebView = it })
-                                                }
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Text("Dark document mode", fontSize = 13.sp)
-                                                    Switch(checked = isDarkDocument, onCheckedChange = { isDarkDocument = it })
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "font_family" -> {
-                                    val fonts = listOf("Aptos Display", "Calibri", "Arial", "Roboto", "Times New Roman", "Courier New")
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .verticalScroll(rememberScrollState()),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        fonts.forEach { f ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        activeFontFamily = f
-                                                        bottomBarDeck = "ribbon"
-                                                    }
-                                                    .background(
-                                                        if (activeFontFamily == f) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(f, fontWeight = if (activeFontFamily == f) FontWeight.Bold else FontWeight.Normal)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "font_size" -> {
-                                    val sizes = listOf(10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36)
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .verticalScroll(rememberScrollState()),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        sizes.forEach { size ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        activeFontSize = size
-                                                        bottomBarDeck = "ribbon"
-                                                    }
-                                                    .background(
-                                                        if (activeFontSize == size) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("$size pt", fontWeight = if (activeFontSize == size) FontWeight.Bold else FontWeight.Normal)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "font_color" -> {
-                                    // Theme color layout matching screenshot
-                                    val themeColorColumns = listOf(
-                                        listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFFF1F5F9), Color(0xFFE2E8F0), Color(0xFFCBD5E1), Color(0xFF94A3B8)),
-                                        listOf(Color(0xFF000000), Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF334155), Color(0xFF475569), Color(0xFF64748B)),
-                                        listOf(Color(0xFFEFF6FF), Color(0xFFDBEAFE), Color(0xFFBFDBFE), Color(0xFF93C5FD), Color(0xFF60A5FA), Color(0xFF2563EB)),
-                                        listOf(Color(0xFFEFF6FF), Color(0xFFDBEAFE), Color(0xFFBFDBFE), Color(0xFF93C5FD), Color(0xFF60A5FA), Color(0xFF1E3A8A)),
-                                        listOf(Color(0xFFF0FDFA), Color(0xFFCCFBF1), Color(0xFF99F6E4), Color(0xFF5EEAD4), Color(0xFF2DD4BF), Color(0xFF0D9488)),
-                                        listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5), Color(0xFFFED7AA), Color(0xFFFDBA74), Color(0xFFFB923C), Color(0xFFF97316)),
-                                        listOf(Color(0xFFF0FDF4), Color(0xFFDCFCE7), Color(0xFFBBF7D0), Color(0xFF86EFAC), Color(0xFF4ADE80), Color(0xFF22C55E)),
-                                        listOf(Color(0xFFECFEFF), Color(0xFFCFFAFE), Color(0xFFA5F3FC), Color(0xFF67E8F9), Color(0xFF22D3EE), Color(0xFF06B6D4)),
-                                        listOf(Color(0xFFFAF5FF), Color(0xFFF3E8FF), Color(0xFFE9D5FF), Color(0xFFD8B4FE), Color(0xFFC084FC), Color(0xFFA855F7)),
-                                        listOf(Color(0xFFF7FEE7), Color(0xFFECFCCB), Color(0xFFD9F99D), Color(0xFFBEF264), Color(0xFFA3E635), Color(0xFF84CC16))
-                                    )
-                                    val standardColors = listOf(
-                                        Color(0xFFEF4444), Color(0xFFF97316), Color(0xFFF59E0B), Color(0xFF10B981), Color(0xFF06B6D4),
-                                        Color(0xFF3B82F6), Color(0xFF1E3A8A), Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF78350F)
-                                    )
-
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .verticalScroll(rememberScrollState()),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text("Warna Tema", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                                        
-                                        // Grid display theme colors
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            themeColorColumns.forEach { column ->
-                                                Column(
-                                                    modifier = Modifier.weight(1f),
-                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                                ) {
-                                                    column.forEach { color ->
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .fillMaxWidth()
-                                                                .height(20.dp)
-                                                                .background(color, RoundedCornerShape(2.dp))
-                                                                .border(0.5.dp, Color.LightGray, RoundedCornerShape(2.dp))
-                                                                .clickable {
-                                                                    fontColor = color
-                                                                    triggerAutosave()
-                                                                    bottomBarDeck = "ribbon"
-                                                                }
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        Text("Warna Standar", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
-                                        
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            standardColors.forEach { color ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(24.dp)
-                                                        .background(color, RoundedCornerShape(4.dp))
-                                                        .border(0.5.dp, Color.LightGray, RoundedCornerShape(4.dp))
-                                                        .clickable {
-                                                            fontColor = color
-                                                            triggerAutosave()
-                                                            bottomBarDeck = "ribbon"
-                                                        }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "highlight_color" -> {
-                                    val colors = listOf(
-                                        Color.Transparent, Color(0xFFFEF08A), Color(0xFFBBF7D0), Color(0xFFBFDBFE),
-                                        Color(0xFFFBCFE8), Color(0xFFFED7AA), Color(0xFFE9D5FF), Color(0xFF99F6E4)
-                                    )
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Fixed(4),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        items(colors) { color ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(44.dp)
-                                                    .background(
-                                                        if (color == Color.Transparent) Color.LightGray.copy(alpha = 0.3f) else color,
-                                                        RoundedCornerShape(8.dp)
-                                                    )
-                                                    .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp))
-                                                    .clickable {
-                                                        highlightColor = color
-                                                        triggerAutosave()
-                                                        bottomBarDeck = "ribbon"
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (color == Color.Transparent) {
-                                                    Text("Tanpa Sorotan", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "navigator" -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .verticalScroll(rememberScrollState())
-                                    ) {
-                                        Text("Daftar Struktur ODF Document", fontSize = 12.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        listOf("Judul: Monoposto Realistic Settings", "Tabel 1: Track Setup", "Tabel 2: Tyre Setup", "Bagian: Pengaturan Lanjutan").forEach { item ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        Toast.makeText(context, "Navigating to $item", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                    .padding(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(Icons.Default.Menu, contentDescription = null, modifier = Modifier.size(16.dp))
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(item, fontSize = 13.sp)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                "version_history" -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .verticalScroll(rememberScrollState())
-                                    ) {
-                                        Text("Riwayat Versi Cloud & Local Sync", fontSize = 12.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        listOf("Versi Terkini - Disimpan Hari Ini pukul 12.40", "Versi 2 - Diubah kemarin oleh MA", "Versi 1 - Inisialisasi ODF Template").forEach { ver ->
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        Toast.makeText(context, "Membuka $ver...", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                    .padding(10.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Text(ver, fontSize = 13.sp)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            // Empty content
                         }
                     }
                 }
             }
+        }
         }
     }
 
