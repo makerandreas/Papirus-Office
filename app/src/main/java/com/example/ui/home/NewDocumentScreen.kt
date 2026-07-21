@@ -174,7 +174,8 @@ fun NewDocumentScreen(
                     CreateFromTemplateView(
                         isOnline = isOnline,
                         selectedFilter = selectedTemplateFilter,
-                        onFilterSelected = { selectedTemplateFilter = it }
+                        onFilterSelected = { selectedTemplateFilter = it },
+                        onNavigateToModule = onNavigateToModule
                     )
                 }
             }
@@ -198,7 +199,11 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onNavigateToModule("Inky") }
+                    .clickable {
+                        com.example.MainActivity.openedFilePath = null
+                        com.example.MainActivity.openedFileType = null
+                        onNavigateToModule("Inky")
+                    }
                     .testTag("item_new_inky")
             ) {
                 Row(
@@ -362,7 +367,8 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
 fun CreateFromTemplateView(
     isOnline: Boolean,
     selectedFilter: String,
-    onFilterSelected: (String) -> Unit
+    onFilterSelected: (String) -> Unit,
+    onNavigateToModule: (String) -> Unit
 ) {
     val filters = listOf("All", "ODT", "ODS", "ODP")
 
@@ -394,14 +400,79 @@ fun CreateFromTemplateView(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Empty State area with custom Expressive illustration and messaging
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
-            contentAlignment = Alignment.Center
-        ) {
+        if (isOnline) {
+            // Show mock templates
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (selectedFilter == "All" || selectedFilter == "ODT") {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    com.example.MainActivity.openedFilePath = null
+                                    com.example.MainActivity.openedFileType = null
+                                    onNavigateToModule("Inky")
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .background(Color(0xFFEFF6FF), RoundedCornerShape(12.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Description,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2563EB),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Resume (Modern)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Inky Document • ODT",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    Icons.Rounded.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Empty State area with custom Expressive illustration and messaging
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -472,4 +543,5 @@ fun CreateFromTemplateView(
             }
         }
     }
+}
 }

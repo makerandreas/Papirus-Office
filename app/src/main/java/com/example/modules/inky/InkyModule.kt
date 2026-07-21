@@ -1,7 +1,14 @@
 package com.example.modules.inky
+import androidx.compose.ui.input.key.*
 
 import android.widget.Toast
 import androidx.compose.animation.*
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -131,6 +138,8 @@ fun InkyModule(
         )
     }
 
+
+
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
     var showOptionsDialog by remember { mutableStateOf(false) }
@@ -246,6 +255,15 @@ fun InkyModule(
 
     val activity = remember(context) { context.findActivity() }
 
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.example.core.jni.LibreOfficeCore.registerCallback(1, object : com.example.core.jni.LibreOfficeCore.DocumentCallback {
+            override fun onEvent(type: Int, payload: String) {
+                android.util.Log.i("InkyModule", "LibreOfficeKit Callback: type=$type payload=$payload")
+                addLokitLog("LOK_CALLBACK_EVENT(type=$type, payload=$payload)")
+            }
+        })
+    }
+
     // Text formatting state
     var activeFontFamily by remember { mutableStateOf("Aptos Display") }
     var activeFontSize by remember { mutableStateOf(12) }
@@ -277,6 +295,46 @@ fun InkyModule(
     var activeInkySubpage by remember { mutableStateOf("") }
     var selectedStyleNameForOptions by remember { mutableStateOf("Normal") }
     var openedFromExternalHub by remember { mutableStateOf(false) }
+
+    var showUnsavedChangesDialog by remember { mutableStateOf(false) }
+    var pendingActionAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    val handleNewDocument = {
+        val createNew = {
+            val idx = com.example.MainActivity.newDocIndex++
+            val name = "Document$idx.odt"
+            com.example.core.jni.LibreOfficeCore.createDocument(name)
+            docTitle = name
+            docBodyText = androidx.compose.ui.text.input.TextFieldValue("")
+            isSaved = true
+            isEditMode = true // Enter edit mode for a new document
+            // Reset states
+            activeFontFamily = "Aptos Display"
+            activeFontSize = 12
+            isBold = false
+            isItalic = false
+            isUnderline = false
+            showBottomBar = false
+        }
+        if (!isSaved) {
+            pendingActionAfterSave = createNew
+            showUnsavedChangesDialog = true
+        } else {
+            createNew()
+        }
+    }
+
+    val handleClose = {
+        val closeAction = {
+            onFormatAction("Back to start center")
+        }
+        if (!isSaved) {
+            pendingActionAfterSave = closeAction
+            showUnsavedChangesDialog = true
+        } else {
+            closeAction()
+        }
+    }
 
     LaunchedEffect(showBottomBar) {
         if (showBottomBar) {
@@ -383,7 +441,7 @@ fun InkyModule(
         } else if (isEditMode) {
             isEditMode = false
         } else {
-            onFormatAction("Back to start center")
+            handleClose()
         }
     }
 
@@ -629,6 +687,16 @@ fun InkyModule(
             modifier = Modifier
                 .fillMaxSize()
                 .background(docBgColor)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                        event.isCtrlPressed &&
+                        event.key == androidx.compose.ui.input.key.Key.N) {
+                        handleNewDocument()
+                        true
+                    } else {
+                        false
+                    }
+                }
         ) {
         Column(modifier = Modifier.fillMaxSize().imePadding()) {
             
@@ -669,7 +737,7 @@ fun InkyModule(
                             }
                         },
                         navigationIcon = {
-                            IconButton(onClick = { onFormatAction("Back to start center") }) {
+                            IconButton(onClick = { handleClose() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
                             }
                         },
@@ -918,13 +986,13 @@ fun InkyModule(
                                 OutlinedTextField(
                                     value = replaceQuery,
                                     onValueChange = { replaceQuery = it },
-                                    placeholder = { Text("Ganti dengan...") },
+                                    placeholder = { Text("Replace with...") },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true
                                 )
                             }
                             IconButton(onClick = { showFindReplace = false }) {
-                                Icon(Icons.Default.Close, contentDescription = "Tutup")
+                                Icon(Icons.Default.Close, contentDescription = "Close")
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -942,9 +1010,9 @@ fun InkyModule(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(onClick = {
                                     triggerAutosave()
-                                    Toast.makeText(context, "Mengganti '$searchQuery' -> '$replaceQuery'", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Replacing '$searchQuery' -> '$replaceQuery'", Toast.LENGTH_SHORT).show()
                                 }) {
-                                    Text("Ganti Semua")
+                                    Text("Replace All")
                                 }
                             }
                         }
@@ -987,99 +1055,6 @@ fun InkyModule(
                                 .horizontalScroll(horizScrollState),
                             contentAlignment = if (zoomScale > 1f) Alignment.CenterStart else Alignment.Center
                         ) {
-                            if (!isEditMode) {
-                                // --- VIEWER MODE: MULTIPLE PAGES DISPLAYED VERTICALLY ---
-                                Column(
-                                    modifier = Modifier.padding(vertical = 16.dp),
-                                    verticalArrangement = Arrangement.spacedBy((16 * zoomScale).dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    pagesList.forEachIndexed { index, pageText ->
-                                        // Precise JNI-like render logging
-                                        androidx.compose.runtime.LaunchedEffect(zoomScale) {
-                                            com.example.core.jni.LibreOfficeCore.renderPageToBuffer(
-                                                docPath = "Inky_Dokumen.odt",
-                                                pageIndex = index,
-                                                outputBuffer = ByteArray(0),
-                                                width = (320 * zoomScale).toInt(),
-                                                height = (452 * zoomScale).toInt()
-                                            )
-                                        }
-
-                                        val pageHeight = 452
-                                        Box(
-                                            modifier = Modifier
-                                                .width((320 * zoomScale).dp)
-                                                .height((pageHeight * zoomScale).dp)
-                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
-                                            contentAlignment = Alignment.TopStart
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .requiredSize(320.dp, pageHeight.dp)
-                                                    .graphicsLayer {
-                                                        scaleX = zoomScale
-                                                        scaleY = zoomScale
-                                                        transformOrigin = TransformOrigin(0f, 0f)
-                                                    }
-                                                    .background(pageBgColor)
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .padding(24.dp)
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .weight(1f)
-                                                            .fillMaxWidth()
-                                                            .border(
-                                                                width = 1.dp,
-                                                                color = borderStrokeColor.copy(alpha = 0.4f),
-                                                                shape = RoundedCornerShape(2.dp)
-                                                            )
-                                                            .padding(16.dp)
-                                                    ) {
-                                                        Text(
-                                                            text = pageText,
-                                                            style = androidx.compose.ui.text.TextStyle(
-                                                                fontSize = activeFontSize.sp,
-                                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                                fontFamily = when (activeFontFamily) {
-                                                                    "Aptos Display" -> FontFamily.SansSerif
-                                                                    "Calibri" -> FontFamily.SansSerif
-                                                                    "Arial" -> FontFamily.SansSerif
-                                                                    "Roboto" -> FontFamily.SansSerif
-                                                                    else -> FontFamily.Default
-                                                                },
-                                                                color = textPrimaryColor,
-                                                                textAlign = textAlignment
-                                                            )
-                                                        )
-                                                    }
-                                                    
-                                                    // Page number footer inside page
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(top = 4.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        Text(
-                                                            text = "Halaman ${index + 1} dari ${pagesList.size}",
-                                                            fontSize = 10.sp,
-                                                            color = Color.Gray
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
                                 // --- EDITOR MODE: DYNAMIC EXPANDING CARD WITH PRINT PAGE BREAKS ---
                                 val linesCount = docBodyText.text.split("\n").size
                                 val baseEditorHeight = maxOf(452, 100 + linesCount * 22)
@@ -1211,7 +1186,7 @@ fun InkyModule(
                                                     .onGloballyPositioned { bodyTextFieldCoordinates = it }
                                                     .focusRequester(focusRequester),
                                                 onTextLayout = { bodyTextLayoutResult = it },
-                                                readOnly = false,
+                                                readOnly = !isEditMode,
                                                 textStyle = androidx.compose.ui.text.TextStyle(
                                                     fontSize = activeFontSize.sp,
                                                     fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
@@ -1252,7 +1227,7 @@ fun InkyModule(
                                                     ) {
                                                         Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
                                                         Text(
-                                                            text = " Halaman ${p + 1} (Page Break) ",
+                                                            text = " Page ${p + 1} (Page Break) ",
                                                             fontSize = 9.sp,
                                                             color = Color.Gray.copy(alpha = 0.5f),
                                                             fontWeight = FontWeight.Bold
@@ -1264,7 +1239,6 @@ fun InkyModule(
                                         }
                                     }
                                 }
-                            }
                         }
                     } else {
                         // --- MOBILE/WEB VIEWPORT (Full Bleed) ---
@@ -1723,7 +1697,7 @@ fun InkyModule(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Rounded.BorderColor,
-                                            contentDescription = "Sorot Warna",
+                                            contentDescription = "Highlight Color",
                                             tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor
                                         )
                                     }
@@ -1737,7 +1711,7 @@ fun InkyModule(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Rounded.FormatColorText,
-                                            contentDescription = "Warna Font",
+                                            contentDescription = "Font Color",
                                             tint = fontColor
                                         )
                                     }
@@ -2251,14 +2225,14 @@ fun InkyModule(
                                         "underline_options" -> UnderlineOptionsSubpage(context, isUnderline) {
                                             activeInkySubpage = "underline_color"
                                         }
-                                        "underline_color" -> ColorPickerSubpage(underlineColor, "Warna Garis Bawah") { underlineColor = it }
-                                        "font_color" -> ColorPickerSubpage(fontColor, "Warna Font") { fontColor = it; triggerAutosave() }
-                                        "highlight_color" -> ColorPickerSubpage(highlightColor, "Warna Sorotan") { highlightColor = it; triggerAutosave() }
+                                        "underline_color" -> ColorPickerSubpage(underlineColor, "Underline Color") { underlineColor = it }
+                                        "font_color" -> ColorPickerSubpage(fontColor, "Font Color") { fontColor = it; triggerAutosave() }
+                                        "highlight_color" -> ColorPickerSubpage(highlightColor, "Highlight Color") { highlightColor = it; triggerAutosave() }
                                         "line_spacing" -> LineSpacingSubpage(context)
                                         "bulleted_list" -> BulletedListSubpage(context)
                                         "numbered_list" -> NumberedListSubpage(context)
                                         "multilevel_list" -> MultilevelListSubpage(context)
-                                        "paragraph_shading" -> ColorPickerSubpage(paragraphShadingColor, "Warna Shading") { paragraphShadingColor = it }
+                                        "paragraph_shading" -> ColorPickerSubpage(paragraphShadingColor, "Shading Color") { paragraphShadingColor = it }
                                         "paragraph_border" -> ParagraphBorderSubpage(context)
                                         "paragraph_styles" -> ParagraphStylesSubpage(context, selectedStyleNameForOptions) { styleName ->
                                             selectedStyleNameForOptions = styleName
@@ -2283,7 +2257,9 @@ fun InkyModule(
                                     ) {
                                         FileSubpage(
                                             context = context,
-                                            onNavigateToOptions = { showOptionsDialog = true }
+                                            onNavigateToOptions = { showOptionsDialog = true },
+                                            onNewDocument = handleNewDocument,
+                                            onCloseDocument = handleClose
                                         )
                                     }
                                 } else if (activeRibbonTab == "Home") {
@@ -2376,7 +2352,7 @@ fun InkyModule(
                 Button(onClick = { 
                     triggerAutosave()
                     showEquationDialog = false
-                    Toast.makeText(context, "Formula berhasil disisipkan!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Formula inserted successfully!", Toast.LENGTH_SHORT).show()
                 }) {
                     Text("Insert Equation")
                 }
@@ -2409,6 +2385,41 @@ fun InkyModule(
                 showPasteSpecialDialog = false
                 triggerAutosave()
                 Toast.makeText(context, "Menempelkan sebagai $format", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showUnsavedChangesDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedChangesDialog = false },
+            title = {
+                Text("Unsaved Changes", style = MaterialTheme.typography.headlineSmall)
+            },
+            text = {
+                Text(
+                    "You have unsaved changes in this document. Do you want to save them before continuing?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUnsavedChangesDialog = false
+                    isSaved = true
+                    Toast.makeText(context, "Document saved.", Toast.LENGTH_SHORT).show()
+                    pendingActionAfterSave?.invoke()
+                    pendingActionAfterSave = null
+                }) {
+                    Text("Save", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showUnsavedChangesDialog = false
+                    pendingActionAfterSave?.invoke()
+                    pendingActionAfterSave = null
+                }) {
+                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                }
             }
         )
     }
@@ -2754,21 +2765,19 @@ fun InkyModule(
 @Composable
 private fun FileSubpage(
     context: android.content.Context,
-    onNavigateToOptions: () -> Unit
+    onNavigateToOptions: () -> Unit,
+    onNewDocument: () -> Unit,
+    onCloseDocument: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
         FileMenuSectionHeader("File")
         FileMenuThreeColumnRow(
-            item1 = Triple(Icons.Rounded.NoteAdd, "New") {
-                Toast.makeText(context, "New document created", Toast.LENGTH_SHORT).show()
-            },
+            item1 = Triple(Icons.Rounded.NoteAdd, "New", onNewDocument),
             item2 = Triple(Icons.Rounded.FolderOpen, "Open") {
                 Toast.makeText(context, "Opening file picker...", Toast.LENGTH_SHORT).show()
             },
-            item3 = Triple(Icons.Rounded.Close, "Close") {
-                Toast.makeText(context, "Closing document...", Toast.LENGTH_SHORT).show()
-            }
+            item3 = Triple(Icons.Rounded.Close, "Close", onCloseDocument)
         )
         FileMenuListItem(
             icon = Icons.Rounded.Refresh,

@@ -111,6 +111,12 @@ object RecentFilesTracker {
         saveRecents(context, recents)
     }
 
+    fun removeFile(context: Context, path: String) {
+        val recents = getRecents(context).toMutableList()
+        recents.removeAll { it.path == path }
+        saveRecents(context, recents)
+    }
+
     private fun saveRecents(context: Context, list: List<RecentFile>) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonArray = JSONArray()
@@ -196,7 +202,7 @@ fun createMockFilesOnDevice(context: Context) {
 
         val file1 = File(docs, "Laporan_Kinerja_Papirus.odt")
         if (!file1.exists()) {
-            file1.writeText("=== LAPORAN KINERJA PAPIRUS ===\nTanggal: 2026-07-20\n\nPapirus Office Writer Document.\nSemua data disimpan di penyimpanan lokal secara aman.")
+            file1.writeText("=== PAPIRUS PERFORMANCE REPORT ===\nDate: 2026-07-20\n\nPapirus Office Writer Document.\nAll data is stored securely in local storage.")
         }
 
         val file2 = File(docs, "Rencana_Anggaran_2026.ods")
@@ -211,7 +217,7 @@ fun createMockFilesOnDevice(context: Context) {
 
         val file4 = File(downloads, "Panduan_Pengguna_Papirus.pdf")
         if (!file4.exists()) {
-            file4.writeText("=== PANDUAN PENGGUNA PAPIRUS ===\n1. Buka aplikasi dan pilih tab Files.\n2. Tap ganda dokumen untuk menyunting.\n3. Simpan perubahan secara realtime.")
+            file4.writeText("=== PAPIRUS USER GUIDE ===\n1. Open the app and select the Files tab.\n2. Double tap a document to edit.\n3. Save changes in realtime.")
         }
     } catch (e: Exception) {
         e.printStackTrace()
@@ -604,8 +610,8 @@ fun HomeDashboard(
         val context = LocalContext.current
         var selectedFilter by remember { mutableStateOf("All") }
 
-        val recentFiles = remember(searchQuery) {
-            RecentFilesTracker.getRecents(context)
+        var recentFiles by remember(searchQuery) {
+            mutableStateOf(RecentFilesTracker.getRecents(context))
         }
 
         val filteredFiles = remember(recentFiles, searchQuery, selectedFilter) {
@@ -807,7 +813,14 @@ fun HomeDashboard(
                                     )
                                 }
 
-                                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.outline)
+                                IconButton(
+                                    onClick = {
+                                        RecentFilesTracker.removeFile(context, file.path)
+                                        recentFiles = RecentFilesTracker.getRecents(context)
+                                    }
+                                ) {
+                                    Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -819,243 +832,6 @@ fun HomeDashboard(
 // ==========================================
 // FILES SUB-PAGE (DYNAMIC FILES EXPLORER)
 // ==========================================
-@Composable
-fun FilesSubPage(
-    onNavigateToModule: (String) -> Unit
-) {
-    val context = LocalContext.current
-    var currentDir by remember { mutableStateOf<File?>(null) }
-    
-    // We check if an external storage is present
-    val externalStorage = remember { getExternalStorageShortcut(context) }
-
-    if (currentDir == null) {
-        // Display top level shortcuts
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                text = "SHORTCUT PENYIMPANAN",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-
-            // 1. Internal Storage
-            ShortcutCard(
-                title = "Internal Storage",
-                path = "/storage/emulated/0",
-                description = "Main device storage directory",
-                icon = Icons.Rounded.Folder
-            ) {
-                currentDir = getDirectoryShortcut(context, "/storage/emulated/0")
-            }
-
-            // 2. Documents Shortcut
-            ShortcutCard(
-                title = "Documents",
-                path = "/storage/emulated/0/Documents",
-                description = "Default document drafts and sheets",
-                icon = Icons.Rounded.Article
-            ) {
-                currentDir = getDirectoryShortcut(context, "/storage/emulated/0/Documents")
-            }
-
-            // 3. Downloads Shortcut
-            ShortcutCard(
-                title = "Downloads",
-                path = "/storage/emulated/0/Downloads",
-                description = "Exported files and web downloads",
-                icon = Icons.Rounded.Download
-            ) {
-                currentDir = getDirectoryShortcut(context, "/storage/emulated/0/Downloads")
-            }
-
-            // 4. External Storage (Only displayed if actually detected)
-            if (externalStorage != null) {
-                ShortcutCard(
-                    title = "External Storage (SD Card)",
-                    path = externalStorage.absolutePath,
-                    description = "Removable secondary storage volume",
-                    icon = Icons.Rounded.SdCard
-                ) {
-                    currentDir = externalStorage
-                }
-            }
-        }
-    } else {
-        // Inside a directory: Display Explorer
-        val filesList = remember(currentDir) {
-            try {
-                val list = currentDir!!.listFiles() ?: emptyArray()
-                // Folders first, then files
-                list.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
-            } catch (e: Exception) {
-                emptyList<File>()
-            }
-        }
-
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Path Navigation Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    val rootPath = getMockStorageRoot(context).absolutePath
-                    val parent = currentDir?.parentFile
-                    if (currentDir?.absolutePath == rootPath || currentDir?.parent == null || !currentDir!!.absolutePath.startsWith(rootPath)) {
-                        currentDir = null
-                    } else {
-                        currentDir = parent
-                    }
-                }) {
-                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Go back")
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Column {
-                    Text(
-                        text = currentDir?.name ?: "Folder",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = currentDir?.absolutePath?.replace(context.filesDir.absolutePath, "/storage/emulated/0") ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            if (filesList.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Folder ini kosong",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(filesList) { file ->
-                        val fileType = getFileTypeForFile(file)
-                        val isDir = file.isDirectory
-
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (isDir) {
-                                        currentDir = file
-                                    } else {
-                                        if (fileType != null) {
-                                            // Save in recent, set companion, navigate
-                                            RecentFilesTracker.addFile(context, file.absolutePath, fileType)
-                                            com.example.MainActivity.openedFilePath = file.absolutePath
-                                            com.example.MainActivity.openedFileType = fileType
-                                            onNavigateToModule(fileType)
-                                            Toast.makeText(context, "Membuka ${file.name}...", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Format tidak didukung secara natif", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val (icon, iconColor, bgIconColor) = when {
-                                    isDir -> Triple(Icons.Rounded.Folder, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                                    fileType == "Inky" -> Triple(Icons.Rounded.Description, Color(0xFF2563EB), Color(0xFFEFF6FF))
-                                    fileType == "Cellina" -> Triple(Icons.Rounded.GridView, Color(0xFF10B981), Color(0xFFECFDF5))
-                                    fileType == "Slidia" -> Triple(Icons.Rounded.Slideshow, Color(0xFFD97706), Color(0xFFFFFBEB))
-                                    fileType == "Pagella" -> Triple(Icons.Rounded.PictureAsPdf, Color(0xFFE11D48), Color(0xFFFFF1F2))
-                                    else -> Triple(Icons.Rounded.InsertDriveFile, Color.Gray, Color.LightGray.copy(alpha = 0.3f))
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .background(bgIconColor, shape = RoundedCornerShape(8.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
-                                }
-
-                                Spacer(modifier = Modifier.width(14.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = file.name,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    val size = if (isDir) {
-                                        val children = file.list()?.size ?: 0
-                                        "$children items"
-                                    } else {
-                                        val bytes = file.length()
-                                        when {
-                                            bytes < 1024 -> "$bytes B"
-                                            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-                                            else -> String.format(Locale.getDefault(), "%.1f MB", bytes.toDouble() / (1024 * 1024))
-                                        }
-                                    }
-                                    Text(
-                                        text = "$size • ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(file.lastModified()))}",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Icon(
-                                    imageVector = if (isDir) Icons.Rounded.ChevronRight else Icons.Rounded.OpenInNew,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 fun ShortcutCard(
     title: String,

@@ -248,7 +248,7 @@ fun HomeSubpage(
             headlineText = "Font style",
             supportingText = activeFontFamily,
             leadingIcon = { Icon(Icons.Rounded.FontDownload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Font") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Font") },
             onClick = { onNavigateSubpage("font_style") }
         )
 
@@ -1070,7 +1070,7 @@ fun ColorPickerSubpage(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Preset Pilihan Warna:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text("Color Presets:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         val presets = listOf(
             Color.Red, Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
             Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF00BCD4), Color(0xFF009688),
@@ -1118,7 +1118,7 @@ fun ColorPickerSubpage(
                     .border(1.dp, MaterialTheme.colorScheme.outline)
             )
             Column {
-                Text("Preview Warna", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                Text("Color Preview", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                 Text(hex, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -1229,7 +1229,7 @@ fun FontSizeDialog(
 
                 // Font size slider (max 96)
                 Text(
-                    text = "Geser untuk atur (maks. 96 pt):",
+                    text = "Slide to adjust (max 96 pt):",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1294,7 +1294,7 @@ fun PasteSpecialDialog(
                 )
 
                 Text(
-                    text = "Pilih format penempelan lanjutan:",
+                    text = "Select advanced paste format:",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

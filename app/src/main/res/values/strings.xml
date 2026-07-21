@@ -35,4 +35,12 @@
     <string name="filter_pagella">Pagella PDF Document</string>
     <string name="recent_documents_header">RECENT DOCUMENTS</string>
     <string name="opening_file">Opening %1$s...</string>
+
+    <!-- Welcome Screen -->
+    <string name="welcome_title">Welcome to Papirus Office</string>
+    <string name="welcome_desc">To start using Papirus Office and access your documents securely, you need to grant the application access to manage your files.</string>
+    <string name="welcome_grant_btn">Grant Access</string>
+    <string name="welcome_settings_desc">Permission denied. Please grant file access from your system settings to continue.</string>
+    <string name="welcome_open_settings_btn">Open App Settings</string>
+
 </resources>

@@ -59,6 +59,31 @@ object LibreOfficeCore {
     }
 
     /**
+     * Interface for LibreOffice core events.
+     */
+    interface DocumentCallback {
+        fun onEvent(type: Int, payload: String)
+    }
+
+    private var currentCallback: DocumentCallback? = null
+
+    /**
+     * Register a callback for LibreOffice events (e.g. invalidate tiles).
+     */
+    fun registerCallback(docId: Int, callback: DocumentCallback) {
+        currentCallback = callback
+        if (!isLibraryLoaded) {
+            Log.w(TAG, "Native library not loaded. Mocking callback registration.")
+            return
+        }
+        try {
+            nativeRegisterCallback(docId, callback)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w(TAG, "nativeRegisterCallback UnsatisfiedLinkError.")
+        }
+    }
+
+    /**
      * Parse and export native spreadsheet calculations.
      */
     fun evaluateFormula(formula: String, sheetDataJson: String): String {
@@ -72,8 +97,28 @@ object LibreOfficeCore {
         }
     }
 
+    /**
+     * Create a new document in LibreOffice.
+     * @return A document ID, or a status indicating success.
+     */
+    fun createDocument(fileName: String): Int {
+        Log.d(TAG, "Creating new document: $fileName")
+        if (!isLibraryLoaded) {
+            Log.w(TAG, "Native library not loaded. Mocking createDocument.")
+            return 1 // Mock success
+        }
+        return try {
+            nativeCreateDocument(fileName)
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w(TAG, "nativeCreateDocument UnsatisfiedLinkError.")
+            1 // Mock success
+        }
+    }
+
     // --- Native Methods ---
     private external fun nativeInitialize(cacheDir: String, enableOoxml: Boolean, enableOmml: Boolean): Boolean
     private external fun nativeRenderPage(docPath: String, pageIndex: Int, buffer: ByteArray, w: Int, h: Int): Boolean
     private external fun nativeEvaluateFormula(formula: String, sheetDataJson: String): String
+    private external fun nativeRegisterCallback(docId: Int, callback: DocumentCallback)
+    private external fun nativeCreateDocument(fileName: String): Int
 }

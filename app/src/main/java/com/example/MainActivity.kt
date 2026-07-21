@@ -29,12 +29,19 @@ import com.example.ui.components.*
 import com.example.ui.home.HomeDashboard
 import com.example.ui.home.CrashLogsScreen
 import com.example.ui.home.NewDocumentScreen
+import com.example.ui.home.WelcomeScreen
 import com.example.ui.theme.PapirusTheme
+import android.os.Build
+import android.os.Environment
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
     companion object {
         var openedFilePath: String? = null
         var openedFileType: String? = null
+        var newDocIndex: Int = 1
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,8 +111,20 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     val isTablet = configuration.screenWidthDp >= 600
 
     // Master Workspace Navigation State
-    // "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
+    // "welcome" (Onboarding), "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
     var currentWorkspace by remember { mutableStateOf("home") }
+    
+    // Check initial permission state
+    LaunchedEffect(Unit) {
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!hasPermission) {
+            currentWorkspace = "welcome"
+        }
+    }
 
     // Dynamic theme preference state
     var dynamicColorEnabled by remember {
@@ -145,7 +164,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Global Header TopBar
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -231,6 +250,11 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     .fillMaxWidth()
             ) {
                 when (currentWorkspace) {
+                    "welcome" -> WelcomeScreen(
+                        onAccessGranted = {
+                            currentWorkspace = "home"
+                        }
+                    )
                     "home" -> HomeDashboard(
                         isTablet = isTablet,
                         onNavigateToModule = { workspaceName ->
