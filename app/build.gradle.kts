@@ -37,6 +37,15 @@ android {
     // Feature toggles for modular C++ / JNI OOXML compatibility layers
     buildConfigField("boolean", "ENABLE_OOXML_SUPPORT", "true")
     buildConfigField("boolean", "ENABLE_OMML_PARSER", "true")
+
+    // Membaca dari environment variable lokal atau CI/CD GitHub
+    val geminiKey = System.getenv("GEMINI_API_KEY") ?: ""
+    val cseCx = System.getenv("GOOGLE_CSE_CX") ?: ""
+    val cseApiKey = System.getenv("GOOGLE_CSE_API_KEY") ?: ""
+
+    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+    buildConfigField("String", "GOOGLE_CSE_CX", "\"$cseCx\"")
+    buildConfigField("String", "GOOGLE_CSE_API_KEY", "\"$cseApiKey\"")
   }
 
   signingConfigs {

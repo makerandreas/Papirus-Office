@@ -51,6 +51,9 @@ jobs:
           KEYSTORE_PASSWORD: papirus123
           KEY_ALIAS: papirus_key
           KEY_PASSWORD: papirus123
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
 
       # SOLUSI JALUR APK MENTAH: Langsung bypass ke halaman GitHub Release Nightly
       - name: Drop Papirus Nightly Release
