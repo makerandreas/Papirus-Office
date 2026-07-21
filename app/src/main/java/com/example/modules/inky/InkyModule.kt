@@ -118,7 +118,15 @@ fun InkyModule(
     var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
-    var docTitle by remember { mutableStateOf("Inky_Dokumen.odt") }
+    var docTitle by remember {
+        mutableStateOf(
+            if (com.example.MainActivity.openedFilePath != null && com.example.MainActivity.openedFileType == "Inky") {
+                java.io.File(com.example.MainActivity.openedFilePath!!).name
+            } else {
+                "Inky_Dokumen.odt"
+            }
+        )
+    }
 
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
@@ -143,8 +151,18 @@ fun InkyModule(
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
     var docBodyText by remember {
+        val initialText = if (com.example.MainActivity.openedFilePath != null && com.example.MainActivity.openedFileType == "Inky") {
+            try {
+                val f = java.io.File(com.example.MainActivity.openedFilePath!!)
+                if (f.exists()) f.readText() else ""
+            } catch(e: Exception) {
+                ""
+            }
+        } else {
+            ""
+        }
         mutableStateOf(
-            androidx.compose.ui.text.input.TextFieldValue("")
+            androidx.compose.ui.text.input.TextFieldValue(initialText)
         )
     }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
@@ -251,8 +269,16 @@ fun InkyModule(
 
     LaunchedEffect(showBottomBar) {
         if (showBottomBar) {
-            wasKeyboardOpenBeforeBottomSheet = isKeyboardVisible
+            if (!wasKeyboardOpenBeforeBottomSheet) {
+                wasKeyboardOpenBeforeBottomSheet = isKeyboardVisible
+            }
             keyboardController?.hide()
+        } else {
+            if (wasKeyboardOpenBeforeBottomSheet) {
+                focusRequester.requestFocus()
+                keyboardController?.show()
+                wasKeyboardOpenBeforeBottomSheet = false
+            }
         }
     }
 
@@ -289,10 +315,6 @@ fun InkyModule(
             showFct = false
         } else if (showBottomBar) {
             showBottomBar = false
-            if (wasKeyboardOpenBeforeBottomSheet) {
-                focusRequester.requestFocus()
-                keyboardController?.show()
-            }
         } else if (isEditMode) {
             isEditMode = false
         } else {
@@ -1860,10 +1882,12 @@ fun InkyModule(
                             // 4. Open Standard Bottom Sheet (Simplified Ribbon Deck)
                             IconButton(
                                 onClick = {
+                                    val wasVisible = isKeyboardVisible
                                     coroutineScope.launch {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
                                         delay(100)
+                                        wasKeyboardOpenBeforeBottomSheet = wasVisible
                                         showBottomBar = true
                                         bottomBarDeck = "ribbon"
                                     }
@@ -1879,7 +1903,14 @@ fun InkyModule(
                         }
                     }
                 }
-            // --- PERSISTENT STANDARD BOTTOM SHEET (Material 3 Expressive) ---
+            }
+        }
+
+        // --- PERSISTENT STANDARD BOTTOM SHEET (Material 3 Expressive) ---
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter
+        ) {
             AnimatedVisibility(
                 visible = showBottomBar,
                 enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
@@ -2001,7 +2032,6 @@ fun InkyModule(
                     }
                 }
             }
-        }
         }
     }
 

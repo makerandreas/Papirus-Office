@@ -31,6 +31,11 @@ import com.example.ui.home.CrashLogsScreen
 import com.example.ui.theme.PapirusTheme
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        var openedFilePath: String? = null
+        var openedFileType: String? = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -130,7 +135,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Global Header TopBar
-        if (currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
+        if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,559 +1,1183 @@
 package com.example.ui.home
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.widget.Toast
+import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.ai.GeminiAiService
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ==========================================
+// LOCAL RECENT FILES PERSISTENCE TRACKER
+// ==========================================
+object RecentFilesTracker {
+    private const val PREFS_NAME = "papirus_recents_prefs"
+    private const val KEY_RECENTS = "recent_files_list"
+
+    data class RecentFile(
+        val path: String,
+        val name: String,
+        val lastOpened: Long,
+        val fileType: String,
+        val size: String
+    )
+
+    fun getRecents(context: Context): List<RecentFile> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonString = prefs.getString(KEY_RECENTS, "[]") ?: "[]"
+        val list = mutableListOf<RecentFile>()
+        try {
+            val jsonArray = JSONArray(jsonString)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val path = obj.getString("path")
+                val name = obj.getString("name")
+                val lastOpened = obj.getLong("lastOpened")
+                val fileType = obj.getString("fileType")
+                val size = obj.getString("size")
+                list.add(RecentFile(path, name, lastOpened, fileType, size))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        // Fulfill criteria: only files existing on device are displayed, no duplicates, sorted by lastOpened desc
+        return list.filter { File(it.path).exists() }
+            .sortedByDescending { it.lastOpened }
+    }
+
+    fun addFile(context: Context, path: String, fileType: String) {
+        val file = File(path)
+        if (!file.exists()) return
+
+        val sizeBytes = file.length()
+        val sizeStr = when {
+            sizeBytes < 1024 -> "$sizeBytes B"
+            sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024} KB"
+            else -> String.format(Locale.getDefault(), "%.1f MB", sizeBytes.toDouble() / (1024 * 1024))
+        }
+
+        val recents = getRecents(context).toMutableList()
+        recents.removeAll { it.path == path }
+
+        recents.add(0, RecentFile(
+            path = path,
+            name = file.name,
+            lastOpened = System.currentTimeMillis(),
+            fileType = fileType,
+            size = sizeStr
+        ))
+
+        saveRecents(context, recents)
+    }
+
+    private fun saveRecents(context: Context, list: List<RecentFile>) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonArray = JSONArray()
+        list.forEach { item ->
+            val obj = JSONObject().apply {
+                put("path", item.path)
+                put("name", item.name)
+                put("lastOpened", item.lastOpened)
+                put("fileType", item.fileType)
+                put("size", item.size)
+            }
+            jsonArray.put(obj)
+        }
+        prefs.edit().putString(KEY_RECENTS, jsonArray.toString()).apply()
+    }
+}
+
+// ==========================================
+// STORAGE UTILITIES AND SHORTCUT DETECTOR
+// ==========================================
+fun getMockStorageRoot(context: Context): File {
+    val realRoot = File("/storage/emulated/0")
+    try {
+        if (realRoot.exists() && realRoot.canRead() && realRoot.canWrite()) {
+            return realRoot
+        }
+    } catch (e: Exception) {}
+    
+    // Fallback sandbox storage structured like /storage/emulated/0
+    val fallback = File(context.filesDir, "storage_emulated_0")
+    if (!fallback.exists()) {
+        fallback.mkdirs()
+    }
+    return fallback
+}
+
+fun getDirectoryShortcut(context: Context, path: String): File {
+    val root = getMockStorageRoot(context)
+    val relative = path.removePrefix("/storage/emulated/0").removePrefix("/")
+    val targetFile = if (relative.isEmpty()) root else File(root, relative)
+    if (!targetFile.exists()) {
+        targetFile.mkdirs()
+    }
+    return targetFile
+}
+
+fun getExternalStorageShortcut(context: Context): File? {
+    val dirs = androidx.core.content.ContextCompat.getExternalFilesDirs(context, null)
+    if (dirs.size > 1) {
+        val extFile = dirs[1]
+        if (extFile != null) {
+            val path = extFile.absolutePath
+            val idx = path.indexOf("/Android/data")
+            if (idx != -1) {
+                return File(path.substring(0, idx))
+            }
+        }
+    }
+    return null
+}
+
+fun getFileTypeForFile(file: File): String? {
+    return when (file.extension.lowercase()) {
+        "odt", "docx", "doc", "txt" -> "Inky"
+        "ods", "xlsx", "xls", "csv" -> "Cellina"
+        "odp", "pptx", "ppt" -> "Slidia"
+        "pdf" -> "Pagella"
+        else -> null
+    }
+}
+
+// ==========================================
+// MOCK DOCUMENT GENERATOR ON DEVICE
+// ==========================================
+fun createMockFilesOnDevice(context: Context) {
+    try {
+        val root = getMockStorageRoot(context)
+        val docs = File(root, "Documents")
+        val downloads = File(root, "Downloads")
+
+        if (!docs.exists()) docs.mkdirs()
+        if (!downloads.exists()) downloads.mkdirs()
+
+        val file1 = File(docs, "Laporan_Kinerja_Papirus.odt")
+        if (!file1.exists()) {
+            file1.writeText("=== LAPORAN KINERJA PAPIRUS ===\nTanggal: 2026-07-20\n\nPapirus Office Writer Document.\nSemua data disimpan di penyimpanan lokal secara aman.")
+        }
+
+        val file2 = File(docs, "Rencana_Anggaran_2026.ods")
+        if (!file2.exists()) {
+            file2.writeText("=== RENCANA ANGGARAN 2026 ===\nItem, Jumlah, Harga, Total\nSewa Ruangan, 12, 500, 6000\nServer Host, 1, 1200, 1200\n\nTotal Pengeluaran: 7200 USD")
+        }
+
+        val file3 = File(downloads, "Presentasi_Fitur_Slidia.odp")
+        if (!file3.exists()) {
+            file3.writeText("=== PRESENTASI FITUR SLIDIA ===\nSlide 1: Memulai Presentasi Baru\nSlide 2: Konfigurasi Kecepatan Transisi\nSlide 3: Kompatibilitas ODP LibreOffice.")
+        }
+
+        val file4 = File(downloads, "Panduan_Pengguna_Papirus.pdf")
+        if (!file4.exists()) {
+            file4.writeText("=== PANDUAN PENGGUNA PAPIRUS ===\n1. Buka aplikasi dan pilih tab Files.\n2. Tap ganda dokumen untuk menyunting.\n3. Simpan perubahan secara realtime.")
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+
+// ==========================================
+// PAPIRUS OFFICE START SCREEN COMPOSABLE
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeDashboard(
     isTablet: Boolean,
     onNavigateToModule: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val scrollState = rememberScrollState()
+    var activeTab by remember { mutableStateOf("Recents") } // Recents, Files, Google Drive
+    
+    // Search queries
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
 
-    // Opt-in AI preferences state
-    var isAiEnabled by remember { mutableStateOf(GeminiAiService.isAiEnabled(context)) }
-    var apiKeyInput by remember { mutableStateOf(GeminiAiService.getUserApiKey(context)) }
-    var selectedModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
-    var showModelMenu by remember { mutableStateOf(false) }
+    // Dialog & Options states
+    var showMoreMenu by remember { mutableStateOf(false) }
+    var showOptionsDialog by remember { mutableStateOf(false) }
+    var showNewDocDialog by remember { mutableStateOf(false) }
+    var showFabMenu by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(scrollState)
-            .padding(16.dp)
-    ) {
-        // Modern Bento-style Header Section
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Dark modern bento logo with rotated square inside
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(Color(0xFF1A1C1E), shape = RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .border(2.dp, Color.White, RoundedCornerShape(3.dp))
-                                .graphicsLayer(rotationZ = 12f)
+    // Seed mock files on startup
+    LaunchedEffect(Unit) {
+        createMockFilesOnDevice(context)
+    }
+
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Papirus Office",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 24.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 4.dp)
                         )
-                    }
-                    Text(
-                        text = "Papirus Office",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF0F172A),
-                        letterSpacing = (-0.5).sp
-                    )
-                }
-
-                // Profile initials avatar "MA" with context menu trigger
-                var showContextMenu by remember { mutableStateOf(false) }
-
-                Box {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .background(Color(0xFFE2E8F0), shape = RoundedCornerShape(20.dp))
-                                .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(20.dp))
-                                .clickable { showContextMenu = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "MA",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF475569)
-                            )
-                        }
-
+                    },
+                    actions = {
                         IconButton(
-                            onClick = { showContextMenu = true },
-                            modifier = Modifier.size(36.dp).testTag("btn_start_center_menu")
+                            onClick = { isSearchActive = !isSearchActive },
+                            modifier = Modifier.testTag("btn_top_search")
                         ) {
                             Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = "Menu Konteks",
-                                tint = Color(0xFF475569)
+                                imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
+                                contentDescription = "Search recent documents"
                             )
                         }
-                    }
-
-                    DropdownMenu(
-                        expanded = showContextMenu,
-                        onDismissRequest = { showContextMenu = false },
-                        modifier = Modifier.background(Color.White)
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = Color(0xFFEF4444),
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        "Diagnostic & Crash Reports",
-                                        color = Color(0xFF1E293B),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            },
-                            onClick = {
-                                showContextMenu = false
-                                onNavigateToModule("crash_logs")
+                        Box {
+                            IconButton(
+                                onClick = { showMoreMenu = true },
+                                modifier = Modifier.testTag("btn_top_more")
+                            ) {
+                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
                             }
-                        )
-                    }
-                }
-            }
-
-            // Version tags & packages
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFFDBEAFE), shape = RoundedCornerShape(10.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "V1.2.4-NIGHTLY",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1D4ED8)
-                    )
-                }
-                Text(
-                    text = "com.makerandreas.papirusoffice",
-                    fontSize = 10.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = Color(0xFF94A3B8)
-                )
-            }
-        }
-
-        // Section: Suite Modules Grid
-        Text(
-            text = "OFFICE WORKSPACES",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF64748B),
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        // Bento 2x2 Grid: Always symmetric and perfectly spaced
-        Column(
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(bottom = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    ModuleBentoCard(
-                        title = "Inky",
-                        subtitle = "ODF/DOCX Editor",
-                        brandColor = Color(0xFF2563EB),
-                        bgColor = Color(0xFFEFF6FF),
-                        icon = Icons.Default.Description
-                    ) { onNavigateToModule("Inky") }
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    ModuleBentoCard(
-                        title = "Cellina",
-                        subtitle = "ODS/XLSX Sheets",
-                        brandColor = Color(0xFF10B981),
-                        bgColor = Color(0xFFECFDF5),
-                        icon = Icons.Default.GridView
-                    ) { onNavigateToModule("Cellina") }
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(modifier = Modifier.weight(1f)) {
-                    ModuleBentoCard(
-                        title = "Slidia",
-                        subtitle = "ODP/PPTX Slides",
-                        brandColor = Color(0xFFD97706),
-                        bgColor = Color(0xFFFFFBEB),
-                        icon = Icons.Default.Slideshow
-                    ) { onNavigateToModule("Slidia") }
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    ModuleBentoCard(
-                        title = "Pagella",
-                        subtitle = "Advanced PDF",
-                        brandColor = Color(0xFFE11D48),
-                        bgColor = Color(0xFFFFF1F2),
-                        icon = Icons.Default.PictureAsPdf
-                    ) { onNavigateToModule("Pagella") }
-                }
-            }
-        }
-
-        // Section: Google Gemini Assistant Opt-In Panel
-        Text(
-            text = "AI COMPANION CONFIGURATION (OPT-IN)",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color(0xFF64748B),
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        // Gemini Purple Bento Card
-        Card(
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFE7E0FF)),
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, Color(0xFFD0C4F2)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .testTag("ai_config_card")
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Opt-in toggle row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Shadow white circle container for AI symbol
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .background(Color.White, shape = RoundedCornerShape(14.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "AI",
-                                tint = Color(0xFF6750A4),
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                "Ask Gemini Assistant",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = Color(0xFF21005D)
-                            )
-                            Text(
-                                "Summarize documents or generate LaTeX equations",
-                                fontSize = 11.sp,
-                                color = Color(0xFF49454F)
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = isAiEnabled,
-                        onCheckedChange = {
-                            isAiEnabled = it
-                            GeminiAiService.setAiEnabled(context, it)
-                        },
-                        modifier = Modifier.testTag("toggle_ai"),
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color(0xFF6750A4)
-                        )
-                    )
-                }
-
-                if (isAiEnabled) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // API Key Input
-                    OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = {
-                            apiKeyInput = it
-                            GeminiAiService.saveUserApiKey(context, it)
-                        },
-                        label = { Text("Google AI Studio API Key", color = Color(0xFF21005D)) },
-                        placeholder = { Text("AIzaSy...") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("api_key_input"),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = Color(0xFF6750A4),
-                            unfocusedBorderColor = Color(0xFFD0C4F2),
-                            focusedLabelColor = Color(0xFF21005D),
-                            unfocusedLabelColor = Color(0xFF49454F)
-                        ),
-                        trailingIcon = {
-                            if (apiKeyInput.isNotEmpty()) {
-                                Icon(Icons.Default.CheckCircle, contentDescription = "Configured", tint = Color(0xFF16A34A))
-                            }
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Don't have a key? Go to https://aistudio.google.com/ to retrieve your free developer API key.",
-                        fontSize = 11.sp,
-                        color = Color(0xFF49454F)
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Model Selection Dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = selectedModel,
-                            onValueChange = {},
-                            label = { Text("Active LLM Model", color = Color(0xFF21005D)) },
-                            readOnly = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color(0xFF6750A4),
-                                unfocusedBorderColor = Color(0xFFD0C4F2),
-                                focusedLabelColor = Color(0xFF21005D),
-                                unfocusedLabelColor = Color(0xFF49454F)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { showModelMenu = true },
-                            trailingIcon = {
-                                IconButton(onClick = { showModelMenu = true }) {
-                                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Select Model", tint = Color(0xFF6750A4))
-                                }
-                            }
-                        )
-                        DropdownMenu(
-                            expanded = showModelMenu,
-                            onDismissRequest = { showModelMenu = false },
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            GeminiAiService.SUPPORTED_MODELS.forEach { modelPair ->
+                            DropdownMenu(
+                                expanded = showMoreMenu,
+                                onDismissRequest = { showMoreMenu = false }
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text(modelPair.second) },
+                                    leadingIcon = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
+                                    text = { Text("Crash Log") },
                                     onClick = {
-                                        selectedModel = modelPair.first
-                                        GeminiAiService.saveSelectedModel(context, modelPair.first)
-                                        showModelMenu = false
+                                        showMoreMenu = false
+                                        onNavigateToModule("crash_logs")
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                                    text = { Text("Papirus Office Options") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showOptionsDialog = true
                                     }
                                 )
                             }
                         }
-                    }
-                }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 14.dp),
-                    color = Color(0xFFD0C4F2).copy(alpha = 0.5f)
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+                    )
                 )
 
-                // Zero Data Retention Policy Notice
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.4f), shape = RoundedCornerShape(12.dp))
-                        .padding(12.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Shield,
-                            contentDescription = "Privacy Policy",
-                            tint = Color(0xFF21005D),
-                            modifier = Modifier.size(16.dp)
+                AnimatedVisibility(visible = isSearchActive) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .testTag("search_field"),
+                        placeholder = { Text("Cari file berdasarkan nama...") },
+                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "Zero Data Retention & Privacy Policy",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF21005D)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "1. Security: Credentials are stored locally via Android Encrypted SharedPreferences; they are never sent to external telemetry systems.\n" +
-                               "2. Privacy: All user documents are fully ephemeral. Our zero-data-retention system instructions forbid Gemini from caching, storing, or logging any document buffers.",
-                        fontSize = 10.sp,
-                        color = Color(0xFF49454F),
-                        lineHeight = 14.sp
                     )
                 }
             }
-        }
+        },
+        bottomBar = {
+            NavigationBar(
+                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+            ) {
+                NavigationBarItem(
+                    selected = activeTab == "Recents",
+                    onClick = { activeTab = "Recents" },
+                    icon = { Icon(Icons.Rounded.History, contentDescription = "Recents tab") },
+                    label = { Text("Recents") }
+                )
+                NavigationBarItem(
+                    selected = activeTab == "Files",
+                    onClick = { activeTab = "Files" },
+                    icon = { Icon(Icons.Rounded.Folder, contentDescription = "Files tab") },
+                    label = { Text("Files") }
+                )
+                NavigationBarItem(
+                    selected = activeTab == "Google Drive",
+                    onClick = { activeTab = "Google Drive" },
+                    icon = { Icon(Icons.Rounded.Cloud, contentDescription = "Google Drive tab") },
+                    label = { Text("Google Drive") }
+                )
+            }
+        },
+        floatingActionButton = {
+            Box(
+                contentAlignment = Alignment.BottomEnd
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AnimatedVisibility(
+                        visible = showFabMenu,
+                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            // 1. New Slidia Presentation
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    tonalElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = "New Slidia Presentation",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        showFabMenu = false
+                                        onNavigateToModule("Slidia")
+                                    },
+                                    containerColor = Color(0xFFD97706),
+                                    contentColor = Color.White
+                                ) {
+                                    Icon(Icons.Rounded.Slideshow, contentDescription = "New Slidia Presentation")
+                                }
+                            }
 
-        // Section: Recent Documents
-        Row(
+                            // 2. New Cellina Spreadsheet
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    tonalElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = "New Cellina Spreadsheet",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        showFabMenu = false
+                                        onNavigateToModule("Cellina")
+                                    },
+                                    containerColor = Color(0xFF10B981),
+                                    contentColor = Color.White
+                                ) {
+                                    Icon(Icons.Rounded.GridView, contentDescription = "New Cellina Spreadsheet")
+                                }
+                            }
+
+                            // 3. New Inky Document
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    tonalElevation = 4.dp
+                                ) {
+                                    Text(
+                                        text = "New Inky Document",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                SmallFloatingActionButton(
+                                    onClick = {
+                                        showFabMenu = false
+                                        onNavigateToModule("Inky")
+                                    },
+                                    containerColor = Color(0xFF2563EB),
+                                    contentColor = Color.White
+                                ) {
+                                    Icon(Icons.Rounded.Description, contentDescription = "New Inky Document")
+                                }
+                            }
+                        }
+                    }
+
+                    FloatingActionButton(
+                        onClick = { showNewDocDialog = true },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier
+                            .combinedClickable(
+                                onLongClick = {
+                                    showFabMenu = !showFabMenu
+                                    Toast.makeText(context, "Menu opsi cepat terbuka", Toast.LENGTH_SHORT).show()
+                                },
+                                onClick = {
+                                    showNewDocDialog = true
+                                }
+                            )
+                            .testTag("main_fab")
+                    ) {
+                        Icon(
+                            imageVector = if (showFabMenu) Icons.Rounded.Close else Icons.Rounded.Add,
+                            contentDescription = "New Document Menu"
+                        )
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            when (activeTab) {
+                "Recents" -> RecentsSubPage(
+                    searchQuery = searchQuery,
+                    onNavigateToModule = onNavigateToModule
+                )
+                "Files" -> FilesSubPage(
+                    onNavigateToModule = onNavigateToModule
+                )
+                "Google Drive" -> GoogleDriveSubPage()
+            }
+        }
+    }
+
+    // ==========================================
+    // OPTIONS & SETTINGS DIALOG (LibreOffice equivalent)
+    // ==========================================
+    if (showOptionsDialog) {
+        var optAiEnabled by remember { mutableStateOf(GeminiAiService.isAiEnabled(context)) }
+        var optApiKey by remember { mutableStateOf(GeminiAiService.getUserApiKey(context)) }
+        var optModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
+        var optShowModelMenu by remember { mutableStateOf(false) }
+
+        var activeSettingSection by remember { mutableStateOf("general") } // general, ai, about
+
+        AlertDialog(
+            onDismissRequest = { showOptionsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Papirus Office Options", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp)
+                ) {
+                    // Category Selection Chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = activeSettingSection == "general",
+                            onClick = { activeSettingSection = "general" },
+                            label = { Text("General") }
+                        )
+                        FilterChip(
+                            selected = activeSettingSection == "ai",
+                            onClick = { activeSettingSection = "ai" },
+                            label = { Text("Gemini AI") }
+                        )
+                        FilterChip(
+                            selected = activeSettingSection == "about",
+                            onClick = { activeSettingSection = "about" },
+                            label = { Text("About") }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        when (activeSettingSection) {
+                            "general" -> {
+                                Text("Language & Formats", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Locale: English (US) / Indonesian (Fallback)", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("LibreOffice Core Integration", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Native ODF Parse Cache: Enabled", style = MaterialTheme.typography.bodyMedium)
+                                Text("JNI Memory Buffering: Optimized for 64-bit systems", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("Document Storage Config", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Auto-Save Recovery: 60 seconds interval", style = MaterialTheme.typography.bodyMedium)
+                                Text("Incremental Sync: Active", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            "ai" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Google Gemini Assistant", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                        Text("Enable AI assistant to generate formulas, explain code and summarize logs.", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Switch(
+                                        checked = optAiEnabled,
+                                        onCheckedChange = {
+                                            optAiEnabled = it
+                                            GeminiAiService.setAiEnabled(context, it)
+                                        }
+                                    )
+                                }
+
+                                if (optAiEnabled) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = optApiKey,
+                                        onValueChange = {
+                                            optApiKey = it
+                                            GeminiAiService.saveUserApiKey(context, it)
+                                        },
+                                        label = { Text("Google AI Studio API Key") },
+                                        placeholder = { Text("AIzaSy...") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedTextField(
+                                            value = optModel,
+                                            onValueChange = {},
+                                            label = { Text("Active AI Model") },
+                                            readOnly = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            trailingIcon = {
+                                                IconButton(onClick = { optShowModelMenu = true }) {
+                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                                }
+                                            }
+                                        )
+                                        DropdownMenu(
+                                            expanded = optShowModelMenu,
+                                            onDismissRequest = { optShowModelMenu = false }
+                                        ) {
+                                            GeminiAiService.SUPPORTED_MODELS.forEach { modelPair ->
+                                                DropdownMenuItem(
+                                                    text = { Text(modelPair.second) },
+                                                    onClick = {
+                                                        optModel = modelPair.first
+                                                        GeminiAiService.saveSelectedModel(context, modelPair.first)
+                                                        optShowModelMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Privacy Guarantee", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                "Credentials are encrypted on-device. Your files are processed entirely in memory with Zero Data Retention.",
+                                                fontSize = 11.sp,
+                                                lineHeight = 15.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            "about" -> {
+                                Text("Papirus Office Mobile Suite", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Text("Version: 1.2.4-NIGHTLY", style = MaterialTheme.typography.bodyMedium)
+                                Text("Package: com.makerandreas.papirusoffice", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text("Built on LibreOffice ODF core compatibility library. Optimized for dynamic Android screen classes.", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showOptionsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // ==========================================
+    // NEW DOCUMENT SHEET DIALOG
+    // ==========================================
+    if (showNewDocDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewDocDialog = false },
+            title = {
+                Text("Buat Dokumen Baru", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Mulai menulis, mengaudit data, atau membuat presentasi visual yang memukau.", style = MaterialTheme.typography.bodyMedium)
+                    
+                    ListItem(
+                        headlineContent = { Text("Inky Writer Document", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text("Tulis draf, esai, laporan dalam format ODT/DOCX") },
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color(0xFFEFF6FF), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.Description, contentDescription = null, tint = Color(0xFF2563EB))
+                            }
+                        },
+                        modifier = Modifier
+                            .clickable {
+                                showNewDocDialog = false
+                                onNavigateToModule("Inky")
+                            }
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+
+                    ListItem(
+                        headlineContent = { Text("Cellina Spreadsheet", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text("Analisis data, tabel anggaran, fungsi ODS/XLSX") },
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color(0xFFECFDF5), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.GridView, contentDescription = null, tint = Color(0xFF10B981))
+                            }
+                        },
+                        modifier = Modifier
+                            .clickable {
+                                showNewDocDialog = false
+                                onNavigateToModule("Cellina")
+                            }
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+
+                    ListItem(
+                        headlineContent = { Text("Slidia Presentation", fontWeight = FontWeight.SemiBold) },
+                        supportingContent = { Text("Desain dek presentasi modern ODP/PPTX") },
+                        leadingContent = {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color(0xFFFFFBEB), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Rounded.Slideshow, contentDescription = null, tint = Color(0xFFD97706))
+                            }
+                        },
+                        modifier = Modifier
+                            .clickable {
+                                showNewDocDialog = false
+                                onNavigateToModule("Slidia")
+                            }
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNewDocDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+}
+
+// ==========================================
+// RECENTS SUB-PAGE
+// ==========================================
+@Composable
+fun RecentsSubPage(
+    searchQuery: String,
+    onNavigateToModule: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val recentFiles = remember(searchQuery) {
+        val list = RecentFilesTracker.getRecents(context)
+        if (searchQuery.trim().isEmpty()) {
+            list
+        } else {
+            list.filter { it.name.lowercase().contains(searchQuery.lowercase()) }
+        }
+    }
+
+    if (recentFiles.isEmpty()) {
+        // REQUIRED: English description and Material 3 Expressive support illustration
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(0.85f)
+            ) {
+                // Dynamic M3 Expressive Custom Vector-style Drawing
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                    Color.Transparent
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Overlapping vector shape simulations
+                    Box(
+                        modifier = Modifier
+                            .size(90.dp)
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer,
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .align(Alignment.Center)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .background(
+                                MaterialTheme.colorScheme.tertiaryContainer,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .offset(x = 18.dp, y = (-18).dp)
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.FindInPage,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(44.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "No Recent Documents",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Any document you open from your device directory or create using the plus button will be listed here instantly for quick, offline access.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            item {
+                Text(
+                    text = "DOKUMEN TERBARU",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            items(recentFiles) { file ->
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            com.example.MainActivity.openedFilePath = file.path
+                            com.example.MainActivity.openedFileType = file.fileType
+                            onNavigateToModule(file.fileType)
+                            Toast.makeText(context, "Membuka ${file.name}...", Toast.LENGTH_SHORT).show()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val (iconColor, bgIconColor, charSymbol) = when (file.fileType) {
+                            "Inky" -> Triple(Color(0xFF2563EB), Color(0xFFEFF6FF), "W")
+                            "Cellina" -> Triple(Color(0xFF10B981), Color(0xFFECFDF5), "S")
+                            "Slidia" -> Triple(Color(0xFFD97706), Color(0xFFFFFBEB), "P")
+                            "Pagella" -> Triple(Color(0xFFE11D48), Color(0xFFFFF1F2), "D")
+                            else -> Triple(Color.Gray, Color.LightGray, "F")
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(bgIconColor, shape = RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(charSymbol, fontWeight = FontWeight.ExtraBold, color = iconColor, fontSize = 16.sp)
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = file.name,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Opened: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastOpened))} • ${file.size}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// FILES SUB-PAGE (DYNAMIC FILES EXPLORER)
+// ==========================================
+@Composable
+fun FilesSubPage(
+    onNavigateToModule: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var currentDir by remember { mutableStateOf<File?>(null) }
+    
+    // We check if an external storage is present
+    val externalStorage = remember { getExternalStorageShortcut(context) }
+
+    if (currentDir == null) {
+        // Display top level shortcuts
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "RECENT DOCUMENTS",
+                text = "SHORTCUT PENYIMPANAN",
                 style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF64748B),
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
-            Text(
-                text = "View All",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF2563EB),
-                modifier = Modifier.clickable {
-                    Toast.makeText(context, "Start Center: All files are managed locally.", Toast.LENGTH_SHORT).show()
+
+            // 1. Internal Storage
+            ShortcutCard(
+                title = "Internal Storage",
+                path = "/storage/emulated/0",
+                description = "Main device storage directory",
+                icon = Icons.Rounded.Folder
+            ) {
+                currentDir = getDirectoryShortcut(context, "/storage/emulated/0")
+            }
+
+            // 2. Documents Shortcut
+            ShortcutCard(
+                title = "Documents",
+                path = "/storage/emulated/0/Documents",
+                description = "Default document drafts and sheets",
+                icon = Icons.Rounded.Article
+            ) {
+                currentDir = getDirectoryShortcut(context, "/storage/emulated/0/Documents")
+            }
+
+            // 3. Downloads Shortcut
+            ShortcutCard(
+                title = "Downloads",
+                path = "/storage/emulated/0/Downloads",
+                description = "Exported files and web downloads",
+                icon = Icons.Rounded.Download
+            ) {
+                currentDir = getDirectoryShortcut(context, "/storage/emulated/0/Downloads")
+            }
+
+            // 4. External Storage (Only displayed if actually detected)
+            if (externalStorage != null) {
+                ShortcutCard(
+                    title = "External Storage (SD Card)",
+                    path = externalStorage.absolutePath,
+                    description = "Removable secondary storage volume",
+                    icon = Icons.Rounded.SdCard
+                ) {
+                    currentDir = externalStorage
                 }
-            )
+            }
+        }
+    } else {
+        // Inside a directory: Display Explorer
+        val filesList = remember(currentDir) {
+            try {
+                val list = currentDir!!.listFiles() ?: emptyArray()
+                // Folders first, then files
+                list.sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
+            } catch (e: Exception) {
+                emptyList<File>()
+            }
         }
 
         Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Document 1
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
+            // Path Navigation Header
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        onNavigateToModule("Inky")
-                        Toast.makeText(context, "Opening Report_Q3_Analysis.docx...", Toast.LENGTH_SHORT).show()
-                    }
+                    .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color(0xFFDBEAFE), shape = RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("W", fontWeight = FontWeight.Bold, color = Color(0xFF2563EB), fontSize = 14.sp)
+                IconButton(onClick = {
+                    val rootPath = getMockStorageRoot(context).absolutePath
+                    val parent = currentDir?.parentFile
+                    if (currentDir?.absolutePath == rootPath || currentDir?.parent == null || !currentDir!!.absolutePath.startsWith(rootPath)) {
+                        currentDir = null
+                    } else {
+                        currentDir = parent
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Report_Q3_Analysis.docx",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Edited 2h ago • 2.4 MB",
-                            fontSize = 10.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = Color(0xFFCBD5E1))
+                }) {
+                    Icon(Icons.Rounded.ArrowBack, contentDescription = "Go back")
+                }
+                
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Column {
+                    Text(
+                        text = currentDir?.name ?: "Folder",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = currentDir?.absolutePath?.replace(context.filesDir.absolutePath, "/storage/emulated/0") ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
-            // Document 2
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        onNavigateToModule("Cellina")
-                        Toast.makeText(context, "Opening Inventory_Audit.ods...", Toast.LENGTH_SHORT).show()
-                    }
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (filesList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color(0xFFD1FAE5), shape = RoundedCornerShape(8.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("S", fontWeight = FontWeight.Bold, color = Color(0xFF10B981), fontSize = 14.sp)
+                    Text(
+                        text = "Folder ini kosong",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filesList) { file ->
+                        val fileType = getFileTypeForFile(file)
+                        val isDir = file.isDirectory
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (isDir) {
+                                        currentDir = file
+                                    } else {
+                                        if (fileType != null) {
+                                            // Save in recent, set companion, navigate
+                                            RecentFilesTracker.addFile(context, file.absolutePath, fileType)
+                                            com.example.MainActivity.openedFilePath = file.absolutePath
+                                            com.example.MainActivity.openedFileType = fileType
+                                            onNavigateToModule(fileType)
+                                            Toast.makeText(context, "Membuka ${file.name}...", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Format tidak didukung secara natif", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val (icon, iconColor, bgIconColor) = when {
+                                    isDir -> Triple(Icons.Rounded.Folder, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
+                                    fileType == "Inky" -> Triple(Icons.Rounded.Description, Color(0xFF2563EB), Color(0xFFEFF6FF))
+                                    fileType == "Cellina" -> Triple(Icons.Rounded.GridView, Color(0xFF10B981), Color(0xFFECFDF5))
+                                    fileType == "Slidia" -> Triple(Icons.Rounded.Slideshow, Color(0xFFD97706), Color(0xFFFFFBEB))
+                                    fileType == "Pagella" -> Triple(Icons.Rounded.PictureAsPdf, Color(0xFFE11D48), Color(0xFFFFF1F2))
+                                    else -> Triple(Icons.Rounded.InsertDriveFile, Color.Gray, Color.LightGray.copy(alpha = 0.3f))
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(bgIconColor, shape = RoundedCornerShape(8.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(20.dp))
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = file.name,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    val size = if (isDir) {
+                                        val children = file.list()?.size ?: 0
+                                        "$children items"
+                                    } else {
+                                        val bytes = file.length()
+                                        when {
+                                            bytes < 1024 -> "$bytes B"
+                                            bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+                                            else -> String.format(Locale.getDefault(), "%.1f MB", bytes.toDouble() / (1024 * 1024))
+                                        }
+                                    }
+                                    Text(
+                                        text = "$size • ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(file.lastModified()))}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = if (isDir) Icons.Rounded.ChevronRight else Icons.Rounded.OpenInNew,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Inventory_Audit.ods",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp,
-                            color = Color(0xFF0F172A)
-                        )
-                        Text(
-                            text = "Shared • Edited 1d ago",
-                            fontSize = 10.sp,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                    Icon(Icons.Default.ChevronRight, contentDescription = "Open", tint = Color(0xFFCBD5E1))
                 }
             }
         }
@@ -561,59 +1185,115 @@ fun HomeDashboard(
 }
 
 @Composable
-private fun ModuleBentoCard(
+fun ShortcutCard(
     title: String,
-    subtitle: String,
-    brandColor: Color,
-    bgColor: Color,
+    path: String,
+    description: String,
     icon: ImageVector,
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(0.5.dp, Color(0xFFE2E8F0)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier
             .fillMaxWidth()
-            .height(130.dp)
             .clickable(onClick = onClick)
-            .testTag("card_${title.lowercase()}"),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Top aligned colored icon box
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .background(bgColor, shape = RoundedCornerShape(12.dp)),
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, shape = CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(description, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(path, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline, fontFamily = FontFamily.Monospace)
+            }
+
+            Icon(Icons.Rounded.ChevronRight, contentDescription = "Browse folder", tint = MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+// ==========================================
+// GOOGLE DRIVE SUB-PAGE
+// ==========================================
+@Composable
+fun GoogleDriveSubPage() {
+    val context = LocalContext.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth(0.85f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFF1F5F9),
+                                Color.Transparent
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = brandColor,
-                    modifier = Modifier.size(20.dp)
+                    imageVector = Icons.Rounded.Cloud,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp)
                 )
             }
 
-            // Bottom aligned info text
-            Column {
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    color = Color(0xFF0F172A)
-                )
-                Text(
-                    text = subtitle,
-                    fontSize = 10.sp,
-                    color = Color(0xFF64748B)
-                )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Google Drive Sync",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Connect your Google Workspace accounts to access and collaborate on your cloud-stored documents, spreadsheets and presentation decks directly within Papirus Office.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    Toast.makeText(context, "Cloud sync is a placeholder and will be configured in the next development cycle.", Toast.LENGTH_LONG).show()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Rounded.CloudQueue, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Hubungkan Akun Google")
             }
         }
     }
