@@ -28,6 +28,7 @@ import com.example.modules.slidia.SlidiaModule
 import com.example.ui.components.*
 import com.example.ui.home.HomeDashboard
 import com.example.ui.home.CrashLogsScreen
+import com.example.ui.home.NewDocumentScreen
 import com.example.ui.theme.PapirusTheme
 
 class MainActivity : ComponentActivity() {
@@ -144,7 +145,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Global Header TopBar
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document") {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -238,6 +239,12 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                         dynamicColorEnabled = dynamicColorEnabled,
                         onDynamicColorChange = { dynamicColorEnabled = it }
                     )
+                    "create_new_document" -> NewDocumentScreen(
+                        onBack = { currentWorkspace = "home" },
+                        onNavigateToModule = { workspaceName ->
+                            currentWorkspace = workspaceName
+                        }
+                    )
                     "crash_logs" -> CrashLogsScreen(
                         onBack = { currentWorkspace = "home" }
                     )
@@ -288,7 +295,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document") {
                 AdaptiveFormattingToolbar(
                     selectedObjectType = formattingObjectType,
                     onFormatClick = { formatAction ->

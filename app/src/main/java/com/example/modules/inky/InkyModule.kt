@@ -134,6 +134,8 @@ fun InkyModule(
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
     var showOptionsDialog by remember { mutableStateOf(false) }
+    var showFontSizeDialog by remember { mutableStateOf(false) }
+    var showPasteSpecialDialog by remember { mutableStateOf(false) }
 
 
 
@@ -254,6 +256,8 @@ fun InkyModule(
     var textAlignment by remember { mutableStateOf(TextAlign.Left) }
     var fontColor by remember { mutableStateOf(Color.Black) }
     var highlightColor by remember { mutableStateOf(Color.Transparent) }
+    var underlineColor by remember { mutableStateOf(Color.Black) }
+    var paragraphShadingColor by remember { mutableStateOf(Color.Transparent) }
 
     // Dialog & overlay triggers
     var showFindReplace by remember { mutableStateOf(false) }
@@ -270,6 +274,9 @@ fun InkyModule(
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
     var activeRibbonTab by remember { mutableStateOf("Home") } // File, Home, Insert, Layout, References, Mailings, Review, View
     var showRibbonTabMenu by remember { mutableStateOf(false) }
+    var activeInkySubpage by remember { mutableStateOf("") }
+    var selectedStyleNameForOptions by remember { mutableStateOf("Normal") }
+    var openedFromExternalHub by remember { mutableStateOf(false) }
 
     LaunchedEffect(showBottomBar) {
         if (showBottomBar) {
@@ -282,6 +289,45 @@ fun InkyModule(
                 focusRequester.requestFocus()
                 keyboardController?.show()
                 wasKeyboardOpenBeforeBottomSheet = false
+            }
+            // Reset subpage states when closing
+            activeInkySubpage = ""
+            openedFromExternalHub = false
+            bottomBarDeck = "ribbon"
+        }
+    }
+
+    LaunchedEffect(bottomBarDeck, showBottomBar) {
+        if (showBottomBar) {
+            when (bottomBarDeck) {
+                "font_color" -> {
+                    activeInkySubpage = "font_color"
+                    openedFromExternalHub = true
+                }
+                "highlight_color" -> {
+                    activeInkySubpage = "highlight_color"
+                    openedFromExternalHub = true
+                }
+                "font_family" -> {
+                    activeInkySubpage = "font_style"
+                    openedFromExternalHub = true
+                }
+                "bulleted_list" -> {
+                    activeInkySubpage = "bulleted_list"
+                    openedFromExternalHub = true
+                }
+                "numbered_list" -> {
+                    activeInkySubpage = "numbered_list"
+                    openedFromExternalHub = true
+                }
+                "multilevel_list" -> {
+                    activeInkySubpage = "multilevel_list"
+                    openedFromExternalHub = true
+                }
+                "underline_options" -> {
+                    activeInkySubpage = "underline_options"
+                    openedFromExternalHub = true
+                }
             }
         }
     }
@@ -318,7 +364,22 @@ fun InkyModule(
         if (showFct) {
             showFct = false
         } else if (showBottomBar) {
-            showBottomBar = false
+            if (activeInkySubpage.isNotEmpty()) {
+                if (openedFromExternalHub) {
+                    showBottomBar = false
+                    openedFromExternalHub = false
+                    bottomBarDeck = "ribbon"
+                } else {
+                    // sequential back
+                    when (activeInkySubpage) {
+                        "underline_color" -> activeInkySubpage = "underline_options"
+                        "create_new_style", "style_options" -> activeInkySubpage = "paragraph_styles"
+                        else -> activeInkySubpage = ""
+                    }
+                }
+            } else {
+                showBottomBar = false
+            }
         } else if (isEditMode) {
             isEditMode = false
         } else {
@@ -1506,95 +1567,64 @@ fun InkyModule(
                                 
                                 // 1. Font Style (Drop-down sepanjang ±3 ikon)
                                 item {
-                                    Box {
-                                        Row(
-                                            modifier = Modifier
-                                                .width(110.dp)
-                                                .height(36.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                                .clickable { showFontMenuInToolbar = true }
-                                                .padding(horizontal = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = activeFontFamily,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowDropDown,
-                                                contentDescription = "Font Style",
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                        DropdownMenu(
-                                            expanded = showFontMenuInToolbar,
-                                            onDismissRequest = { showFontMenuInToolbar = false }
-                                        ) {
-                                            val fonts = listOf("Aptos Display", "Calibri", "Arial", "Roboto", "Times New Roman", "Courier New")
-                                            fonts.forEach { f ->
-                                                DropdownMenuItem(
-                                                    text = { Text(f, style = MaterialTheme.typography.bodyMedium) },
-                                                    onClick = {
-                                                        activeFontFamily = f
-                                                        showFontMenuInToolbar = false
-                                                        triggerAutosave()
-                                                    }
-                                                )
+                                    Row(
+                                        modifier = Modifier
+                                            .width(120.dp)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                bottomBarDeck = "font_family"
+                                                showBottomBar = true
                                             }
-                                        }
+                                            .padding(horizontal = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = activeFontFamily,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                                            contentDescription = "Font Style",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
 
                                 // 2. Font Size (Drop-down sepanjang ±2 ikon)
                                 item {
-                                    Box {
-                                        Row(
-                                            modifier = Modifier
-                                                .width(72.dp)
-                                                .height(36.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                                .clickable { showSizeMenuInToolbar = true }
-                                                .padding(horizontal = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                text = "$activeFontSize pt",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.ArrowDropDown,
-                                                contentDescription = "Font Size",
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                        DropdownMenu(
-                                            expanded = showSizeMenuInToolbar,
-                                            onDismissRequest = { showSizeMenuInToolbar = false }
-                                        ) {
-                                            val sizes = listOf(10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36)
-                                            sizes.forEach { size ->
-                                                DropdownMenuItem(
-                                                    text = { Text("$size pt", style = MaterialTheme.typography.bodyMedium) },
-                                                    onClick = {
-                                                        activeFontSize = size
-                                                        showSizeMenuInToolbar = false
-                                                        triggerAutosave()
-                                                    }
-                                                )
-                                            }
-                                        }
+                                    Row(
+                                        modifier = Modifier
+                                            .width(76.dp)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                            .clickable { showFontSizeDialog = true }
+                                            .padding(horizontal = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "$activeFontSize pt",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Icon(
+                                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                                            contentDescription = "Font Size",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
 
@@ -1620,11 +1650,58 @@ fun InkyModule(
 
                                 // 5. Underline
                                 item {
-                                    IconButton(
-                                        onClick = { isUnderline = !isUnderline; triggerAutosave() },
-                                        colors = if (isUnderline) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
+                                    Row(
+                                        modifier = Modifier
+                                            .width(72.dp)
+                                            .height(36.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(
+                                                if (isUnderline) MaterialTheme.colorScheme.secondaryContainer
+                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isUnderline) MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                                RoundedCornerShape(8.dp)
+                                            ),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Rounded.FormatUnderlined, contentDescription = "Underline", tint = MaterialTheme.colorScheme.primary)
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clickable {
+                                                    isUnderline = !isUnderline
+                                                    triggerAutosave()
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.FormatUnderlined,
+                                                contentDescription = "Underline",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .width(28.dp)
+                                                .fillMaxHeight()
+                                                .clickable {
+                                                    bottomBarDeck = "underline_options"
+                                                    openedFromExternalHub = true
+                                                    showBottomBar = true
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                                contentDescription = "Underline Options",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
                                     }
                                 }
 
@@ -1932,91 +2009,224 @@ fun InkyModule(
                     Column(
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        // Header bar: tabs on left, 3 persistent buttons on right
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // 1. Baris tab (scrollable)
+                        if (activeInkySubpage.isNotEmpty()) {
+                            // Subpage Header Bar
                             Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .horizontalScroll(rememberScrollState()),
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                val tabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
-                                tabs.forEach { tab ->
-                                    val isSelected = activeRibbonTab == tab
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primaryContainer
-                                                else Color.Transparent
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Leading Back Button
+                                    if (!openedFromExternalHub) {
+                                        IconButton(onClick = {
+                                            when (activeInkySubpage) {
+                                                "underline_color" -> activeInkySubpage = "underline_options"
+                                                "create_new_style", "style_options" -> activeInkySubpage = "paragraph_styles"
+                                                else -> {
+                                                    activeInkySubpage = ""
+                                                    openedFromExternalHub = false
+                                                    bottomBarDeck = "ribbon"
+                                                }
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.ArrowBack,
+                                                contentDescription = "Kembali",
+                                                tint = MaterialTheme.colorScheme.primary
                                             )
-                                            .clickable { activeRibbonTab = tab }
-                                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = tab,
-                                            fontSize = 14.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                        }
+                                    }
+
+                                    // Headline
+                                    Text(
+                                        text = when (activeInkySubpage) {
+                                            "paste_options" -> "Paste options"
+                                            "font_style" -> "Font Style"
+                                            "underline_options" -> "Underline Options"
+                                            "underline_color" -> "Underline Color"
+                                            "font_color" -> "Font Color"
+                                            "highlight_color" -> "Highlight Text Color"
+                                            "line_spacing" -> "Line Spacing"
+                                            "bulleted_list" -> "Create Bulleted List"
+                                            "numbered_list" -> "Create Numbered List"
+                                            "multilevel_list" -> "Create Bulleted List"
+                                            "paragraph_shading" -> "Paragraph Shading"
+                                            "paragraph_border" -> "Paragraph Border"
+                                            "paragraph_styles" -> "Paragraph Styles"
+                                            "create_new_style" -> "Create New Style"
+                                            "style_options" -> "Options for $selectedStyleNameForOptions"
+                                            "change_capitalization" -> "Change Capitalization"
+                                            else -> ""
+                                        },
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+
+                                // Trailing Icons Row
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    // Custom actions per subpage
+                                    if (activeInkySubpage == "paragraph_styles") {
+                                        IconButton(onClick = { activeInkySubpage = "create_new_style" }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Add,
+                                                contentDescription = "Create New Style",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    val needsMoreOptions = listOf(
+                                        "underline_options", "line_spacing", "bulleted_list",
+                                        "numbered_list", "multilevel_list", "paragraph_border"
+                                    ).contains(activeInkySubpage)
+
+                                    if (needsMoreOptions) {
+                                        IconButton(onClick = {
+                                            Toast.makeText(context, "More Options will be developed soon", Toast.LENGTH_SHORT).show()
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.MoreVert,
+                                                contentDescription = "More Options",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    // Persistent undo/redo/close
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Undo,
+                                            contentDescription = "Undo",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=REDO)")
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Redo,
+                                            contentDescription = "Redo",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        showBottomBar = false
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = "Close Standard Bottom Sheet",
+                                            tint = MaterialTheme.colorScheme.error
                                         )
                                     }
                                 }
                             }
-
-                            // Vertical divider
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 8.dp)
-                                    .width(1.dp)
-                                    .height(24.dp)
-                                    .background(borderStrokeColor.copy(alpha = 0.3f))
-                            )
-
-                            // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close)
+                        } else {
+                            // Header bar: tabs on left, 3 persistent buttons on right
                             Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                IconButton(onClick = {
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Undo,
-                                        contentDescription = "Undo",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
+                                // 1. Baris tab (scrollable)
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .horizontalScroll(rememberScrollState()),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val tabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
+                                    tabs.forEach { tab ->
+                                        val isSelected = activeRibbonTab == tab
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                                    else Color.Transparent
+                                                )
+                                                .clickable { activeRibbonTab = tab }
+                                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = tab,
+                                                fontSize = 14.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
                                 }
-                                IconButton(onClick = {
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                    addLokitLog("lok::Document::postWindow(event=REDO)")
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Redo,
-                                        contentDescription = "Redo",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    showBottomBar = false
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Close,
-                                        contentDescription = "Close Standard Bottom Sheet",
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
+
+                                // Vertical divider
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp)
+                                        .width(1.dp)
+                                        .height(24.dp)
+                                        .background(borderStrokeColor.copy(alpha = 0.3f))
+                                )
+
+                                // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Undo,
+                                            contentDescription = "Undo",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        triggerAutosave()
+                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                        addLokitLog("lok::Document::postWindow(event=REDO)")
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Redo,
+                                            contentDescription = "Redo",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        showBottomBar = false
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Close,
+                                            contentDescription = "Close Standard Bottom Sheet",
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2029,30 +2239,96 @@ fun InkyModule(
                                 .fillMaxWidth()
                                 .weight(1f)
                         ) {
-                            if (activeRibbonTab == "File") {
+                            if (activeInkySubpage.isNotEmpty()) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .verticalScroll(rememberScrollState())
-                                        .padding(vertical = 8.dp)
                                 ) {
-                                    FileSubpage(
-                                        context = context,
-                                        onNavigateToOptions = { showOptionsDialog = true }
-                                    )
+                                    when (activeInkySubpage) {
+                                        "paste_options" -> PasteOptionsSubpage(context) { showPasteSpecialDialog = true }
+                                        "font_style" -> FontStyleSubpage(context, activeFontFamily) { activeFontFamily = it; triggerAutosave() }
+                                        "underline_options" -> UnderlineOptionsSubpage(context, isUnderline) {
+                                            activeInkySubpage = "underline_color"
+                                        }
+                                        "underline_color" -> ColorPickerSubpage(underlineColor, "Warna Garis Bawah") { underlineColor = it }
+                                        "font_color" -> ColorPickerSubpage(fontColor, "Warna Font") { fontColor = it; triggerAutosave() }
+                                        "highlight_color" -> ColorPickerSubpage(highlightColor, "Warna Sorotan") { highlightColor = it; triggerAutosave() }
+                                        "line_spacing" -> LineSpacingSubpage(context)
+                                        "bulleted_list" -> BulletedListSubpage(context)
+                                        "numbered_list" -> NumberedListSubpage(context)
+                                        "multilevel_list" -> MultilevelListSubpage(context)
+                                        "paragraph_shading" -> ColorPickerSubpage(paragraphShadingColor, "Warna Shading") { paragraphShadingColor = it }
+                                        "paragraph_border" -> ParagraphBorderSubpage(context)
+                                        "paragraph_styles" -> ParagraphStylesSubpage(context, selectedStyleNameForOptions) { styleName ->
+                                            selectedStyleNameForOptions = styleName
+                                            activeInkySubpage = "style_options"
+                                        }
+                                        "create_new_style" -> CreateNewStyleSubpage(context) {
+                                            activeInkySubpage = "paragraph_styles"
+                                        }
+                                        "style_options" -> StyleOptionsSubpage(context, selectedStyleNameForOptions) {
+                                            activeInkySubpage = "paragraph_styles"
+                                        }
+                                        "change_capitalization" -> ChangeCapitalizationSubpage(context)
+                                    }
                                 }
                             } else {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "$activeRibbonTab options will be implemented soon.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                if (activeRibbonTab == "File") {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        FileSubpage(
+                                            context = context,
+                                            onNavigateToOptions = { showOptionsDialog = true }
+                                        )
+                                    }
+                                } else if (activeRibbonTab == "Home") {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .verticalScroll(rememberScrollState())
+                                            .padding(vertical = 8.dp)
+                                    ) {
+                                        HomeSubpage(
+                                            context = context,
+                                            isBold = isBold,
+                                            onBoldChange = { isBold = it; triggerAutosave() },
+                                            isItalic = isItalic,
+                                            onItalicChange = { isItalic = it; triggerAutosave() },
+                                            isUnderline = isUnderline,
+                                            onUnderlineChange = { isUnderline = it; triggerAutosave() },
+                                            isStrikethrough = isStrikethrough,
+                                            onStrikethroughChange = { isStrikethrough = it; triggerAutosave() },
+                                            activeFontFamily = activeFontFamily,
+                                            activeFontSize = activeFontSize,
+                                            fontColor = fontColor,
+                                            highlightColor = highlightColor,
+                                            textAlignment = textAlignment,
+                                            onTextAlignmentChange = { textAlignment = it; triggerAutosave() },
+                                            onNavigateSubpage = { subpage ->
+                                                activeInkySubpage = subpage
+                                                openedFromExternalHub = false
+                                            },
+                                            onShowFontSizeDialog = { showFontSizeDialog = true }
+                                        )
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$activeRibbonTab options will be implemented soon.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -2109,6 +2385,30 @@ fun InkyModule(
                 TextButton(onClick = { showEquationDialog = false }) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    if (showFontSizeDialog) {
+        FontSizeDialog(
+            currentSize = activeFontSize,
+            onDismiss = { showFontSizeDialog = false },
+            onConfirm = { size ->
+                activeFontSize = size
+                showFontSizeDialog = false
+                triggerAutosave()
+                Toast.makeText(context, "Ukuran font diubah ke $size pt", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showPasteSpecialDialog) {
+        PasteSpecialDialog(
+            onDismiss = { showPasteSpecialDialog = false },
+            onPasteSuccess = { format ->
+                showPasteSpecialDialog = false
+                triggerAutosave()
+                Toast.makeText(context, "Menempelkan sebagai $format", Toast.LENGTH_SHORT).show()
             }
         )
     }

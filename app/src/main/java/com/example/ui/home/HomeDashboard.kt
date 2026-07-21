@@ -12,7 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.res.stringResource
+import com.example.R
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -355,134 +358,16 @@ fun HomeDashboard(
             }
         },
         floatingActionButton = {
-            Box(
-                contentAlignment = Alignment.BottomEnd
+            FloatingActionButton(
+                onClick = { onNavigateToModule("create_new_document") },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.testTag("main_fab")
             ) {
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    AnimatedVisibility(
-                        visible = showFabMenu,
-                        enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            // 1. New Slidia Presentation
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    tonalElevation = 4.dp
-                                ) {
-                                    Text(
-                                        text = "New Slidia Presentation",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                SmallFloatingActionButton(
-                                    onClick = {
-                                        showFabMenu = false
-                                        onNavigateToModule("Slidia")
-                                    },
-                                    containerColor = Color(0xFFD97706),
-                                    contentColor = Color.White
-                                ) {
-                                    Icon(Icons.Rounded.Slideshow, contentDescription = "New Slidia Presentation")
-                                }
-                            }
-
-                            // 2. New Cellina Spreadsheet
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    tonalElevation = 4.dp
-                                ) {
-                                    Text(
-                                        text = "New Cellina Spreadsheet",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                SmallFloatingActionButton(
-                                    onClick = {
-                                        showFabMenu = false
-                                        onNavigateToModule("Cellina")
-                                    },
-                                    containerColor = Color(0xFF10B981),
-                                    contentColor = Color.White
-                                ) {
-                                    Icon(Icons.Rounded.GridView, contentDescription = "New Cellina Spreadsheet")
-                                }
-                            }
-
-                            // 3. New Inky Document
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    tonalElevation = 4.dp
-                                ) {
-                                    Text(
-                                        text = "New Inky Document",
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                SmallFloatingActionButton(
-                                    onClick = {
-                                        showFabMenu = false
-                                        onNavigateToModule("Inky")
-                                    },
-                                    containerColor = Color(0xFF2563EB),
-                                    contentColor = Color.White
-                                ) {
-                                    Icon(Icons.Rounded.Description, contentDescription = "New Inky Document")
-                                }
-                            }
-                        }
-                    }
-
-                    FloatingActionButton(
-                        onClick = { showNewDocDialog = true },
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier
-                            .combinedClickable(
-                                onLongClick = {
-                                    showFabMenu = !showFabMenu
-                                    Toast.makeText(context, "Menu opsi cepat terbuka", Toast.LENGTH_SHORT).show()
-                                },
-                                onClick = {
-                                    showNewDocDialog = true
-                                }
-                            )
-                            .testTag("main_fab")
-                    ) {
-                        Icon(
-                            imageVector = if (showFabMenu) Icons.Rounded.Close else Icons.Rounded.Add,
-                            contentDescription = "New Document Menu"
-                        )
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = stringResource(R.string.create_new_document)
+                )
             }
         }
     ) { innerPadding ->
@@ -705,269 +590,231 @@ fun HomeDashboard(
             }
         )
     }
-
-    // ==========================================
-    // NEW DOCUMENT SHEET DIALOG
-    // ==========================================
-    if (showNewDocDialog) {
-        AlertDialog(
-            onDismissRequest = { showNewDocDialog = false },
-            title = {
-                Text("Buat Dokumen Baru", fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Mulai menulis, mengaudit data, atau membuat presentasi visual yang memukau.", style = MaterialTheme.typography.bodyMedium)
-                    
-                    ListItem(
-                        headlineContent = { Text("Inky Writer Document", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Tulis draf, esai, laporan dalam format ODT/DOCX") },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(Color(0xFFEFF6FF), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Rounded.Description, contentDescription = null, tint = Color(0xFF2563EB))
-                            }
-                        },
-                        modifier = Modifier
-                            .clickable {
-                                showNewDocDialog = false
-                                onNavigateToModule("Inky")
-                            }
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-
-                    ListItem(
-                        headlineContent = { Text("Cellina Spreadsheet", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Analisis data, tabel anggaran, fungsi ODS/XLSX") },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(Color(0xFFECFDF5), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Rounded.GridView, contentDescription = null, tint = Color(0xFF10B981))
-                            }
-                        },
-                        modifier = Modifier
-                            .clickable {
-                                showNewDocDialog = false
-                                onNavigateToModule("Cellina")
-                            }
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-
-                    ListItem(
-                        headlineContent = { Text("Slidia Presentation", fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Desain dek presentasi modern ODP/PPTX") },
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .background(Color(0xFFFFFBEB), RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Rounded.Slideshow, contentDescription = null, tint = Color(0xFFD97706))
-                            }
-                        },
-                        modifier = Modifier
-                            .clickable {
-                                showNewDocDialog = false
-                                onNavigateToModule("Slidia")
-                            }
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showNewDocDialog = false }) {
-                    Text("Batal")
-                }
-            }
-        )
-    }
 }
 
-// ==========================================
-// RECENTS SUB-PAGE
-// ==========================================
-@Composable
-fun RecentsSubPage(
-    searchQuery: String,
-    onNavigateToModule: (String) -> Unit
-) {
-    val context = LocalContext.current
-    val recentFiles = remember(searchQuery) {
-        val list = RecentFilesTracker.getRecents(context)
-        if (searchQuery.trim().isEmpty()) {
-            list
-        } else {
-            list.filter { it.name.lowercase().contains(searchQuery.lowercase()) }
-        }
-    }
+    // ==========================================
+    // RECENTS SUB-PAGE
+    // ==========================================
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    fun RecentsSubPage(
+        searchQuery: String,
+        onNavigateToModule: (String) -> Unit
+    ) {
+        val context = LocalContext.current
+        var selectedFilter by remember { mutableStateOf("All") }
 
-    if (recentFiles.isEmpty()) {
-        // REQUIRED: English description and Material 3 Expressive support illustration
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth(0.85f)
+        val recentFiles = remember(searchQuery) {
+            RecentFilesTracker.getRecents(context)
+        }
+
+        val filteredFiles = remember(recentFiles, searchQuery, selectedFilter) {
+            val searched = if (searchQuery.trim().isEmpty()) {
+                recentFiles
+            } else {
+                recentFiles.filter { it.name.lowercase().contains(searchQuery.lowercase()) }
+            }
+
+            if (selectedFilter == "All") {
+                searched
+            } else {
+                searched.filter {
+                    val fileTypeToMatch = when (selectedFilter) {
+                        "Inky Document" -> "Inky"
+                        "Cellina Spreadsheet" -> "Cellina"
+                        "Slidia Presentation" -> "Slidia"
+                        "Pagella PDF Document" -> "Pagella"
+                        else -> ""
+                    }
+                    it.fileType == fileTypeToMatch
+                }
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Filter Chips under the app bar
+            val filterOptions = listOf(
+                "All" to R.string.filter_all,
+                "Inky Document" to R.string.filter_inky,
+                "Cellina Spreadsheet" to R.string.filter_cellina,
+                "Slidia Presentation" to R.string.filter_slidia,
+                "Pagella PDF Document" to R.string.filter_pagella
+            )
+
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Dynamic M3 Expressive Custom Vector-style Drawing
-                Box(
-                    modifier = Modifier
-                        .size(160.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                    Color.Transparent
-                                )
-                            )
+                items(filterOptions) { (filterKey, stringResId) ->
+                    FilterChip(
+                        selected = selectedFilter == filterKey,
+                        onClick = { selectedFilter = filterKey },
+                        label = { Text(stringResource(stringResId), style = MaterialTheme.typography.labelMedium) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Overlapping vector shape simulations
-                    Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .background(
-                                MaterialTheme.colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .align(Alignment.Center)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .background(
-                                MaterialTheme.colorScheme.tertiaryContainer,
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .offset(x = 18.dp, y = (-18).dp)
-                    )
-                    Icon(
-                        imageVector = Icons.Rounded.FindInPage,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.testTag("filter_chip_${filterKey.lowercase().replace(" ", "_")}")
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "No Recent Documents",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Any document you open from your device directory or create using the plus button will be listed here instantly for quick, offline access.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
             }
-        }
-    } else {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                Text(
-                    text = "DOKUMEN TERBARU",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            }
-            items(recentFiles) { file ->
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+
+            if (filteredFiles.isEmpty()) {
+                Box(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .clickable {
-                            com.example.MainActivity.openedFilePath = file.path
-                            com.example.MainActivity.openedFileType = file.fileType
-                            onNavigateToModule(file.fileType)
-                            Toast.makeText(context, "Membuka ${file.name}...", Toast.LENGTH_SHORT).show()
-                        }
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth(0.85f)
                     ) {
-                        val (iconColor, bgIconColor, charSymbol) = when (file.fileType) {
-                            "Inky" -> Triple(Color(0xFF2563EB), Color(0xFFEFF6FF), "W")
-                            "Cellina" -> Triple(Color(0xFF10B981), Color(0xFFECFDF5), "S")
-                            "Slidia" -> Triple(Color(0xFFD97706), Color(0xFFFFFBEB), "P")
-                            "Pagella" -> Triple(Color(0xFFE11D48), Color(0xFFFFF1F2), "D")
-                            else -> Triple(Color.Gray, Color.LightGray, "F")
-                        }
-
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .background(bgIconColor, shape = RoundedCornerShape(10.dp)),
+                                .size(160.dp)
+                                .background(
+                                    brush = Brush.radialGradient(
+                                        colors = listOf(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(charSymbol, fontWeight = FontWeight.ExtraBold, color = iconColor, fontSize = 16.sp)
+                            Box(
+                                modifier = Modifier
+                                    .size(90.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                        shape = RoundedCornerShape(24.dp)
+                                    )
+                                    .align(Alignment.Center)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.tertiaryContainer,
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .offset(x = 18.dp, y = (-18).dp)
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.FindInPage,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(44.dp)
+                            )
                         }
 
-                        Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = "No Recent Documents",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center
+                        )
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = file.name,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "Opened: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastOpened))} • ${file.size}",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Any document you open from your device directory or create using the plus button will be listed here instantly for quick, offline access.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Text(
+                            text = stringResource(R.string.recent_documents_header),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(filteredFiles) { file ->
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    com.example.MainActivity.openedFilePath = file.path
+                                    com.example.MainActivity.openedFileType = file.fileType
+                                    onNavigateToModule(file.fileType)
+                                    val toastMsg = context.getString(R.string.opening_file, file.name)
+                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val (iconColor, bgIconColor, charSymbol) = when (file.fileType) {
+                                    "Inky" -> Triple(Color(0xFF2563EB), Color(0xFFEFF6FF), "W")
+                                    "Cellina" -> Triple(Color(0xFF10B981), Color(0xFFECFDF5), "S")
+                                    "Slidia" -> Triple(Color(0xFFD97706), Color(0xFFFFFBEB), "P")
+                                    "Pagella" -> Triple(Color(0xFFE11D48), Color(0xFFFFF1F2), "D")
+                                    else -> Triple(Color.Gray, Color.LightGray, "F")
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(bgIconColor, shape = RoundedCornerShape(10.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(charSymbol, fontWeight = FontWeight.ExtraBold, color = iconColor, fontSize = 16.sp)
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = file.name,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "Opened: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastOpened))} • ${file.size}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.outline)
+                            }
                         }
-
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Open", tint = MaterialTheme.colorScheme.outline)
                     }
                 }
             }
         }
     }
-}
 
 // ==========================================
 // FILES SUB-PAGE (DYNAMIC FILES EXPLORER)

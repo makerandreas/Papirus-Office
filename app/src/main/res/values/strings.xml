@@ -1,3 +1,38 @@
 <resources>
+    <!-- Application Name -->
     <string name="app_name">Papirus Office</string>
+
+    <!-- App bar / Options -->
+    <string name="search_placeholder">Search files by name...</string>
+    <string name="menu_crash_log">Crash Log</string>
+    <string name="menu_options">Papirus Office Options</string>
+    <string name="quick_menu_opened">Quick options menu opened</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- New Document Screen / FAB -->
+    <string name="create_new_document">Create New Document</string>
+    <string name="tab_create_new">Create New</string>
+    <string name="tab_from_template">Create from Template</string>
+    <string name="inky_title">New Inky Document</string>
+    <string name="inky_desc">Write drafts, essays, and reports in ODT/DOCX format</string>
+    <string name="cellina_title">New Cellina Spreadsheet</string>
+    <string name="cellina_desc">Analyze data, budget tables, and functions in ODS/XLSX format</string>
+    <string name="slidia_title">New Slidia Presentation</string>
+    <string name="slidia_desc">Design modern presentation decks in ODP/PPTX format</string>
+    
+    <!-- Template Tab -->
+    <string name="search_templates">Search online templates</string>
+    <string name="no_templates">No templates available</string>
+    <string name="no_templates_desc">There are no templates available at the moment.</string>
+    <string name="no_internet">No internet connection</string>
+    <string name="no_internet_desc">Please check your network and try again.</string>
+
+    <!-- Recents Filter Chips -->
+    <string name="filter_all">All</string>
+    <string name="filter_inky">Inky Document</string>
+    <string name="filter_cellina">Cellina Spreadsheet</string>
+    <string name="filter_slidia">Slidia Presentation</string>
+    <string name="filter_pagella">Pagella PDF Document</string>
+    <string name="recent_documents_header">RECENT DOCUMENTS</string>
+    <string name="opening_file">Opening %1$s...</string>
 </resources>
