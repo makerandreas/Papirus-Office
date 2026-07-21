@@ -156,7 +156,7 @@ fun HomeSubpage(
                     modifier = Modifier
                         .weight(1f)
                         .clickable {
-                            Toast.makeText(context, "Menempelkan teks dari papan klip...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Pasting text from clipboard...", Toast.LENGTH_SHORT).show()
                         }
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -198,8 +198,8 @@ fun HomeSubpage(
         // Row containing Cut, Copy, Format Painter
         ThreeColumnRow(
             col1 = {
-                OutlinedButton(
-                    onClick = { Toast.makeText(context, "Potong teks (Cut)", Toast.LENGTH_SHORT).show() },
+                FilledTonalButton(
+                    onClick = { Toast.makeText(context, "Cut text", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_cut_btn"),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                 ) {
@@ -209,8 +209,8 @@ fun HomeSubpage(
                 }
             },
             col2 = {
-                OutlinedButton(
-                    onClick = { Toast.makeText(context, "Salin teks (Copy)", Toast.LENGTH_SHORT).show() },
+                FilledTonalButton(
+                    onClick = { Toast.makeText(context, "Copied text", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_copy_btn"),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                 ) {
@@ -220,8 +220,8 @@ fun HomeSubpage(
                 }
             },
             col3 = {
-                OutlinedButton(
-                    onClick = { Toast.makeText(context, "Penyalin format (Painter)", Toast.LENGTH_SHORT).show() },
+                FilledTonalButton(
+                    onClick = { Toast.makeText(context, "Format Painter activated", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_painter_btn"),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
                 ) {
@@ -298,13 +298,12 @@ fun HomeSubpage(
                 }
             },
             col3 = {
-                // Custom Underline action row with vertical divider & chevron right
+                // Custom Underline action row with vertical divider & chevron down
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (isUnderline) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
+                        .background(if (isUnderline) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
                     color = Color.Transparent
                 ) {
                     Row(
@@ -333,7 +332,7 @@ fun HomeSubpage(
                             modifier = Modifier.width(36.dp)
                         ) {
                             Icon(
-                                Icons.Rounded.ChevronRight,
+                                Icons.Rounded.KeyboardArrowDown,
                                 contentDescription = "Underline Options",
                                 modifier = Modifier.size(16.dp),
                                 tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -364,7 +363,7 @@ fun HomeSubpage(
                 }
             },
             col2 = {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = { Toast.makeText(context, "Subscript applied", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 2.dp)
@@ -375,7 +374,7 @@ fun HomeSubpage(
                 }
             },
             col3 = {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = { Toast.makeText(context, "Superscript applied", Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(horizontal = 2.dp)
@@ -390,7 +389,6 @@ fun HomeSubpage(
         // Change Capitalization Subpage Link
         M3ListItem(
             headlineText = "Change Capitalization",
-            supportingText = "Sesuaikan huruf kapital",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Capitalization Options") },
             onClick = { onNavigateSubpage("change_capitalization") }
@@ -399,7 +397,6 @@ fun HomeSubpage(
         // Font Color
         M3ListItem(
             headlineText = "Font Color",
-            supportingText = "Ganti warna teks",
             leadingIcon = {
                 Box(
                     modifier = Modifier
@@ -409,14 +406,13 @@ fun HomeSubpage(
                         .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 )
             },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Warna") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color") },
             onClick = { onNavigateSubpage("font_color") }
         )
 
         // Highlight Text Color
         M3ListItem(
             headlineText = "Highlight Text Color",
-            supportingText = "Beri warna stabilo teks",
             leadingIcon = {
                 Box(
                     modifier = Modifier
@@ -426,30 +422,28 @@ fun HomeSubpage(
                         .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 )
             },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Warna") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color") },
             onClick = { onNavigateSubpage("highlight_color") }
         )
 
         // Delete formatting
         M3ListItem(
             headlineText = "Delete all formatting",
-            supportingText = "Kembalikan format ke default",
             leadingIcon = { Icon(Icons.Rounded.FormatClear, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             onClick = {
                 onBoldChange(false)
                 onItalicChange(false)
                 onUnderlineChange(false)
                 onStrikethroughChange(false)
-                Toast.makeText(context, "Semua format dihapus!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "All formatting cleared!", Toast.LENGTH_SHORT).show()
             }
         )
 
         // Character Options
         M3ListItem(
             headlineText = "Character Options",
-            supportingText = "Pengaturan karakter tingkat lanjut",
             leadingIcon = { Icon(Icons.Rounded.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Character Options akan dikembangkan segera", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Character Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -502,16 +496,16 @@ fun HomeSubpage(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedButton(
-                onClick = { Toast.makeText(context, "Indentasi Bertambah", Toast.LENGTH_SHORT).show() },
+            FilledTonalButton(
+                onClick = { Toast.makeText(context, "Indent increased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Increase Indent", fontSize = 11.sp)
             }
-            OutlinedButton(
-                onClick = { Toast.makeText(context, "Indentasi Berkurang", Toast.LENGTH_SHORT).show() },
+            FilledTonalButton(
+                onClick = { Toast.makeText(context, "Indent decreased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
@@ -523,43 +517,38 @@ fun HomeSubpage(
         // Set line spacing
         M3ListItem(
             headlineText = "Set line spacing",
-            supportingText = "Atur jarak antar baris",
             leadingIcon = { Icon(Icons.Rounded.FormatLineSpacing, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Ubah Jarak") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Spacing") },
             onClick = { onNavigateSubpage("line_spacing") }
         )
 
         // Create bulleted list
         M3ListItem(
             headlineText = "Create bulleted list",
-            supportingText = "Paragraf daftar berpoin",
             leadingIcon = { Icon(Icons.Rounded.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Poin") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Bullets") },
             onClick = { onNavigateSubpage("bulleted_list") }
         )
 
         // Create numbered list
         M3ListItem(
             headlineText = "Create numbered list",
-            supportingText = "Paragraf daftar bernomor",
             leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Nomor") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Numbers") },
             onClick = { onNavigateSubpage("numbered_list") }
         )
 
         // Create multilevel list
         M3ListItem(
             headlineText = "Create multilevel list",
-            supportingText = "Daftar bertingkat",
             leadingIcon = { Icon(Icons.Rounded.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) }, // icon representation
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Multilevel") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Multilevel") },
             onClick = { onNavigateSubpage("multilevel_list") }
         )
 
         // Toggle paragraph marks
         M3ListItem(
             headlineText = "Toggle paragraph marks",
-            supportingText = "Tampilkan penanda paragraf",
             leadingIcon = { Icon(Icons.Rounded.Notes, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             trailingContent = {
                 Switch(
@@ -573,15 +562,13 @@ fun HomeSubpage(
         // Sort text/table
         M3ListItem(
             headlineText = "Sort text/table",
-            supportingText = "Urutkan teks atau tabel",
             leadingIcon = { Icon(Icons.Rounded.SortByAlpha, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Mengurutkan dokumen...", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Sorting document...", Toast.LENGTH_SHORT).show() }
         )
 
         // Toggle RTL writing direction
         M3ListItem(
             headlineText = "Toggle RTL writing direction",
-            supportingText = "Ganti penulisan Kanan-ke-Kiri",
             leadingIcon = { Icon(Icons.Rounded.FormatTextdirectionRToL, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             trailingContent = {
                 Switch(
@@ -595,27 +582,24 @@ fun HomeSubpage(
         // Paragraph Shading Color
         M3ListItem(
             headlineText = "Paragraph Shading Color",
-            supportingText = "Warna shading latar paragraf",
             leadingIcon = { Icon(Icons.Rounded.FormatColorFill, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Pilih Warna Shading") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Shading Color") },
             onClick = { onNavigateSubpage("paragraph_shading") }
         )
 
         // Paragraph Border
         M3ListItem(
             headlineText = "Paragraph Border",
-            supportingText = "Atur batas / bingkai paragraf",
             leadingIcon = { Icon(Icons.Rounded.BorderAll, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Atur Bingkai") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Configure Border") },
             onClick = { onNavigateSubpage("paragraph_border") }
         )
 
         // Paragraph Options
         M3ListItem(
             headlineText = "Paragraph Options",
-            supportingText = "Opsi paragraf tingkat lanjut",
             leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Paragraph Options akan segera dikembangkan", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Paragraph Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -632,18 +616,17 @@ fun HomeSubpage(
         // Style selector
         M3ListItem(
             headlineText = "Style selector",
-            supportingText = "Pilih gaya pemformatan paragraf",
+            supportingText = "Select paragraph formatting style",
             leadingIcon = { Icon(Icons.Rounded.Style, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Buka Gaya Paragraf") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Paragraph Styles") },
             onClick = { onNavigateSubpage("paragraph_styles") }
         )
 
         // Paragraph Style Options
         M3ListItem(
             headlineText = "Paragraph Style Options",
-            supportingText = "Pengaturan gaya paragraf",
             leadingIcon = { Icon(Icons.Rounded.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Paragraph Style Options akan dikembangkan segera", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Paragraph Style Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -656,28 +639,28 @@ fun PasteOptionsSubpage(context: Context, onShowPasteSpecial: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
         M3ListItem(
             headlineText = "Keep source formatting",
-            supportingText = "Pertahankan gaya format asli dari sumber",
+            supportingText = "Keep original style from the source",
             leadingIcon = { Icon(Icons.Rounded.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            onClick = { Toast.makeText(context, "Teks ditempelkan dengan Keep Source Formatting", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Pasted text with Keep Source Formatting", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Merge formatting",
-            supportingText = "Gabungkan format sumber dengan format dokumen",
+            supportingText = "Merge source style with document style",
             leadingIcon = { Icon(Icons.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            onClick = { Toast.makeText(context, "Teks ditempelkan dengan Merge Formatting", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Pasted text with Merge Formatting", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Paste unformatted text",
-            supportingText = "Tempelkan teks murni tanpa format apapun",
+            supportingText = "Paste clean text without formatting",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            onClick = { Toast.makeText(context, "Teks murni berhasil ditempelkan", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Clean text pasted successfully", Toast.LENGTH_SHORT).show() }
         )
         
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
         
         M3ListItem(
             headlineText = "Paste Special...",
-            supportingText = "Pilihan pemformatan lanjutan",
+            supportingText = "Advanced formatting choices",
             leadingIcon = { Icon(Icons.Rounded.SettingsApplications, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             onClick = {
                 onShowPasteSpecial()
@@ -710,7 +693,7 @@ fun FontStyleSubpage(
             val isSelected = fontName == currentFont
             M3ListItem(
                 headlineText = fontName,
-                supportingText = if (isSelected) "Aktif" else "Klik untuk memilih",
+                supportingText = if (isSelected) "Active" else "Tap to select",
                 leadingIcon = {
                     Icon(
                         Icons.Rounded.CheckCircle,
@@ -721,7 +704,7 @@ fun FontStyleSubpage(
                 },
                 onClick = {
                     onFontSelected(fontName)
-                    Toast.makeText(context, "Font diubah ke $fontName", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Font changed to $fontName", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -743,9 +726,9 @@ fun UnderlineOptionsSubpage(
     Column(modifier = Modifier.fillMaxWidth()) {
         M3ListItem(
             headlineText = "Underline color",
-            supportingText = "Tentukan warna garis bawah",
+            supportingText = "Choose underline color",
             leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Warna") },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Color") },
             onClick = onOpenColorPage
         )
 
@@ -761,10 +744,10 @@ fun UnderlineOptionsSubpage(
         lineStyles.forEach { style ->
             M3ListItem(
                 headlineText = style,
-                supportingText = "Terapkan gaya garis bawah ini",
+                supportingText = "Apply this underline style",
                 leadingIcon = { Icon(Icons.Rounded.HorizontalRule, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                 onClick = {
-                    Toast.makeText(context, "Gaya garis bawah $style diterapkan", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Underline style $style applied", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -783,10 +766,10 @@ fun LineSpacingSubpage(context: Context) {
         options.forEach { opt ->
             M3ListItem(
                 headlineText = opt,
-                supportingText = "Pilih spasi baris $opt",
+                supportingText = "Select line spacing $opt",
                 leadingIcon = { Icon(Icons.Rounded.LineStyle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
                 onClick = {
-                    Toast.makeText(context, "Spasi $opt dipilih", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Spacing $opt selected", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -805,10 +788,10 @@ fun BulletedListSubpage(context: Context) {
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = variant,
-                supportingText = "Terapkan penanda berpoin ini",
+                supportingText = "Apply this bullet style",
                 leadingIcon = { Icon(Icons.Rounded.RadioButtonChecked, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 onClick = {
-                    Toast.makeText(context, "Bulleted $variant berhasil diterapkan", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Bulleted $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -826,10 +809,10 @@ fun NumberedListSubpage(context: Context) {
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = "Format $variant",
-                supportingText = "Gunakan pengurutan ini",
+                supportingText = "Use this numbering sequence",
                 leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 onClick = {
-                    Toast.makeText(context, "Numbered $variant berhasil diterapkan", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Numbered $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -850,10 +833,10 @@ fun MultilevelListSubpage(context: Context) {
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = variant,
-                supportingText = "Gunakan skema daftar bertingkat ini",
+                supportingText = "Use this multilevel structure",
                 leadingIcon = { Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 onClick = {
-                    Toast.makeText(context, "Multilevel list $variant berhasil diterapkan", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Multilevel list $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -867,37 +850,37 @@ fun ParagraphBorderSubpage(context: Context) {
         // No border option
         M3ListItem(
             headlineText = "No border",
-            supportingText = "Tanpa garis bingkai",
+            supportingText = "No border lines",
             leadingIcon = { Icon(Icons.Rounded.BorderClear, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            onClick = { Toast.makeText(context, "Bingkai dihapus", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Border cleared", Toast.LENGTH_SHORT).show() }
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
         // Normal Category (4 columns representation)
         Text(
-            text = "Kategori Normal",
+            text = "Normal Category",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
         ThreeColumnRow(
             col1 = {
-                OutlinedButton(onClick = { Toast.makeText(context, "Garis Atas Normal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Top Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderTop, contentDescription = "Top")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Top", fontSize = 11.sp)
                 }
             },
             col2 = {
-                OutlinedButton(onClick = { Toast.makeText(context, "Garis Bawah Normal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Bottom Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderBottom, contentDescription = "Bottom")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Bottom", fontSize = 11.sp)
                 }
             },
             col3 = {
-                OutlinedButton(onClick = { Toast.makeText(context, "Garis Samping Normal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Side Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderOuter, contentDescription = "Borders")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Sides", fontSize = 11.sp)
@@ -907,28 +890,28 @@ fun ParagraphBorderSubpage(context: Context) {
 
         // Thick Category
         Text(
-            text = "Kategori Tebal (Thick)",
+            text = "Thick Category",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
         ThreeColumnRow(
             col1 = {
-                Button(onClick = { Toast.makeText(context, "Garis Atas Tebal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Top Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderTop, contentDescription = "Top Thick")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Thick Top", fontSize = 10.sp)
                 }
             },
             col2 = {
-                Button(onClick = { Toast.makeText(context, "Garis Bawah Tebal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Bottom Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderBottom, contentDescription = "Bottom Thick")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Thick Bot", fontSize = 10.sp)
                 }
             },
             col3 = {
-                Button(onClick = { Toast.makeText(context, "Bingkai Luar Tebal", Toast.LENGTH_SHORT).show() }) {
+                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Outer Border", Toast.LENGTH_SHORT).show() }) {
                     Icon(Icons.Rounded.BorderOuter, contentDescription = "All Thick")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Thick Box", fontSize = 10.sp)
@@ -941,21 +924,21 @@ fun ParagraphBorderSubpage(context: Context) {
         // Grid Box models
         M3ListItem(
             headlineText = "Box and grid",
-            supportingText = "Terapkan kotak dan kisi lengkap",
+            supportingText = "Apply complete box and grid borders",
             leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Bingkai Box and Grid diterapkan", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Box and Grid borders applied", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Box",
-            supportingText = "Terapkan kotak luar saja",
+            supportingText = "Apply outer box border only",
             leadingIcon = { Icon(Icons.Rounded.CheckBoxOutlineBlank, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Bingkai Box luar diterapkan", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Outer Box border applied", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Inside (Grid)",
-            supportingText = "Hanya garis grid bagian dalam",
+            supportingText = "Inner grid lines only",
             leadingIcon = { Icon(Icons.Rounded.GridGoldenratio, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = { Toast.makeText(context, "Bingkai Grid dalam diterapkan", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Inner Grid border applied", Toast.LENGTH_SHORT).show() }
         )
     }
 }
@@ -967,14 +950,36 @@ fun ParagraphStylesSubpage(
     selectedStyle: String,
     onNavigateStyleOptions: (String) -> Unit
 ) {
+    var activeStyle by remember { mutableStateOf(selectedStyle) }
+    val styles = listOf("Normal", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle", "Footnote")
+
     Column(modifier = Modifier.fillMaxWidth()) {
-        M3ListItem(
-            headlineText = "Normal",
-            supportingText = "Gaya dasar dokumen standar",
-            leadingIcon = { Icon(Icons.Rounded.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Options") },
-            onClick = { onNavigateStyleOptions("Normal") }
-        )
+        styles.forEach { styleName ->
+            val isSelected = styleName == activeStyle
+            M3ListItem(
+                headlineText = styleName,
+                leadingIcon = {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = {
+                            activeStyle = styleName
+                            Toast.makeText(context, "Style changed to $styleName", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                },
+                trailingContent = {
+                    IconButton(onClick = {
+                        onNavigateStyleOptions(styleName)
+                    }) {
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Options for $styleName")
+                    }
+                },
+                onClick = {
+                    activeStyle = styleName
+                    Toast.makeText(context, "Style changed to $styleName", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
     }
 }
 
@@ -987,19 +992,17 @@ fun CreateNewStyleSubpage(
     Column(modifier = Modifier.fillMaxWidth()) {
         M3ListItem(
             headlineText = "Create New",
-            supportingText = "Buat gaya kustom baru dari awal",
             leadingIcon = { Icon(Icons.Rounded.AddBox, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             onClick = {
-                Toast.makeText(context, "Gaya baru berhasil dibuat", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "New style created successfully", Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
         M3ListItem(
             headlineText = "Create New from Text",
-            supportingText = "Gunakan format teks terpilih saat ini",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             onClick = {
-                Toast.makeText(context, "Gaya baru dari teks terpilih berhasil disimpan", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "New style from selected text saved successfully", Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
@@ -1016,29 +1019,26 @@ fun StyleOptionsSubpage(
     Column(modifier = Modifier.fillMaxWidth()) {
         M3ListItem(
             headlineText = "Edit",
-            supportingText = "Modifikasi parameter gaya $styleName",
             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             onClick = {
-                Toast.makeText(context, "Mengedit gaya $styleName...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Editing style $styleName...", Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
         M3ListItem(
             headlineText = "Update from Text",
-            supportingText = "Perbarui gaya $styleName menggunakan format teks terpilih",
             leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             onClick = {
-                Toast.makeText(context, "Gaya $styleName diperbarui", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Style $styleName updated", Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
         if (styleName != "Normal") {
             M3ListItem(
                 headlineText = "Delete",
-                supportingText = "Hapus gaya ini secara permanen",
                 leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                 onClick = {
-                    Toast.makeText(context, "Gaya $styleName berhasil dihapus", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Style $styleName deleted successfully", Toast.LENGTH_SHORT).show()
                     onSuccess()
                 }
             )
@@ -1336,34 +1336,30 @@ fun ChangeCapitalizationSubpage(context: Context) {
     Column(modifier = Modifier.fillMaxWidth()) {
         M3ListItem(
             headlineText = "First Character Uppercase",
-            supportingText = "Huruf pertama menjadi kapital",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             onClick = {
-                Toast.makeText(context, "Huruf pertama menjadi kapital", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "First character capitalized", Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
             headlineText = "First word uppercase",
-            supportingText = "Kata pertama menjadi kapital",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             onClick = {
-                Toast.makeText(context, "Kata pertama menjadi kapital", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "First word capitalized", Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
             headlineText = "ALL UPPERCASE",
-            supportingText = "SEMUA HURUF BESAR",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             onClick = {
-                Toast.makeText(context, "SEMUA HURUF BESAR", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "ALL UPPERCASE", Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
             headlineText = "all lowercase",
-            supportingText = "semua huruf kecil",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
             onClick = {
-                Toast.makeText(context, "semua huruf kecil", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "all lowercase", Toast.LENGTH_SHORT).show()
             }
         )
     }

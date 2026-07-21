@@ -662,7 +662,7 @@ fun InkyModule(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Hanya Lihat • ODT Format",
+                                    text = "Read-Only • ODT Format",
                                     fontSize = 11.sp,
                                     color = Color.Gray
                                 )
@@ -675,7 +675,7 @@ fun InkyModule(
                         },
                         actions = {
                             IconButton(onClick = {
-                                Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
                                 addLokitLog("Upload to Drive triggered")
                             }) {
                                 Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
@@ -685,7 +685,7 @@ fun InkyModule(
                             }
                             IconButton(onClick = { 
                                 isWebView = !isWebView
-                                Toast.makeText(context, if (isWebView) "Tampilan Seluler Aktif" else "Tampilan Normal Aktif", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
                                 addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
                             }) {
                                 Icon(
@@ -705,7 +705,7 @@ fun InkyModule(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Mengekspor ke PDF...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
                                             addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
@@ -714,7 +714,7 @@ fun InkyModule(
                                         text = { Text("Save as...") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Menyimpan salinan...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Saving copy...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
@@ -730,7 +730,7 @@ fun InkyModule(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Mencetak dokumen...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Printing document...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
                                     )
@@ -754,7 +754,7 @@ fun InkyModule(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (isSaved) "Tersimpan di perangkat ini" else "Menyimpan...",
+                                    text = if (isSaved) "Saved on this device" else "Saving...",
                                     fontSize = 11.sp,
                                     color = if (isSaved) Color(0xFF10B981) else Color.LightGray
                                 )
@@ -767,7 +767,7 @@ fun InkyModule(
                         },
                         actions = {
                             IconButton(onClick = {
-                                Toast.makeText(context, "Mengunggah ke Google Drive...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
                                 addLokitLog("Upload to Drive triggered")
                             }) {
                                 Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
@@ -777,7 +777,7 @@ fun InkyModule(
                             }
                             IconButton(onClick = { 
                                 isWebView = !isWebView
-                                Toast.makeText(context, if (isWebView) "Tampilan Seluler" else "Tampilan Normal", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, if (isWebView) "Mobile View" else "Normal View", Toast.LENGTH_SHORT).show()
                                 addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
                             }) {
                                 Icon(
@@ -804,7 +804,7 @@ fun InkyModule(
                                         text = { Text("Share") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Membuka Share Sheet...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Opening Share Sheet...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
                                     )
@@ -812,7 +812,7 @@ fun InkyModule(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Mengekspor ODF ke PDF...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Exporting ODF to PDF...", Toast.LENGTH_SHORT).show()
                                             addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
@@ -830,7 +830,7 @@ fun InkyModule(
                                         text = { Text("Save as") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Menyimpan salinan...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Saving copy...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
@@ -846,7 +846,7 @@ fun InkyModule(
                                         text = { Text("Read it Aloud") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Membacakan dokumen...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
                                     )
@@ -872,7 +872,7 @@ fun InkyModule(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Menghubungkan printer...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Connecting printer...", Toast.LENGTH_SHORT).show()
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
                                     )
@@ -1448,7 +1448,7 @@ fun InkyModule(
                             .padding(24.dp)
                             .testTag("fab_edit_document"),
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = Color.White
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 }
             }
@@ -1478,13 +1478,13 @@ fun InkyModule(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Halaman $currentPage dari $pageCount",
+                        text = "Page $currentPage of $pageCount",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Gray
                     )
                     Text(
-                        text = "$wordCount kata",
+                        text = "$wordCount words",
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
@@ -2037,7 +2037,7 @@ fun InkyModule(
                                         }) {
                                             Icon(
                                                 imageVector = Icons.Rounded.ArrowBack,
-                                                contentDescription = "Kembali",
+                                                contentDescription = "Back",
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
                                         }
@@ -2772,8 +2772,7 @@ private fun FileSubpage(
         )
         FileMenuListItem(
             icon = Icons.Rounded.Refresh,
-            title = "Reload document",
-            subtitle = "Discard unsaved changes and reload from storage"
+            title = "Reload document"
         ) {
             Toast.makeText(context, "Reloading document...", Toast.LENGTH_SHORT).show()
         }
@@ -2786,43 +2785,37 @@ private fun FileSubpage(
         FileMenuSectionHeader("Document")
         FileMenuListItem(
             icon = Icons.Rounded.Save,
-            title = "Save",
-            subtitle = "Save active document changes directly"
+            title = "Save"
         ) {
             Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Save,
-            title = "Save as...",
-            subtitle = "Save document copy with a new name"
+            title = "Save as..."
         ) {
             Toast.makeText(context, "Opening Save As dialog...", Toast.LENGTH_SHORT).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.LibraryBooks,
-            title = "Save all opened document",
-            subtitle = "Save changes in all currently active editors"
+            title = "Save all opened document"
         ) {
             Toast.makeText(context, "Saving all documents...", Toast.LENGTH_SHORT).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.ImportExport,
-            title = "Export as...",
-            subtitle = "Generate high-fidelity PDF, EPUB, or XHTML files"
+            title = "Export as..."
         ) {
             Toast.makeText(context, "Export options: PDF, EPUB, XHTML", Toast.LENGTH_SHORT).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Share,
-            title = "Share",
-            subtitle = "Send document copy to another app or contact"
+            title = "Share"
         ) {
             Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.DoneAll,
-            title = "Finalize",
-            subtitle = "Mark document as final and make it read-only"
+            title = "Finalize"
         ) {
             Toast.makeText(context, "Document finalized!", Toast.LENGTH_SHORT).show()
         }
@@ -2853,15 +2846,13 @@ private fun FileSubpage(
         FileMenuSectionHeader("File Management")
         FileMenuListItem(
             icon = Icons.Rounded.Info,
-            title = "Document properties",
-            subtitle = "View document metadata, statistics, and configuration details"
+            title = "Document properties"
         ) {
             Toast.makeText(context, "Properties: 1 page, 340 words, 2,130 characters", Toast.LENGTH_LONG).show()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Image,
-            title = "Compress all pictures",
-            subtitle = "Reduce document file size by optimizing visual assets"
+            title = "Compress all pictures"
         ) {
             Toast.makeText(context, "All pictures compressed successfully (Saved 1.2 MB)", Toast.LENGTH_SHORT).show()
         }
@@ -2874,8 +2865,7 @@ private fun FileSubpage(
         FileMenuSectionHeader("Settings")
         FileMenuListItem(
             icon = Icons.Rounded.Settings,
-            title = "Options",
-            subtitle = "Configure Papirus Office options and Gemini AI settings"
+            title = "Options"
         ) {
             onNavigateToOptions()
         }
@@ -2900,7 +2890,7 @@ private fun FileMenuListItem(
     icon: ImageVector,
     iconTint: Color = MaterialTheme.colorScheme.primary,
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     onClick: () -> Unit
 ) {
     Row(
@@ -2910,20 +2900,12 @@ private fun FileMenuListItem(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(24.dp)
+        )
         Spacer(modifier = Modifier.width(16.dp))
         Column(
             modifier = Modifier.weight(1f)
@@ -2934,11 +2916,13 @@ private fun FileMenuListItem(
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -2962,8 +2946,7 @@ private fun FileMenuThreeColumnRow(
                     .height(80.dp)
                     .clickable(onClick = onClick),
                 shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             ) {
                 Column(
                     modifier = Modifier

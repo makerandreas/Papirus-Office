@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -55,6 +56,7 @@ fun NewDocumentScreen(
     onBack: () -> Unit,
     onNavigateToModule: (String) -> Unit
 ) {
+    BackHandler(onBack = onBack)
     val context = LocalContext.current
     var activeSubTab by remember { mutableStateOf("Create New") } // "Create New" or "Create from Template"
     var selectedTemplateFilter by remember { mutableStateOf("All") } // "All", "ODT", "ODS", "ODP"
