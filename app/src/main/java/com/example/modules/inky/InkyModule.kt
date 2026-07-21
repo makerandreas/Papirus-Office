@@ -66,10 +66,6 @@ import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Track setup model matching the actual user document
-data class TrackSetupRow(val track: String, val sayap: Int, val rem: Int, val suspensi: Int)
-data class TyreSetupRow(val durasi: Int, val konsumsi: Int, val perbedaan: Int)
-
 // Safe helper to find the ComponentActivity from any wrapped context
 fun android.content.Context.findActivity(): androidx.activity.ComponentActivity? {
     var currentContext = this
@@ -248,16 +244,6 @@ fun InkyModule(
 
     var activeToolbarTypeState by remember { mutableStateOf("Standard") } // For compatibility or internal tracking
 
-    val advSettings = remember {
-        mutableStateListOf(
-            "Driving Help: Mid",
-            "Opponent Level: Real",
-            "Bantuan Mengemudi: 27",
-            "Antispin: 22",
-            "Sensitivitas Kemudi: 115"
-        )
-    }
-
     val activity = remember(context) { context.findActivity() }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -316,9 +302,9 @@ fun InkyModule(
                     docTitle = "${template.name.replace(" ", "_")}.odt"
                 }
                 
-                val mockContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
+                val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
                 
-                docBodyText = androidx.compose.ui.text.input.TextFieldValue(mockContent)
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue(sampleTemplateContent)
                 isSaved = true
                 isEditMode = true
                 showBottomBar = false
@@ -498,37 +484,6 @@ fun InkyModule(
         previousScrollValue = scrollState.value
     }
 
-    // Interactive Track Data Table state matching screenshot
-    val tracks = remember {
-        mutableStateListOf(
-            TrackSetupRow("Australia", 20, -6, 8),
-            TrackSetupRow("Tiongkok", 25, -5, 9),
-            TrackSetupRow("Jepang", 32, -7, 11),
-            TrackSetupRow("Bahrain", 26, -5, 7),
-            TrackSetupRow("Arab Saudi", 8, -2, 2),
-            TrackSetupRow("Amerika Serikat (Miami)", 22, -6, 8),
-            TrackSetupRow("Kanada", 10, -3, 4),
-            TrackSetupRow("Monako", 38, -8, 14),
-            TrackSetupRow("Spanyol (Barcelona)", 30, -7, 10),
-            TrackSetupRow("Austria", 14, -4, 6),
-            TrackSetupRow("Inggris", 34, -7, 10),
-            TrackSetupRow("Belgia", 28, -6, 9),
-            TrackSetupRow("Hongaria", 38, -8, 13),
-            TrackSetupRow("Belanda", 36, -7, 12),
-            TrackSetupRow("Italia (Monza)", 5, -2, 0)
-        )
-    }
-
-    // Tyre setup list
-    val tyreSetups = remember {
-        mutableStateListOf(
-            TyreSetupRow(25, 100, 85),
-            TyreSetupRow(35, 90, 75),
-            TyreSetupRow(50, 80, 65),
-            TyreSetupRow(100, 70, 55)
-        )
-    }
-
     // Helper functions
     fun triggerAutosave() {
         isSaved = false
@@ -591,7 +546,7 @@ fun InkyModule(
     var textToolbarCutCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
     var textToolbarSelectAllCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    val dummyTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp, horizScrollState.value) {
+    val customTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp, horizScrollState.value) {
         object : androidx.compose.ui.platform.TextToolbar {
             override fun showMenu(
                 rect: androidx.compose.ui.geometry.Rect,
@@ -716,7 +671,7 @@ fun InkyModule(
     }
 
     androidx.compose.runtime.CompositionLocalProvider(
-        androidx.compose.ui.platform.LocalTextToolbar provides dummyTextToolbar
+        androidx.compose.ui.platform.LocalTextToolbar provides customTextToolbar
     ) {
         Box(
             modifier = Modifier
