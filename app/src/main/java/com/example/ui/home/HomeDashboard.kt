@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.ai.GeminiAiService
+import com.example.ui.theme.ThemeSettings
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -222,7 +223,9 @@ fun createMockFilesOnDevice(context: Context) {
 @Composable
 fun HomeDashboard(
     isTablet: Boolean,
-    onNavigateToModule: (String) -> Unit
+    onNavigateToModule: (String) -> Unit,
+    dynamicColorEnabled: Boolean = false,
+    onDynamicColorChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     var activeTab by remember { mutableStateOf("Recents") } // Recents, Files, Google Drive
@@ -562,6 +565,28 @@ fun HomeDashboard(
                     ) {
                         when (activeSettingSection) {
                             "general" -> {
+                                Text("Theming & Appearance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Dynamic Color (Material You)", style = MaterialTheme.typography.bodyMedium)
+                                        Text("Use system wallpaper accent colors (Android 12+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Switch(
+                                        checked = dynamicColorEnabled,
+                                        enabled = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
+                                        onCheckedChange = { isChecked ->
+                                            ThemeSettings.setDynamicColorEnabled(context, isChecked)
+                                            onDynamicColorChange(isChecked)
+                                        }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+
                                 Text("Language & Formats", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text("Locale: English (US) / Indonesian (Fallback)", style = MaterialTheme.typography.bodyMedium)

@@ -106,6 +106,11 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     // "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
     var currentWorkspace by remember { mutableStateOf("home") }
 
+    // Dynamic theme preference state
+    var dynamicColorEnabled by remember {
+        mutableStateOf(com.example.ui.theme.ThemeSettings.isDynamicColorEnabled(context))
+    }
+
     // Adaptive formatting toolbar / ribbon bar states
     var ribbonVisible by remember { mutableStateOf(false) }
     var selectedRibbonCategory by remember { mutableStateOf("Home") }
@@ -129,171 +134,180 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+    PapirusTheme(
+        workspace = currentWorkspace,
+        dynamicColor = dynamicColorEnabled
     ) {
-        // Global Header TopBar
-        if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Global Header TopBar
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (currentWorkspace != "home") {
+                                IconButton(
+                                    onClick = { currentWorkspace = "home" },
+                                    modifier = Modifier.testTag("btn_back_home")
+                                ) {
+                                    Icon(Icons.Default.Home, contentDescription = "Back to Start Center")
+                                }
+                            }
+                            Text(
+                                text = if (currentWorkspace == "home") "Papirus Office" else "Papirus — $currentWorkspace Workspace",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    },
+                    actions = {
+                        // Quick shortcut to launch Find & Replace
                         if (currentWorkspace != "home") {
-                            IconButton(
-                                onClick = { currentWorkspace = "home" },
-                                modifier = Modifier.testTag("btn_back_home")
-                            ) {
-                                Icon(Icons.Default.Home, contentDescription = "Back to Start Center")
+                            IconButton(onClick = { showFindReplace = !showFindReplace }) {
+                                Icon(Icons.Default.Search, contentDescription = "Find & Replace")
                             }
                         }
-                        Text(
-                            text = if (currentWorkspace == "home") "Papirus Office" else "Papirus — $currentWorkspace Workspace",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                    }
-                },
-                actions = {
-                    // Quick shortcut to launch Find & Replace
-                    if (currentWorkspace != "home") {
-                        IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                            Icon(Icons.Default.Search, contentDescription = "Find & Replace")
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
+                    )
+                )
+
+                // Quick Access Toolbar (QAT)
+                QuickAccessToolbar(
+                    isTablet = isTablet,
+                    onActionClick = { actionName ->
+                        when (actionName) {
+                            "Save" -> Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
+                            "Undo" -> Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                            "Redo" -> Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                            "Share" -> Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
+                            "Search" -> showFindReplace = !showFindReplace
+                            "AI" -> Toast.makeText(context, "AI features can be toggled in settings below.", Toast.LENGTH_LONG).show()
+                            else -> Toast.makeText(context, "Clicked: $actionName", Toast.LENGTH_SHORT).show()
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                )
-            )
-
-            // Quick Access Toolbar (QAT)
-            QuickAccessToolbar(
-                isTablet = isTablet,
-                onActionClick = { actionName ->
-                    when (actionName) {
-                        "Save" -> Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
-                        "Undo" -> Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                        "Redo" -> Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                        "Share" -> Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
-                        "Search" -> showFindReplace = !showFindReplace
-                        "AI" -> Toast.makeText(context, "AI features can be toggled in settings below.", Toast.LENGTH_LONG).show()
-                        else -> Toast.makeText(context, "Clicked: $actionName", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-        }
-
-        // Find & Replace Overlay Bar (Mobile / Tablet adaptive formats)
-        AnimatedVisibility(
-            visible = showFindReplace,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            FindAndReplaceBar(
-                isTablet = isTablet,
-                onFind = { query ->
-                    Toast.makeText(context, "Searching document for: $query", Toast.LENGTH_SHORT).show()
-                },
-                onReplace = { find, replace ->
-                    Toast.makeText(context, "Replaced instances of '$find' with '$replace'", Toast.LENGTH_SHORT).show()
-                },
-                onClose = { showFindReplace = false }
-            )
-        }
-
-        // Expanded Tablet Ribbon bar docking area
-        if (isTablet && ribbonVisible && currentWorkspace != "home") {
-            RibbonFullView(
-                selectedCategory = selectedRibbonCategory,
-                onCategoryChange = { selectedRibbonCategory = it },
-                onActionClick = { action ->
-                    Toast.makeText(context, "Ribbon: $action", Toast.LENGTH_SHORT).show()
-                },
-                moduleContext = currentWorkspace.lowercase()
-            )
-        }
-
-        // Core Workspace display area
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            when (currentWorkspace) {
-                "home" -> HomeDashboard(
-                    isTablet = isTablet,
-                    onNavigateToModule = { workspaceName ->
-                        currentWorkspace = workspaceName
-                    }
-                )
-                "crash_logs" -> CrashLogsScreen(
-                    onBack = { currentWorkspace = "home" }
-                )
-                "Inky" -> InkyModule(
-                    isTablet = isTablet,
-                    onFormatAction = { act ->
-                        if (act == "Back to start center") {
-                            currentWorkspace = "home"
-                        } else {
-                            Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                )
-                "Cellina" -> CellinaModule(
-                    isTablet = isTablet,
-                    onFormulaSelected = { formula ->
-                        Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
-                    }
-                )
-                "Slidia" -> SlidiaModule(
-                    isTablet = isTablet,
-                    onTransitionSelected = { trans ->
-                        Toast.makeText(context, trans, Toast.LENGTH_SHORT).show()
-                    }
-                )
-                "Pagella" -> PagellaModule(
-                    isTablet = isTablet,
-                    onPdfAction = { action ->
-                        Toast.makeText(context, action, Toast.LENGTH_SHORT).show()
                     }
                 )
             }
-        }
 
-        // Mobile dropdown ribbon sheet
-        if (!isTablet && ribbonVisible && currentWorkspace != "home") {
-            SimplifiedRibbonBar(
-                selectedCategory = selectedRibbonCategory,
-                onCategoryChange = { selectedRibbonCategory = it },
-                onCloseRibbon = { ribbonVisible = false },
-                onActionClick = { action ->
-                    Toast.makeText(context, "Ribbon action: $action", Toast.LENGTH_SHORT).show()
-                },
-                moduleContext = currentWorkspace.lowercase()
-            )
-        }
+            // Find & Replace Overlay Bar (Mobile / Tablet adaptive formats)
+            AnimatedVisibility(
+                visible = showFindReplace,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                FindAndReplaceBar(
+                    isTablet = isTablet,
+                    onFind = { query ->
+                        Toast.makeText(context, "Searching document for: $query", Toast.LENGTH_SHORT).show()
+                    },
+                    onReplace = { find, replace ->
+                        Toast.makeText(context, "Replaced instances of '$find' with '$replace'", Toast.LENGTH_SHORT).show()
+                    },
+                    onClose = { showFindReplace = false }
+                )
+            }
 
-        // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-        if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
-            AdaptiveFormattingToolbar(
-                selectedObjectType = formattingObjectType,
-                onFormatClick = { formatAction ->
-                    Toast.makeText(context, "Format style: $formatAction", Toast.LENGTH_SHORT).show()
-                    // Toggle contextual element formatting simulation
-                    if (formatAction == "toggle_header") {
-                        formattingObjectType = "text"
-                    } else if (formatAction == "helper") {
-                        formattingObjectType = "formula"
-                    }
-                },
-                onToggleKeyboard = {
-                    Toast.makeText(context, "Virtual Keyboard Toggled", Toast.LENGTH_SHORT).show()
-                },
-                onToggleRibbon = {
-                    ribbonVisible = !ribbonVisible
+            // Expanded Tablet Ribbon bar docking area
+            if (isTablet && ribbonVisible && currentWorkspace != "home") {
+                RibbonFullView(
+                    selectedCategory = selectedRibbonCategory,
+                    onCategoryChange = { selectedRibbonCategory = it },
+                    onActionClick = { action ->
+                        Toast.makeText(context, "Ribbon: $action", Toast.LENGTH_SHORT).show()
+                    },
+                    moduleContext = currentWorkspace.lowercase()
+                )
+            }
+
+            // Core Workspace display area
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when (currentWorkspace) {
+                    "home" -> HomeDashboard(
+                        isTablet = isTablet,
+                        onNavigateToModule = { workspaceName ->
+                            currentWorkspace = workspaceName
+                        },
+                        dynamicColorEnabled = dynamicColorEnabled,
+                        onDynamicColorChange = { dynamicColorEnabled = it }
+                    )
+                    "crash_logs" -> CrashLogsScreen(
+                        onBack = { currentWorkspace = "home" }
+                    )
+                    "Inky" -> InkyModule(
+                        isTablet = isTablet,
+                        onFormatAction = { act ->
+                            if (act == "Back to start center") {
+                                currentWorkspace = "home"
+                            } else {
+                                Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        dynamicColorEnabled = dynamicColorEnabled,
+                        onDynamicColorChange = { dynamicColorEnabled = it }
+                    )
+                    "Cellina" -> CellinaModule(
+                        isTablet = isTablet,
+                        onFormulaSelected = { formula ->
+                            Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    "Slidia" -> SlidiaModule(
+                        isTablet = isTablet,
+                        onTransitionSelected = { trans ->
+                            Toast.makeText(context, trans, Toast.LENGTH_SHORT).show()
+                        }
+                    )
+                    "Pagella" -> PagellaModule(
+                        isTablet = isTablet,
+                        onPdfAction = { action ->
+                            Toast.makeText(context, action, Toast.LENGTH_SHORT).show()
+                        }
+                    )
                 }
-            )
+            }
+
+            // Mobile dropdown ribbon sheet
+            if (!isTablet && ribbonVisible && currentWorkspace != "home") {
+                SimplifiedRibbonBar(
+                    selectedCategory = selectedRibbonCategory,
+                    onCategoryChange = { selectedRibbonCategory = it },
+                    onCloseRibbon = { ribbonVisible = false },
+                    onActionClick = { action ->
+                        Toast.makeText(context, "Ribbon action: $action", Toast.LENGTH_SHORT).show()
+                    },
+                    moduleContext = currentWorkspace.lowercase()
+                )
+            }
+
+            // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs") {
+                AdaptiveFormattingToolbar(
+                    selectedObjectType = formattingObjectType,
+                    onFormatClick = { formatAction ->
+                        Toast.makeText(context, "Format style: $formatAction", Toast.LENGTH_SHORT).show()
+                        // Toggle contextual element formatting simulation
+                        if (formatAction == "toggle_header") {
+                            formattingObjectType = "text"
+                        } else if (formatAction == "helper") {
+                            formattingObjectType = "formula"
+                        }
+                    },
+                    onToggleKeyboard = {
+                        Toast.makeText(context, "Virtual Keyboard Toggled", Toast.LENGTH_SHORT).show()
+                    },
+                    onToggleRibbon = {
+                        ribbonVisible = !ribbonVisible
+                    }
+                )
+            }
         }
     }
 }

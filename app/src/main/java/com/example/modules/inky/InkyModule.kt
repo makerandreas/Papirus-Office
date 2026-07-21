@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.example.core.equation.EquationParser
 import com.example.core.ai.GeminiAiService
 import com.example.ui.components.FloatingContextualToolbar
+import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -103,14 +104,16 @@ fun partitionTextToPages(text: String, maxLinesPerPage: Int = 15): List<String> 
 @Composable
 fun InkyModule(
     isTablet: Boolean,
-    onFormatAction: (String) -> Unit
+    onFormatAction: (String) -> Unit,
+    dynamicColorEnabled: Boolean = false,
+    onDynamicColorChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-
+    
     val focusRequester = remember { FocusRequester() }
 
     // --- Inky Core States ---
@@ -130,6 +133,7 @@ fun InkyModule(
 
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
+    var showOptionsDialog by remember { mutableStateOf(false) }
 
 
 
@@ -2019,15 +2023,38 @@ fun InkyModule(
 
                         HorizontalDivider(color = borderStrokeColor.copy(alpha = 0.4f))
 
-                        // Scrollable content area (empty for now)
+                        // Scrollable content area
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp)
                         ) {
-                            // Empty content
+                            if (activeRibbonTab == "File") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    FileSubpage(
+                                        context = context,
+                                        onNavigateToOptions = { showOptionsDialog = true }
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$activeRibbonTab options will be implemented soon.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -2216,5 +2243,453 @@ fun InkyModule(
             }
         )
     }
+
+    if (showOptionsDialog) {
+        var optAiEnabled by remember { mutableStateOf(GeminiAiService.isAiEnabled(context)) }
+        var optApiKey by remember { mutableStateOf(GeminiAiService.getUserApiKey(context)) }
+        var optModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
+        var optShowModelMenu by remember { mutableStateOf(false) }
+
+        var activeSettingSection by remember { mutableStateOf("general") }
+
+        AlertDialog(
+            onDismissRequest = { showOptionsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Papirus Office Options", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 450.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = activeSettingSection == "general",
+                            onClick = { activeSettingSection = "general" },
+                            label = { Text("General") }
+                        )
+                        FilterChip(
+                            selected = activeSettingSection == "ai",
+                            onClick = { activeSettingSection = "ai" },
+                            label = { Text("Gemini AI") }
+                        )
+                        FilterChip(
+                            selected = activeSettingSection == "about",
+                            onClick = { activeSettingSection = "about" },
+                            label = { Text("About") }
+                        )
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        when (activeSettingSection) {
+                            "general" -> {
+                                Text("Theming & Appearance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Dynamic Color (Material You)", style = MaterialTheme.typography.bodyMedium)
+                                        Text("Use system wallpaper accent colors (Android 12+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    Switch(
+                                        checked = dynamicColorEnabled,
+                                        enabled = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
+                                        onCheckedChange = { isChecked ->
+                                            ThemeSettings.setDynamicColorEnabled(context, isChecked)
+                                            onDynamicColorChange(isChecked)
+                                        }
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("Language & Formats", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Locale: English (US) / Indonesian (Fallback)", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("LibreOffice Core Integration", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Native ODF Parse Cache: Enabled", style = MaterialTheme.typography.bodyMedium)
+                                Text("JNI Memory Buffering: Optimized for 64-bit systems", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("Document Storage Config", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Auto-Save Recovery: 60 seconds interval", style = MaterialTheme.typography.bodyMedium)
+                                Text("Incremental Sync: Active", style = MaterialTheme.typography.bodyMedium)
+                            }
+                            "ai" -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Google Gemini Assistant", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                        Text("Enable AI assistant to generate formulas, explain code and summarize logs.", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    Switch(
+                                        checked = optAiEnabled,
+                                        onCheckedChange = {
+                                            optAiEnabled = it
+                                            GeminiAiService.setAiEnabled(context, it)
+                                        }
+                                    )
+                                }
+
+                                if (optAiEnabled) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = optApiKey,
+                                        onValueChange = {
+                                            optApiKey = it
+                                            GeminiAiService.saveUserApiKey(context, it)
+                                        },
+                                        label = { Text("Google AI Studio API Key") },
+                                        placeholder = { Text("AIzaSy...") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedTextField(
+                                            value = optModel,
+                                            onValueChange = {},
+                                            label = { Text("Active AI Model") },
+                                            readOnly = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            trailingIcon = {
+                                                IconButton(onClick = { optShowModelMenu = true }) {
+                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                                }
+                                            }
+                                        )
+                                        DropdownMenu(
+                                            expanded = optShowModelMenu,
+                                            onDismissRequest = { optShowModelMenu = false }
+                                        ) {
+                                            GeminiAiService.SUPPORTED_MODELS.forEach { modelPair ->
+                                                DropdownMenuItem(
+                                                    text = { Text(modelPair.second) },
+                                                    onClick = {
+                                                        optModel = modelPair.first
+                                                        GeminiAiService.saveSelectedModel(context, modelPair.first)
+                                                        optShowModelMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Privacy Guarantee", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                "API Keys are kept offline in secure app preferences and transmitted securely directly to the Google Gemini developer API endpoints.",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            "about" -> {
+                                Text("Papirus Office Enterprise", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Version: v2026.07.20-Expressive", style = MaterialTheme.typography.bodyMedium)
+                                Text("Engine: LibreOffice Core v24.2.5 (Fork)", style = MaterialTheme.typography.bodyMedium)
+                                Text("Platform JNI bindings: Active", style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Text("Developers", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Google AI Studio Coding Agent & Maker Andreas", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showOptionsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+    }
+}
+
+// ==========================================
+// File Subpage & Components
+// ==========================================
+@Composable
+private fun FileSubpage(
+    context: android.content.Context,
+    onNavigateToOptions: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Grup File
+        FileMenuSectionHeader("File")
+        FileMenuThreeColumnRow(
+            item1 = Triple(Icons.Rounded.NoteAdd, "New") {
+                Toast.makeText(context, "New document created", Toast.LENGTH_SHORT).show()
+            },
+            item2 = Triple(Icons.Rounded.FolderOpen, "Open") {
+                Toast.makeText(context, "Opening file picker...", Toast.LENGTH_SHORT).show()
+            },
+            item3 = Triple(Icons.Rounded.Close, "Close") {
+                Toast.makeText(context, "Closing document...", Toast.LENGTH_SHORT).show()
+            }
+        )
+        FileMenuListItem(
+            icon = Icons.Rounded.Refresh,
+            title = "Reload document",
+            subtitle = "Discard unsaved changes and reload from storage"
+        ) {
+            Toast.makeText(context, "Reloading document...", Toast.LENGTH_SHORT).show()
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Grup Document
+        FileMenuSectionHeader("Document")
+        FileMenuListItem(
+            icon = Icons.Rounded.Save,
+            title = "Save",
+            subtitle = "Save active document changes directly"
+        ) {
+            Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.Save,
+            title = "Save as...",
+            subtitle = "Save document copy with a new name"
+        ) {
+            Toast.makeText(context, "Opening Save As dialog...", Toast.LENGTH_SHORT).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.LibraryBooks,
+            title = "Save all opened document",
+            subtitle = "Save changes in all currently active editors"
+        ) {
+            Toast.makeText(context, "Saving all documents...", Toast.LENGTH_SHORT).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.ImportExport,
+            title = "Export as...",
+            subtitle = "Generate high-fidelity PDF, EPUB, or XHTML files"
+        ) {
+            Toast.makeText(context, "Export options: PDF, EPUB, XHTML", Toast.LENGTH_SHORT).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.Share,
+            title = "Share",
+            subtitle = "Send document copy to another app or contact"
+        ) {
+            Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.DoneAll,
+            title = "Finalize",
+            subtitle = "Mark document as final and make it read-only"
+        ) {
+            Toast.makeText(context, "Document finalized!", Toast.LENGTH_SHORT).show()
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Grup Print
+        FileMenuSectionHeader("Print")
+        FileMenuThreeColumnRow(
+            item1 = Triple(Icons.Rounded.Print, "Print") {
+                Toast.makeText(context, "Preparing print job...", Toast.LENGTH_SHORT).show()
+            },
+            item2 = Triple(Icons.Rounded.RemoveRedEye, "Preview") {
+                Toast.makeText(context, "Generating print preview...", Toast.LENGTH_SHORT).show()
+            },
+            item3 = Triple(Icons.Rounded.CallMerge, "Merge") {
+                Toast.makeText(context, "Print merge wizard...", Toast.LENGTH_SHORT).show()
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Grup File Management
+        FileMenuSectionHeader("File Management")
+        FileMenuListItem(
+            icon = Icons.Rounded.Info,
+            title = "Document properties",
+            subtitle = "View document metadata, statistics, and configuration details"
+        ) {
+            Toast.makeText(context, "Properties: 1 page, 340 words, 2,130 characters", Toast.LENGTH_LONG).show()
+        }
+        FileMenuListItem(
+            icon = Icons.Rounded.Image,
+            title = "Compress all pictures",
+            subtitle = "Reduce document file size by optimizing visual assets"
+        ) {
+            Toast.makeText(context, "All pictures compressed successfully (Saved 1.2 MB)", Toast.LENGTH_SHORT).show()
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Grup Settings
+        FileMenuSectionHeader("Settings")
+        FileMenuListItem(
+            icon = Icons.Rounded.Settings,
+            title = "Options",
+            subtitle = "Configure Papirus Office options and Gemini AI settings"
+        ) {
+            onNavigateToOptions()
+        }
+    }
+}
+
+@Composable
+private fun FileMenuSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun FileMenuListItem(
+    icon: ImageVector,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun FileMenuThreeColumnRow(
+    item1: Triple<ImageVector, String, () -> Unit>,
+    item2: Triple<ImageVector, String, () -> Unit>,
+    item3: Triple<ImageVector, String, () -> Unit>
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        listOf(item1, item2, item3).forEach { (icon, label, onClick) ->
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(80.dp)
+                    .clickable(onClick = onClick),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
