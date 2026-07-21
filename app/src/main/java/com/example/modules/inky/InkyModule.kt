@@ -1,5 +1,10 @@
 package com.example.modules.inky
+import android.util.Log
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.input.key.isShiftPressed
+import com.example.core.util.TemplateManager
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -298,6 +303,36 @@ fun InkyModule(
 
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
     var pendingActionAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var showCreateFromTemplateDialog by remember { mutableStateOf(false) }
+
+    val handleLoadTemplate = { template: TemplateManager.TemplateItem ->
+        val loadTemplate = {
+            coroutineScope.launch {
+                val filePath = com.example.MainActivity.openedFilePath
+                if (filePath != null) {
+                    val file = java.io.File(filePath)
+                    docTitle = file.name
+                } else {
+                    docTitle = "${template.name.replace(" ", "_")}.odt"
+                }
+                
+                val mockContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
+                
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue(mockContent)
+                isSaved = true
+                isEditMode = true
+                showBottomBar = false
+                showCreateFromTemplateDialog = false
+            }
+            Unit
+        }
+        if (!isSaved) {
+            pendingActionAfterSave = loadTemplate
+            showUnsavedChangesDialog = true
+        } else {
+            loadTemplate()
+        }
+    }
 
     val handleNewDocument = {
         val createNew = {
@@ -688,11 +723,16 @@ fun InkyModule(
                 .fillMaxSize()
                 .background(docBgColor)
                 .onPreviewKeyEvent { event ->
-                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
-                        event.isCtrlPressed &&
-                        event.key == androidx.compose.ui.input.key.Key.N) {
-                        handleNewDocument()
-                        true
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.isCtrlPressed) {
+                        if (event.isShiftPressed && event.key == androidx.compose.ui.input.key.Key.N) {
+                            showCreateFromTemplateDialog = true
+                            true
+                        } else if (event.key == androidx.compose.ui.input.key.Key.N) {
+                            handleNewDocument()
+                            true
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
@@ -2751,6 +2791,201 @@ fun InkyModule(
             },
             confirmButton = {
                 TextButton(onClick = { showOptionsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // --- CREATE FROM TEMPLATE DIALOG ---
+    if (showCreateFromTemplateDialog) {
+        var templateList by remember { mutableStateOf<List<TemplateManager.TemplateItem>>(emptyList()) }
+        var isFetchingTemplates by remember { mutableStateOf(false) }
+        var selectedTemplateItem by remember { mutableStateOf<TemplateManager.TemplateItem?>(null) }
+        var activeDownloadProgress by remember { mutableStateOf<Float?>(null) }
+        var downloadedFilePathState by remember { mutableStateOf<String?>(null) }
+
+        LaunchedEffect(Unit) {
+            isFetchingTemplates = true
+            try {
+                templateList = TemplateManager.searchTemplates(context, "ODT")
+            } catch (e: Exception) {
+                Log.e("InkyModule", "Error fetching templates", e)
+            } finally {
+                isFetchingTemplates = false
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showCreateFromTemplateDialog = false },
+            title = {
+                Text(
+                    text = "Create from Template",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 350.dp)
+                ) {
+                    if (isFetchingTemplates) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    } else if (templateList.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(120.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No ODT templates found. Please check internet connection.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(templateList) { template ->
+                                val isSelected = selectedTemplateItem == template
+                                val isCurDownloaded = downloadedFilePathState != null && selectedTemplateItem == template
+                                val borderStroke = if (isSelected) {
+                                    BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                } else {
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                                }
+
+                                Card(
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                                        else MaterialTheme.colorScheme.surface
+                                    ),
+                                    border = borderStroke,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedTemplateItem = template
+                                            // Reset download status for new selection if not already downloaded
+                                            if (!isCurDownloaded) {
+                                                activeDownloadProgress = null
+                                                downloadedFilePathState = null
+                                            }
+                                            
+                                            // Trigger automatic download upon tap
+                                            coroutineScope.launch {
+                                                activeDownloadProgress = 0f
+                                                val file = TemplateManager.downloadTemplate(context, template) { progress ->
+                                                    activeDownloadProgress = progress
+                                                }
+                                                if (file != null) {
+                                                    activeDownloadProgress = 1.0f
+                                                    downloadedFilePathState = file.absolutePath
+                                                    com.example.MainActivity.openedFilePath = file.absolutePath
+                                                    com.example.MainActivity.openedFileType = "Inky"
+                                                    Toast.makeText(context, "Template downloaded successfully!", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    activeDownloadProgress = null
+                                                    Toast.makeText(context, "Download failed. Please try again.", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(
+                                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                                                    RoundedCornerShape(8.dp)
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Description,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = template.name,
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = template.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        if (isSelected) {
+                                            val currentProg = activeDownloadProgress
+                                            if (currentProg != null && currentProg < 1.0f) {
+                                                CircularProgressIndicator(
+                                                    progress = { currentProg },
+                                                    modifier = Modifier.size(20.dp),
+                                                    strokeWidth = 2.dp
+                                                )
+                                            } else if (downloadedFilePathState != null) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.CheckCircle,
+                                                    contentDescription = "Downloaded",
+                                                    tint = Color(0xFF10B981),
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val currentTemplate = selectedTemplateItem
+                        if (currentTemplate != null && downloadedFilePathState != null) {
+                            handleLoadTemplate(currentTemplate)
+                        }
+                    },
+                    enabled = selectedTemplateItem != null && downloadedFilePathState != null,
+                    modifier = Modifier.testTag("template_open_btn")
+                ) {
+                    Text("Open")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showCreateFromTemplateDialog = false },
+                    modifier = Modifier.testTag("template_close_btn")
+                ) {
                     Text("Close")
                 }
             }

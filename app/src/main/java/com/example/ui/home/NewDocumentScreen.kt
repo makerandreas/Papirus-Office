@@ -1,6 +1,8 @@
 package com.example.ui.home
 
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.launch
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.widget.Toast
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.core.util.TemplateManager
 
 /**
  * Checks if the device has an active internet connection.
@@ -174,6 +177,7 @@ fun NewDocumentScreen(
                     CreateFromTemplateView(
                         isOnline = isOnline,
                         selectedFilter = selectedTemplateFilter,
+                        searchQuery = searchQuery,
                         onFilterSelected = { selectedTemplateFilter = it },
                         onNavigateToModule = onNavigateToModule
                     )
@@ -367,10 +371,46 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
 fun CreateFromTemplateView(
     isOnline: Boolean,
     selectedFilter: String,
+    searchQuery: String,
     onFilterSelected: (String) -> Unit,
     onNavigateToModule: (String) -> Unit
 ) {
     val filters = listOf("All", "ODT", "ODS", "ODP")
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var templates by remember { mutableStateOf<List<TemplateManager.TemplateItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(false) }
+    var downloadProgressMap by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
+    var downloadedFilesMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    // Fetch templates whenever filter or network status changes
+    LaunchedEffect(selectedFilter, isOnline) {
+        if (isOnline) {
+            isLoading = true
+            try {
+                templates = TemplateManager.searchTemplates(context, selectedFilter)
+            } catch (e: Exception) {
+                Log.e("CreateFromTemplateView", "Error fetching templates", e)
+            } finally {
+                isLoading = false
+            }
+        } else {
+            templates = emptyList()
+        }
+    }
+
+    // Filter by search query
+    val filteredTemplates = remember(templates, searchQuery) {
+        if (searchQuery.trim().isEmpty()) {
+            templates
+        } else {
+            templates.filter {
+                it.name.contains(searchQuery, ignoreCase = true) ||
+                it.description.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -398,74 +438,27 @@ fun CreateFromTemplateView(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        if (isOnline) {
-            // Show mock templates
-            LazyColumn(
+        if (isLoading) {
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
             ) {
-                if (selectedFilter == "All" || selectedFilter == "ODT") {
-                    item {
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    com.example.MainActivity.openedFilePath = null
-                                    com.example.MainActivity.openedFileType = null
-                                    onNavigateToModule("Inky")
-                                }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(18.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(52.dp)
-                                        .background(Color(0xFFEFF6FF), RoundedCornerShape(12.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Description,
-                                        contentDescription = null,
-                                        tint = Color(0xFF2563EB),
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Resume (Modern)",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Inky Document • ODT",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Icon(
-                                    Icons.Rounded.ChevronRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Querying ODF repositories...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
-        } else {
-            // Empty State area with custom Expressive illustration and messaging
+        } else if (!isOnline) {
+            // Offline Empty State
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -473,75 +466,271 @@ fun CreateFromTemplateView(
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.Center
             ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth(0.85f)
-            ) {
-                // Dynamic M3 Expressive Custom Vector-style Drawing for Empty/Offline State
-                Box(
-                    modifier = Modifier
-                        .size(180.dp)
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    if (isOnline) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                    else MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
-                                    Color.Transparent
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth(0.85f)
                 ) {
-                    // Overlapping vector shape simulations with restraint & precision
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
+                            .size(180.dp)
                             .background(
-                                if (isOnline) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.errorContainer,
-                                shape = RoundedCornerShape(28.dp)
-                            )
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.error.copy(alpha = 0.12f),
+                                        Color.Transparent
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.errorContainer,
+                                    shape = RoundedCornerShape(28.dp)
+                                )
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(70.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .offset(x = 18.dp, y = (-18).dp)
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.CloudOff,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = stringResource(R.string.no_internet),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(70.dp)
-                            .background(
-                                if (isOnline) MaterialTheme.colorScheme.secondaryContainer
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .offset(x = 18.dp, y = (-18).dp)
-                    )
-                    Icon(
-                        imageVector = if (isOnline) Icons.Rounded.Article else Icons.Rounded.CloudOff,
-                        contentDescription = null,
-                        tint = if (isOnline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
-                        modifier = Modifier.size(48.dp)
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = stringResource(R.string.no_internet_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
                     )
                 }
+            }
+        } else if (filteredTemplates.isEmpty()) {
+            // No Results Empty State
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth(0.85f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(180.dp)
+                            .background(
+                                brush = Brush.radialGradient(
+                                    colors = listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                        Color.Transparent
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(28.dp)
+                                )
+                        )
+                        Icon(
+                            imageVector = Icons.Rounded.Article,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                Text(
-                    text = stringResource(if (isOnline) R.string.no_templates else R.string.no_internet),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
-                )
+                    Text(
+                        text = stringResource(R.string.no_templates),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = stringResource(if (isOnline) R.string.no_templates_desc else R.string.no_internet_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
+                    Text(
+                        text = stringResource(R.string.no_templates_desc),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                }
+            }
+        } else {
+            // Display Template List
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(filteredTemplates) { template ->
+                    val progress = downloadProgressMap[template.name]
+                    val isDownloading = progress != null && progress < 1.0f
+                    val isDownloaded = downloadedFilesMap.containsKey(template.name)
+
+                    // Theme Colors according to document/template type
+                    val (themeColor, icon) = when (template.type) {
+                        "ODT" -> Color(0xFF2563EB) to Icons.Rounded.Description
+                        "ODS" -> Color(0xFF10B981) to Icons.Rounded.GridView
+                        else -> Color(0xFFD97706) to Icons.Rounded.Slideshow
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isDownloading) {
+                                coroutineScope.launch {
+                                    if (isDownloaded) {
+                                        // Already downloaded, just open it
+                                        val filePath = downloadedFilesMap[template.name]!!
+                                        com.example.MainActivity.openedFilePath = filePath
+                                        com.example.MainActivity.openedFileType = when (template.type) {
+                                            "ODS" -> "Cellina"
+                                            "ODP" -> "Slidia"
+                                            else -> "Inky"
+                                        }
+                                        onNavigateToModule(com.example.MainActivity.openedFileType ?: "Inky")
+                                    } else {
+                                        // Start downloading
+                                        Toast.makeText(context, "Downloading template: ${template.name}...", Toast.LENGTH_SHORT).show()
+                                        downloadProgressMap = downloadProgressMap + (template.name to 0f)
+                                        val file = TemplateManager.downloadTemplate(context, template) { prog ->
+                                            downloadProgressMap = downloadProgressMap + (template.name to prog)
+                                        }
+                                        if (file != null) {
+                                            downloadProgressMap = downloadProgressMap + (template.name to 1.0f)
+                                            downloadedFilesMap = downloadedFilesMap + (template.name to file.absolutePath)
+                                            Toast.makeText(context, "Download complete! Opening...", Toast.LENGTH_SHORT).show()
+                                            
+                                            com.example.MainActivity.openedFilePath = file.absolutePath
+                                            com.example.MainActivity.openedFileType = when (template.type) {
+                                                "ODS" -> "Cellina"
+                                                "ODP" -> "Slidia"
+                                                else -> "Inky"
+                                            }
+                                            onNavigateToModule(com.example.MainActivity.openedFileType ?: "Inky")
+                                        } else {
+                                            downloadProgressMap = downloadProgressMap - template.name
+                                            Toast.makeText(context, "Download failed. Please check your connection.", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                            }
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(themeColor.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = themeColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = template.name,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "Papirus Template • ${template.type}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                if (isDownloading) {
+                                    CircularProgressIndicator(
+                                        progress = { progress ?: 0f },
+                                        modifier = Modifier.size(24.dp),
+                                        color = themeColor,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else if (isDownloaded) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = "Downloaded successfully",
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Download,
+                                        contentDescription = "Download template",
+                                        tint = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+
+                            if (template.description.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = template.description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-}
 }
