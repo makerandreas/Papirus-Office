@@ -3,6 +3,7 @@ package com.example
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -113,6 +114,10 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     // Master Workspace Navigation State
     // "welcome" (Onboarding), "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
     var currentWorkspace by remember { mutableStateOf("home") }
+
+    BackHandler(enabled = currentWorkspace != "home" && currentWorkspace != "welcome") {
+        currentWorkspace = "home"
+    }
     
     // Check initial permission state
     LaunchedEffect(Unit) {
@@ -232,7 +237,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Expanded Tablet Ribbon bar docking area
-            if (isTablet && ribbonVisible && currentWorkspace != "home") {
+            if (isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "welcome") {
                 RibbonFullView(
                     selectedCategory = selectedRibbonCategory,
                     onCategoryChange = { selectedRibbonCategory = it },
@@ -249,64 +254,81 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                when (currentWorkspace) {
-                    "welcome" -> WelcomeScreen(
-                        onAccessGranted = {
-                            currentWorkspace = "home"
+                AnimatedContent(
+                    targetState = currentWorkspace,
+                    transitionSpec = {
+                        val isGoingBack = targetState == "home" || targetState == "welcome"
+                        if (isGoingBack) {
+                            (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
+                                slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                            )
+                        } else {
+                            (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
+                                slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                            )
                         }
-                    )
-                    "home" -> HomeDashboard(
-                        isTablet = isTablet,
-                        onNavigateToModule = { workspaceName ->
-                            currentWorkspace = workspaceName
-                        },
-                        dynamicColorEnabled = dynamicColorEnabled,
-                        onDynamicColorChange = { dynamicColorEnabled = it }
-                    )
-                    "create_new_document" -> NewDocumentScreen(
-                        onBack = { currentWorkspace = "home" },
-                        onNavigateToModule = { workspaceName ->
-                            currentWorkspace = workspaceName
-                        }
-                    )
-                    "crash_logs" -> CrashLogsScreen(
-                        onBack = { currentWorkspace = "home" }
-                    )
-                    "Inky" -> InkyModule(
-                        isTablet = isTablet,
-                        onFormatAction = { act ->
-                            if (act == "Back to start center") {
+                    },
+                    label = "WorkspaceTransition"
+                ) { workspace ->
+                    when (workspace) {
+                        "welcome" -> WelcomeScreen(
+                            onAccessGranted = {
                                 currentWorkspace = "home"
-                            } else {
-                                Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
                             }
-                        },
-                        dynamicColorEnabled = dynamicColorEnabled,
-                        onDynamicColorChange = { dynamicColorEnabled = it }
-                    )
-                    "Cellina" -> CellinaModule(
-                        isTablet = isTablet,
-                        onFormulaSelected = { formula ->
-                            Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    "Slidia" -> SlidiaModule(
-                        isTablet = isTablet,
-                        onTransitionSelected = { trans ->
-                            Toast.makeText(context, trans, Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    "Pagella" -> PagellaModule(
-                        isTablet = isTablet,
-                        onPdfAction = { action ->
-                            Toast.makeText(context, action, Toast.LENGTH_SHORT).show()
-                        }
-                    )
+                        )
+                        "home" -> HomeDashboard(
+                            isTablet = isTablet,
+                            onNavigateToModule = { workspaceName ->
+                                currentWorkspace = workspaceName
+                            },
+                            dynamicColorEnabled = dynamicColorEnabled,
+                            onDynamicColorChange = { dynamicColorEnabled = it }
+                        )
+                        "create_new_document" -> NewDocumentScreen(
+                            onBack = { currentWorkspace = "home" },
+                            onNavigateToModule = { workspaceName ->
+                                currentWorkspace = workspaceName
+                            }
+                        )
+                        "crash_logs" -> CrashLogsScreen(
+                            onBack = { currentWorkspace = "home" }
+                        )
+                        "Inky" -> InkyModule(
+                            isTablet = isTablet,
+                            onFormatAction = { act ->
+                                if (act == "Back to start center") {
+                                    currentWorkspace = "home"
+                                } else {
+                                    Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            dynamicColorEnabled = dynamicColorEnabled,
+                            onDynamicColorChange = { dynamicColorEnabled = it }
+                        )
+                        "Cellina" -> CellinaModule(
+                            isTablet = isTablet,
+                            onFormulaSelected = { formula ->
+                                Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        "Slidia" -> SlidiaModule(
+                            isTablet = isTablet,
+                            onTransitionSelected = { trans ->
+                                Toast.makeText(context, trans, Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        "Pagella" -> PagellaModule(
+                            isTablet = isTablet,
+                            onPdfAction = { action ->
+                                Toast.makeText(context, action, Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
                 }
             }
 
             // Mobile dropdown ribbon sheet
-            if (!isTablet && ribbonVisible && currentWorkspace != "home") {
+            if (!isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "welcome") {
                 SimplifiedRibbonBar(
                     selectedCategory = selectedRibbonCategory,
                     onCategoryChange = { selectedRibbonCategory = it },
@@ -319,7 +341,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
                 AdaptiveFormattingToolbar(
                     selectedObjectType = formattingObjectType,
                     onFormatClick = { formatAction ->

@@ -59,13 +59,28 @@ fun NewDocumentScreen(
     onBack: () -> Unit,
     onNavigateToModule: (String) -> Unit
 ) {
-    BackHandler(onBack = onBack)
-    val context = LocalContext.current
-    var activeSubTab by remember { mutableStateOf("Create New") } // "Create New" or "Create from Template"
-    var selectedTemplateFilter by remember { mutableStateOf("All") } // "All", "ODT", "ODS", "ODP"
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var activeSubTab by remember { mutableStateOf("Create New") } // "Create New" or "Create from Template"
+    var selectedTemplateFilter by remember { mutableStateOf("All") } // "All", "ODT", "ODS", "ODP"
+
+    val handleBack = {
+        isSearchActive = false
+        searchQuery = ""
+        onBack()
+    }
+
+    BackHandler(onBack = handleBack)
+    val context = LocalContext.current
     
+    // Automatically close template search bar when switching away from "Create from Template"
+    LaunchedEffect(activeSubTab) {
+        if (activeSubTab != "Create from Template") {
+            isSearchActive = false
+            searchQuery = ""
+        }
+    }
+
     // Check network connectivity on screen entry
     val isOnline = remember { isNetworkAvailable(context) }
 
@@ -83,7 +98,7 @@ fun NewDocumentScreen(
                     },
                     navigationIcon = {
                         IconButton(
-                            onClick = onBack,
+                            onClick = handleBack,
                             modifier = Modifier.testTag("new_doc_back_btn")
                         ) {
                             Icon(
@@ -169,18 +184,34 @@ fun NewDocumentScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            when (activeSubTab) {
-                "Create New" -> {
-                    CreateNewDocumentList(onNavigateToModule = onNavigateToModule)
-                }
-                "Create from Template" -> {
-                    CreateFromTemplateView(
-                        isOnline = isOnline,
-                        selectedFilter = selectedTemplateFilter,
-                        searchQuery = searchQuery,
-                        onFilterSelected = { selectedTemplateFilter = it },
-                        onNavigateToModule = onNavigateToModule
-                    )
+            AnimatedContent(
+                targetState = activeSubTab,
+                transitionSpec = {
+                    if (targetState == "Create from Template") {
+                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
+                            slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                        )
+                    } else {
+                        (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
+                            slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                        )
+                    }
+                },
+                label = "NewDocSubTabTransition"
+            ) { targetSubTab ->
+                when (targetSubTab) {
+                    "Create New" -> {
+                        CreateNewDocumentList(onNavigateToModule = onNavigateToModule)
+                    }
+                    "Create from Template" -> {
+                        CreateFromTemplateView(
+                            isOnline = isOnline,
+                            selectedFilter = selectedTemplateFilter,
+                            searchQuery = searchQuery,
+                            onFilterSelected = { selectedTemplateFilter = it },
+                            onNavigateToModule = onNavigateToModule
+                        )
+                    }
                 }
             }
         }

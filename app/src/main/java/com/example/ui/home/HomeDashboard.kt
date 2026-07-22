@@ -243,6 +243,12 @@ fun HomeDashboard(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
 
+    // Auto-close search bar when switching subpages (Recents, Files, Google Drive)
+    LaunchedEffect(activeTab) {
+        isSearchActive = false
+        searchQuery = ""
+    }
+
     // Dialog & Options states
     var showMoreMenu by remember { mutableStateOf(false) }
     var showOptionsDialog by remember { mutableStateOf(false) }
@@ -322,7 +328,7 @@ fun HomeDashboard(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .testTag("search_field"),
-                        placeholder = { Text("Cari file berdasarkan nama...") },
+                        placeholder = { Text(stringResource(R.string.search_placeholder)) },
                         leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -385,15 +391,34 @@ fun HomeDashboard(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            when (activeTab) {
-                "Recents" -> RecentsSubPage(
-                    searchQuery = searchQuery,
-                    onNavigateToModule = onNavigateToModule
-                )
-                "Files" -> FilesSubPage(
-                    onNavigateToModule = onNavigateToModule
-                )
-                "Google Drive" -> GoogleDriveSubPage()
+            AnimatedContent(
+                targetState = activeTab,
+                transitionSpec = {
+                    val tabOrder = listOf("Recents", "Files", "Google Drive")
+                    val initialIdx = tabOrder.indexOf(initialState)
+                    val targetIdx = tabOrder.indexOf(targetState)
+                    if (targetIdx >= initialIdx) {
+                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
+                            slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                        )
+                    } else {
+                        (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
+                            slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                        )
+                    }
+                },
+                label = "HomeTabTransition"
+            ) { targetTab ->
+                when (targetTab) {
+                    "Recents" -> RecentsSubPage(
+                        searchQuery = searchQuery,
+                        onNavigateToModule = onNavigateToModule
+                    )
+                    "Files" -> FilesSubPage(
+                        onNavigateToModule = onNavigateToModule
+                    )
+                    "Google Drive" -> GoogleDriveSubPage()
+                }
             }
         }
     }

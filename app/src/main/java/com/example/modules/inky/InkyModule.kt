@@ -990,7 +990,7 @@ fun InkyModule(
                             OutlinedTextField(
                                 value = searchQuery,
                                 onValueChange = { searchQuery = it },
-                                placeholder = { Text("Cari teks...") },
+                                placeholder = { Text("Search text...") },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 trailingIcon = {
@@ -1021,9 +1021,9 @@ fun InkyModule(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextButton(onClick = {
-                                Toast.makeText(context, "Mencari: $searchQuery", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Searching: $searchQuery", Toast.LENGTH_SHORT).show()
                             }) {
-                                Text("Cari")
+                                Text("Find")
                             }
                             if (isEditMode) {
                                 Spacer(modifier = Modifier.width(8.dp))
