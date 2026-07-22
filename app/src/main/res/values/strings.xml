@@ -43,4 +43,32 @@
     <string name="welcome_settings_desc">Permission denied. Please grant file access from your system settings to continue.</string>
     <string name="welcome_open_settings_btn">Open App Settings</string>
 
+    <!-- Open Document & Context Menu -->
+    <string name="open_document_title">Open</string>
+    <string name="tab_recents">Recents</string>
+    <string name="tab_files">Files</string>
+    <string name="tab_google_drive">Google Drive</string>
+    <string name="btn_open">Open</string>
+    <string name="btn_close_search">Close Search</string>
+    <string name="menu_share">Share</string>
+    <string name="menu_export_pdf">Export to PDF</string>
+    <string name="menu_export_epub">Export to ePub</string>
+    <string name="menu_doc_properties">Document Properties</string>
+    <string name="menu_remove_from_list">Remove from List</string>
+    <string name="error_file_not_found_title">File Not Found</string>
+    <string name="error_file_not_found_msg">The document has been moved, renamed, or deleted from its original location.</string>
+    <string name="unsaved_changes_title">Unsaved Changes</string>
+    <string name="unsaved_changes_msg">Do you want to save changes to %1$s before opening another document?</string>
+    <string name="save">Save</string>
+    <string name="dont_save">Don\'t Save</string>
+    <string name="doc_props_title">Document Properties</string>
+    <string name="doc_props_name">File Name</string>
+    <string name="doc_props_path">Location</string>
+    <string name="doc_props_size">Size</string>
+    <string name="doc_props_type">Document Type</string>
+    <string name="doc_props_modified">Last Modified</string>
+    <string name="gdrive_connect_title">Google Drive Sync</string>
+    <string name="gdrive_connect_desc">Connect your Google Workspace account to access and collaborate on your cloud-stored documents via OAuth2 authorization.</string>
+    <string name="gdrive_connect_btn">Sign in with Google Drive</string>
+
 </resources>

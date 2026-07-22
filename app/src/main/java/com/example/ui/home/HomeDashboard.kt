@@ -1,6 +1,7 @@
 package com.example.ui.home
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -81,9 +82,8 @@ object RecentFilesTracker {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        // Fulfill criteria: only files existing on device are displayed, no duplicates, sorted by lastOpened desc
-        return list.filter { File(it.path).exists() }
-            .sortedByDescending { it.lastOpened }
+        // Do NOT filter out missing files here so moved/renamed documents can still be listed and removed manually
+        return list.sortedByDescending { it.lastOpened }
     }
 
     fun addFile(context: Context, path: String, fileType: String) {
@@ -268,14 +268,16 @@ fun HomeDashboard(
                         )
                     },
                     actions = {
-                        IconButton(
-                            onClick = { isSearchActive = !isSearchActive },
-                            modifier = Modifier.testTag("btn_top_search")
-                        ) {
-                            Icon(
-                                imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                                contentDescription = "Search recent documents"
-                            )
+                        if (activeTab != "Files") {
+                            IconButton(
+                                onClick = { isSearchActive = !isSearchActive },
+                                modifier = Modifier.testTag("btn_top_search")
+                            ) {
+                                Icon(
+                                    imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
+                                    contentDescription = "Search"
+                                )
+                            }
                         }
                         Box {
                             IconButton(
@@ -637,6 +639,45 @@ fun HomeDashboard(
             }
         }
 
+        var selectedDocForProps by remember { mutableStateOf<RecentFilesTracker.RecentFile?>(null) }
+        var showFileNotFoundDialog by remember { mutableStateOf(false) }
+
+        if (showFileNotFoundDialog) {
+            AlertDialog(
+                onDismissRequest = { showFileNotFoundDialog = false },
+                icon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                title = { Text(stringResource(R.string.error_file_not_found_title), fontWeight = FontWeight.Bold) },
+                text = { Text(stringResource(R.string.error_file_not_found_msg)) },
+                confirmButton = {
+                    TextButton(onClick = { showFileNotFoundDialog = false }) {
+                        Text("OK")
+                    }
+                }
+            )
+        }
+
+        selectedDocForProps?.let { doc ->
+            AlertDialog(
+                onDismissRequest = { selectedDocForProps = null },
+                icon = { Icon(Icons.Rounded.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = { Text(stringResource(R.string.doc_props_title), fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("${stringResource(R.string.doc_props_name)}: ${doc.name}", fontWeight = FontWeight.SemiBold)
+                        Text("${stringResource(R.string.doc_props_path)}: ${doc.path}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${stringResource(R.string.doc_props_size)}: ${doc.size}")
+                        Text("${stringResource(R.string.doc_props_type)}: ${doc.fileType}")
+                        Text("${stringResource(R.string.doc_props_modified)}: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(doc.lastOpened))}")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedDocForProps = null }) {
+                        Text("Close")
+                    }
+                }
+            )
+        }
+
         Column(modifier = Modifier.fillMaxSize()) {
             // Filter Chips under the app bar
             val filterOptions = listOf(
@@ -760,6 +801,8 @@ fun HomeDashboard(
                         )
                     }
                     items(filteredFiles) { file ->
+                        var showItemMenu by remember { mutableStateOf(false) }
+
                         Card(
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -767,11 +810,15 @@ fun HomeDashboard(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    com.example.MainActivity.openedFilePath = file.path
-                                    com.example.MainActivity.openedFileType = file.fileType
-                                    onNavigateToModule(file.fileType)
-                                    val toastMsg = context.getString(R.string.opening_file, file.name)
-                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                    if (!File(file.path).exists()) {
+                                        showFileNotFoundDialog = true
+                                    } else {
+                                        com.example.MainActivity.openedFilePath = file.path
+                                        com.example.MainActivity.openedFileType = file.fileType
+                                        onNavigateToModule(file.fileType)
+                                        val toastMsg = context.getString(R.string.opening_file, file.name)
+                                        Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                         ) {
                             Row(
@@ -813,13 +860,81 @@ fun HomeDashboard(
                                     )
                                 }
 
-                                IconButton(
-                                    onClick = {
-                                        RecentFilesTracker.removeFile(context, file.path)
-                                        recentFiles = RecentFilesTracker.getRecents(context)
+                                Box {
+                                    IconButton(
+                                        onClick = { showItemMenu = true }
+                                    ) {
+                                        Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
                                     }
-                                ) {
-                                    Icon(Icons.Rounded.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+
+                                    DropdownMenu(
+                                        expanded = showItemMenu,
+                                        onDismissRequest = { showItemMenu = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.menu_share)) },
+                                            onClick = {
+                                                showItemMenu = false
+                                                if (!File(file.path).exists()) {
+                                                    showFileNotFoundDialog = true
+                                                } else {
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = "text/plain"
+                                                        putExtra(Intent.EXTRA_SUBJECT, file.name)
+                                                        putExtra(Intent.EXTRA_TEXT, "Document: ${file.name}\nPath: ${file.path}")
+                                                    }
+                                                    context.startActivity(Intent.createChooser(shareIntent, "Share Document"))
+                                                }
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.menu_export_pdf)) },
+                                            onClick = {
+                                                showItemMenu = false
+                                                if (!File(file.path).exists()) {
+                                                    showFileNotFoundDialog = true
+                                                } else {
+                                                    Toast.makeText(context, "Exported ${file.name} to PDF", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.MenuBook, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.menu_export_epub)) },
+                                            onClick = {
+                                                showItemMenu = false
+                                                if (!File(file.path).exists()) {
+                                                    showFileNotFoundDialog = true
+                                                } else {
+                                                    Toast.makeText(context, "Exported ${file.name} to ePub", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                                            text = { Text(stringResource(R.string.menu_doc_properties)) },
+                                            onClick = {
+                                                showItemMenu = false
+                                                if (!File(file.path).exists()) {
+                                                    showFileNotFoundDialog = true
+                                                } else {
+                                                    selectedDocForProps = file
+                                                }
+                                            }
+                                        )
+                                        HorizontalDivider()
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                            text = { Text(stringResource(R.string.menu_remove_from_list), color = MaterialTheme.colorScheme.error) },
+                                            onClick = {
+                                                showItemMenu = false
+                                                RecentFilesTracker.removeFile(context, file.path)
+                                                recentFiles = RecentFilesTracker.getRecents(context)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

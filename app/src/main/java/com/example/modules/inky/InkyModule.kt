@@ -4,7 +4,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.core.util.TemplateManager
+import com.example.ui.home.RecentFilesTracker
+import com.example.ui.home.ShortcutCard
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -290,6 +298,19 @@ fun InkyModule(
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
     var pendingActionAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
     var showCreateFromTemplateDialog by remember { mutableStateOf(false) }
+    var showOpenDocumentDialog by remember { mutableStateOf(false) }
+
+    val handleOpenDocument = {
+        val openAction = {
+            showOpenDocumentDialog = true
+        }
+        if (!isSaved) {
+            pendingActionAfterSave = openAction
+            showUnsavedChangesDialog = true
+        } else {
+            openAction()
+        }
+    }
 
     val handleLoadTemplate = { template: TemplateManager.TemplateItem ->
         val loadTemplate = {
@@ -684,6 +705,9 @@ fun InkyModule(
                             true
                         } else if (event.key == androidx.compose.ui.input.key.Key.N) {
                             handleNewDocument()
+                            true
+                        } else if (event.key == androidx.compose.ui.input.key.Key.O) {
+                            handleOpenDocument()
                             true
                         } else {
                             false
@@ -2254,6 +2278,7 @@ fun InkyModule(
                                             context = context,
                                             onNavigateToOptions = { showOptionsDialog = true },
                                             onNewDocument = handleNewDocument,
+                                            onOpenDocument = handleOpenDocument,
                                             onCloseDocument = handleClose
                                         )
                                     }
@@ -2388,11 +2413,11 @@ fun InkyModule(
         AlertDialog(
             onDismissRequest = { showUnsavedChangesDialog = false },
             title = {
-                Text("Unsaved Changes", style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.unsaved_changes_title), style = MaterialTheme.typography.headlineSmall)
             },
             text = {
                 Text(
-                    "You have unsaved changes in this document. Do you want to save them before continuing?",
+                    stringResource(R.string.unsaved_changes_msg, docTitle),
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -2404,7 +2429,7 @@ fun InkyModule(
                     pendingActionAfterSave?.invoke()
                     pendingActionAfterSave = null
                 }) {
-                    Text("Save", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -2413,8 +2438,31 @@ fun InkyModule(
                     pendingActionAfterSave?.invoke()
                     pendingActionAfterSave = null
                 }) {
-                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.dont_save), color = MaterialTheme.colorScheme.error)
                 }
+            }
+        )
+    }
+
+    if (showOpenDocumentDialog) {
+        OpenDocumentDialog(
+            context = context,
+            onDismissRequest = { showOpenDocumentDialog = false },
+            onFileSelected = { filePath, fileType ->
+                showOpenDocumentDialog = false
+                val file = java.io.File(filePath)
+                com.example.MainActivity.openedFilePath = filePath
+                com.example.MainActivity.openedFileType = fileType
+                docTitle = file.name
+                val loadedText = try {
+                    if (file.exists()) file.readText() else ""
+                } catch (e: Exception) {
+                    ""
+                }
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue(loadedText)
+                isSaved = true
+                RecentFilesTracker.addFile(context, filePath, fileType)
+                Toast.makeText(context, "Opened ${file.name}", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -2957,6 +3005,7 @@ private fun FileSubpage(
     context: android.content.Context,
     onNavigateToOptions: () -> Unit,
     onNewDocument: () -> Unit,
+    onOpenDocument: () -> Unit,
     onCloseDocument: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -2964,9 +3013,7 @@ private fun FileSubpage(
         FileMenuSectionHeader("File")
         FileMenuThreeColumnRow(
             item1 = Triple(Icons.Rounded.NoteAdd, "New", onNewDocument),
-            item2 = Triple(Icons.Rounded.FolderOpen, "Open") {
-                Toast.makeText(context, "Opening file picker...", Toast.LENGTH_SHORT).show()
-            },
+            item2 = Triple(Icons.Rounded.FolderOpen, "Open", onOpenDocument),
             item3 = Triple(Icons.Rounded.Close, "Close", onCloseDocument)
         )
         FileMenuListItem(
@@ -3170,6 +3217,313 @@ private fun FileMenuThreeColumnRow(
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// OPEN DOCUMENT DIALOG
+// ==========================================
+@Composable
+fun OpenDocumentDialog(
+    context: android.content.Context,
+    onDismissRequest: () -> Unit,
+    onFileSelected: (String, String) -> Unit
+) {
+    var activeTab by remember { mutableStateOf("Recents") }
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+    var selectedRecentFile by remember { mutableStateOf<RecentFilesTracker.RecentFile?>(null) }
+
+    val openDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            try {
+                var displayName = "document.odt"
+                context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1 && cursor.moveToFirst()) {
+                        displayName = cursor.getString(nameIndex)
+                    }
+                }
+                val lowerName = displayName.lowercase()
+                val fileType = when {
+                    lowerName.endsWith(".ods") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> "Cellina"
+                    lowerName.endsWith(".odp") || lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> "Slidia"
+                    lowerName.endsWith(".pdf") -> "Pagella"
+                    else -> "Inky"
+                }
+                val cacheFile = java.io.File(context.cacheDir, displayName)
+                context.contentResolver.openInputStream(it)?.use { input ->
+                    java.io.FileOutputStream(cacheFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                RecentFilesTracker.addFile(context, cacheFile.absolutePath, fileType)
+                onFileSelected(cacheFile.absolutePath, fileType)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error opening document: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                // Top Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    if (isSearchActive && activeTab != "Files") {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search document...") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    searchQuery = ""
+                                    isSearchActive = false
+                                }) {
+                                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.btn_close_search))
+                                }
+                            }
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.open_document_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (activeTab != "Files") {
+                            IconButton(onClick = { isSearchActive = true }) {
+                                Icon(Icons.Rounded.Search, contentDescription = "Search")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Navigation Tabs
+                TabRow(
+                    selectedTabIndex = when (activeTab) {
+                        "Recents" -> 0
+                        "Files" -> 1
+                        else -> 2
+                    }
+                ) {
+                    Tab(
+                        selected = activeTab == "Recents",
+                        onClick = { activeTab = "Recents" },
+                        text = { Text(stringResource(R.string.tab_recents)) },
+                        icon = { Icon(Icons.Rounded.History, contentDescription = null) }
+                    )
+                    Tab(
+                        selected = activeTab == "Files",
+                        onClick = { activeTab = "Files" },
+                        text = { Text(stringResource(R.string.tab_files)) },
+                        icon = { Icon(Icons.Rounded.Folder, contentDescription = null) }
+                    )
+                    Tab(
+                        selected = activeTab == "Google Drive",
+                        onClick = { activeTab = "Google Drive" },
+                        text = { Text(stringResource(R.string.tab_google_drive)) },
+                        icon = { Icon(Icons.Rounded.Cloud, contentDescription = null) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Main Content Body
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when (activeTab) {
+                        "Recents" -> {
+                            val recents = remember(searchQuery) {
+                                val list = RecentFilesTracker.getRecents(context)
+                                if (searchQuery.isBlank()) list
+                                else list.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                            }
+                            if (recents.isEmpty()) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("No recent documents found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(recents) { file ->
+                                        val isSelected = selectedRecentFile?.path == file.path
+                                        Card(
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = CardDefaults.cardColors(
+                                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            ),
+                                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable { selectedRecentFile = file }
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Description,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(32.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(file.name, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                    Text(file.path, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "Files" -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                ShortcutCard(
+                                    title = "Browse Android Documents UI",
+                                    path = "System Storage Picker",
+                                    description = "Open ODF (ODT/OTT/ODS) & OOXML (DOCX) files via SAF",
+                                    icon = Icons.Rounded.FolderOpen
+                                ) {
+                                    openDocumentLauncher.launch(
+                                        arrayOf(
+                                            "application/vnd.oasis.opendocument.text",
+                                            "application/vnd.oasis.opendocument.spreadsheet",
+                                            "application/vnd.oasis.opendocument.presentation",
+                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                            "application/msword",
+                                            "*/*"
+                                        )
+                                    )
+                                }
+                                ShortcutCard(
+                                    title = "Internal Storage",
+                                    path = "/storage/emulated/0",
+                                    description = "Main storage directory",
+                                    icon = Icons.Rounded.Storage
+                                ) {
+                                    openDocumentLauncher.launch(arrayOf("*/*"))
+                                }
+                                ShortcutCard(
+                                    title = "Documents",
+                                    path = "/storage/emulated/0/Documents",
+                                    description = "Documents folder",
+                                    icon = Icons.Rounded.Article
+                                ) {
+                                    openDocumentLauncher.launch(arrayOf("*/*"))
+                                }
+                                ShortcutCard(
+                                    title = "Downloads",
+                                    path = "/storage/emulated/0/Downloads",
+                                    description = "Downloads folder",
+                                    icon = Icons.Rounded.Download
+                                ) {
+                                    openDocumentLauncher.launch(arrayOf("*/*"))
+                                }
+                            }
+                        }
+                        "Google Drive" -> {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Cloud,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(56.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    stringResource(R.string.gdrive_connect_title),
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    stringResource(R.string.gdrive_connect_desc),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = {
+                                        Toast.makeText(context, "Initiating Google OAuth2 sign-in...", Toast.LENGTH_SHORT).show()
+                                    }
+                                ) {
+                                    Icon(Icons.Rounded.CloudQueue, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(R.string.gdrive_connect_btn))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Footer Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissRequest) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Button(
+                        onClick = {
+                            if (activeTab == "Recents") {
+                                selectedRecentFile?.let { file ->
+                                    if (!java.io.File(file.path).exists()) {
+                                        Toast.makeText(context, context.getString(R.string.error_file_not_found_msg), Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        onFileSelected(file.path, file.fileType)
+                                    }
+                                }
+                            } else if (activeTab == "Files") {
+                                openDocumentLauncher.launch(arrayOf("*/*"))
+                            } else {
+                                Toast.makeText(context, "Please sign in to Google Drive", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        enabled = activeTab == "Files" || (activeTab == "Recents" && selectedRecentFile != null) || activeTab == "Google Drive"
+                    ) {
+                        Text(stringResource(R.string.btn_open))
+                    }
                 }
             }
         }
