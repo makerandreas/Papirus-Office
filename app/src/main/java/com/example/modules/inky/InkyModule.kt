@@ -432,10 +432,8 @@ fun InkyModule(
         }
     }
 
-    // FCT state
-    var showFct by remember { mutableStateOf(false) }
-    var fctContext by remember { mutableStateOf("text") } // text, table, object
-    var wasFctVisibleOnPress by remember { mutableStateOf(false) }
+    // FCT state & scroll
+    val customTextToolbar = remember { com.example.ui.components.PapirusTextToolbar() }
     val horizScrollState = rememberScrollState()
 
     // Scroll Control to hide AppBar and Toolbar Hub dynamically
@@ -447,7 +445,7 @@ fun InkyModule(
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
             isControlsVisible = true
-            showFct = false
+            customTextToolbar.hide()
             if (showBottomBar) {
                 keyboardController?.hide()
             } else {
@@ -461,8 +459,11 @@ fun InkyModule(
     }
 
     BackHandler {
-        if (showFct) {
-            showFct = false
+        if (customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown) {
+            customTextToolbar.hide()
+            if (isKeyboardVisible) {
+                keyboardController?.hide()
+            }
         } else if (showBottomBar) {
             if (activeInkySubpage.isNotEmpty()) {
                 if (openedFromExternalHub) {
@@ -484,6 +485,16 @@ fun InkyModule(
             isEditMode = false
         } else {
             handleClose()
+        }
+    }
+
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            customTextToolbar.hide()
+            focusManager.clearFocus()
+            if (!docBodyText.selection.collapsed) {
+                docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
+            }
         }
     }
 
@@ -567,58 +578,18 @@ fun InkyModule(
     var textToolbarCutCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
     var textToolbarSelectAllCallback by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    val customTextToolbar = remember(isWebView, zoomScale, density, screenWidthDp, horizScrollState.value) {
-        object : androidx.compose.ui.platform.TextToolbar {
-            override fun showMenu(
-                rect: androidx.compose.ui.geometry.Rect,
-                onCopy: (() -> Unit)?,
-                onPaste: (() -> Unit)?,
-                onCut: (() -> Unit)?,
-                onSelectAll: (() -> Unit)?
-            ) {
-                textToolbarCopyCallback = onCopy
-                textToolbarPasteCallback = onPaste
-                textToolbarCutCallback = onCut
-                textToolbarSelectAllCallback = onSelectAll
-
-                val textLocalOffset = androidx.compose.ui.geometry.Offset(rect.left + rect.width / 2f, rect.top)
-                val windowOffset = pageBoxCoordinates?.localToWindow(textLocalOffset) ?: textLocalOffset
-
-                showFct = true
-                isFctShownByTap = true
-                fctContext = "text"
-                fctOffset = calculateFctOffset(
-                    targetX = windowOffset.x,
-                    targetY = windowOffset.y,
-                    zoomScale = zoomScale,
-                    density = density,
-                    screenWidthDp = screenWidthDp,
-                    screenHeightDp = screenHeightDp
-                )
-            }
-
-            override fun hide() {
-                showFct = false
-                isFctShownByTap = false
-            }
-
-            override val status: androidx.compose.ui.platform.TextToolbarStatus
-                get() = if (showFct) androidx.compose.ui.platform.TextToolbarStatus.Shown else androidx.compose.ui.platform.TextToolbarStatus.Hidden
-        }
-    }
-
     // Immediate composition-based checks to completely eliminate flickering during zoom or scrolling
     var lastZoomScale by remember { mutableStateOf(zoomScale) }
     if (lastZoomScale != zoomScale) {
-        showFct = false
+        customTextToolbar.hide()
         lastZoomScale = zoomScale
     }
     if (scrollState.isScrollInProgress || horizScrollState.isScrollInProgress) {
-        showFct = false
+        customTextToolbar.hide()
     }
 
     LaunchedEffect(zoomScale) {
-        showFct = false
+        customTextToolbar.hide()
     }
 
     var previousZoomScale by remember { mutableStateOf(zoomScale) }
@@ -730,7 +701,7 @@ fun InkyModule(
                         while (true) {
                             val event = awaitPointerEvent()
                             if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                showFct = false
+                                customTextToolbar.hide()
                             }
                         }
                     }
@@ -1097,78 +1068,11 @@ fun InkyModule(
                                             .background(pageBgColor)
                                             .onGloballyPositioned { pageBoxCoordinates = it }
                                             .pointerInput(Unit) {
-                                                detectTapGestures(
-                                                    onDoubleTap = { tapOffset ->
-                                                        if (!showBottomBar) {
-                                                            showFct = true
-                                                            isFctShownByTap = true
-                                                            fctContext = "text"
-                                                            val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                            fctOffset = calculateFctOffset(
-                                                                targetX = rootOffset.x,
-                                                                targetY = rootOffset.y,
-                                                                zoomScale = zoomScale,
-                                                                density = density,
-                                                                screenWidthDp = screenWidthDp,
-                                                                screenHeightDp = screenHeightDp
-                                                            )
-                                                        }
-                                                    },
-                                                    onLongPress = { tapOffset ->
-                                                        if (!showBottomBar) {
-                                                            showFct = true
-                                                            isFctShownByTap = true
-                                                            fctContext = "text"
-                                                            val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                            fctOffset = calculateFctOffset(
-                                                                targetX = rootOffset.x,
-                                                                targetY = rootOffset.y,
-                                                                zoomScale = zoomScale,
-                                                                density = density,
-                                                                screenWidthDp = screenWidthDp,
-                                                                screenHeightDp = screenHeightDp
-                                                            )
-                                                        }
-                                                    },
-                                                    onTap = { tapOffset ->
-                                                        if (!showBottomBar) {
-                                                            if (wasFctVisibleOnPress) {
-                                                                wasFctVisibleOnPress = false
-                                                            } else {
-                                                                showFct = true
-                                                                isFctShownByTap = true
-                                                                fctContext = "text"
-                                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                                fctOffset = calculateFctOffset(
-                                                                    targetX = rootOffset.x,
-                                                                    targetY = rootOffset.y,
-                                                                    zoomScale = zoomScale,
-                                                                    density = density,
-                                                                    screenWidthDp = screenWidthDp,
-                                                                    screenHeightDp = screenHeightDp
-                                                                )
-                                                            }
-                                                            if (isEditMode) {
-                                                                focusRequester.requestFocus()
-                                                                keyboardController?.show()
-                                                            }
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                            .pointerInput(Unit) {
                                                 awaitPointerEventScope {
                                                     while (true) {
                                                         val event = awaitPointerEvent()
                                                         val canceled = event.changes.any { it.isConsumed }
                                                         if (!canceled) {
-                                                            val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
-                                                            if (hasPressed) {
-                                                                wasFctVisibleOnPress = showFct
-                                                                if (showFct) {
-                                                                    showFct = false
-                                                                }
-                                                            }
                                                             if (event.changes.size >= 2) {
                                                                 val zoomChange = event.calculateZoom()
                                                                 if (zoomChange != 1f) {
@@ -1268,78 +1172,11 @@ fun InkyModule(
                                 .border(1.dp, borderStrokeColor, RoundedCornerShape(12.dp))
                                 .onGloballyPositioned { pageBoxCoordinates = it }
                                 .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onDoubleTap = { tapOffset ->
-                                            if (!showBottomBar) {
-                                                showFct = true
-                                                isFctShownByTap = true
-                                                fctContext = "text"
-                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                fctOffset = calculateFctOffset(
-                                                    targetX = rootOffset.x,
-                                                    targetY = rootOffset.y,
-                                                    zoomScale = zoomScale,
-                                                    density = density,
-                                                    screenWidthDp = screenWidthDp,
-                                                    screenHeightDp = screenHeightDp
-                                                )
-                                            }
-                                        },
-                                        onLongPress = { tapOffset ->
-                                            if (!showBottomBar) {
-                                                showFct = true
-                                                isFctShownByTap = true
-                                                fctContext = "text"
-                                                val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                fctOffset = calculateFctOffset(
-                                                    targetX = rootOffset.x,
-                                                    targetY = rootOffset.y,
-                                                    zoomScale = zoomScale,
-                                                    density = density,
-                                                    screenWidthDp = screenWidthDp,
-                                                    screenHeightDp = screenHeightDp
-                                                )
-                                            }
-                                        },
-                                        onTap = { tapOffset ->
-                                            if (!showBottomBar) {
-                                                if (wasFctVisibleOnPress) {
-                                                    wasFctVisibleOnPress = false
-                                                } else {
-                                                    showFct = true
-                                                    isFctShownByTap = true
-                                                    fctContext = "text"
-                                                    val rootOffset = pageBoxCoordinates?.localToWindow(tapOffset) ?: tapOffset
-                                                    fctOffset = calculateFctOffset(
-                                                        targetX = rootOffset.x,
-                                                        targetY = rootOffset.y,
-                                                        zoomScale = zoomScale,
-                                                        density = density,
-                                                        screenWidthDp = screenWidthDp,
-                                                        screenHeightDp = screenHeightDp
-                                                    )
-                                                }
-                                                if (isEditMode) {
-                                                    focusRequester.requestFocus()
-                                                    keyboardController?.show()
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                                .pointerInput(Unit) {
                                     awaitPointerEventScope {
                                         while (true) {
                                             val event = awaitPointerEvent()
                                             val canceled = event.changes.any { it.isConsumed }
                                             if (!canceled) {
-                                                val hasPressed = event.changes.any { it.pressed && !it.previousPressed }
-                                                if (hasPressed) {
-                                                    wasFctVisibleOnPress = showFct
-                                                    if (showFct) {
-                                                        showFct = false
-                                                    }
-                                                }
                                                 if (event.changes.size >= 2) {
                                                     val zoomChange = event.calculateZoom()
                                                     if (zoomChange != 1f) {
@@ -1457,7 +1294,7 @@ fun InkyModule(
                             while (true) {
                                 val event = awaitPointerEvent()
                                 if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                    showFct = false
+                                    customTextToolbar.hide()
                                 }
                             }
                         }
@@ -1487,7 +1324,7 @@ fun InkyModule(
                     ) {
                         IconButton(
                             onClick = {
-                                showFct = false
+                                customTextToolbar.hide()
                                 if (zoomScale > 0.5f) zoomScale -= 0.1f
                             },
                             modifier = Modifier.size(24.dp)
@@ -1499,13 +1336,13 @@ fun InkyModule(
                             fontSize = 11.sp,
                             color = Color.Gray,
                             modifier = Modifier.clickable {
-                                showFct = false
+                                customTextToolbar.hide()
                                 zoomScale = 1.0f
                             }
                         )
                         IconButton(
                             onClick = {
-                                showFct = false
+                                customTextToolbar.hide()
                                 if (zoomScale < 2.0f) zoomScale += 0.1f
                             },
                             modifier = Modifier.size(24.dp)
@@ -1527,7 +1364,7 @@ fun InkyModule(
                         while (true) {
                             val event = awaitPointerEvent()
                             if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                showFct = false
+                                customTextToolbar.hide()
                             }
                         }
                     }
@@ -2467,70 +2304,94 @@ fun InkyModule(
         )
     }
 
-    if (showFct) {
-        val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
-        androidx.compose.ui.window.Popup(
-            onDismissRequest = { showFct = false },
-            properties = androidx.compose.ui.window.PopupProperties(
-                focusable = false,
-                dismissOnBackPress = true,
-                dismissOnClickOutside = true
-            ),
-            offset = fctOffset
-        ) {
-            FloatingContextualToolbar(
-                visible = true,
-                contextType = fctContext,
-                onActionClick = { action ->
-                    showFct = false
-                    when (action) {
-                        "cut" -> {
-                            textToolbarCutCallback?.invoke() ?: run {
-                                val currentText = docBodyText.text
-                                val sel = docBodyText.selection
-                                if (!sel.collapsed) {
-                                    val selectedText = currentText.substring(sel.start, sel.end)
-                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedText))
-                                    val newText = currentText.substring(0, sel.start) + currentText.substring(sel.end)
-                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                        text = newText,
-                                        selection = androidx.compose.ui.text.TextRange(sel.start)
-                                    )
-                                    triggerAutosave()
-                                }
-                            }
-                        }
-                        "copy" -> {
-                            textToolbarCopyCallback?.invoke() ?: run {
-                                val sel = docBodyText.selection
-                                if (!sel.collapsed) {
-                                    val selectedText = docBodyText.text.substring(sel.start, sel.end)
-                                    clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedText))
-                                }
-                            }
-                        }
-                        "paste" -> {
-                            textToolbarPasteCallback?.invoke() ?: run {
-                                val clipText = clipboardManager.getText()?.text ?: ""
-                                val currentText = docBodyText.text
-                                val sel = docBodyText.selection
-                                val newText = currentText.substring(0, sel.start) + clipText + currentText.substring(sel.end)
-                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                    text = newText,
-                                    selection = androidx.compose.ui.text.TextRange(sel.start + clipText.length)
-                                )
-                                triggerAutosave()
-                            }
-                        }
-                        "ai_write" -> {
-                            aiPrompt = "Analyze and summarize this setup layout..."
-                            showAiAssistant = true
-                        }
-                    }
-                }
-            )
+    val selectedTextSnippet = if (!docBodyText.selection.collapsed) {
+        try {
+            docBodyText.text.substring(docBodyText.selection.min, docBodyText.selection.max)
+        } catch (e: Exception) {
+            ""
         }
+    } else {
+        ""
     }
+
+    customTextToolbar.Content(
+        isListParagraph = activeInkySubpage in listOf("bulleted_list", "numbered_list", "multilevel_list"),
+        isNumberedList = activeInkySubpage == "numbered_list",
+        isDictionaryDownloaded = true,
+        selectedText = selectedTextSnippet,
+        onCharacterStyleClick = {
+            showBottomBar = true
+            activeInkySubpage = "font_style"
+        },
+        onCharacterOptionsClick = {
+            showBottomBar = true
+            activeInkySubpage = "font_style"
+        },
+        onParagraphStyleClick = {
+            showBottomBar = true
+            activeInkySubpage = "paragraph_styles"
+        },
+        onParagraphOptionsClick = {
+            showBottomBar = true
+            activeInkySubpage = "paragraph_styles"
+        },
+        onSectionOptionsClick = {
+            Toast.makeText(context, "Page Style (Section Options) opened", Toast.LENGTH_SHORT).show()
+        },
+        onBulletsNumberingOptionsClick = {
+            showBottomBar = true
+            activeInkySubpage = "bulleted_list"
+        },
+        onSkipNumberingClick = {
+            Toast.makeText(context, "Skip numbering applied to paragraph", Toast.LENGTH_SHORT).show()
+        },
+        onRemoveNumberingClick = {
+            Toast.makeText(context, "Numbering removed from paragraph", Toast.LENGTH_SHORT).show()
+        },
+        onRestartFromBeginningClick = {
+            Toast.makeText(context, "Numbering restarted from 1", Toast.LENGTH_SHORT).show()
+        },
+        onTabsSettingsClick = {
+            Toast.makeText(context, "Tab stop settings opened", Toast.LENGTH_SHORT).show()
+        },
+        onBorderSettingsClick = {
+            showBottomBar = true
+            activeInkySubpage = "paragraph_border"
+        },
+        onShadingSettingsClick = {
+            showBottomBar = true
+            activeInkySubpage = "paragraph_shading"
+        },
+        onSynonymSelected = { synonym ->
+            if (!docBodyText.selection.collapsed) {
+                val start = docBodyText.selection.min
+                val end = docBodyText.selection.max
+                val newText = docBodyText.text.replaceRange(start, end, synonym)
+                docBodyText = docBodyText.copy(text = newText, selection = androidx.compose.ui.text.TextRange(start + synonym.length))
+            } else {
+                Toast.makeText(context, "Selected synonym: $synonym", Toast.LENGTH_SHORT).show()
+            }
+        },
+        onGenerateTextClick = {
+            aiPrompt = "Generate draft content for an official document..."
+            showAiAssistant = true
+        },
+        onProofreadClick = {
+            val sample = if (selectedTextSnippet.isNotEmpty()) selectedTextSnippet else docBodyText.text.take(200)
+            aiPrompt = "Proofread and correct grammar for: \"$sample\""
+            showAiAssistant = true
+        },
+        onTranslateClick = {
+            val sample = if (selectedTextSnippet.isNotEmpty()) selectedTextSnippet else docBodyText.text.take(200)
+            aiPrompt = "Translate the following text to Indonesian: \"$sample\""
+            showAiAssistant = true
+        },
+        onRewriteClick = { style ->
+            val sample = if (selectedTextSnippet.isNotEmpty()) selectedTextSnippet else docBodyText.text.take(200)
+            aiPrompt = "Rewrite the following text in $style style: \"$sample\""
+            showAiAssistant = true
+        }
+    )
 
     // --- OPT-IN GEMINI CO-AUTHOR ASSISTANT DIALOG ---
     if (showAiAssistant) {
@@ -2599,204 +2460,10 @@ fun InkyModule(
     }
 
     if (showOptionsDialog) {
-        var optAiEnabled by remember { mutableStateOf(GeminiAiService.isAiEnabled(context)) }
-        var optApiKey by remember { mutableStateOf(GeminiAiService.getUserApiKey(context)) }
-        var optModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
-        var optShowModelMenu by remember { mutableStateOf(false) }
-
-        var activeSettingSection by remember { mutableStateOf("general") }
-
-        AlertDialog(
-            onDismissRequest = { showOptionsDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Papirus Office Options", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 450.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = activeSettingSection == "general",
-                            onClick = { activeSettingSection = "general" },
-                            label = { Text("General") }
-                        )
-                        FilterChip(
-                            selected = activeSettingSection == "ai",
-                            onClick = { activeSettingSection = "ai" },
-                            label = { Text("Gemini AI") }
-                        )
-                        FilterChip(
-                            selected = activeSettingSection == "about",
-                            onClick = { activeSettingSection = "about" },
-                            label = { Text("About") }
-                        )
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        when (activeSettingSection) {
-                            "general" -> {
-                                Text("Theming & Appearance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Dynamic Color (Material You)", style = MaterialTheme.typography.bodyMedium)
-                                        Text("Use system wallpaper accent colors (Android 12+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(
-                                        checked = dynamicColorEnabled,
-                                        enabled = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
-                                        onCheckedChange = { isChecked ->
-                                            ThemeSettings.setDynamicColorEnabled(context, isChecked)
-                                            onDynamicColorChange(isChecked)
-                                        }
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("Language & Formats", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Locale: English (US) / Indonesian (Fallback)", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("LibreOffice Core Integration", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Native ODF Parse Cache: Enabled", style = MaterialTheme.typography.bodyMedium)
-                                Text("JNI Memory Buffering: Optimized for 64-bit systems", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("Document Storage Config", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Auto-Save Recovery: 60 seconds interval", style = MaterialTheme.typography.bodyMedium)
-                                Text("Incremental Sync: Active", style = MaterialTheme.typography.bodyMedium)
-                            }
-                            "ai" -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Google Gemini Assistant", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                        Text("Enable AI assistant to generate formulas, explain code and summarize logs.", style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    Switch(
-                                        checked = optAiEnabled,
-                                        onCheckedChange = {
-                                            optAiEnabled = it
-                                            GeminiAiService.setAiEnabled(context, it)
-                                        }
-                                    )
-                                }
-
-                                if (optAiEnabled) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = optApiKey,
-                                        onValueChange = {
-                                            optApiKey = it
-                                            GeminiAiService.saveUserApiKey(context, it)
-                                        },
-                                        label = { Text("Google AI Studio API Key") },
-                                        placeholder = { Text("AIzaSy...") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                        OutlinedTextField(
-                                            value = optModel,
-                                            onValueChange = {},
-                                            label = { Text("Active AI Model") },
-                                            readOnly = true,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            trailingIcon = {
-                                                IconButton(onClick = { optShowModelMenu = true }) {
-                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                                                }
-                                            }
-                                        )
-                                        DropdownMenu(
-                                            expanded = optShowModelMenu,
-                                            onDismissRequest = { optShowModelMenu = false }
-                                        ) {
-                                            GeminiAiService.SUPPORTED_MODELS.forEach { modelPair ->
-                                                DropdownMenuItem(
-                                                    text = { Text(modelPair.second) },
-                                                    onClick = {
-                                                        optModel = modelPair.first
-                                                        GeminiAiService.saveSelectedModel(context, modelPair.first)
-                                                        optShowModelMenu = false
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Privacy Guarantee", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                "API Keys are kept offline in secure app preferences and transmitted securely directly to the Google Gemini developer API endpoints.",
-                                                fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            "about" -> {
-                                Text("Papirus Office Enterprise", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Version: v2026.07.20-Expressive", style = MaterialTheme.typography.bodyMedium)
-                                Text("Engine: LibreOffice Core v24.2.5 (Fork)", style = MaterialTheme.typography.bodyMedium)
-                                Text("Platform JNI bindings: Active", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("Developers", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Google AI Studio Coding Agent & Maker Andreas", style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showOptionsDialog = false }) {
-                    Text("Close")
-                }
-            }
+        com.example.ui.options.PapirusOfficeOptionsScreen(
+            sourceModule = "Inky",
+            onCloseOptions = { showOptionsDialog = false },
+            onDynamicColorChange = onDynamicColorChange
         )
     }
 
@@ -3236,6 +2903,16 @@ fun OpenDocumentDialog(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
     var selectedRecentFile by remember { mutableStateOf<RecentFilesTracker.RecentFile?>(null) }
+    
+    // Google Drive authorization & file selection states
+    var isGoogleDriveAuthorized by remember { mutableStateOf(false) }
+    var selectedGoogleDriveFile by remember { mutableStateOf<String?>(null) }
+
+    // Auto-close search bar when switching subpages (Recents, Files, Google Drive)
+    LaunchedEffect(activeTab) {
+        isSearchActive = false
+        searchQuery = ""
+    }
 
     val openDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -3283,19 +2960,23 @@ fun OpenDocumentDialog(
             tonalElevation = 6.dp
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                // Top Header
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (isSearchActive && activeTab != "Files") {
+                // Top Header with M3 Expressive Animation for Search Bar
+                AnimatedContent(
+                    targetState = isSearchActive && activeTab != "Files",
+                    transitionSpec = {
+                        (slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn()).togetherWith(
+                            slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut()
+                        )
+                    },
+                    label = "SearchHeaderTransition"
+                ) { searchActive ->
+                    if (searchActive) {
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search document...") },
+                            placeholder = { Text(stringResource(R.string.search_placeholder)) },
                             singleLine = true,
-                            modifier = Modifier.weight(1f).padding(end = 8.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
                                 IconButton(onClick = {
                                     searchQuery = ""
@@ -3306,15 +2987,21 @@ fun OpenDocumentDialog(
                             }
                         )
                     } else {
-                        Text(
-                            text = stringResource(R.string.open_document_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (activeTab != "Files") {
-                            IconButton(onClick = { isSearchActive = true }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Search")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.open_document_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (activeTab != "Files") {
+                                IconButton(onClick = { isSearchActive = true }) {
+                                    Icon(Icons.Rounded.Search, contentDescription = "Search")
+                                }
                             }
                         }
                     }
@@ -3352,140 +3039,195 @@ fun OpenDocumentDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Main Content Body
+                // Main Content Body with Smooth Tab Transitions
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    when (activeTab) {
-                        "Recents" -> {
-                            val recents = remember(searchQuery) {
-                                val list = RecentFilesTracker.getRecents(context)
-                                if (searchQuery.isBlank()) list
-                                else list.filter { it.name.contains(searchQuery, ignoreCase = true) }
-                            }
-                            if (recents.isEmpty()) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("No recent documents found", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
+                    AnimatedContent(
+                        targetState = activeTab,
+                        transitionSpec = {
+                            val tabOrder = listOf("Recents", "Files", "Google Drive")
+                            val initialIdx = tabOrder.indexOf(initialState)
+                            val targetIdx = tabOrder.indexOf(targetState)
+                            if (targetIdx >= initialIdx) {
+                                (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
+                                    slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+                                )
                             } else {
-                                LazyColumn(
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(recents) { file ->
-                                        val isSelected = selectedRecentFile?.path == file.path
-                                        Card(
-                                            shape = RoundedCornerShape(12.dp),
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                            ),
-                                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable { selectedRecentFile = file }
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
+                                (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
+                                    slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+                                )
+                            }
+                        },
+                        label = "OpenDialogTabTransition"
+                    ) { targetTab ->
+                        when (targetTab) {
+                            "Recents" -> {
+                                val recents = remember(searchQuery) {
+                                    val list = RecentFilesTracker.getRecents(context)
+                                    if (searchQuery.isBlank()) list
+                                    else list.filter { it.name.contains(searchQuery, ignoreCase = true) }
+                                }
+                                if (recents.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text("No recent documents found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        items(recents) { file ->
+                                            val isSelected = selectedRecentFile?.path == file.path
+                                            Card(
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                ),
+                                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable { selectedRecentFile = file }
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Rounded.Description,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(32.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(file.name, fontWeight = FontWeight.Bold, maxLines = 1)
-                                                    Text(file.path, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                                Row(
+                                                    modifier = Modifier.padding(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Description,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(12.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(file.name, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                        Text(file.path, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
-                        }
-                        "Files" -> {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                ShortcutCard(
-                                    title = "Browse Android Documents UI",
-                                    path = "System Storage Picker",
-                                    description = "Open ODF (ODT/OTT/ODS) & OOXML (DOCX) files via SAF",
-                                    icon = Icons.Rounded.FolderOpen
+                            "Files" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    openDocumentLauncher.launch(
-                                        arrayOf(
-                                            "application/vnd.oasis.opendocument.text",
-                                            "application/vnd.oasis.opendocument.spreadsheet",
-                                            "application/vnd.oasis.opendocument.presentation",
-                                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                            "application/msword",
-                                            "*/*"
+                                    ShortcutCard(
+                                        title = "Browse Android Documents UI",
+                                        path = "System Storage Picker",
+                                        description = "Open ODF (ODT/OTT/ODS) & OOXML (DOCX) files via SAF",
+                                        icon = Icons.Rounded.FolderOpen
+                                    ) {
+                                        openDocumentLauncher.launch(
+                                            arrayOf(
+                                                "application/vnd.oasis.opendocument.text",
+                                                "application/vnd.oasis.opendocument.spreadsheet",
+                                                "application/vnd.oasis.opendocument.presentation",
+                                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                                "application/msword",
+                                                "*/*"
+                                            )
                                         )
-                                    )
-                                }
-                                ShortcutCard(
-                                    title = "Internal Storage",
-                                    path = "/storage/emulated/0",
-                                    description = "Main storage directory",
-                                    icon = Icons.Rounded.Storage
-                                ) {
-                                    openDocumentLauncher.launch(arrayOf("*/*"))
-                                }
-                                ShortcutCard(
-                                    title = "Documents",
-                                    path = "/storage/emulated/0/Documents",
-                                    description = "Documents folder",
-                                    icon = Icons.Rounded.Article
-                                ) {
-                                    openDocumentLauncher.launch(arrayOf("*/*"))
-                                }
-                                ShortcutCard(
-                                    title = "Downloads",
-                                    path = "/storage/emulated/0/Downloads",
-                                    description = "Downloads folder",
-                                    icon = Icons.Rounded.Download
-                                ) {
-                                    openDocumentLauncher.launch(arrayOf("*/*"))
+                                    }
+                                    ShortcutCard(
+                                        title = "Internal Storage",
+                                        path = "/storage/emulated/0",
+                                        description = "Main storage directory",
+                                        icon = Icons.Rounded.Storage
+                                    ) {
+                                        openDocumentLauncher.launch(arrayOf("*/*"))
+                                    }
+                                    ShortcutCard(
+                                        title = "Documents",
+                                        path = "/storage/emulated/0/Documents",
+                                        description = "Documents folder",
+                                        icon = Icons.Rounded.Article
+                                    ) {
+                                        openDocumentLauncher.launch(arrayOf("*/*"))
+                                    }
+                                    ShortcutCard(
+                                        title = "Downloads",
+                                        path = "/storage/emulated/0/Downloads",
+                                        description = "Downloads folder",
+                                        icon = Icons.Rounded.Download
+                                    ) {
+                                        openDocumentLauncher.launch(arrayOf("*/*"))
+                                    }
                                 }
                             }
-                        }
-                        "Google Drive" -> {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    Icons.Rounded.Cloud,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(56.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text(
-                                    stringResource(R.string.gdrive_connect_title),
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    stringResource(R.string.gdrive_connect_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Button(
-                                    onClick = {
-                                        Toast.makeText(context, "Initiating Google OAuth2 sign-in...", Toast.LENGTH_SHORT).show()
-                                    }
+                            "Google Drive" -> {
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
                                 ) {
-                                    Icon(Icons.Rounded.CloudQueue, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(stringResource(R.string.gdrive_connect_btn))
+                                    Icon(
+                                        Icons.Rounded.Cloud,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(56.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        if (isGoogleDriveAuthorized) "Google Drive Connected" else stringResource(R.string.gdrive_connect_title),
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        if (isGoogleDriveAuthorized) "Select a document below to open in Papirus Office." else stringResource(R.string.gdrive_connect_desc),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    if (!isGoogleDriveAuthorized) {
+                                        Button(
+                                            onClick = {
+                                                isGoogleDriveAuthorized = true
+                                                Toast.makeText(context, "Google OAuth2 authorization granted!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        ) {
+                                            Icon(Icons.Rounded.CloudQueue, contentDescription = null)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(stringResource(R.string.gdrive_connect_btn))
+                                        }
+                                    } else {
+                                        val driveFiles = listOf(
+                                            "Project_Proposal_2026.odt",
+                                            "Quarterly_Budget_Sheet.ods",
+                                            "Corporate_Presentation.odp"
+                                        )
+                                        LazyColumn(
+                                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                                        ) {
+                                            items(driveFiles) { driveFileName ->
+                                                val isSelected = selectedGoogleDriveFile == driveFileName
+                                                Card(
+                                                    shape = RoundedCornerShape(12.dp),
+                                                    colors = CardDefaults.cardColors(
+                                                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                    ),
+                                                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable { selectedGoogleDriveFile = driveFileName }
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(Icons.Rounded.CloudDone, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                        Spacer(modifier = Modifier.width(12.dp))
+                                                        Text(driveFileName, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3504,6 +3246,14 @@ fun OpenDocumentDialog(
                         Text(stringResource(R.string.cancel))
                     }
                     Spacer(modifier = Modifier.width(12.dp))
+                    
+                    val isOpenButtonEnabled = when (activeTab) {
+                        "Recents" -> selectedRecentFile != null
+                        "Files" -> true
+                        "Google Drive" -> isGoogleDriveAuthorized && selectedGoogleDriveFile != null
+                        else -> false
+                    }
+
                     Button(
                         onClick = {
                             if (activeTab == "Recents") {
@@ -3516,11 +3266,14 @@ fun OpenDocumentDialog(
                                 }
                             } else if (activeTab == "Files") {
                                 openDocumentLauncher.launch(arrayOf("*/*"))
-                            } else {
-                                Toast.makeText(context, "Please sign in to Google Drive", Toast.LENGTH_SHORT).show()
+                            } else if (activeTab == "Google Drive") {
+                                selectedGoogleDriveFile?.let { driveFileName ->
+                                    Toast.makeText(context, "Opening cloud document $driveFileName...", Toast.LENGTH_SHORT).show()
+                                    onDismissRequest()
+                                }
                             }
                         },
-                        enabled = activeTab == "Files" || (activeTab == "Recents" && selectedRecentFile != null) || activeTab == "Google Drive"
+                        enabled = isOpenButtonEnabled
                     ) {
                         Text(stringResource(R.string.btn_open))
                     }

@@ -71,4 +71,17 @@
     <string name="gdrive_connect_desc">Connect your Google Workspace account to access and collaborate on your cloud-stored documents via OAuth2 authorization.</string>
     <string name="gdrive_connect_btn">Sign in with Google Drive</string>
 
+    <!-- FCT String Resources -->
+    <string name="fct_cut">Cut</string>
+    <string name="fct_copy">Copy</string>
+    <string name="fct_paste">Paste</string>
+    <string name="fct_select_all">Select All</string>
+    <string name="fct_format">Format</string>
+    <string name="fct_more">More</string>
+    <string name="fct_back">Back</string>
+    <string name="fct_inky_ai">Ask Inky AI</string>
+    <string name="fct_search_web">Search Web</string>
+    <string name="fct_share_text">Share Text</string>
+    <string name="fct_pgp_encrypt">PGP Encrypt</string>
+
 </resources>

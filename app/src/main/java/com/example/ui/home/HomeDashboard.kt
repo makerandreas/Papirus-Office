@@ -189,43 +189,6 @@ fun getFileTypeForFile(file: File): String? {
 }
 
 // ==========================================
-// MOCK DOCUMENT GENERATOR ON DEVICE
-// ==========================================
-fun createMockFilesOnDevice(context: Context) {
-    try {
-        val root = getMockStorageRoot(context)
-        val docs = File(root, "Documents")
-        val downloads = File(root, "Downloads")
-
-        if (!docs.exists()) docs.mkdirs()
-        if (!downloads.exists()) downloads.mkdirs()
-
-        val file1 = File(docs, "Laporan_Kinerja_Papirus.odt")
-        if (!file1.exists()) {
-            file1.writeText("=== PAPIRUS PERFORMANCE REPORT ===\nDate: 2026-07-20\n\nPapirus Office Writer Document.\nAll data is stored securely in local storage.")
-        }
-
-        val file2 = File(docs, "Rencana_Anggaran_2026.ods")
-        if (!file2.exists()) {
-            file2.writeText("=== RENCANA ANGGARAN 2026 ===\nItem, Jumlah, Harga, Total\nSewa Ruangan, 12, 500, 6000\nServer Host, 1, 1200, 1200\n\nTotal Pengeluaran: 7200 USD")
-        }
-
-        val file3 = File(downloads, "Presentasi_Fitur_Slidia.odp")
-        if (!file3.exists()) {
-            file3.writeText("=== PRESENTASI FITUR SLIDIA ===\nSlide 1: Memulai Presentasi Baru\nSlide 2: Konfigurasi Kecepatan Transisi\nSlide 3: Kompatibilitas ODP LibreOffice.")
-        }
-
-        val file4 = File(downloads, "Panduan_Pengguna_Papirus.pdf")
-        if (!file4.exists()) {
-            file4.writeText("=== PAPIRUS USER GUIDE ===\n1. Open the app and select the Files tab.\n2. Double tap a document to edit.\n3. Save changes in realtime.")
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
-
-// ==========================================
 // PAPIRUS OFFICE START SCREEN COMPOSABLE
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -254,11 +217,6 @@ fun HomeDashboard(
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showNewDocDialog by remember { mutableStateOf(false) }
     var showFabMenu by remember { mutableStateOf(false) }
-
-    // Seed mock files on startup
-    LaunchedEffect(Unit) {
-        createMockFilesOnDevice(context)
-    }
 
     Scaffold(
         topBar = {
@@ -424,203 +382,13 @@ fun HomeDashboard(
     }
 
     // ==========================================
-    // OPTIONS & SETTINGS DIALOG (LibreOffice equivalent)
+    // PAPIRUS OFFICE OPTIONS SCREEN
     // ==========================================
     if (showOptionsDialog) {
-        var optAiEnabled by remember { mutableStateOf(GeminiAiService.isAiEnabled(context)) }
-        var optApiKey by remember { mutableStateOf(GeminiAiService.getUserApiKey(context)) }
-        var optModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
-        var optShowModelMenu by remember { mutableStateOf(false) }
-
-        var activeSettingSection by remember { mutableStateOf("general") } // general, ai, about
-
-        AlertDialog(
-            onDismissRequest = { showOptionsDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text("Papirus Office Options", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 450.dp)
-                ) {
-                    // Category Selection Chips
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilterChip(
-                            selected = activeSettingSection == "general",
-                            onClick = { activeSettingSection = "general" },
-                            label = { Text("General") }
-                        )
-                        FilterChip(
-                            selected = activeSettingSection == "ai",
-                            onClick = { activeSettingSection = "ai" },
-                            label = { Text("Gemini AI") }
-                        )
-                        FilterChip(
-                            selected = activeSettingSection == "about",
-                            onClick = { activeSettingSection = "about" },
-                            label = { Text("About") }
-                        )
-                    }
-
-                    HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        when (activeSettingSection) {
-                            "general" -> {
-                                Text("Theming & Appearance", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Dynamic Color (Material You)", style = MaterialTheme.typography.bodyMedium)
-                                        Text("Use system wallpaper accent colors (Android 12+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(
-                                        checked = dynamicColorEnabled,
-                                        enabled = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S,
-                                        onCheckedChange = { isChecked ->
-                                            ThemeSettings.setDynamicColorEnabled(context, isChecked)
-                                            onDynamicColorChange(isChecked)
-                                        }
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("Language & Formats", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Locale: English (US) / Indonesian (Fallback)", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("LibreOffice Core Integration", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Native ODF Parse Cache: Enabled", style = MaterialTheme.typography.bodyMedium)
-                                Text("JNI Memory Buffering: Optimized for 64-bit systems", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Text("Document Storage Config", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Auto-Save Recovery: 60 seconds interval", style = MaterialTheme.typography.bodyMedium)
-                                Text("Incremental Sync: Active", style = MaterialTheme.typography.bodyMedium)
-                            }
-                            "ai" -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text("Google Gemini Assistant", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                        Text("Enable AI assistant to generate formulas, explain code and summarize logs.", style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    Switch(
-                                        checked = optAiEnabled,
-                                        onCheckedChange = {
-                                            optAiEnabled = it
-                                            GeminiAiService.setAiEnabled(context, it)
-                                        }
-                                    )
-                                }
-
-                                if (optAiEnabled) {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = optApiKey,
-                                        onValueChange = {
-                                            optApiKey = it
-                                            GeminiAiService.saveUserApiKey(context, it)
-                                        },
-                                        label = { Text("Google AI Studio API Key") },
-                                        placeholder = { Text("AIzaSy...") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                        OutlinedTextField(
-                                            value = optModel,
-                                            onValueChange = {},
-                                            label = { Text("Active AI Model") },
-                                            readOnly = true,
-                                            modifier = Modifier.fillMaxWidth(),
-                                            trailingIcon = {
-                                                IconButton(onClick = { optShowModelMenu = true }) {
-                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                                                }
-                                            }
-                                        )
-                                        DropdownMenu(
-                                            expanded = optShowModelMenu,
-                                            onDismissRequest = { optShowModelMenu = false }
-                                        ) {
-                                            GeminiAiService.SUPPORTED_MODELS.forEach { modelPair ->
-                                                DropdownMenuItem(
-                                                    text = { Text(modelPair.second) },
-                                                    onClick = {
-                                                        optModel = modelPair.first
-                                                        GeminiAiService.saveSelectedModel(context, modelPair.first)
-                                                        optShowModelMenu = false
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                    ) {
-                                        Column(modifier = Modifier.padding(12.dp)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Rounded.Shield, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Privacy Guarantee", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                            }
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            Text(
-                                                "Credentials are encrypted on-device. Your files are processed entirely in memory with Zero Data Retention.",
-                                                fontSize = 11.sp,
-                                                lineHeight = 15.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            "about" -> {
-                                Text("Papirus Office Mobile Suite", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                Text("Version: 1.2.4-NIGHTLY", style = MaterialTheme.typography.bodyMedium)
-                                Text("Package: com.makerandreas.papirusoffice", style = MaterialTheme.typography.bodyMedium)
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Text("Built on LibreOffice ODF core compatibility library. Optimized for dynamic Android screen classes.", style = MaterialTheme.typography.bodySmall)
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showOptionsDialog = false }) {
-                    Text("Close")
-                }
-            }
+        com.example.ui.options.PapirusOfficeOptionsScreen(
+            sourceModule = "general",
+            onCloseOptions = { showOptionsDialog = false },
+            onDynamicColorChange = onDynamicColorChange
         )
     }
 }
