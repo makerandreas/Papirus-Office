@@ -17,9 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.R
 
 @Composable
 fun LoadSaveGeneralSubpage(
@@ -79,117 +81,187 @@ fun LoadSaveGeneralSubpage(
         when (currentSubSubpage) {
             "auto_recovery" -> {
                 // SUB-SUBPAGE: Save Auto Recovery Options
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    // Item 1: Save every
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                tempIntervalText = autoRecoveryInterval.toString()
-                                showIntervalDialog = true
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Top Expressive Card Container for the primary option
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "Save every",
+                                text = stringResource(R.string.save_auto_recovery_title),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = "$autoRecoveryInterval minutes",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            Switch(
+                                checked = autoRecoveryEnabled,
+                                onCheckedChange = {
+                                    autoRecoveryEnabled = it
+                                    prefs.edit().putBoolean("auto_recovery_enabled", it).apply()
+                                },
+                                modifier = Modifier.testTag("switch_top_auto_recovery")
                             )
                         }
                     }
 
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Item 2: Automatically Save the Document too
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
-                        Text(
-                            text = "Automatically Save the Document too",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
+                        // Item 1: Save every
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    tempIntervalText = autoRecoveryInterval.toString()
+                                    showIntervalDialog = true
+                                }
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.save_every),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = stringResource(R.string.save_every_minutes, autoRecoveryInterval),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
-                        Switch(
-                            checked = autoSaveDocumentToo,
-                            onCheckedChange = {
-                                autoSaveDocumentToo = it
-                                prefs.edit().putBoolean("auto_save_document_too", it).apply()
-                            },
-                            modifier = Modifier.testTag("switch_auto_save_doc")
-                        )
+
+                        // Item 2: Automatically Save the Document too
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.auto_save_doc_too),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = autoSaveDocumentToo,
+                                onCheckedChange = {
+                                    autoSaveDocumentToo = it
+                                    prefs.edit().putBoolean("auto_save_document_too", it).apply()
+                                },
+                                modifier = Modifier.testTag("switch_auto_save_doc")
+                            )
+                        }
                     }
                 }
             }
 
             "backup_copies" -> {
                 // SUB-SUBPAGE: Always Create a Backup Copy
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    Row(
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Top Expressive Card Container for the primary option
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.always_create_backup_copy),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = alwaysCreateBackupCopy,
+                                onCheckedChange = {
+                                    alwaysCreateBackupCopy = it
+                                    prefs.edit().putBoolean("always_create_backup_copy", it).apply()
+                                },
+                                modifier = Modifier.testTag("switch_top_backup_copy")
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
-                        Text(
-                            text = "Place Backup in Same Folder as Document",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = placeBackupInSameFolder,
-                            onCheckedChange = {
-                                placeBackupInSameFolder = it
-                                prefs.edit().putBoolean("place_backup_in_same_folder", it).apply()
-                            },
-                            modifier = Modifier.testTag("switch_place_backup_same_folder")
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = stringResource(R.string.place_backup_same_folder),
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = placeBackupInSameFolder,
+                                onCheckedChange = {
+                                    placeBackupInSameFolder = it
+                                    prefs.edit().putBoolean("place_backup_in_same_folder", it).apply()
+                                },
+                                modifier = Modifier.testTag("switch_place_backup_same_folder")
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Default backup directory: /storage/emulated/0/Android/data/com.makerandreas.papirusoffice/files/backups/",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.default_backup_dir_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
             }
 
             else -> {
                 // MAIN SUBPAGE: General (Loading and saving documents)
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // GROUP 1: Load
-                    SubCategoryHeader(title = "Load")
+                    SubCategoryHeader(title = stringResource(R.string.load_group_title))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -198,7 +270,7 @@ fun LoadSaveGeneralSubpage(
                     ) {
                         // Load user-specific settings
                         SubSettingSwitchRow(
-                            title = "Load user-specific settings along with the document",
+                            title = stringResource(R.string.load_user_settings),
                             checked = loadUserSpecificSettings,
                             onCheckedChange = {
                                 loadUserSpecificSettings = it
@@ -214,7 +286,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Load printer settings
                         SubSettingSwitchRow(
-                            title = "Load printer settings along with the document",
+                            title = stringResource(R.string.load_printer_settings),
                             checked = loadPrinterSettings,
                             onCheckedChange = {
                                 loadPrinterSettings = it
@@ -227,7 +299,7 @@ fun LoadSaveGeneralSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // GROUP 2: Save
-                    SubCategoryHeader(title = "Save")
+                    SubCategoryHeader(title = stringResource(R.string.save_group_title))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -236,7 +308,7 @@ fun LoadSaveGeneralSubpage(
                     ) {
                         // Save Auto Recovery Options (Sub-subpage + Toggle Switch)
                         SubSettingComplexSubpageRow(
-                            title = "Save Auto Recovery Options",
+                            title = stringResource(R.string.save_auto_recovery_title),
                             switchChecked = autoRecoveryEnabled,
                             onSwitchChange = {
                                 autoRecoveryEnabled = it
@@ -253,7 +325,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Edit document properties before saving
                         SubSettingSwitchRow(
-                            title = "Edit Document Properties Before Saving",
+                            title = stringResource(R.string.edit_doc_props_before_saving),
                             checked = editDocPropertiesBeforeSaving,
                             onCheckedChange = {
                                 editDocPropertiesBeforeSaving = it
@@ -269,7 +341,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Always create backup copy (Sub-subpage + Toggle Switch)
                         SubSettingComplexSubpageRow(
-                            title = "Always Create a Backup Copy",
+                            title = stringResource(R.string.always_create_backup_copy),
                             switchChecked = alwaysCreateBackupCopy,
                             onSwitchChange = {
                                 alwaysCreateBackupCopy = it
@@ -286,7 +358,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Save URLs Relative to File System
                         SubSettingSwitchRow(
-                            title = "Save URLs Relative to the File System",
+                            title = stringResource(R.string.save_urls_relative_file_system),
                             checked = saveUrlsRelativeFileSystem,
                             onCheckedChange = {
                                 saveUrlsRelativeFileSystem = it
@@ -302,7 +374,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Save URLs Relative to Internet
                         SubSettingSwitchRow(
-                            title = "Save URLs Relative to the Internet",
+                            title = stringResource(R.string.save_urls_relative_internet),
                             checked = saveUrlsRelativeInternet,
                             onCheckedChange = {
                                 saveUrlsRelativeInternet = it
@@ -315,7 +387,7 @@ fun LoadSaveGeneralSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // GROUP 3: Default File Formats and ODF Settings
-                    SubCategoryHeader(title = "Default File Formats and ODF Settings")
+                    SubCategoryHeader(title = stringResource(R.string.default_file_formats_odf_group))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -325,7 +397,7 @@ fun LoadSaveGeneralSubpage(
                         // ODF Format Version
                         Box {
                             SubSettingDropdownRow(
-                                title = "ODF Format Version",
+                                title = stringResource(R.string.odf_format_version),
                                 valueSubtitle = odfFormatVersion,
                                 onClick = { showOdfVersionMenu = true }
                             )
@@ -358,10 +430,10 @@ fun LoadSaveGeneralSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
 
-                        // Always Save As (Simplified to 2 options)
+                        // Always Save As (Simplified to 2 options: OpenDocument or Microsoft Office)
                         Box {
                             SubSettingDropdownRow(
-                                title = "Always Save as",
+                                title = stringResource(R.string.always_save_as),
                                 valueSubtitle = alwaysSaveAs,
                                 onClick = { showAlwaysSaveAsMenu = true }
                             )
@@ -393,7 +465,7 @@ fun LoadSaveGeneralSubpage(
 
                         // Warn when not saving in ODF format
                         SubSettingSwitchRow(
-                            title = "Warn when not saving in ODF format",
+                            title = stringResource(R.string.warn_when_not_saving_odf),
                             checked = warnWhenNotSavingOdf,
                             onCheckedChange = {
                                 warnWhenNotSavingOdf = it
@@ -411,7 +483,7 @@ fun LoadSaveGeneralSubpage(
     if (showIntervalDialog) {
         AlertDialog(
             onDismissRequest = { showIntervalDialog = false },
-            title = { Text("Auto Recovery Interval") },
+            title = { Text(stringResource(R.string.save_auto_recovery_title)) },
             text = {
                 Column {
                     Text("Enter interval in minutes for auto recovery saving:", style = MaterialTheme.typography.bodyMedium)
@@ -437,12 +509,12 @@ fun LoadSaveGeneralSubpage(
                         Toast.makeText(context, "Auto Recovery set to every $validMinutes minutes", Toast.LENGTH_SHORT).show()
                     }
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.save))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showIntervalDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

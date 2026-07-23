@@ -71,6 +71,48 @@
     <string name="gdrive_connect_desc">Connect your Google Workspace account to access and collaborate on your cloud-stored documents via OAuth2 authorization.</string>
     <string name="gdrive_connect_btn">Sign in with Google Drive</string>
 
+    <!-- Options Screen & Groups -->
+    <string name="options_title">Papirus Office Options</string>
+    <string name="options_done">Done</string>
+    <string name="options_help">Help</string>
+    <string name="options_reset">Reset</string>
+    <string name="options_search_hint">Search settings...</string>
+
+    <string name="group_papirus_settings">Papirus Settings</string>
+    <string name="group_load_and_save">Load and Save</string>
+
+    <!-- Options Subpage Load and Save - General -->
+    <string name="load_group_title">Load</string>
+    <string name="load_user_settings">Load user-specific settings along with the document</string>
+    <string name="load_printer_settings">Load printer settings along with the document</string>
+
+    <string name="save_group_title">Save</string>
+    <string name="save_auto_recovery_title">Save Auto Recovery Options</string>
+    <string name="save_every">Save every</string>
+    <string name="save_every_minutes">%1$d minutes</string>
+    <string name="auto_save_doc_too">Automatically Save the Document too</string>
+    <string name="edit_doc_props_before_saving">Edit Document Properties Before Saving</string>
+    <string name="always_create_backup_copy">Always Create a Backup Copy</string>
+    <string name="place_backup_same_folder">Place Backup in Same Folder as Document</string>
+    <string name="default_backup_dir_note">Default backup directory: /storage/emulated/0/Android/data/com.makerandreas.papirusoffice/files/backups/</string>
+    <string name="save_urls_relative_file_system">Save URLs Relative to the File System</string>
+    <string name="save_urls_relative_internet">Save URLs Relative to the Internet</string>
+
+    <string name="default_file_formats_odf_group">Default File Formats and ODF Settings</string>
+    <string name="odf_format_version">ODF Format Version</string>
+    <string name="always_save_as">Always Save as</string>
+    <string name="warn_when_not_saving_odf">Warn when not saving in ODF format</string>
+
+    <!-- Help Dialog Strings -->
+    <string name="help_dialog_main_title">Papirus Office Options Help</string>
+    <string name="help_dialog_main_body">Configure system preferences, user data, load and save rules, locale settings, and module options for Papirus Office. Settings applied here are saved automatically across all document editors.</string>
+    <string name="help_dialog_load_save_title">Help: Load and Save - General</string>
+    <string name="help_dialog_load_save_body">Configure document loading preferences (user settings, printer configuration) and saving defaults (Auto Recovery, backup copies, relative URLs, and default ODF/OOXML file formats).</string>
+    <string name="help_dialog_auto_recovery_title">Help: Save Auto Recovery Options</string>
+    <string name="help_dialog_auto_recovery_body">Auto Recovery saves critical recovery information periodically to protect open documents against system or app crashes. You can set the interval in minutes and optionally allow Papirus Office to automatically save the document itself.</string>
+    <string name="help_dialog_backup_copy_title">Help: Always Create a Backup Copy</string>
+    <string name="help_dialog_backup_copy_body">Saves the previous version of a document as a BAK backup copy whenever you save. The backup is stored in the default backups directory or in the same folder as the document if enabled.</string>
+
     <!-- FCT String Resources -->
     <string name="fct_cut">Cut</string>
     <string name="fct_copy">Copy</string>

@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.sp
 import com.example.core.ai.GeminiAiService
 import com.example.ui.theme.ThemeSettings
 
+import androidx.compose.ui.res.stringResource
+import com.example.R
+
 data class OptionItem(
     val id: String,
     val title: String,
@@ -73,7 +76,7 @@ fun PapirusOfficeOptionsScreen(
     // Settings Groups Definition
     val generalGroup = OptionGroup(
         groupKey = "general_group",
-        title = "General",
+        title = stringResource(R.string.group_papirus_settings),
         items = listOf(
             OptionItem("user_data", "User data", "Personalize user information & author credits", Icons.Rounded.Person),
             OptionItem("general", "General", "Basic application preferences and startup settings", Icons.Rounded.Settings),
@@ -92,7 +95,7 @@ fun PapirusOfficeOptionsScreen(
 
     val loadingSavingGroup = OptionGroup(
         groupKey = "loading_saving_group",
-        title = "Loading and saving documents",
+        title = stringResource(R.string.group_load_and_save),
         items = listOf(
             OptionItem("load_save_general", "General", "Auto-save intervals, backup creation, and default ODF versions", Icons.Rounded.Save),
             OptionItem("microsoft_office", "Microsoft Office", "DOCX, XLSX, PPTX conversion and compatibility rules", Icons.Rounded.Description)
@@ -229,14 +232,11 @@ fun PapirusOfficeOptionsScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // 1. "Done" Button: SHOWN ONLY IN SUBPAGES (Wide, filled color)
+                        // When clicked, completes applying changes and closes entire options screen and subpages
                         if (activeSubpage != null) {
                             Button(
                                 onClick = {
-                                    if (activeSubSubpage != null) {
-                                        activeSubSubpage = null
-                                    } else {
-                                        activeSubpage = null
-                                    }
+                                    onCloseOptions()
                                 },
                                 shape = RoundedCornerShape(20.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -248,7 +248,7 @@ fun PapirusOfficeOptionsScreen(
                                     .height(36.dp)
                                     .testTag("btn_options_done")
                             ) {
-                                Text("Done", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(stringResource(R.string.options_done), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
 
@@ -270,7 +270,7 @@ fun PapirusOfficeOptionsScreen(
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Help") },
+                                    text = { Text(stringResource(R.string.options_help)) },
                                     leadingIcon = { Icon(Icons.Rounded.HelpOutline, contentDescription = null) },
                                     onClick = {
                                         showMoreMenu = false
@@ -278,7 +278,7 @@ fun PapirusOfficeOptionsScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Reset") },
+                                    text = { Text(stringResource(R.string.options_reset)) },
                                     leadingIcon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null) },
                                     onClick = {
                                         showMoreMenu = false
@@ -420,17 +420,42 @@ fun PapirusOfficeOptionsScreen(
         }
     }
 
-    // Help Dialog
+    // Contextual Help Dialog
     if (showHelpDialog) {
+        val (helpTitle, helpBody) = when {
+            activeSubpage?.id == "load_save_general" -> {
+                when (activeSubSubpage) {
+                    "auto_recovery" -> Pair(
+                        stringResource(R.string.help_dialog_auto_recovery_title),
+                        stringResource(R.string.help_dialog_auto_recovery_body)
+                    )
+                    "backup_copies" -> Pair(
+                        stringResource(R.string.help_dialog_backup_copy_title),
+                        stringResource(R.string.help_dialog_backup_copy_body)
+                    )
+                    else -> Pair(
+                        stringResource(R.string.help_dialog_load_save_title),
+                        stringResource(R.string.help_dialog_load_save_body)
+                    )
+                }
+            }
+            activeSubpage != null -> Pair(
+                "Help: ${activeSubpage!!.title}",
+                "Configurations changed in '${activeSubpage!!.title}' take effect immediately without requiring an application restart."
+            )
+            else -> Pair(
+                stringResource(R.string.help_dialog_main_title),
+                stringResource(R.string.help_dialog_main_body)
+            )
+        }
+
         AlertDialog(
             onDismissRequest = { showHelpDialog = false },
             icon = { Icon(Icons.Rounded.HelpOutline, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text(activeSubpage?.let { "Help: ${it.title}" } ?: "Papirus Office Options Help") },
+            title = { Text(helpTitle) },
             text = {
                 Text(
-                    text = activeSubpage?.let {
-                        "Configurations changed in '${it.title}' take effect immediately without requiring an application restart."
-                    } ?: "Configure system preferences, layout, dictionary languages, and application settings. Any changes made here are saved instantly.",
+                    text = helpBody,
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
