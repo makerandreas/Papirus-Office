@@ -415,19 +415,15 @@ fun CreateFromTemplateView(
     var downloadProgressMap by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
     var downloadedFilesMap by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
-    // Fetch templates whenever filter or network status changes
-    LaunchedEffect(selectedFilter, isOnline) {
-        if (isOnline) {
-            isLoading = true
-            try {
-                templates = TemplateManager.searchTemplates(context, selectedFilter)
-            } catch (e: Exception) {
-                Log.e("CreateFromTemplateView", "Error fetching templates", e)
-            } finally {
-                isLoading = false
-            }
-        } else {
-            templates = emptyList()
+    // Fetch templates whenever filter changes, with automatic offline fallback
+    LaunchedEffect(selectedFilter) {
+        isLoading = true
+        try {
+            templates = TemplateManager.searchTemplates(context, selectedFilter)
+        } catch (e: Exception) {
+            Log.e("CreateFromTemplateView", "Error fetching templates", e)
+        } finally {
+            isLoading = false
         }
     }
 
@@ -488,7 +484,7 @@ fun CreateFromTemplateView(
                     )
                 }
             }
-        } else if (!isOnline) {
+        } else if (!isOnline && templates.isEmpty()) {
             // Offline Empty State
             Box(
                 modifier = Modifier

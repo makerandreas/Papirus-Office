@@ -37,6 +37,8 @@ import android.os.Environment
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import android.content.Intent
+import com.example.ui.home.RecentFilesTracker
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -45,8 +47,58 @@ class MainActivity : ComponentActivity() {
         var newDocIndex: Int = 1
     }
 
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action
+        val dataUri = intent.data
+        if ((action == Intent.ACTION_VIEW || action == Intent.ACTION_SEND) && dataUri != null) {
+            try {
+                var displayName = "document.odt"
+                contentResolver.query(dataUri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex != -1 && cursor.moveToFirst()) {
+                        displayName = cursor.getString(nameIndex)
+                    }
+                }
+                
+                val lowerName = displayName.lowercase()
+                val fileType = when {
+                    lowerName.endsWith(".ods") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> "Cellina"
+                    lowerName.endsWith(".odp") || lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> "Slidia"
+                    lowerName.endsWith(".pdf") -> "Pagella"
+                    else -> "Inky"
+                }
+                
+                val cacheFile = java.io.File(cacheDir, displayName)
+                contentResolver.openInputStream(dataUri)?.use { input ->
+                    java.io.FileOutputStream(cacheFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                
+                openedFilePath = cacheFile.absolutePath
+                openedFileType = fileType
+                
+                // Track in recent files too
+                RecentFilesTracker.addFile(this, cacheFile.absolutePath, fileType)
+                
+                Toast.makeText(this, "Opening: $displayName", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this, "Failed to resolve file: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         
         // Setup uncaught exception handler to capture real crashes in crash.log
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -114,6 +166,14 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     // Master Workspace Navigation State
     // "welcome" (Onboarding), "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
     var currentWorkspace by remember { mutableStateOf("home") }
+
+    LaunchedEffect(MainActivity.openedFilePath, MainActivity.openedFileType) {
+        val path = MainActivity.openedFilePath
+        val type = MainActivity.openedFileType
+        if (path != null && type != null) {
+            currentWorkspace = type
+        }
+    }
 
     BackHandler(enabled = currentWorkspace != "home" && currentWorkspace != "welcome") {
         currentWorkspace = "home"

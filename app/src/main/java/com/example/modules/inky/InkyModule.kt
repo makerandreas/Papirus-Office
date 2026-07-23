@@ -198,6 +198,9 @@ fun InkyModule(
         if (filePath != null && com.example.MainActivity.openedFileType == "Inky") {
             val f = java.io.File(filePath)
             if (f.exists()) {
+                isNewDocument = false
+                isSaved = true
+                docTitle = f.name
                 isParsingDoc = true
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val parseResult = docxParser.parseDocument(f)
@@ -344,10 +347,28 @@ fun InkyModule(
                 saveFailed = true
                 showSaveFailedDialog = true
             } else {
+                val path = com.example.MainActivity.openedFilePath
+                var actualSuccess = true
+                if (path != null) {
+                    try {
+                        val file = java.io.File(path)
+                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                        actualSuccess = parser.saveDocument(file, docBodyText.text)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        actualSuccess = false
+                    }
+                }
+                
                 isSaving = false
-                isSaved = true
-                saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                if (actualSuccess) {
+                    isSaved = true
+                    saveFailed = false
+                    Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                } else {
+                    saveFailed = true
+                    showSaveFailedDialog = true
+                }
             }
         }
     }
@@ -360,15 +381,35 @@ fun InkyModule(
             saveFailed = false
             delay(1200)
             showSavingProgressPopup = false
-            isSaving = false
+            
             if (simulateError) {
+                isSaving = false
                 saveFailed = true
                 showSaveFailedDialog = true
             } else {
-                isSaved = true
-                saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
-                onSuccess?.invoke()
+                val path = com.example.MainActivity.openedFilePath
+                var actualSuccess = true
+                if (path != null) {
+                    try {
+                        val file = java.io.File(path)
+                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                        actualSuccess = parser.saveDocument(file, docBodyText.text)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        actualSuccess = false
+                    }
+                }
+                
+                isSaving = false
+                if (actualSuccess) {
+                    isSaved = true
+                    saveFailed = false
+                    Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                    onSuccess?.invoke()
+                } else {
+                    saveFailed = true
+                    showSaveFailedDialog = true
+                }
             }
         }
     }
@@ -377,46 +418,67 @@ fun InkyModule(
         contract = ActivityResultContracts.CreateDocument(currentSaveMimeType)
     ) { uri ->
         uri?.let {
-            try {
-                context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                    outputStream.write(docBodyText.text.toByteArray())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-            val prefs = context.getSharedPreferences("papirus_options", android.content.Context.MODE_PRIVATE)
-            if (prefs.getBoolean("always_create_backup_copy", false)) {
+            coroutineScope.launch {
+                var actualSuccess = true
                 try {
-                    val backupDir = context.getExternalFilesDir("backups") ?: java.io.File(context.filesDir, "backups")
-                    if (!backupDir.exists()) backupDir.mkdirs()
-                    val backupFile = java.io.File(backupDir, "${currentSaveDefaultFilename}.bak")
-                    backupFile.writeText(docBodyText.text)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-
-            var savedName = currentSaveDefaultFilename
-            try {
-                val cursor = context.contentResolver.query(it, null, null, null, null)
-                cursor?.use { c ->
-                    if (c.moveToFirst()) {
-                        val nameIndex = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex >= 0) {
-                            savedName = c.getString(nameIndex)
+                    val tempFile = java.io.File(context.cacheDir, "temp_uri_save.odt")
+                    if (tempFile.exists()) tempFile.delete()
+                    
+                    val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                    val success = parser.saveDocument(tempFile, docBodyText.text)
+                    if (success && tempFile.exists()) {
+                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                            tempFile.inputStream().copyTo(outputStream)
+                        }
+                        tempFile.delete()
+                    } else {
+                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                            outputStream.write(docBodyText.text.toByteArray())
                         }
                     }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    actualSuccess = false
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+                
+                if (actualSuccess) {
+                    val prefs = context.getSharedPreferences("papirus_options", android.content.Context.MODE_PRIVATE)
+                    if (prefs.getBoolean("always_create_backup_copy", false)) {
+                        try {
+                            val backupDir = context.getExternalFilesDir("backups") ?: java.io.File(context.filesDir, "backups")
+                            if (!backupDir.exists()) backupDir.mkdirs()
+                            val backupFile = java.io.File(backupDir, "${currentSaveDefaultFilename}.bak")
+                            backupFile.writeText(docBodyText.text)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
 
-            docTitle = savedName
-            isSaved = true
-            isNewDocument = false
-            Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
-            pendingActionAfterSave?.invoke()
-            pendingActionAfterSave = null
+                    var savedName = currentSaveDefaultFilename
+                    try {
+                        val cursor = context.contentResolver.query(it, null, null, null, null)
+                        cursor?.use { c ->
+                            if (c.moveToFirst()) {
+                                val nameIndex = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                if (nameIndex >= 0) {
+                                    savedName = c.getString(nameIndex)
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+
+                    docTitle = savedName
+                    isSaved = true
+                    isNewDocument = false
+                    Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
+                    pendingActionAfterSave?.invoke()
+                    pendingActionAfterSave = null
+                } else {
+                    Toast.makeText(context, "Error saving document to uri", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -668,7 +730,19 @@ fun InkyModule(
         isSaved = false
         coroutineScope.launch {
             delay(1500)
-            isSaved = true
+            val path = com.example.MainActivity.openedFilePath
+            if (path != null) {
+                try {
+                    val file = java.io.File(path)
+                    val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                    val success = parser.saveDocument(file, docBodyText.text)
+                    if (success) {
+                        isSaved = true
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
         }
     }
 

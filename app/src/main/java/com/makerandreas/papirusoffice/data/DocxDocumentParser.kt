@@ -166,7 +166,8 @@ class DocxDocumentParser(private val context: Context) {
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
-                            if (parser.name.contains("p", ignoreCase = true) || parser.name.contains("h", ignoreCase = true)) {
+                            val tagName = parser.name
+                            if (tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h") {
                                 inText = true
                                 currentPara.clear()
                             }
@@ -177,7 +178,8 @@ class DocxDocumentParser(private val context: Context) {
                             }
                         }
                         XmlPullParser.END_TAG -> {
-                            if (parser.name.contains("p", ignoreCase = true) || parser.name.contains("h", ignoreCase = true)) {
+                            val tagName = parser.name
+                            if (tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h") {
                                 inText = false
                                 if (currentPara.isNotEmpty()) {
                                     textBuilder.append(currentPara.toString()).append("\n\n")
@@ -194,5 +196,146 @@ class DocxDocumentParser(private val context: Context) {
 
         val resultStr = textBuilder.toString().trim()
         return@withContext DocxParseResult(if (resultStr.isBlank()) "Empty Document" else resultStr)
+    }
+
+    suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
+        val fileName = file.name.lowercase()
+        val isDocx = fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".xlsx") || fileName.endsWith(".pptx")
+        val isOdt = fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".odp")
+        
+        if (!isDocx && !isOdt) {
+            // Write raw text for plain text fallback
+            return@withContext try {
+                file.writeText(text)
+                true
+            } catch (e: Exception) {
+                e.printStackTrace()
+                false
+            }
+        }
+        
+        val tempFile = File(context.cacheDir, "temp_save_" + file.name)
+        val success = try {
+            val targetEntry = if (isDocx) "word/document.xml" else "content.xml"
+            
+            // Check if file is empty or doesn't exist yet (new document case)
+            if (!file.exists() || file.length() == 0L) {
+                // If it's a new document, we can write a basic ZIP structure with the target xml entry
+                java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
+                    val newEntry = java.util.zip.ZipEntry(targetEntry)
+                    zout.putNextEntry(newEntry)
+                    val updatedXmlBytes = if (isDocx) {
+                        generateDocxXml(text)
+                    } else {
+                        generateOdtXml(text)
+                    }
+                    zout.write(updatedXmlBytes)
+                    zout.closeEntry()
+                }
+            } else {
+                java.util.zip.ZipInputStream(file.inputStream()).use { zin ->
+                    java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
+                        var entry = zin.nextEntry
+                        var foundTarget = false
+                        while (entry != null) {
+                            val newEntry = java.util.zip.ZipEntry(entry.name)
+                            zout.putNextEntry(newEntry)
+                            
+                            if (entry.name == targetEntry) {
+                                foundTarget = true
+                                val updatedXmlBytes = if (isDocx) {
+                                    generateDocxXml(text)
+                                } else {
+                                    generateOdtXml(text)
+                                }
+                                zout.write(updatedXmlBytes)
+                            } else {
+                                zin.copyTo(zout)
+                            }
+                            
+                            zout.closeEntry()
+                            zin.closeEntry()
+                            entry = zin.nextEntry
+                        }
+                        
+                        if (!foundTarget) {
+                            val newEntry = java.util.zip.ZipEntry(targetEntry)
+                            zout.putNextEntry(newEntry)
+                            val updatedXmlBytes = if (isDocx) generateDocxXml(text) else generateOdtXml(text)
+                            zout.write(updatedXmlBytes)
+                            zout.closeEntry()
+                        }
+                    }
+                }
+            }
+            
+            // Copy tempFile back to file
+            tempFile.copyTo(file, overwrite = true)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            if (tempFile.exists()) {
+                tempFile.delete()
+            }
+        }
+        return@withContext success
+    }
+
+    private fun generateDocxXml(text: String): ByteArray {
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        sb.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n")
+        sb.append("  <w:body>\n")
+        
+        val paragraphs = text.split("\n")
+        for (p in paragraphs) {
+            val escapedText = escapeXml(p)
+            sb.append("    <w:p>\n")
+            sb.append("      <w:r>\n")
+            sb.append("        <w:t>$escapedText</w:t>\n")
+            sb.append("      </w:r>\n")
+            sb.append("    </w:p>\n")
+        }
+        
+        sb.append("    <w:sectPr>\n")
+        sb.append("      <w:pgSz w:w=\"12240\" w:h=\"15840\"/>\n")
+        sb.append("      <w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n")
+        sb.append("    </w:sectPr>\n")
+        sb.append("  </w:body>\n")
+        sb.append("</w:document>")
+        return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun generateOdtXml(text: String): ByteArray {
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        sb.append("<office:document-content ")
+        sb.append("xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ")
+        sb.append("xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\" ")
+        sb.append("xmlns:style=\"urn:oasis:names:tc:opendocument:xmlns:style:1.0\" ")
+        sb.append("office:version=\"1.2\">\n")
+        sb.append("  <office:body>\n")
+        sb.append("    <office:text>\n")
+        
+        val paragraphs = text.split("\n")
+        for (p in paragraphs) {
+            val escapedText = escapeXml(p)
+            sb.append("      <text:p>$escapedText</text:p>\n")
+        }
+        
+        sb.append("    </office:text>\n")
+        sb.append("  </office:body>\n")
+        sb.append("</office:document-content>")
+        return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun escapeXml(text: String): String {
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;")
+                   .replace("'", "&apos;")
     }
 }
