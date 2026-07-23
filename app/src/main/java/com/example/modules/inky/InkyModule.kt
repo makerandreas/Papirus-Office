@@ -181,20 +181,35 @@ fun InkyModule(
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
+
+    val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
+    var docxImages by remember { mutableStateOf<Map<String, java.io.File>>(emptyMap()) }
+    var docxExtents by remember { mutableStateOf<Map<String, Pair<Long, Long>>>(emptyMap()) }
+    var isParsingDoc by remember { mutableStateOf(false) }
+
     var docBodyText by remember {
-        val initialText = if (com.example.MainActivity.openedFilePath != null && com.example.MainActivity.openedFileType == "Inky") {
-            try {
-                val f = java.io.File(com.example.MainActivity.openedFilePath!!)
-                if (f.exists()) f.readText() else ""
-            } catch(e: Exception) {
-                ""
-            }
-        } else {
-            ""
-        }
         mutableStateOf(
-            androidx.compose.ui.text.input.TextFieldValue(initialText)
+            androidx.compose.ui.text.input.TextFieldValue("")
         )
+    }
+
+    LaunchedEffect(com.example.MainActivity.openedFilePath) {
+        val filePath = com.example.MainActivity.openedFilePath
+        if (filePath != null && com.example.MainActivity.openedFileType == "Inky") {
+            val f = java.io.File(filePath)
+            if (f.exists()) {
+                isParsingDoc = true
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val parseResult = docxParser.parseDocument(f)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                        docxImages = parseResult.extractedImages
+                        docxExtents = parseResult.imageExtents
+                        isParsingDoc = false
+                    }
+                }
+            }
+        }
     }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
     var wasKeyboardOpenBeforeBottomSheet by remember { mutableStateOf(false) }
@@ -1279,45 +1294,73 @@ fun InkyModule(
                                                 }
                                             }
                                     ) {
-                                        Box(
+                                        Column(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .padding(24.dp)
                                         ) {
-                                            androidx.compose.foundation.text.BasicTextField(
-                                                value = docBodyText,
-                                                onValueChange = {
-                                                    docBodyText = it
-                                                    isSaved = false
-                                                    triggerAutosave()
-                                                    addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
-                                                    addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
-                                                },
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                                    .focusRequester(focusRequester),
-                                                onTextLayout = { bodyTextLayoutResult = it },
-                                                readOnly = !isEditMode,
-                                                textStyle = androidx.compose.ui.text.TextStyle(
-                                                    fontSize = activeFontSize.sp,
-                                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                    textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                    fontFamily = when (activeFontFamily) {
-                                                        "Aptos Display" -> FontFamily.SansSerif
-                                                        "Calibri" -> FontFamily.SansSerif
-                                                        "Arial" -> FontFamily.SansSerif
-                                                        "Roboto" -> FontFamily.SansSerif
-                                                        else -> FontFamily.Default
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                androidx.compose.foundation.text.BasicTextField(
+                                                    value = docBodyText,
+                                                    onValueChange = {
+                                                        docBodyText = it
+                                                        isSaved = false
+                                                        triggerAutosave()
+                                                        addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
+                                                        addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
                                                     },
-                                                    color = textPrimaryColor,
-                                                    textAlign = textAlignment
-                                                ),
-                                                decorationBox = { innerTextField ->
-                                                    innerTextField()
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .onGloballyPositioned { bodyTextFieldCoordinates = it }
+                                                        .focusRequester(focusRequester),
+                                                    onTextLayout = { bodyTextLayoutResult = it },
+                                                    readOnly = !isEditMode,
+                                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                                        fontSize = activeFontSize.sp,
+                                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                        textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                        fontFamily = when (activeFontFamily) {
+                                                            "Aptos Display" -> FontFamily.SansSerif
+                                                            "Calibri" -> FontFamily.SansSerif
+                                                            "Arial" -> FontFamily.SansSerif
+                                                            "Roboto" -> FontFamily.SansSerif
+                                                            else -> FontFamily.Default
+                                                        },
+                                                        color = textPrimaryColor,
+                                                        textAlign = textAlignment
+                                                    ),
+                                                    decorationBox = { innerTextField ->
+                                                        innerTextField()
+                                                    }
+                                                )
+                                            }
+                                            if (docxImages.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(16.dp))
+                                                Text(
+                                                    text = "--- EMBEDDED IMAGES ---",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = textAccentColor,
+                                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                docxImages.forEach { (imageName, imageFile) ->
+                                                    val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(vertical = 4.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        com.example.ui.components.DocxEmbeddedImage(
+                                                            imageFile = imageFile,
+                                                            extentCx = extent.first,
+                                                            extentCy = extent.second
+                                                        )
+                                                    }
                                                 }
-                                            )
+                                            }
                                         }
 
                                         // Subtle print page break divider lines
@@ -1399,7 +1442,7 @@ fun InkyModule(
                                     modifier = Modifier.padding(bottom = 8.dp)
                                 )
 
-                                Box(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
                                     androidx.compose.foundation.text.BasicTextField(
                                         value = docBodyText,
                                         onValueChange = {
@@ -1444,7 +1487,32 @@ fun InkyModule(
                                         }
                                     )
 
-
+                                    if (docxImages.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "--- EMBEDDED IMAGES ---",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textAccentColor,
+                                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        docxImages.forEach { (imageName, imageFile) ->
+                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                com.example.ui.components.DocxEmbeddedImage(
+                                                    imageFile = imageFile,
+                                                    extentCx = extent.first,
+                                                    extentCy = extent.second
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2490,15 +2558,19 @@ fun InkyModule(
                 com.example.MainActivity.openedFilePath = filePath
                 com.example.MainActivity.openedFileType = fileType
                 docTitle = file.name
-                val loadedText = try {
-                    if (file.exists()) file.readText() else ""
-                } catch (e: Exception) {
-                    ""
+                isParsingDoc = true
+                coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val parseResult = docxParser.parseDocument(file)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                        docxImages = parseResult.extractedImages
+                        docxExtents = parseResult.imageExtents
+                        isSaved = true
+                        isParsingDoc = false
+                        RecentFilesTracker.addFile(context, filePath, fileType)
+                        Toast.makeText(context, "Opened ${file.name}", Toast.LENGTH_SHORT).show()
+                    }
                 }
-                docBodyText = androidx.compose.ui.text.input.TextFieldValue(loadedText)
-                isSaved = true
-                RecentFilesTracker.addFile(context, filePath, fileType)
-                Toast.makeText(context, "Opened ${file.name}", Toast.LENGTH_SHORT).show()
             }
         )
     }
