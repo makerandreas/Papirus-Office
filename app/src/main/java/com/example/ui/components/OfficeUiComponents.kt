@@ -25,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.ui.res.stringResource
+import com.example.R
+
 // --- QAT (Quick Access Toolbar) ---
 @Composable
 fun QuickAccessToolbar(
@@ -803,3 +806,168 @@ private fun FctSeparator() {
             .background(Color.Gray.copy(alpha = 0.4f))
     )
 }
+
+// --- BARU: Full-page Loading Popup ---
+@Composable
+fun FullPageDocumentLoadingPopup(
+    moduleName: String = "Writer",
+    moduleColor: Color = Color(0xFF2563EB),
+    isCreating: Boolean = false,
+    docName: String = "Inky_Dokumen.odt",
+    progressStatus: String = stringResource(R.string.loading_status_odf),
+    onDismissRequest: () -> Unit = {}
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Area Atas: Teks Rata Tengah "Papirus [nama modul]"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = androidx.compose.ui.res.stringResource(com.example.R.string.loading_module_prefix),
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = moduleName,
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = moduleColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(48.dp))
+
+                    // Area Tengah: Loading Indicator khas Material 3 Expressive
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(96.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(72.dp),
+                            color = moduleColor,
+                            strokeWidth = 6.dp,
+                            trackColor = moduleColor.copy(alpha = 0.15f)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(48.dp))
+
+                    // Area Bawah: 2 baris teks rata tengah
+                    // Baris 1: "Opening [docName]..." atau "Creating document..."
+                    Text(
+                        text = if (isCreating) {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.loading_creating_doc)
+                        } else {
+                            androidx.compose.ui.res.stringResource(com.example.R.string.loading_opening_file, docName)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Baris 2: Status/progres pembuatan/pembukaan dokumen
+                    Text(
+                        text = progressStatus,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+// --- BARU: Popup Dialog "Saving..." ---
+@Composable
+fun SavingProgressPopupDialog(
+    docName: String = "Inky_Dokumen.odt",
+    moduleColor: Color = Color(0xFF2563EB),
+    statusText: String = stringResource(R.string.status_saving),
+    onDismissRequest: () -> Unit = {}
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .width(280.dp)
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Area Atas-Tengah: Loading indicator khas Material 3 Expressive
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = moduleColor,
+                        strokeWidth = 4.dp,
+                        trackColor = moduleColor.copy(alpha = 0.15f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Teks Progres Penyimpanan
+                Text(
+                    text = stringResource(R.string.saving_doc_progress, docName),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+

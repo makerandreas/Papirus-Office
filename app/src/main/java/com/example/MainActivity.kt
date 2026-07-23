@@ -168,8 +168,8 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Global Header TopBar
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
+            // Global Header TopBar (Excluded for document modules which manage their own topbar/status bar)
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -237,7 +237,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Expanded Tablet Ribbon bar docking area
-            if (isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "welcome") {
+            if (isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "welcome") {
                 RibbonFullView(
                     selectedCategory = selectedRibbonCategory,
                     onCategoryChange = { selectedRibbonCategory = it },
@@ -309,26 +309,29 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                             isTablet = isTablet,
                             onFormulaSelected = { formula ->
                                 Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            onBack = { currentWorkspace = "home" }
                         )
                         "Slidia" -> SlidiaModule(
                             isTablet = isTablet,
                             onTransitionSelected = { trans ->
                                 Toast.makeText(context, trans, Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            onBack = { currentWorkspace = "home" }
                         )
                         "Pagella" -> PagellaModule(
                             isTablet = isTablet,
                             onPdfAction = { action ->
                                 Toast.makeText(context, action, Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            onBack = { currentWorkspace = "home" }
                         )
                     }
                 }
             }
 
             // Mobile dropdown ribbon sheet
-            if (!isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "welcome") {
+            if (!isTablet && ribbonVisible && currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "welcome") {
                 SimplifiedRibbonBar(
                     selectedCategory = selectedRibbonCategory,
                     onCategoryChange = { selectedRibbonCategory = it },
@@ -341,7 +344,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
                 AdaptiveFormattingToolbar(
                     selectedObjectType = formattingObjectType,
                     onFormatClick = { formatAction ->

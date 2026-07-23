@@ -126,4 +126,41 @@
     <string name="fct_share_text">Share Text</string>
     <string name="fct_pgp_encrypt">PGP Encrypt</string>
 
+    <!-- Save Failure Popup Dialog -->
+    <string name="save_failed_title">Document Save Failed</string>
+    <string name="save_failed_msg">An error occurred while attempting to save "%1$s". Your latest changes could not be saved to disk.</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_return_editor">Return to Editor</string>
+    <string name="btn_exit_without_saving">Exit Without Saving</string>
+
+    <!-- Document Status Bar -->
+    <string name="status_saved">Saved</string>
+    <string name="status_unsaved">Unsaved changes</string>
+    <string name="status_saving">Saving...</string>
+    <string name="status_save_failed">Save failed</string>
+
+    <!-- Full-page Loading Popup & Saving Dialog -->
+    <string name="discard">Discard</string>
+    <string name="loading_module_prefix">Papirus </string>
+    <string name="loading_opening_file">Opening %1$s...</string>
+    <string name="loading_creating_doc">Creating document...</string>
+    <string name="loading_status_odf">Loading ODF document XML structure...</string>
+    <string name="loading_status_rendering">Rendering page layouts and typography canvas...</string>
+    <string name="loading_status_preparing">Preparing editor workspace...</string>
+    <string name="saving_doc_title">Saving Document</string>
+    <string name="saving_doc_progress">Saving %1$s to storage...</string>
+    <string name="save_as_title">Save as...</string>
+    <string name="save_as_opendocument">OpenDocument</string>
+    <string name="save_as_microsoft_office">Microsoft Office</string>
+    <string name="save_as_with_password">Save with Password</string>
+    <string name="save_as_encrypt_gpg">Encrypt with GPG</string>
+    <string name="save_as_auto_suffix">Automatically Add File Format Suffix</string>
+    <string name="warn_non_odf_title">Confirm File Format</string>
+    <string name="warn_non_odf_msg">This document may contain formatting or features that cannot be saved in the selected Microsoft Office format (%1$s). Do you want to save in this format anyway?</string>
+    <string name="btn_continue">Continue</string>
+    <string name="restart_required_title">Restart Required</string>
+    <string name="restart_required_msg">Changing auto-recovery or backup preferences requires restarting Papirus Office.</string>
+    <string name="restart_now">Restart Now</string>
+    <string name="restart_later">Restart Later</string>
+    <string name="doc_saved_success">Document saved successfully as %1$s</string>
 </resources>

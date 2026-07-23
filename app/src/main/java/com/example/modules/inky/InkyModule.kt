@@ -8,6 +8,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.ui.components.SaveAsDialog
 import com.example.core.util.TemplateManager
 import com.example.ui.home.RecentFilesTracker
 import com.example.ui.home.ShortcutCard
@@ -137,6 +138,12 @@ fun InkyModule(
     var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
+    var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null) }
+    var showSaveAsDialog by remember { mutableStateOf(false) }
+    var showRestartConfirmDialog by remember { mutableStateOf(false) }
+    var currentSaveMimeType by remember { mutableStateOf("application/vnd.oasis.opendocument.text") }
+    var currentSaveDefaultFilename by remember { mutableStateOf("Inky_Dokumen.odt") }
+
     var docTitle by remember {
         mutableStateOf(
             if (com.example.MainActivity.openedFilePath != null && com.example.MainActivity.openedFileType == "Inky") {
@@ -300,6 +307,135 @@ fun InkyModule(
     var showCreateFromTemplateDialog by remember { mutableStateOf(false) }
     var showOpenDocumentDialog by remember { mutableStateOf(false) }
 
+    // Save & Loading states
+    var isSaving by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    var showSaveFailedDialog by remember { mutableStateOf(false) }
+    var showSavingProgressPopup by remember { mutableStateOf(false) }
+    var savingProgressDocName by remember { mutableStateOf(docTitle) }
+
+    var isLoadingDocument by remember { mutableStateOf(false) }
+    var isCreatingDoc by remember { mutableStateOf(false) }
+    var loadingDocName by remember { mutableStateOf(docTitle) }
+    var loadingProgressStatus by remember { mutableStateOf("") }
+
+    val performSave = { simulateError: Boolean ->
+        coroutineScope.launch {
+            isSaving = true
+            saveFailed = false
+            delay(1000)
+            if (simulateError) {
+                isSaving = false
+                saveFailed = true
+                showSaveFailedDialog = true
+            } else {
+                isSaving = false
+                isSaved = true
+                saveFailed = false
+                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val performSaveWithPopup = { docName: String, simulateError: Boolean, onSuccess: (() -> Unit)? ->
+        coroutineScope.launch {
+            showSavingProgressPopup = true
+            savingProgressDocName = docName
+            isSaving = true
+            saveFailed = false
+            delay(1200)
+            showSavingProgressPopup = false
+            isSaving = false
+            if (simulateError) {
+                saveFailed = true
+                showSaveFailedDialog = true
+            } else {
+                isSaved = true
+                saveFailed = false
+                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                onSuccess?.invoke()
+            }
+        }
+    }
+
+    val saveDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument(currentSaveMimeType)
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                    outputStream.write(docBodyText.text.toByteArray())
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            val prefs = context.getSharedPreferences("papirus_options", android.content.Context.MODE_PRIVATE)
+            if (prefs.getBoolean("always_create_backup_copy", false)) {
+                try {
+                    val backupDir = context.getExternalFilesDir("backups") ?: java.io.File(context.filesDir, "backups")
+                    if (!backupDir.exists()) backupDir.mkdirs()
+                    val backupFile = java.io.File(backupDir, "${currentSaveDefaultFilename}.bak")
+                    backupFile.writeText(docBodyText.text)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            var savedName = currentSaveDefaultFilename
+            try {
+                val cursor = context.contentResolver.query(it, null, null, null, null)
+                cursor?.use { c ->
+                    if (c.moveToFirst()) {
+                        val nameIndex = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex >= 0) {
+                            savedName = c.getString(nameIndex)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            docTitle = savedName
+            isSaved = true
+            isNewDocument = false
+            Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
+            pendingActionAfterSave?.invoke()
+            pendingActionAfterSave = null
+        }
+    }
+
+    val handleSaveCommand: () -> Unit = {
+        if (isNewDocument) {
+            showSaveAsDialog = true
+        } else {
+            if (!isEditMode) {
+                performSaveWithPopup(docTitle, false) {
+                    pendingActionAfterSave?.invoke()
+                    pendingActionAfterSave = null
+                }
+            } else {
+                performSave(false)
+            }
+        }
+    }
+
+    val runDocumentLoading = { isCreating: Boolean, name: String, onFinished: () -> Unit ->
+        coroutineScope.launch {
+            isLoadingDocument = true
+            isCreatingDoc = isCreating
+            loadingDocName = name
+            loadingProgressStatus = context.getString(R.string.loading_status_odf)
+            delay(500)
+            loadingProgressStatus = context.getString(R.string.loading_status_rendering)
+            delay(500)
+            loadingProgressStatus = context.getString(R.string.loading_status_preparing)
+            delay(400)
+            isLoadingDocument = false
+            onFinished()
+        }
+    }
+
     val handleOpenDocument = {
         val openAction = {
             showOpenDocumentDialog = true
@@ -314,17 +450,11 @@ fun InkyModule(
 
     val handleLoadTemplate = { template: TemplateManager.TemplateItem ->
         val loadTemplate = {
-            coroutineScope.launch {
-                val filePath = com.example.MainActivity.openedFilePath
-                if (filePath != null) {
-                    val file = java.io.File(filePath)
-                    docTitle = file.name
-                } else {
-                    docTitle = "${template.name.replace(" ", "_")}.odt"
-                }
-                
-                val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
-                
+            val name = "${template.name.replace(" ", "_")}.odt"
+            val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
+            
+            runDocumentLoading(true, name) {
+                docTitle = name
                 docBodyText = androidx.compose.ui.text.input.TextFieldValue(sampleTemplateContent)
                 isSaved = true
                 isEditMode = true
@@ -346,17 +476,19 @@ fun InkyModule(
             val idx = com.example.MainActivity.newDocIndex++
             val name = "Document$idx.odt"
             com.example.core.jni.LibreOfficeCore.createDocument(name)
-            docTitle = name
-            docBodyText = androidx.compose.ui.text.input.TextFieldValue("")
-            isSaved = true
-            isEditMode = true // Enter edit mode for a new document
-            // Reset states
-            activeFontFamily = "Aptos Display"
-            activeFontSize = 12
-            isBold = false
-            isItalic = false
-            isUnderline = false
-            showBottomBar = false
+            runDocumentLoading(true, name) {
+                docTitle = name
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue("")
+                isSaved = true
+                isEditMode = true
+                activeFontFamily = "Aptos Display"
+                activeFontSize = 12
+                isBold = false
+                isItalic = false
+                isUnderline = false
+                showBottomBar = false
+            }
+            Unit
         }
         if (!isSaved) {
             pendingActionAfterSave = createNew
@@ -707,24 +839,18 @@ fun InkyModule(
                     }
                 }
             ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                 if (!isEditMode) {
                     // --- VIEWER MODE APP BAR ---
                     TopAppBar(
                         title = {
-                            Column {
-                                Text(
-                                    text = docTitle,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "Read-Only • ODT Format",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray
-                                )
-                            }
+                            Text(
+                                text = docTitle,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         },
                         navigationIcon = {
                             IconButton(onClick = { handleClose() }) {
@@ -737,9 +863,6 @@ fun InkyModule(
                                 addLokitLog("Upload to Drive triggered")
                             }) {
                                 Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
-                            }
-                            IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Find in Document")
                             }
                             IconButton(onClick = { 
                                 isWebView = !isWebView
@@ -772,7 +895,7 @@ fun InkyModule(
                                         text = { Text("Save as...") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Saving copy...", Toast.LENGTH_SHORT).show()
+                                            showSaveAsDialog = true
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
@@ -783,6 +906,14 @@ fun InkyModule(
                                             isDarkDocument = !isDarkDocument
                                         },
                                         leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Simulate Save Error") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            performSave(true)
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Print") },
@@ -800,24 +931,9 @@ fun InkyModule(
                         )
                     )
                 } else {
-                    // --- EDIT MODE APP BAR ---
+                    // --- EDIT MODE APP BAR (Headline & Subtitle removed) ---
                     TopAppBar(
-                        title = {
-                            Column {
-                                Text(
-                                    text = docTitle,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = if (isSaved) "Saved on this device" else "Saving...",
-                                    fontSize = 11.sp,
-                                    color = if (isSaved) Color(0xFF10B981) else Color.LightGray
-                                )
-                            }
-                        },
+                        title = { /* Headline & Subtitle removed in Edit Mode as required */ },
                         navigationIcon = {
                             IconButton(onClick = { isEditMode = false }) {
                                 Icon(Icons.Default.Check, contentDescription = "Exit Edit Mode", tint = MaterialTheme.colorScheme.primary)
@@ -844,11 +960,9 @@ fun InkyModule(
                                 )
                             }
                             IconButton(onClick = { 
-                                triggerAutosave()
-                                Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                handleSaveCommand()
                             }) {
-                                Icon(Icons.Rounded.Undo, contentDescription = "Undo")
+                                Icon(Icons.Rounded.Save, contentDescription = "Save")
                             }
                             Box {
                                 IconButton(onClick = { showMoreMenu = true }) {
@@ -867,6 +981,22 @@ fun InkyModule(
                                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
                                     )
                                     DropdownMenuItem(
+                                        text = { Text("Save") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            handleSaveCommand()
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Simulate Save Error") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            performSave(true)
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    )
+                                    DropdownMenuItem(
                                         text = { Text("Export to PDF") },
                                         onClick = {
                                             showMoreMenu = false
@@ -874,23 +1004,6 @@ fun InkyModule(
                                             addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Save") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            triggerAutosave()
-                                            addLokitLog("lok::Document::saveAs(\"Inky_Dokumen.odt\", \"odt\")")
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Save as") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Saving copy...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
@@ -918,15 +1031,6 @@ fun InkyModule(
                                         leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Document Version History") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showBottomBar = true
-                                            bottomBarDeck = "version_history"
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.History, contentDescription = "History") }
-                                    )
-                                    DropdownMenuItem(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
@@ -941,7 +1045,92 @@ fun InkyModule(
                             containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
                         )
                     )
+
+                    // --- STATUS BAR BARU DI BAWAH APP BAR (Edit Mode Only) ---
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = docTitle,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (isSaving) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(12.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.status_saving),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else if (saveFailed) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.ErrorOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.status_save_failed),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                } else if (isSaved) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.status_saved),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF10B981)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Edit,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.status_unsaved),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.secondary
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
+            }
             }
 
             // --- FIND AND REPLACE OVERLAY BAR ---
@@ -1283,71 +1472,73 @@ fun InkyModule(
                 }
             }
 
-            // --- FOOTER STATS & STATUS BAR (Always visible in document workspaces) ---
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
-                shape = RoundedCornerShape(0.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                    customTextToolbar.hide()
+            // --- FOOTER STATS & STATUS BAR (Edit Mode Only as required) ---
+            if (isEditMode) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
+                    shape = RoundedCornerShape(0.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
+                                        customTextToolbar.hide()
+                                    }
                                 }
                             }
                         }
-                    }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Page $currentPage of $pageCount",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = "$wordCount words",
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(
-                            onClick = {
-                                customTextToolbar.hide()
-                                if (zoomScale > 0.5f) zoomScale -= 0.1f
-                            },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
-                        }
                         Text(
-                            text = "Zoom: ${(zoomScale * 100).toInt()}%",
+                            text = "Page $currentPage of $pageCount",
                             fontSize = 11.sp,
-                            color = Color.Gray,
-                            modifier = Modifier.clickable {
-                                customTextToolbar.hide()
-                                zoomScale = 1.0f
-                            }
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Gray
                         )
-                        IconButton(
-                            onClick = {
-                                customTextToolbar.hide()
-                                if (zoomScale < 2.0f) zoomScale += 0.1f
-                            },
-                            modifier = Modifier.size(24.dp)
+                        Text(
+                            text = "$wordCount words",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
+                            IconButton(
+                                onClick = {
+                                    customTextToolbar.hide()
+                                    if (zoomScale > 0.5f) zoomScale -= 0.1f
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
+                            }
+                            Text(
+                                text = "Zoom: ${(zoomScale * 100).toInt()}%",
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.clickable {
+                                    customTextToolbar.hide()
+                                    zoomScale = 1.0f
+                                }
+                            )
+                            IconButton(
+                                onClick = {
+                                    customTextToolbar.hide()
+                                    if (zoomScale < 2.0f) zoomScale += 0.1f
+                                },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
+                            }
                         }
                     }
                 }
@@ -2116,7 +2307,15 @@ fun InkyModule(
                                             onNavigateToOptions = { showOptionsDialog = true },
                                             onNewDocument = handleNewDocument,
                                             onOpenDocument = handleOpenDocument,
-                                            onCloseDocument = handleClose
+                                            onCloseDocument = handleClose,
+                                            onSaveDocument = {
+                                                showBottomBar = false
+                                                handleSaveCommand()
+                                            },
+                                            onSaveAsDocument = {
+                                                showBottomBar = false
+                                                showSaveAsDialog = true
+                                            }
                                         )
                                     }
                                 } else if (activeRibbonTab == "Home") {
@@ -2261,10 +2460,10 @@ fun InkyModule(
             confirmButton = {
                 TextButton(onClick = {
                     showUnsavedChangesDialog = false
-                    isSaved = true
-                    Toast.makeText(context, "Document saved.", Toast.LENGTH_SHORT).show()
-                    pendingActionAfterSave?.invoke()
-                    pendingActionAfterSave = null
+                    performSaveWithPopup(docTitle, false) {
+                        pendingActionAfterSave?.invoke()
+                        pendingActionAfterSave = null
+                    }
                 }) {
                     Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
                 }
@@ -2463,7 +2662,60 @@ fun InkyModule(
         com.example.ui.options.PapirusOfficeOptionsScreen(
             sourceModule = "Inky",
             onCloseOptions = { showOptionsDialog = false },
-            onDynamicColorChange = onDynamicColorChange
+            onDynamicColorChange = onDynamicColorChange,
+            onRestartRequested = {
+                if (!isSaved) {
+                    showRestartConfirmDialog = true
+                } else {
+                    onFormatAction("Back to start center")
+                }
+            }
+        )
+    }
+
+    if (showRestartConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestartConfirmDialog = false },
+            title = { Text(stringResource(R.string.unsaved_changes_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.unsaved_changes_msg, docTitle)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestartConfirmDialog = false
+                        pendingActionAfterSave = { onFormatAction("Back to start center") }
+                        handleSaveCommand()
+                    },
+                    modifier = Modifier.testTag("btn_save_before_restart")
+                ) {
+                    Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showRestartConfirmDialog = false
+                        onFormatAction("Back to start center")
+                    },
+                    modifier = Modifier.testTag("btn_discard_before_restart")
+                ) {
+                    Text(stringResource(R.string.discard))
+                }
+            }
+        )
+    }
+
+    if (showSaveAsDialog) {
+        SaveAsDialog(
+            moduleType = "Inky",
+            currentTitle = docTitle,
+            onDismiss = { showSaveAsDialog = false },
+            onConfirmSave = { selectedFormat, extension, mimeType ->
+                currentSaveMimeType = mimeType
+                val baseName = docTitle.substringBeforeLast(".")
+                currentSaveDefaultFilename = if (baseName.isBlank()) "Inky_Dokumen$extension" else "$baseName$extension"
+                showSaveAsDialog = false
+                saveDocumentLauncher.launch(currentSaveDefaultFilename)
+            }
         )
     }
 
@@ -2661,6 +2913,66 @@ fun InkyModule(
             }
         )
     }
+
+    // --- SAVING PROGRESS POPUP DIALOG ---
+    if (showSavingProgressPopup) {
+        com.example.ui.components.SavingProgressPopupDialog(
+            docName = savingProgressDocName,
+            moduleColor = Color(0xFF2563EB)
+        )
+    }
+
+    // --- DIALOG: SAVE FAILURE POPUP ---
+    if (showSaveFailedDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveFailedDialog = false },
+            icon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.save_failed_title)) },
+            text = { Text(stringResource(R.string.save_failed_msg, docTitle)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSaveFailedDialog = false
+                        performSave(false)
+                    }
+                ) {
+                    Text(stringResource(R.string.btn_retry))
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            showSaveFailedDialog = false
+                            isEditMode = true
+                        }
+                    ) {
+                        Text(stringResource(R.string.btn_return_editor))
+                    }
+                    TextButton(
+                        onClick = {
+                            showSaveFailedDialog = false
+                            isSaved = true
+                            handleClose()
+                        }
+                    ) {
+                        Text(stringResource(R.string.btn_exit_without_saving), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        )
+    }
+
+    // --- FULL-PAGE DOCUMENT LOADING POPUP ---
+    if (isLoadingDocument) {
+        com.example.ui.components.FullPageDocumentLoadingPopup(
+            moduleName = "Writer",
+            moduleColor = Color(0xFF2563EB),
+            isCreating = isCreatingDoc,
+            docName = loadingDocName,
+            progressStatus = loadingProgressStatus
+        )
+    }
     }
 }
 
@@ -2673,7 +2985,9 @@ private fun FileSubpage(
     onNavigateToOptions: () -> Unit,
     onNewDocument: () -> Unit,
     onOpenDocument: () -> Unit,
-    onCloseDocument: () -> Unit
+    onCloseDocument: () -> Unit,
+    onSaveDocument: () -> Unit,
+    onSaveAsDocument: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
@@ -2700,19 +3014,13 @@ private fun FileSubpage(
             icon = Icons.Rounded.Save,
             title = "Save"
         ) {
-            Toast.makeText(context, "Document Saved!", Toast.LENGTH_SHORT).show()
+            onSaveDocument()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Save,
             title = "Save as..."
         ) {
-            Toast.makeText(context, "Opening Save As dialog...", Toast.LENGTH_SHORT).show()
-        }
-        FileMenuListItem(
-            icon = Icons.Rounded.LibraryBooks,
-            title = "Save all opened document"
-        ) {
-            Toast.makeText(context, "Saving all documents...", Toast.LENGTH_SHORT).show()
+            onSaveAsDocument()
         }
         FileMenuListItem(
             icon = Icons.Rounded.ImportExport,

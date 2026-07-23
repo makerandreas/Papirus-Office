@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,10 +25,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// Data class to store drawn lines
+data class LinePath(
+    val points: androidx.compose.runtime.snapshots.SnapshotStateList<Offset>,
+    val color: Color
+)
+
 @Composable
 fun PagellaModule(
     isTablet: Boolean,
-    onPdfAction: (String) -> Unit
+    onPdfAction: (String) -> Unit,
+    onBack: () -> Unit = {}
 ) {
     var currentPage by remember { mutableStateOf(1) }
     var totalPages by remember { mutableStateOf(12) }
@@ -41,11 +49,20 @@ fun PagellaModule(
     val paths = remember { mutableStateListOf<LinePath>() }
     var currentPath by remember { mutableStateOf<LinePath?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE2E8F0)) // Cool slate gray boards
-    ) {
+    // Loading Popup state
+    var isLoadingDocument by remember { mutableStateOf(false) }
+    var isCreatingDoc by remember { mutableStateOf(false) }
+    var loadingDocName by remember { mutableStateOf("Pagella_Document.pdf") }
+    var loadingProgressStatus by remember { mutableStateOf("") }
+
+    val moduleColor = Color(0xFFDC2626) // Pagella Red
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFE2E8F0)) // Cool slate gray boards
+        ) {
         // PDF navigation / toolbar
         Row(
             modifier = Modifier
@@ -60,6 +77,9 @@ fun PagellaModule(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                IconButton(onClick = { onBack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
                 IconButton(
                     onClick = { if (currentPage > 1) currentPage-- },
                     enabled = currentPage > 1
@@ -199,11 +219,16 @@ fun PagellaModule(
                 }
             }
         }
+
+        }
+
+        if (isLoadingDocument) {
+            com.example.ui.components.FullPageDocumentLoadingPopup(
+                isCreating = isCreatingDoc,
+                docName = loadingDocName,
+                progressStatus = loadingProgressStatus,
+                moduleColor = moduleColor
+            )
+        }
     }
 }
-
-// Data class to store drawn lines
-data class LinePath(
-    val points: androidx.compose.runtime.snapshots.SnapshotStateList<Offset>,
-    val color: Color
-)

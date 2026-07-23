@@ -51,7 +51,8 @@ data class OptionGroup(
 fun PapirusOfficeOptionsScreen(
     sourceModule: String = "general", // "general", "Inky", "Cellina", "Slidia"
     onCloseOptions: () -> Unit,
-    onDynamicColorChange: ((Boolean) -> Unit)? = null
+    onDynamicColorChange: ((Boolean) -> Unit)? = null,
+    onRestartRequested: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -61,6 +62,7 @@ fun PapirusOfficeOptionsScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
+    var showRestartDialog by remember { mutableStateOf(false) }
 
     // Intercept back button
     BackHandler {
@@ -174,6 +176,37 @@ fun PapirusOfficeOptionsScreen(
         baseGroups
     }
 
+    if (showRestartDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestartDialog = false },
+            title = { Text(stringResource(R.string.restart_required_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.restart_required_msg)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestartDialog = false
+                        onCloseOptions()
+                        onRestartRequested?.invoke()
+                    },
+                    modifier = Modifier.testTag("btn_restart_now")
+                ) {
+                    Text(stringResource(R.string.restart_now), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showRestartDialog = false
+                        onCloseOptions()
+                    },
+                    modifier = Modifier.testTag("btn_restart_later")
+                ) {
+                    Text(stringResource(R.string.restart_later))
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             // GOOGLE PIXEL SYSTEM SETTINGS STYLED APP BAR
@@ -236,7 +269,11 @@ fun PapirusOfficeOptionsScreen(
                         if (activeSubpage != null) {
                             Button(
                                 onClick = {
-                                    onCloseOptions()
+                                    if (activeSubpage?.id == "load_save_general") {
+                                        showRestartDialog = true
+                                    } else {
+                                        onCloseOptions()
+                                    }
                                 },
                                 shape = RoundedCornerShape(20.dp),
                                 colors = ButtonDefaults.buttonColors(
