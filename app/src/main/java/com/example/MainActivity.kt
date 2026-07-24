@@ -31,6 +31,7 @@ import com.example.ui.home.HomeDashboard
 import com.example.ui.home.CrashLogsScreen
 import com.example.ui.home.NewDocumentScreen
 import com.example.ui.home.WelcomeScreen
+import com.example.ui.home.AboutScreen
 import com.example.ui.theme.PapirusTheme
 import android.os.Build
 import android.os.Environment
@@ -232,7 +233,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Global Header TopBar (Excluded for document modules which manage their own topbar/status bar)
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome" && currentWorkspace != "about") {
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -356,6 +357,9 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                         "crash_logs" -> CrashLogsScreen(
                             onBack = { currentWorkspace = "home" }
                         )
+                        "about" -> AboutScreen(
+                            onBack = { currentWorkspace = "home" }
+                        )
                         "Inky" -> InkyModule(
                             isTablet = isTablet,
                             onFormatAction = { act ->
@@ -409,7 +413,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
             }
 
             // Bottom Adaptive Formatting Toolbar (Visible in document workspaces)
-            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome") {
+            if (currentWorkspace != "home" && currentWorkspace != "Inky" && currentWorkspace != "Cellina" && currentWorkspace != "Slidia" && currentWorkspace != "Pagella" && currentWorkspace != "crash_logs" && currentWorkspace != "create_new_document" && currentWorkspace != "welcome" && currentWorkspace != "about") {
                 AdaptiveFormattingToolbar(
                     selectedObjectType = formattingObjectType,
                     onFormatClick = { formatAction ->

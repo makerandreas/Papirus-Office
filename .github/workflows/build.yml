@@ -29,31 +29,58 @@ jobs:
       # yang selalu disertakan dalam build.gradle.kts baik lokal maupun di GitHub Actions.
       # Dengan begitu, kita tidak perlu menginstal LibreOffice yang sangat lambat dan tidak stabil di CI.
 
-      # 1. KUNCI KONSISTENSI: Buat Keystore statis dengan tanggal kedaluwarsa panjang
-      # Kunci ini akan selalu sama di setiap commit, sehingga Kamu bisa menimpa aplikasi tanpa uninstall!
-      - name: Generate Automated Testing Keystore
+      - name: Generate SemVer and Release Info
+        id: version_calc
         run: |
-          keytool -genkeypair -v \
-            -keystore app/release.jks \
-            -alias papirus_key \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass "papirus123" \
-            -keypass "papirus123" \
-            -dname "CN=Andreas Maker, OU=Papirus Office, O=Anyum Software, L=Sorong, S=Southwest Papua, C=ID"
+          # Ambil tanggal rilis dalam format DDMMYYYY
+          DATE_STR=$(date +'%d%m%Y')
+          
+          # Gunakan RUN_NUMBER untuk NN
+          RUN_NUM="${{ github.run_number }}"
+          
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # Jika dipicu oleh tag rilis baru (misal: v1.0-release atau v1.0-beta_01)
+            TAG_NAME="${{ github.ref_name }}"
+            # Hapus huruf 'v' di awal jika ada
+            VERSION_NAME="${TAG_NAME#v}"
+            # Hitung version code sederhana berdasarkan run number
+            VERSION_CODE=$((1000000 + RUN_NUM))
+          else
+            # Jika push biasa atau pull request, format: 1.0-nightly_DDMMYYYY_NN
+            VERSION_NAME="1.0-nightly_${DATE_STR}_${RUN_NUM}"
+            VERSION_CODE=$((100000 + RUN_NUM))
+          fi
+          
+          echo "APP_VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          echo "APP_VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
+          echo "Calculated Version Name: $VERSION_NAME"
+          echo "Calculated Version Code: $VERSION_CODE"
+
+      - name: Decode Keystore from Base64
+        run: |
+          # Mengubah teks Base64 dari Secrets kembali menjadi file biner .jks
+          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/papirus-release.jks
 
       - name: Build Debug APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
         env:
-          KEYSTORE_PASSWORD: papirus123
-          KEY_ALIAS: papirus_key
-          KEY_PASSWORD: papirus123
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'papirus123' }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'papirus_key' }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'papirus123' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+
+      - name: Sign Release APK
+        uses: rsetup/sign-android-release@v1
+        with:
+          releaseDirectory: app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
 
       # SOLUSI JALUR APK MENTAH: Langsung bypass ke halaman GitHub Release Nightly
       - name: Drop Papirus Nightly Release
@@ -65,3 +92,4 @@ jobs:
           title: "Papirus Office Nightly Build"
           files: |
             app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk

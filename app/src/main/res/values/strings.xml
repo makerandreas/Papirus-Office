@@ -176,4 +176,21 @@
     <string name="loading_status_still_processing">Still processing. This may take some time...</string>
     <string name="loading_status_completed">Document loaded successfully</string>
     <string name="loading_status_cached">Loading document from local cache...</string>
+    
+    <!-- About Screen Strings -->
+    <string name="aboutTitle">About Papirus Office</string>
+    <string name="aboutAppDescription">Papirus Office is a complete, lightweight, and professional office productivity suite. Designed for high performance even on low-end devices, it supports open standard formats natively.</string>
+    <string name="aboutAppVersion">App Version</string>
+    <string name="aboutEngineVersion">Papirus Engine Version</string>
+    <string name="aboutComponentsTitle">Components</string>
+    <string name="aboutComponentsDesc">Papirus Office uses premium modular components for high compatibility, rendering, and layout precision:</string>
+    <string name="aboutComponentInky">Inky Module (Writer): OpenDocument Text (ODT) and OOXML (.docx) editor with live rich styling.</string>
+    <string name="aboutComponentCellina">Cellina Module (Spreadsheets): OpenDocument Spreadsheet (DS) and OOXML (.xlsx) calculations with interactive cell formulas.</string>
+    <string name="aboutComponentSlidia">Slidia Module (Presentations): OpenDocument Presentation (ODP) and OOXML (.pptx) presentation deck renderer.</string>
+    <string name="aboutComponentPagella">Pagella Module (PDF/Forms): Compact high-precision PDF document viewer and form filler.</string>
+    <string name="aboutComponentHarfbuzz">HarfBuzz Integration: Professional advanced font and text shaping engine.</string>
+    <string name="aboutComponentTinyxml">TinyXML Parser: Lightweight C++ XML parser optimized for memory-constrained environments.</string>
+    <string name="aboutLicensesTitle">Licenses &amp; Credits</string>
+    <string name="aboutLicensesDesc">This suite builds on top of LibreOffice SDK, Microsoft OpenXML specifications, and ECMA-376 standards. Licensed under GNU LGPL v3 and Mozilla Public License 2.0.</string>
+    <string name="aboutDeveloperNote">Design with ❤️ from An Open-source and AI Enthusiast</string>
 </resources>

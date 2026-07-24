@@ -270,6 +270,14 @@ fun HomeDashboard(
                                         showOptionsDialog = true
                                     }
                                 )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                                    text = { Text("About") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        onNavigateToModule("about")
+                                    }
+                                )
                             }
                         }
                     },

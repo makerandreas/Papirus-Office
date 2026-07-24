@@ -18,18 +18,38 @@ android {
     minSdk = 24
     targetSdk = 36
     
-    // Semantic Versioning (SemVer) with Pre-release and Nightly Build support
+    // Dynamic versioning with environment variable support (CI/CD) and local fallbacks
+    val envVersionName = System.getenv("APP_VERSION_NAME")
+    val envVersionCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+
     val semVerMajor = 1
     val semVerMinor = 0
     val semVerPatch = 0
-    val preRelease = "nightly" // Options: "alpha", "beta", "rc", "nightly", or "" for stable
-    val buildMetadata = "20260712" // E.g., timestamp or commit hash for nightlies
-    
-    versionCode = semVerMajor * 1000000 + semVerMinor * 10000 + semVerPatch * 100 + 1
-    versionName = if (preRelease.isNotEmpty()) {
+    val preRelease = "nightly"
+    val buildMetadata = "20260724"
+
+    versionCode = envVersionCode ?: (semVerMajor * 1000000 + semVerMinor * 10000 + semVerPatch * 100 + 1)
+    versionName = envVersionName ?: (if (preRelease.isNotEmpty()) {
       "$semVerMajor.$semVerMinor.$semVerPatch-$preRelease+$buildMetadata"
     } else {
       "$semVerMajor.$semVerMinor.$semVerPatch"
+    })
+
+    // Compute dynamic Papirus Engine version based on engine source changes
+    val engineDir = file("src/main/java/com/makerandreas/papirusoffice")
+    val engineVersion = if (engineDir.exists()) {
+      var hashSum = 0L
+      var fileCount = 0
+      engineDir.walkTopDown().filter { it.isFile }.forEach { f ->
+        hashSum += f.length() + f.lastModified()
+        fileCount++
+      }
+      val engineMajor = 1
+      val engineMinor = 3
+      val enginePatch = fileCount + (hashSum % 100).toInt()
+      "$engineMajor.$engineMinor.$enginePatch-engine"
+    } else {
+      "1.3.0-engine"
     }
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -37,6 +57,8 @@ android {
     // Feature toggles for modular C++ / JNI OOXML compatibility layers
     buildConfigField("boolean", "ENABLE_OOXML_SUPPORT", "true")
     buildConfigField("boolean", "ENABLE_OMML_PARSER", "true")
+    buildConfigField("String", "APP_VERSION_NAME", "\"$versionName\"")
+    buildConfigField("String", "PAPIRUS_ENGINE_VERSION", "\"$engineVersion\"")
 
     // Membaca dari environment variable lokal atau CI/CD GitHub
     val geminiKey = System.getenv("GEMINI_API_KEY") ?: ""
@@ -50,7 +72,7 @@ android {
 
   signingConfigs {
     create("release") {
-      val keyFile = file("release.jks")
+      val keyFile = if (file("papirus-release.jks").exists()) file("papirus-release.jks") else file("release.jks")
       if (keyFile.exists()) {
         storeFile = keyFile
         storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "papirus123"
