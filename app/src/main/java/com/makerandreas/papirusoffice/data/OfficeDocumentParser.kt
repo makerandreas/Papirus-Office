@@ -1,5 +1,7 @@
 package com.makerandreas.papirusoffice.data
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import android.content.Context
 import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +12,18 @@ import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.zip.ZipInputStream
 
+data class ParsingProgress(
+    val percentage: Int = 0,
+    val statusMessage: String = "Loading document...",
+    val isFailed: Boolean = false,
+    val errorMessage: String? = null
+)
+
+sealed class SchemaValidationResult {
+    object Valid : SchemaValidationResult()
+    data class Invalid(val reason: String, val warnings: List<String> = emptyList()) : SchemaValidationResult()
+}
+
 /**
  * Modern document parser for ODT and DOCX files.
  * Uses standard Java ZIP and XML libraries to extract 'content.xml' (ODT) or 'word/document.xml' (DOCX)
@@ -19,6 +33,119 @@ import java.util.zip.ZipInputStream
 class OfficeDocumentParser(private val context: Context) {
 
     private val imageExtractor = DocxImageExtractor(context)
+
+    private val _parsingProgress = MutableLiveData<ParsingProgress>(ParsingProgress(0, "Loading document..."))
+    val parsingProgress: LiveData<ParsingProgress> get() = _parsingProgress
+
+    /**
+     * Validates XML structure integrity against ODF/OOXML standard schema expectations.
+     * Logs structural anomalies and warnings to crash.log via DocumentParsingLogger.
+     */
+    fun validateXmlSchema(
+        xmlContent: String,
+        isOdt: Boolean,
+        isDocx: Boolean,
+        fileName: String
+    ): SchemaValidationResult {
+        val warnings = mutableListOf<String>()
+        if (xmlContent.isBlank()) {
+            val errorMsg = "XML content is empty or corrupted in $fileName."
+            DocumentParsingLogger.logMalformedXml(context, fileName, errorMsg)
+            return SchemaValidationResult.Invalid(errorMsg)
+        }
+
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val parser = factory.newPullParser()
+            parser.setInput(ByteArrayInputStream(xmlContent.toByteArray(Charsets.UTF_8)), "UTF-8")
+
+            var eventType = parser.eventType
+            var rootTag: String? = null
+            var hasBody = false
+            var tagCount = 0
+
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    val tagName = parser.name ?: ""
+                    val tagNameLower = tagName.lowercase()
+                    tagCount++
+
+                    if (rootTag == null) {
+                        rootTag = tagName
+                        if (isOdt && !tagNameLower.contains("document") && !tagNameLower.contains("content")) {
+                            val msg = "ODT Schema Deviation: Root tag <$tagName> does not match ODF standard (<office:document-content>)."
+                            warnings.add(msg)
+                            DocumentParsingLogger.logError(
+                                context = context,
+                                tag = "ODT Schema Violation",
+                                exceptionType = "XmlSchemaViolationWarning",
+                                message = msg,
+                                details = "File: $fileName, RootTag: <$tagName>"
+                            )
+                        } else if (isDocx && !tagNameLower.endsWith("document")) {
+                            val msg = "DOCX Schema Deviation: Root tag <$tagName> does not match OpenXML standard (<w:document>)."
+                            warnings.add(msg)
+                            DocumentParsingLogger.logError(
+                                context = context,
+                                tag = "DOCX Schema Violation",
+                                exceptionType = "XmlSchemaViolationWarning",
+                                message = msg,
+                                details = "File: $fileName, RootTag: <$tagName>"
+                            )
+                        }
+                    }
+
+                    if (tagNameLower.endsWith("body") || tagNameLower.endsWith("text")) {
+                        hasBody = true
+                    }
+                }
+                eventType = parser.next()
+            }
+
+            if (tagCount == 0) {
+                val errorMsg = "XML structure contains no valid tags in file $fileName"
+                DocumentParsingLogger.logMalformedXml(context, fileName, errorMsg)
+                return SchemaValidationResult.Invalid(errorMsg)
+            }
+
+            if (isOdt && !hasBody) {
+                val msg = "ODT Structural Deviation: Missing <office:body> container element in $fileName."
+                warnings.add(msg)
+                DocumentParsingLogger.logError(
+                    context = context,
+                    tag = "ODT Structural Anomaly",
+                    exceptionType = "XmlStructureAnomalyWarning",
+                    message = msg,
+                    details = "File: $fileName"
+                )
+            }
+
+            if (isDocx && !hasBody) {
+                val msg = "DOCX Structural Deviation: Missing <w:body> container element in $fileName."
+                warnings.add(msg)
+                DocumentParsingLogger.logError(
+                    context = context,
+                    tag = "DOCX Structural Anomaly",
+                    exceptionType = "XmlStructureAnomalyWarning",
+                    message = msg,
+                    details = "File: $fileName"
+                )
+            }
+
+            return SchemaValidationResult.Valid
+
+        } catch (e: Exception) {
+            val errorMsg = "XML Schema Validation Failed: ${e.localizedMessage ?: "Syntax error"}"
+            DocumentParsingLogger.logMalformedXml(
+                context = context,
+                fileName = fileName,
+                errorMsg = errorMsg,
+                cause = e
+            )
+            return SchemaValidationResult.Invalid(errorMsg, warnings)
+        }
+    }
 
     /**
      * Extracts raw 'content.xml' from ODT file or 'word/document.xml' from DOCX file
@@ -56,26 +183,43 @@ class OfficeDocumentParser(private val context: Context) {
      * mapping paragraphs, headings, list items, tables, and images.
      */
     suspend fun parseDocument(file: File): OfficeParsedDocument = withContext(Dispatchers.IO) {
+        _parsingProgress.postValue(ParsingProgress(10, context.getString(com.example.R.string.loading_status_initial)))
+
         val isOdt = file.name.endsWith(".odt", ignoreCase = true)
         val isDocx = file.name.endsWith(".docx", ignoreCase = true) || file.name.endsWith(".doc", ignoreCase = true)
 
+        val xmlContent = extractXmlContent(file)
+        _parsingProgress.postValue(ParsingProgress(25, context.getString(com.example.R.string.loading_status_validating)))
+
+        val validation = validateXmlSchema(xmlContent, isOdt, isDocx, file.name)
+        if (validation is SchemaValidationResult.Invalid) {
+            val failProgress = ParsingProgress(
+                percentage = 0,
+                statusMessage = context.getString(com.example.R.string.doc_open_failed_title),
+                isFailed = true,
+                errorMessage = validation.reason
+            )
+            _parsingProgress.postValue(failProgress)
+            return@withContext OfficeParsedDocument(
+                elements = emptyList(),
+                rawXml = xmlContent,
+                plainText = "",
+                extractedImages = emptyMap(),
+                isOdt = isOdt,
+                isDocx = isDocx,
+                isParsingFailed = true,
+                failureReason = validation.reason
+            )
+        }
+
+        _parsingProgress.postValue(ParsingProgress(45, context.getString(com.example.R.string.loading_status_extracting)))
         val extractedImages = if (isOdt) {
             imageExtractor.extractImagesFromOdt(file)
         } else {
             imageExtractor.extractImagesFromDocx(file)
         }
 
-        val xmlContent = extractXmlContent(file)
-        if (xmlContent.isBlank()) {
-            return@withContext OfficeParsedDocument(
-                elements = emptyList(),
-                rawXml = "",
-                plainText = "",
-                extractedImages = extractedImages,
-                isOdt = isOdt,
-                isDocx = isDocx
-            )
-        }
+        _parsingProgress.postValue(ParsingProgress(60, context.getString(com.example.R.string.loading_status_processing)))
 
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
@@ -101,6 +245,7 @@ class OfficeDocumentParser(private val context: Context) {
             var isBold = false
             var isItalic = false
             var isUnderline = false
+            var eventCount = 0
 
             // Standard supported tag set for warning/unsupported tag diagnostic logging
             val supportedTags = setOf(
@@ -113,6 +258,18 @@ class OfficeDocumentParser(private val context: Context) {
             )
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
+                eventCount++
+                if (eventCount % 40 == 0) {
+                    if (eventCount > 150) {
+                        _parsingProgress.postValue(
+                            ParsingProgress(85, context.getString(com.example.R.string.loading_status_still_processing))
+                        )
+                    } else {
+                        _parsingProgress.postValue(
+                            ParsingProgress(75, context.getString(com.example.R.string.loading_status_processing))
+                        )
+                    }
+                }
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
@@ -310,12 +467,32 @@ class OfficeDocumentParser(private val context: Context) {
                 eventType = parser.next()
             }
 
+            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
+
         } catch (e: Exception) {
+            val errorMsg = e.message ?: "Unknown XML parsing error"
             DocumentParsingLogger.logMalformedXml(
                 context = context,
                 fileName = file.name,
-                errorMsg = e.message ?: "Unknown XML parsing error",
+                errorMsg = errorMsg,
                 cause = e
+            )
+            val failProgress = ParsingProgress(
+                percentage = 0,
+                statusMessage = context.getString(com.example.R.string.doc_open_failed_title),
+                isFailed = true,
+                errorMessage = errorMsg
+            )
+            _parsingProgress.postValue(failProgress)
+            return@withContext OfficeParsedDocument(
+                elements = emptyList(),
+                rawXml = xmlContent,
+                plainText = "",
+                extractedImages = extractedImages,
+                isOdt = isOdt,
+                isDocx = isDocx,
+                isParsingFailed = true,
+                failureReason = errorMsg
             )
         }
 
@@ -326,7 +503,8 @@ class OfficeDocumentParser(private val context: Context) {
             plainText = if (plainTextResult.isBlank()) "Empty Document" else plainTextResult,
             extractedImages = extractedImages,
             isOdt = isOdt,
-            isDocx = isDocx
+            isDocx = isDocx,
+            isParsingFailed = false
         )
     }
 

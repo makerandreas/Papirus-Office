@@ -59,5 +59,7 @@ data class OfficeParsedDocument(
     val plainText: String = "",
     val extractedImages: Map<String, File> = emptyMap(),
     val isOdt: Boolean = false,
-    val isDocx: Boolean = false
+    val isDocx: Boolean = false,
+    val isParsingFailed: Boolean = false,
+    val failureReason: String? = null
 )

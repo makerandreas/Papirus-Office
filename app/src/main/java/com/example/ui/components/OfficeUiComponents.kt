@@ -904,6 +904,88 @@ fun FullPageDocumentLoadingPopup(
     }
 }
 
+// --- BARU: Document Open Failed Dialog ---
+@Composable
+fun DocumentOpenFailedDialog(
+    docName: String,
+    errorMessage: String? = null,
+    onDismissRequest: () -> Unit = {},
+    onReturnToRecent: () -> Unit,
+    onViewLogs: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(36.dp)
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.doc_open_failed_title),
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = stringResource(R.string.doc_open_failed_msg, docName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (!errorMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                    ) {
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onReturnToRecent,
+                modifier = Modifier.testTag("btn_failed_ok")
+            ) {
+                Text(stringResource(R.string.btn_ok), fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            FilledTonalButton(
+                onClick = onViewLogs,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                ),
+                modifier = Modifier.testTag("btn_failed_view_logs")
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.BugReport,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.btn_view_logs), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    )
+}
+
 // --- BARU: Popup Dialog "Saving..." ---
 @Composable
 fun SavingProgressPopupDialog(

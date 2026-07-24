@@ -21,6 +21,8 @@ class DocxDocumentParser(private val context: Context) {
     private val imageExtractor = DocxImageExtractor(context)
     private val officeParser = OfficeDocumentParser(context)
 
+    val parsingProgress: androidx.lifecycle.LiveData<ParsingProgress> get() = officeParser.parsingProgress
+
     suspend fun parseDocument(file: File): DocxParseResult = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext DocxParseResult("")
 

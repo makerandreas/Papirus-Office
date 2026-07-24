@@ -163,4 +163,16 @@
     <string name="restart_now">Restart Now</string>
     <string name="restart_later">Restart Later</string>
     <string name="doc_saved_success">Document saved successfully as %1$s</string>
+
+    <!-- Document Open Failure & Detailed Progress Status Strings -->
+    <string name="doc_open_failed_title">Failed to Open Document</string>
+    <string name="doc_open_failed_msg">The document "%1$s" could not be opened because it contains invalid or corrupted XML structure.</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_view_logs">View Logs</string>
+    <string name="loading_status_initial">Loading document...</string>
+    <string name="loading_status_validating">Validating XML schema integrity...</string>
+    <string name="loading_status_extracting">Extracting document media and resources...</string>
+    <string name="loading_status_processing">Processing document structure...</string>
+    <string name="loading_status_still_processing">Still processing. This may take some time...</string>
+    <string name="loading_status_completed">Document loaded successfully</string>
 </resources>

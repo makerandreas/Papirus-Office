@@ -193,6 +193,13 @@ fun InkyModule(
         )
     }
 
+    var isLoadingDocument by remember { mutableStateOf(false) }
+    var isCreatingDoc by remember { mutableStateOf(false) }
+    var loadingDocName by remember { mutableStateOf(docTitle) }
+    var loadingProgressStatus by remember { mutableStateOf("") }
+    var showDocOpenFailedDialog by remember { mutableStateOf(false) }
+    var docOpenFailedError by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(com.example.MainActivity.openedFilePath) {
         val filePath = com.example.MainActivity.openedFilePath
         if (filePath != null && com.example.MainActivity.openedFileType == "Inky") {
@@ -201,17 +208,42 @@ fun InkyModule(
                 isNewDocument = false
                 isSaved = true
                 docTitle = f.name
+                loadingDocName = f.name
                 isParsingDoc = true
+                isLoadingDocument = true
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val parseResult = docxParser.parseDocument(f)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                        docxImages = parseResult.extractedImages
-                        docxExtents = parseResult.imageExtents
+                        isLoadingDocument = false
                         isParsingDoc = false
+                        if (parseResult.parsedDocument?.isParsingFailed == true) {
+                            showDocOpenFailedDialog = true
+                            docOpenFailedError = parseResult.parsedDocument.failureReason
+                        } else {
+                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                            docxImages = parseResult.extractedImages
+                            docxExtents = parseResult.imageExtents
+                        }
                     }
                 }
             }
+        }
+    }
+
+    DisposableEffect(docxParser) {
+        val observer = androidx.lifecycle.Observer<com.makerandreas.papirusoffice.data.ParsingProgress> { progress ->
+            if (progress != null) {
+                loadingProgressStatus = progress.statusMessage
+                if (progress.isFailed) {
+                    isLoadingDocument = false
+                    showDocOpenFailedDialog = true
+                    docOpenFailedError = progress.errorMessage
+                }
+            }
+        }
+        docxParser.parsingProgress.observeForever(observer)
+        onDispose {
+            docxParser.parsingProgress.removeObserver(observer)
         }
     }
     var activeToolbarType by remember { mutableStateOf("Standard") } // Default to Standard toolbar as requested
@@ -331,11 +363,6 @@ fun InkyModule(
     var showSaveFailedDialog by remember { mutableStateOf(false) }
     var showSavingProgressPopup by remember { mutableStateOf(false) }
     var savingProgressDocName by remember { mutableStateOf(docTitle) }
-
-    var isLoadingDocument by remember { mutableStateOf(false) }
-    var isCreatingDoc by remember { mutableStateOf(false) }
-    var loadingDocName by remember { mutableStateOf(docTitle) }
-    var loadingProgressStatus by remember { mutableStateOf("") }
 
     val performSave = { simulateError: Boolean ->
         coroutineScope.launch {
@@ -3117,6 +3144,23 @@ fun InkyModule(
             isCreating = isCreatingDoc,
             docName = loadingDocName,
             progressStatus = loadingProgressStatus
+        )
+    }
+
+    // --- DOCUMENT OPEN FAILED DIALOG ---
+    if (showDocOpenFailedDialog) {
+        com.example.ui.components.DocumentOpenFailedDialog(
+            docName = loadingDocName,
+            errorMessage = docOpenFailedError,
+            onDismissRequest = { showDocOpenFailedDialog = false },
+            onReturnToRecent = {
+                showDocOpenFailedDialog = false
+                onFormatAction("Back to start center")
+            },
+            onViewLogs = {
+                showDocOpenFailedDialog = false
+                onFormatAction("crash_logs")
+            }
         )
     }
     }

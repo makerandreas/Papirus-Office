@@ -358,6 +358,8 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                             onFormatAction = { act ->
                                 if (act == "Back to start center") {
                                     currentWorkspace = "home"
+                                } else if (act == "crash_logs") {
+                                    currentWorkspace = "crash_logs"
                                 } else {
                                     Toast.makeText(context, act, Toast.LENGTH_SHORT).show()
                                 }
