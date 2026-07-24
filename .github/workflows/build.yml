@@ -79,17 +79,6 @@ jobs:
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
 
-      - name: Sign Release APK
-        if: ${{ env.SIGNING_KEY != '' }}
-        uses: r0adrunner/sign-android-release@v1
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
 
       # SOLUSI JALUR APK MENTAH: Langsung bypass ke halaman GitHub Release Nightly
       - name: Drop Papirus Nightly Release
