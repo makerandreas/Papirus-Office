@@ -80,8 +80,10 @@ jobs:
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
 
       - name: Sign Release APK
-        if: ${{ secrets.SIGNING_KEY != '' }}
+        if: ${{ env.SIGNING_KEY != '' }}
         uses: r0adrunner/sign-android-release@v1
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         with:
           releaseDirectory: app/build/outputs/apk/release
           signingKeyBase64: ${{ secrets.SIGNING_KEY }}
