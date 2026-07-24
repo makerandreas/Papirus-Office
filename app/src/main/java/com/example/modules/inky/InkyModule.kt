@@ -1397,6 +1397,26 @@ fun InkyModule(
                                             .background(pageBgColor)
                                             .onGloballyPositioned { pageBoxCoordinates = it }
                                             .pointerInput(Unit) {
+                                                detectTapGestures(
+                                                    onLongPress = { offset ->
+                                                        val windowOffset = pageBoxCoordinates?.localToWindow(offset) ?: offset
+                                                        val rect = androidx.compose.ui.geometry.Rect(
+                                                            left = windowOffset.x,
+                                                            top = windowOffset.y,
+                                                            right = windowOffset.x + 1f,
+                                                            bottom = windowOffset.y + 1f
+                                                        )
+                                                        customTextToolbar.show(rect)
+                                                    },
+                                                    onTap = {
+                                                        if (customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown) {
+                                                            customTextToolbar.hide()
+                                                        }
+                                                        focusRequester.requestFocus()
+                                                    }
+                                                )
+                                            }
+                                            .pointerInput(Unit) {
                                                 awaitPointerEventScope {
                                                     while (true) {
                                                         val event = awaitPointerEvent()
@@ -1428,6 +1448,9 @@ fun InkyModule(
                                                 androidx.compose.foundation.text.BasicTextField(
                                                     value = docBodyText,
                                                     onValueChange = {
+                                                        if (it.text != docBodyText.text) {
+                                                            customTextToolbar.hide()
+                                                        }
                                                         docBodyText = it
                                                         isSaved = false
                                                         triggerAutosave()
@@ -2323,6 +2346,7 @@ fun InkyModule(
 
                                     // Persistent undo/redo/close
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         triggerAutosave()
                                         Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=UNDO)")
@@ -2334,6 +2358,7 @@ fun InkyModule(
                                         )
                                     }
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         triggerAutosave()
                                         Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=REDO)")
@@ -2345,6 +2370,7 @@ fun InkyModule(
                                         )
                                     }
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         showBottomBar = false
                                     }) {
                                         Icon(
@@ -2412,6 +2438,7 @@ fun InkyModule(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         triggerAutosave()
                                         Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=UNDO)")
@@ -2423,6 +2450,7 @@ fun InkyModule(
                                         )
                                     }
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         triggerAutosave()
                                         Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
                                         addLokitLog("lok::Document::postWindow(event=REDO)")
@@ -2434,6 +2462,7 @@ fun InkyModule(
                                         )
                                     }
                                     IconButton(onClick = {
+                                        customTextToolbar.hide()
                                         showBottomBar = false
                                     }) {
                                         Icon(
@@ -2711,11 +2740,23 @@ fun InkyModule(
         ""
     }
 
+    val fctClipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val fctHasClipboardContent = remember(docBodyText) {
+        try {
+            fctClipboardManager.hasText()
+        } catch (e: Exception) {
+            true
+        }
+    }
+
     customTextToolbar.Content(
+        isEditMode = isEditMode,
         isListParagraph = activeInkySubpage in listOf("bulleted_list", "numbered_list", "multilevel_list"),
         isNumberedList = activeInkySubpage == "numbered_list",
         isDictionaryDownloaded = true,
         selectedText = selectedTextSnippet,
+        hasClipboardContent = fctHasClipboardContent,
+        isBottomBarShowing = showBottomBar,
         onCharacterStyleClick = {
             showBottomBar = true
             activeInkySubpage = "font_style"

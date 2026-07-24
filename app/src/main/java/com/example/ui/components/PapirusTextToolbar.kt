@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,6 +31,10 @@ import kotlin.math.roundToInt
 enum class FctMode {
     COMPACT,
     GENERAL,
+    CHARACTER,
+    PARAGRAPH,
+    SYNONYMS,
+    SELECTION_MODE,
     AI_OPTIONS
 }
 
@@ -68,12 +71,20 @@ class PapirusTextToolbar : TextToolbar {
         statusState = TextToolbarStatus.Shown
     }
 
+    fun show(rect: Rect) {
+        rectState = rect
+        statusState = TextToolbarStatus.Shown
+    }
+
     @Composable
     fun Content(
+        isEditMode: Boolean = true,
         isListParagraph: Boolean = false,
         isNumberedList: Boolean = false,
         isDictionaryDownloaded: Boolean = true,
         selectedText: String = "",
+        hasClipboardContent: Boolean = true,
+        isBottomBarShowing: Boolean = false,
         onCharacterStyleClick: () -> Unit = {},
         onCharacterOptionsClick: () -> Unit = {},
         onParagraphStyleClick: () -> Unit = {},
@@ -87,6 +98,8 @@ class PapirusTextToolbar : TextToolbar {
         onBorderSettingsClick: () -> Unit = {},
         onShadingSettingsClick: () -> Unit = {},
         onSynonymSelected: (String) -> Unit = {},
+        onSelectNonContiguousClick: () -> Unit = {},
+        onBlockToSelectClick: () -> Unit = {},
         onGenerateTextClick: () -> Unit = {},
         onProofreadClick: () -> Unit = {},
         onTranslateClick: () -> Unit = {},
@@ -94,10 +107,6 @@ class PapirusTextToolbar : TextToolbar {
     ) {
         if (statusState == TextToolbarStatus.Shown) {
             var mode by remember { mutableStateOf(FctMode.COMPACT) }
-
-            BackHandler(enabled = mode != FctMode.COMPACT) {
-                mode = FctMode.COMPACT
-            }
 
             val density = LocalDensity.current
             val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
@@ -113,9 +122,6 @@ class PapirusTextToolbar : TextToolbar {
             val spaceAbove = rectState.top - gapPx - minTopMarginPx
             val spaceBelow = screenHeightPx - minBottomMarginPx - (rectState.bottom + gapPx)
 
-            // Determine if the toolbar should anchor ABOVE the cursor/selection or BELOW it.
-            // Using a consistent anchor decision for both COMPACT and EXPANDED modes prevents
-            // the popup from jumping or flipping across the cursor line when expanding.
             val isAbove = spaceAbove >= targetExpandedHeightPx || (spaceAbove >= compactHeightPx && spaceAbove >= spaceBelow)
 
             val maxExpandedHeightDp = if (isAbove) {
@@ -151,7 +157,7 @@ class PapirusTextToolbar : TextToolbar {
                 properties = PopupProperties(
                     focusable = false,
                     dismissOnBackPress = true,
-                    dismissOnClickOutside = true
+                    dismissOnClickOutside = !isBottomBarShowing
                 )
             ) {
                 Surface(
@@ -164,55 +170,84 @@ class PapirusTextToolbar : TextToolbar {
                         targetState = mode,
                         label = "FCTModeTransition"
                     ) { targetMode ->
+                        val hasSelection = selectedText.isNotEmpty()
+                        val synonymsList = remember(selectedText) { getSynonymsForText(selectedText) }
+                        val hasSynonyms = hasSelection && synonymsList.isNotEmpty()
+
                         when (targetMode) {
                             FctMode.COMPACT -> {
-                                // MODE 1: COMPACT BAR
                                 Row(
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    if (onCut != null) {
-                                        FctIconButton(Icons.Default.ContentCut, stringResource(R.string.fct_cut)) {
-                                            val action = onCut
-                                            hide()
-                                            action?.invoke()
+                                    if (isEditMode) {
+                                        // Editor Mode Compact
+                                        if (hasSelection && onCut != null) {
+                                            FctIconButton(Icons.Default.ContentCut, stringResource(R.string.fct_cut)) {
+                                                val action = onCut
+                                                hide()
+                                                action?.invoke()
+                                            }
                                         }
-                                    }
-                                    if (onCopy != null) {
-                                        FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
-                                            val action = onCopy
-                                            hide()
-                                            action?.invoke()
+                                        if (hasSelection && onCopy != null) {
+                                            FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
+                                                val action = onCopy
+                                                hide()
+                                                action?.invoke()
+                                            }
                                         }
-                                    }
-                                    if (onPaste != null) {
-                                        FctIconButton(Icons.Default.ContentPaste, stringResource(R.string.fct_paste)) {
-                                            val action = onPaste
-                                            hide()
-                                            action?.invoke()
+                                        if (hasClipboardContent && onPaste != null) {
+                                            FctIconButton(Icons.Default.ContentPaste, stringResource(R.string.fct_paste)) {
+                                                val action = onPaste
+                                                hide()
+                                                action?.invoke()
+                                            }
                                         }
-                                    }
-                                    VerticalDivider(
-                                        modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
-                                        color = MaterialTheme.colorScheme.outlineVariant
-                                    )
-                                    if (onSelectAll != null) {
-                                        FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
-                                            val action = onSelectAll
-                                            hide()
-                                            action?.invoke()
+                                        if (hasSelection) {
+                                            VerticalDivider(
+                                                modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant
+                                            )
+                                            FctIconButton(Icons.Default.Delete, "Delete") {
+                                                val action = onCut
+                                                hide()
+                                                action?.invoke()
+                                            }
                                         }
-                                    }
-                                    FctIconButton(Icons.Default.AutoAwesome, "AI Options") {
-                                        mode = FctMode.AI_OPTIONS
-                                    }
-                                    FctIconButton(Icons.Default.MoreVert, stringResource(R.string.fct_more)) {
-                                        mode = FctMode.GENERAL
+                                        if (onSelectAll != null) {
+                                            FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
+                                                val action = onSelectAll
+                                                hide()
+                                                action?.invoke()
+                                            }
+                                        }
+                                        FctIconButton(Icons.Default.AutoAwesome, "AI options") {
+                                            mode = FctMode.AI_OPTIONS
+                                        }
+                                        FctIconButton(Icons.Default.MoreVert, stringResource(R.string.fct_more)) {
+                                            mode = FctMode.GENERAL
+                                        }
+                                    } else {
+                                        // Viewer Mode Compact
+                                        if (hasSelection && onCopy != null) {
+                                            FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
+                                                val action = onCopy
+                                                hide()
+                                                action?.invoke()
+                                            }
+                                        }
+                                        if (onSelectAll != null) {
+                                            FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
+                                                val action = onSelectAll
+                                                hide()
+                                                action?.invoke()
+                                            }
+                                        }
                                     }
                                 }
                             }
+
                             FctMode.GENERAL -> {
-                                // MODE 2: EXPANDED GENERAL MENU
                                 Column(
                                     modifier = Modifier
                                         .width(260.dp)
@@ -220,70 +255,38 @@ class PapirusTextToolbar : TextToolbar {
                                         .verticalScroll(rememberScrollState())
                                         .padding(vertical = 4.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = { mode = FctMode.COMPACT },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Back",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "General Options",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
+                                    FctHeader("General Options") { mode = FctMode.COMPACT }
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
-                                    // Character Submenu
-                                    var expandCharacter by remember { mutableStateOf(false) }
+                                    // Selection Mode... [1]
+                                    if (hasSelection) {
+                                        FctMenuItem(
+                                            icon = Icons.Default.SelectAll,
+                                            label = "Selection Mode...",
+                                            enabled = true,
+                                            trailingIcon = Icons.Default.KeyboardArrowRight,
+                                            onClick = { mode = FctMode.SELECTION_MODE }
+                                        )
+                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                    }
+
+                                    // Character -> Character Mode
                                     FctMenuItem(
                                         icon = Icons.Default.TextFields,
                                         label = "Character",
-                                        trailingIcon = if (expandCharacter) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        onClick = { expandCharacter = !expandCharacter }
+                                        trailingIcon = Icons.Default.KeyboardArrowRight,
+                                        onClick = { mode = FctMode.CHARACTER }
                                     )
-                                    if (expandCharacter) {
-                                        FctSubMenuItem("Character Style...") {
-                                            hide()
-                                            onCharacterStyleClick()
-                                        }
-                                        FctSubMenuItem("Character Options...") {
-                                            hide()
-                                            onCharacterOptionsClick()
-                                        }
-                                    }
 
-                                    // Paragraph Submenu
-                                    var expandParagraph by remember { mutableStateOf(false) }
+                                    // Paragraph -> Paragraph Mode
                                     FctMenuItem(
                                         icon = Icons.Default.FormatAlignLeft,
                                         label = "Paragraph",
-                                        trailingIcon = if (expandParagraph) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        onClick = { expandParagraph = !expandParagraph }
+                                        trailingIcon = Icons.Default.KeyboardArrowRight,
+                                        onClick = { mode = FctMode.PARAGRAPH }
                                     )
-                                    if (expandParagraph) {
-                                        FctSubMenuItem("Paragraph Style...") {
-                                            hide()
-                                            onParagraphStyleClick()
-                                        }
-                                        FctSubMenuItem("Paragraph Options...") {
-                                            hide()
-                                            onParagraphOptionsClick()
-                                        }
-                                    }
 
+                                    // Section Options...
                                     FctMenuItem(
                                         icon = Icons.Default.Layers,
                                         label = "Section Options...",
@@ -295,14 +298,16 @@ class PapirusTextToolbar : TextToolbar {
 
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
+                                    // Bullets and Numbering Options...
                                     FctMenuItem(
                                         icon = Icons.Default.FormatListBulleted,
-                                        label = "Bullets and Numbering Options",
+                                        label = "Bullets and Numbering Options...",
                                         onClick = {
                                             hide()
                                             onBulletsNumberingOptionsClick()
                                         }
                                     )
+                                    // Skip Numbering [2]
                                     FctMenuItem(
                                         icon = Icons.Default.FormatListBulleted,
                                         label = "Skip Numbering",
@@ -312,6 +317,7 @@ class PapirusTextToolbar : TextToolbar {
                                             onSkipNumberingClick()
                                         }
                                     )
+                                    // Remove Numbering [2]
                                     FctMenuItem(
                                         icon = Icons.Default.FormatListBulleted,
                                         label = "Remove Numbering",
@@ -321,10 +327,11 @@ class PapirusTextToolbar : TextToolbar {
                                             onRemoveNumberingClick()
                                         }
                                     )
+                                    // Restart from Beginning [3]
                                     FctMenuItem(
                                         icon = Icons.Default.FormatListNumbered,
-                                        label = "Restart from beginning",
-                                        enabled = isListParagraph && isNumberedList,
+                                        label = "Restart from Beginning",
+                                        enabled = isNumberedList,
                                         onClick = {
                                             hide()
                                             onRestartFromBeginningClick()
@@ -333,57 +340,50 @@ class PapirusTextToolbar : TextToolbar {
 
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
+                                    // Tab Settings...
                                     FctMenuItem(
                                         icon = Icons.Default.Tab,
-                                        label = "Tabs settings",
+                                        label = "Tab Settings...",
                                         onClick = {
                                             hide()
                                             onTabsSettingsClick()
                                         }
                                     )
+                                    // Border Settings...
                                     FctMenuItem(
                                         icon = Icons.Default.BorderAll,
-                                        label = "Border settings",
+                                        label = "Border Settings...",
                                         onClick = {
                                             hide()
                                             onBorderSettingsClick()
                                         }
                                     )
+                                    // Shading Settings...
                                     FctMenuItem(
                                         icon = Icons.Default.FormatColorFill,
-                                        label = "Shading settings",
+                                        label = "Shading Settings...",
                                         onClick = {
                                             hide()
                                             onShadingSettingsClick()
                                         }
                                     )
 
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                                    if (hasSynonyms) {
+                                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-                                    // Synonyms Submenu
-                                    var expandSynonyms by remember { mutableStateOf(false) }
-                                    FctMenuItem(
-                                        icon = Icons.Default.Spellcheck,
-                                        label = "Synonyms",
-                                        enabled = isDictionaryDownloaded,
-                                        trailingIcon = if (expandSynonyms) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        onClick = { if (isDictionaryDownloaded) expandSynonyms = !expandSynonyms }
-                                    )
-                                    if (expandSynonyms && isDictionaryDownloaded) {
-                                        val synonymsList = remember(selectedText) {
-                                            getSynonymsForText(selectedText)
-                                        }
-                                        synonymsList.forEach { synonym ->
-                                            FctSubMenuItem(synonym) {
-                                                hide()
-                                                onSynonymSelected(synonym)
-                                            }
-                                        }
+                                        // Synonyms [4]
+                                        FctMenuItem(
+                                            icon = Icons.Default.Spellcheck,
+                                            label = "Synonyms",
+                                            enabled = isDictionaryDownloaded,
+                                            trailingIcon = Icons.Default.KeyboardArrowRight,
+                                            onClick = { mode = FctMode.SYNONYMS }
+                                        )
                                     }
                                 }
                             }
-                            FctMode.AI_OPTIONS -> {
-                                // MODE 3: EXPANDED AI OPTIONS MENU
+
+                            FctMode.CHARACTER -> {
                                 Column(
                                     modifier = Modifier
                                         .width(260.dp)
@@ -391,30 +391,130 @@ class PapirusTextToolbar : TextToolbar {
                                         .verticalScroll(rememberScrollState())
                                         .padding(vertical = 4.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        IconButton(
-                                            onClick = { mode = FctMode.COMPACT },
-                                            modifier = Modifier.size(32.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                                contentDescription = "Back",
-                                                modifier = Modifier.size(18.dp)
+                                    FctHeader("Character") { mode = FctMode.GENERAL }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                    FctMenuItem(
+                                        icon = Icons.Default.Style,
+                                        label = "Character Style...",
+                                        onClick = {
+                                            hide()
+                                            onCharacterStyleClick()
+                                        }
+                                    )
+                                    FctMenuItem(
+                                        icon = Icons.Default.Tune,
+                                        label = "Character Options...",
+                                        onClick = {
+                                            hide()
+                                            onCharacterOptionsClick()
+                                        }
+                                    )
+                                }
+                            }
+
+                            FctMode.PARAGRAPH -> {
+                                Column(
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    FctHeader("Paragraph") { mode = FctMode.GENERAL }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                    FctMenuItem(
+                                        icon = Icons.Default.Style,
+                                        label = "Paragraph Style...",
+                                        onClick = {
+                                            hide()
+                                            onParagraphStyleClick()
+                                        }
+                                    )
+                                    FctMenuItem(
+                                        icon = Icons.Default.Tune,
+                                        label = "Paragraph Options...",
+                                        onClick = {
+                                            hide()
+                                            onParagraphOptionsClick()
+                                        }
+                                    )
+                                }
+                            }
+
+                            FctMode.SYNONYMS -> {
+                                Column(
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    FctHeader("Synonyms") { mode = FctMode.GENERAL }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                    if (synonymsList.isEmpty()) {
+                                        FctMenuItem(
+                                            icon = Icons.Default.Spellcheck,
+                                            label = "No synonyms available",
+                                            enabled = false,
+                                            onClick = {}
+                                        )
+                                    } else {
+                                        synonymsList.forEach { synonym ->
+                                            FctMenuItem(
+                                                icon = Icons.Default.Translate,
+                                                label = synonym,
+                                                onClick = {
+                                                    hide()
+                                                    onSynonymSelected(synonym)
+                                                }
                                             )
                                         }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "AI Options",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
                                     }
+                                }
+                            }
+
+                            FctMode.SELECTION_MODE -> {
+                                Column(
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    FctHeader("Selection Mode") { mode = FctMode.GENERAL }
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                                    FctMenuItem(
+                                        icon = Icons.Default.TouchApp,
+                                        label = "Select non-contiguous text",
+                                        onClick = {
+                                            hide()
+                                            onSelectNonContiguousClick()
+                                        }
+                                    )
+                                    FctMenuItem(
+                                        icon = Icons.Default.CropFree,
+                                        label = "Block to select",
+                                        onClick = {
+                                            hide()
+                                            onBlockToSelectClick()
+                                        }
+                                    )
+                                }
+                            }
+
+                            FctMode.AI_OPTIONS -> {
+                                Column(
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    FctHeader("AI Options") { mode = FctMode.COMPACT }
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                     FctMenuItem(
@@ -472,13 +572,46 @@ class PapirusTextToolbar : TextToolbar {
     }
 }
 
+@Composable
+private fun FctHeader(
+    title: String,
+    onBackClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onBackClick,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
 private fun getSynonymsForText(text: String): List<String> {
     val clean = text.trim().lowercase()
+    if (clean.isEmpty()) return emptyList()
     return when {
         clean.contains("dokumen") || clean.contains("file") || clean.contains("naskah") -> listOf("Berkas", "Naskah", "Arsip", "Dokumentasi", "Catatan")
         clean.contains("teks") || clean.contains("kata") || clean.contains("tulisan") -> listOf("Kalimat", "Wacana", "Paragraf", "Redaksi", "Penggalan")
         clean.contains("buat") || clean.contains("kerja") -> listOf("Susun", "Ciptakan", "Gagas", "Hasilkan", "Gubah")
-        else -> listOf("Padanan 1", "Padanan 2", "Padanan 3", "Persamaan Kata")
+        clean.contains("hello") || clean.contains("halo") -> listOf("Hai", "Salam", "Greetings", "Sapaan")
+        else -> listOf("Persamaan 1", "Persamaan 2", "Sinonim Kata")
     }
 }
 
@@ -560,3 +693,4 @@ private fun FctSubMenuItem(
         )
     }
 }
+
