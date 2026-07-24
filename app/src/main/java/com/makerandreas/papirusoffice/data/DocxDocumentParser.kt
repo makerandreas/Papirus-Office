@@ -27,7 +27,7 @@ class DocxDocumentParser(private val context: Context) {
         if (!file.exists()) return@withContext DocxParseResult("")
 
         val fileName = file.name.lowercase()
-        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || isZipFile(file)) {
+        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm") || isZipFile(file)) {
             val parsedDoc = officeParser.parseDocument(file)
             return@withContext DocxParseResult(
                 text = parsedDoc.plainText,
@@ -283,11 +283,27 @@ class DocxDocumentParser(private val context: Context) {
 
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
         val fileName = file.name.lowercase()
-        val isDocx = fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".xlsx") || fileName.endsWith(".pptx")
-        val isOdt = fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".odp")
+        val isXlsx = fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm")
+        val isOds = fileName.endsWith(".ods")
+        val isOdp = fileName.endsWith(".odp")
+        val isOdt = fileName.endsWith(".odt")
+        val isPptx = fileName.endsWith(".pptx") || fileName.endsWith(".pptm")
+        val isDocx = fileName.endsWith(".docx") || fileName.endsWith(".docm")
         
+        if (isXlsx) {
+            return@withContext officeParser.saveXlsxDocument(file, text)
+        }
+        if (isOds) {
+            return@withContext officeParser.saveOdsDocument(file, text)
+        }
+        if (isOdp) {
+            return@withContext officeParser.saveOdpDocument(file, text)
+        }
         if (isOdt) {
             return@withContext officeParser.saveOdtDocument(file, text)
+        }
+        if (isPptx) {
+            return@withContext officeParser.savePptxDocument(file, text)
         }
 
         if (!isDocx) {

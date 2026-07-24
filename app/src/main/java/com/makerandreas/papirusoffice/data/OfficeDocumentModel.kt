@@ -60,6 +60,10 @@ data class OfficeParsedDocument(
     val extractedImages: Map<String, File> = emptyMap(),
     val isOdt: Boolean = false,
     val isDocx: Boolean = false,
+    val isOds: Boolean = false,
+    val isXlsx: Boolean = false,
+    val isOdp: Boolean = false,
+    val isPptx: Boolean = false,
     val isParsingFailed: Boolean = false,
     val failureReason: String? = null
 )

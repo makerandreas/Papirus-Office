@@ -50,6 +50,10 @@ fun CellinaModule(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
+    var showDocOpenFailedDialog by remember { mutableStateOf(false) }
+    var docOpenFailedError by remember { mutableStateOf<String?>(null) }
+
     // Mode state
     var isEditMode by remember { mutableStateOf(false) }
     var docTitle by remember { mutableStateOf("Cellina_Data.ods") }
@@ -103,6 +107,60 @@ fun CellinaModule(
             "A4" to "Q3", "B4" to "16000", "C4" to "21000", "D4" to "37000",
             "A5" to "Average", "B5" to "14166", "C5" to "18066", "D5" to "32233"
         )
+    }
+
+    DisposableEffect(Unit) {
+        val observer = androidx.lifecycle.Observer<com.makerandreas.papirusoffice.data.ParsingProgress> { progress ->
+            progress?.let {
+                loadingProgressStatus = it.statusMessage
+                if (it.isFailed) {
+                    isLoadingDocument = false
+                    docOpenFailedError = it.errorMessage
+                    showDocOpenFailedDialog = true
+                }
+            }
+        }
+        docxParser.parsingProgress.observeForever(observer)
+        onDispose {
+            docxParser.parsingProgress.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(com.example.MainActivity.openedFilePath) {
+        val path = com.example.MainActivity.openedFilePath
+        if (path != null) {
+            val file = java.io.File(path)
+            if (file.exists()) {
+                docTitle = file.name
+                loadingDocName = file.name
+                isLoadingDocument = true
+
+                val result = docxParser.parseDocument(file)
+                isLoadingDocument = false
+
+                if (result.parsedDocument?.isParsingFailed == true) {
+                    docOpenFailedError = result.parsedDocument.failureReason ?: context.getString(R.string.doc_open_failed_msg, file.name)
+                    showDocOpenFailedDialog = true
+                } else if (result.text.isNotBlank()) {
+                    val lines = result.text.split("\n")
+                    var rowIdx = 1
+                    for (line in lines) {
+                        if (line.isNotBlank()) {
+                            val cells = line.split("\t")
+                            var colIdx = 0
+                            for (cell in cells) {
+                                if (colIdx < columnsLabels.size) {
+                                    val cellKey = "${columnsLabels[colIdx]}$rowIdx"
+                                    cellValues[cellKey] = cell.trim()
+                                }
+                                colIdx++
+                            }
+                            rowIdx++
+                        }
+                    }
+                }
+            }
+        }
     }
 
     val moduleColor = Color(0xFF16A34A) // Calc Green
@@ -863,6 +921,23 @@ fun CellinaModule(
                 docName = loadingDocName,
                 progressStatus = loadingProgressStatus,
                 moduleColor = moduleColor
+            )
+        }
+
+        // --- DOCUMENT OPEN FAILED DIALOG ---
+        if (showDocOpenFailedDialog) {
+            com.example.ui.components.DocumentOpenFailedDialog(
+                docName = loadingDocName,
+                errorMessage = docOpenFailedError,
+                onDismissRequest = { showDocOpenFailedDialog = false },
+                onReturnToRecent = {
+                    showDocOpenFailedDialog = false
+                    onBack()
+                },
+                onViewLogs = {
+                    showDocOpenFailedDialog = false
+                    onBack()
+                }
             )
         }
 
