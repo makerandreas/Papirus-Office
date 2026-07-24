@@ -136,6 +136,9 @@ class MainActivity : ComponentActivity() {
             enableOmml = BuildConfig.ENABLE_OMML_PARSER
         )
 
+        // Schedule periodic Room cache cleanup worker
+        com.makerandreas.papirusoffice.data.cache.DocumentCacheCleanupWorker.schedulePeriodicCleanup(this)
+
         enableEdgeToEdge()
         setContent {
             PapirusTheme {

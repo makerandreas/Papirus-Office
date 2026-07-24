@@ -74,6 +74,56 @@ class DocumentCacheRepository(context: Context) {
         return cacheDao.getRecentCachedDocuments(limit)
     }
 
+    /**
+     * Performs cleanup of expired, duplicate, or orphaned metadata entries in Room
+     * for ODT/DOCX, ODS/XLSX, and ODP/PPTX files.
+     */
+    suspend fun performAutomatedCleanup(): CleanupResult = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        var purgedCount = 0
+
+        // 1. Purge entries older than 7 days
+        val sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000L)
+        purgedCount += cacheDao.clearOldCache(sevenDaysAgo)
+
+        // 2. Purge large file cache (> 5 MB) older than 3 days
+        val threeDaysAgo = now - (3 * 24 * 60 * 60 * 1000L)
+        val minLargeSizeBytes = 5 * 1024 * 1024L
+        purgedCount += cacheDao.deleteLargeExpiredCache(minLargeSizeBytes, threeDaysAgo)
+
+        // 3. Purge failed parsing cache older than 24 hours
+        val oneDayAgo = now - (24 * 60 * 60 * 1000L)
+        purgedCount += cacheDao.deleteFailedParseCache(oneDayAgo)
+
+        // 4. Purge orphaned entries where the underlying file no longer exists
+        val allEntries = cacheDao.getAllCachedDocuments()
+        for (entry in allEntries) {
+            val file = File(entry.filePath)
+            if (!file.exists()) {
+                cacheDao.deleteCacheByPath(entry.filePath)
+                purgedCount++
+            }
+        }
+
+        // 5. Purge duplicate entries (same file name and file size, retain the most recently opened)
+        val remaining = cacheDao.getAllCachedDocuments()
+        val seenSignatures = mutableSetOf<String>()
+        for (entry in remaining) {
+            val signature = "${entry.fileName}_${entry.fileSize}"
+            if (seenSignatures.contains(signature)) {
+                cacheDao.deleteCacheByPath(entry.filePath)
+                purgedCount++
+            } else {
+                seenSignatures.add(signature)
+            }
+        }
+
+        // 6. Enforce maximum capacity limit (keep top 100 entries)
+        purgedCount += cacheDao.deleteExcessOldCache(keepCount = 100)
+
+        return@withContext CleanupResult(purgedCount = purgedCount)
+    }
+
     private fun getDocumentFormat(file: File): String {
         val name = file.name.lowercase()
         return when {
