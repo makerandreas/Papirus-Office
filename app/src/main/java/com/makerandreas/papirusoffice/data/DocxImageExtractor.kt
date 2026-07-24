@@ -10,7 +10,7 @@ import java.util.zip.ZipInputStream
 class DocxImageExtractor(private val context: Context) {
 
     /**
-     * Membaca dan mengekstrak gambar dari berkas DOCX tanpa membebani Main Thread UI
+     * Membaca dan mengekstrak gambar dari berkas DOCX/ODT tanpa membebani Main Thread UI
      */
     suspend fun extractImagesFromDocx(docxFile: File): Map<String, File> = withContext(Dispatchers.IO) {
         val extractedImages = mutableMapOf<String, File>()
@@ -21,16 +21,22 @@ class DocxImageExtractor(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     // Berkas gambar di Microsoft OpenXML tersimpan di folder word/media/
-                    if (entry.name.startsWith("word/media/")) {
-                        val imageName = entry.name.substringAfterLast("/")
-                        val outputFile = File(cacheDir, imageName)
+                    // Berkas gambar di OpenDocument (ODT) tersimpan di folder Pictures/
+                    val name = entry.name
+                    if (name.startsWith("word/media/") || name.startsWith("Pictures/") || name.startsWith("pictures/")) {
+                        val imageName = name.substringAfterLast("/")
+                        if (imageName.isNotEmpty()) {
+                            val outputFile = File(cacheDir, imageName)
 
-                        if (!outputFile.exists()) {
-                            FileOutputStream(outputFile).use { output ->
-                                zip.copyTo(output)
+                            if (!outputFile.exists()) {
+                                FileOutputStream(outputFile).use { output ->
+                                    zip.copyTo(output)
+                                }
                             }
+                            extractedImages[imageName] = outputFile
+                            // Also store with full path key for ODT relative links (e.g. Pictures/image.png)
+                            extractedImages[name] = outputFile
                         }
-                        extractedImages[imageName] = outputFile
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
@@ -41,4 +47,6 @@ class DocxImageExtractor(private val context: Context) {
         }
         return@withContext extractedImages
     }
+
+    suspend fun extractImagesFromOdt(odtFile: File): Map<String, File> = extractImagesFromDocx(odtFile)
 }

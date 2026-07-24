@@ -79,25 +79,46 @@ class DocxDocumentParser(private val context: Context) {
                 var inParagraph = false
                 var inText = false
                 val currentParagraph = StringBuilder()
+                var isFirstCellInRow = true
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             val tagName = parser.name
-                            if (tagName.equals("w:p", ignoreCase = true) || tagName.equals("p", ignoreCase = true)) {
-                                inParagraph = true
-                                currentParagraph.clear()
-                            } else if (tagName.equals("w:t", ignoreCase = true) || tagName.equals("t", ignoreCase = true)) {
-                                inText = true
-                            } else if (tagName.equals("w:br", ignoreCase = true) || tagName.equals("br", ignoreCase = true)) {
-                                currentParagraph.append("\n")
-                            } else if (tagName.equals("wp:extent", ignoreCase = true) || tagName.equals("extent", ignoreCase = true)) {
-                                val cxStr = parser.getAttributeValue(null, "cx")
-                                val cyStr = parser.getAttributeValue(null, "cy")
-                                val cx = cxStr?.toLongOrNull() ?: 0L
-                                val cy = cyStr?.toLongOrNull() ?: 0L
-                                if (cx > 0 && cy > 0) {
-                                    extentsMap["default"] = Pair(cx, cy)
+                            val tagLower = tagName.lowercase()
+                            when {
+                                tagLower == "w:p" || tagLower == "p" -> {
+                                    inParagraph = true
+                                }
+                                tagLower == "w:numpr" || tagLower == "numpr" -> {
+                                    currentParagraph.append("• ")
+                                }
+                                tagLower == "w:t" || tagLower == "t" -> {
+                                    inText = true
+                                }
+                                tagLower == "w:br" || tagLower == "br" || tagLower == "w:cr" || tagLower == "cr" -> {
+                                    currentParagraph.append("\n")
+                                }
+                                tagLower == "w:tab" || tagLower == "tab" -> {
+                                    currentParagraph.append("\t")
+                                }
+                                tagLower == "w:tc" || tagLower == "tc" -> {
+                                    if (!isFirstCellInRow) {
+                                        currentParagraph.append("\t")
+                                    }
+                                    isFirstCellInRow = false
+                                }
+                                tagLower == "w:tr" || tagLower == "tr" -> {
+                                    isFirstCellInRow = true
+                                }
+                                tagLower == "wp:extent" || tagLower == "extent" -> {
+                                    val cxStr = parser.getAttributeValue(null, "cx")
+                                    val cyStr = parser.getAttributeValue(null, "cy")
+                                    val cx = cxStr?.toLongOrNull() ?: 0L
+                                    val cy = cyStr?.toLongOrNull() ?: 0L
+                                    if (cx > 0 && cy > 0) {
+                                        extentsMap["default"] = Pair(cx, cy)
+                                    }
                                 }
                             }
                         }
@@ -108,17 +129,31 @@ class DocxDocumentParser(private val context: Context) {
                         }
                         XmlPullParser.END_TAG -> {
                             val tagName = parser.name
-                            if (tagName.equals("w:t", ignoreCase = true) || tagName.equals("t", ignoreCase = true)) {
-                                inText = false
-                            } else if (tagName.equals("w:p", ignoreCase = true) || tagName.equals("p", ignoreCase = true)) {
-                                inParagraph = false
-                                if (currentParagraph.isNotEmpty()) {
-                                    textBuilder.append(currentParagraph.toString()).append("\n\n")
+                            val tagLower = tagName.lowercase()
+                            when {
+                                tagLower == "w:t" || tagLower == "t" -> {
+                                    inText = false
+                                }
+                                tagLower == "w:p" || tagLower == "p" -> {
+                                    inParagraph = false
+                                    if (currentParagraph.isNotEmpty()) {
+                                        textBuilder.append(currentParagraph.toString()).append("\n\n")
+                                        currentParagraph.clear()
+                                    }
+                                }
+                                tagLower == "w:tr" || tagLower == "tr" -> {
+                                    if (currentParagraph.isNotEmpty()) {
+                                        textBuilder.append(currentParagraph.toString()).append("\n")
+                                        currentParagraph.clear()
+                                    }
                                 }
                             }
                         }
                     }
                     eventType = parser.next()
+                }
+                if (currentParagraph.isNotEmpty()) {
+                    textBuilder.append(currentParagraph.toString())
                 }
             }
         } catch (e: Exception) {
@@ -139,6 +174,7 @@ class DocxDocumentParser(private val context: Context) {
     }
 
     private suspend fun parseOdtFile(odtFile: File): DocxParseResult = withContext(Dispatchers.IO) {
+        val extractedImages = imageExtractor.extractImagesFromOdt(odtFile)
         val textBuilder = StringBuilder()
         try {
             var contentXmlBytes: ByteArray? = null
@@ -160,34 +196,71 @@ class DocxDocumentParser(private val context: Context) {
                 parser.setInput(stream, "UTF-8")
 
                 var eventType = parser.eventType
-                var inText = false
+                var inTextElement = false
                 val currentPara = StringBuilder()
+                var isFirstCellInRow = true
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             val tagName = parser.name
-                            if (tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h") {
-                                inText = true
-                                currentPara.clear()
+                            when {
+                                tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h" -> {
+                                    inTextElement = true
+                                }
+                                tagName == "text:list-item" || tagName == "list-item" -> {
+                                    currentPara.append("• ")
+                                }
+                                tagName == "text:line-break" || tagName == "line-break" -> {
+                                    currentPara.append("\n")
+                                }
+                                tagName == "text:tab" || tagName == "tab" -> {
+                                    currentPara.append("\t")
+                                }
+                                tagName == "text:s" || tagName == "s" -> {
+                                    val countAttr = parser.getAttributeValue(null, "c") ?: parser.getAttributeValue(null, "text:c")
+                                    val count = countAttr?.toIntOrNull() ?: 1
+                                    repeat(count) { currentPara.append(" ") }
+                                }
+                                tagName == "table:table-cell" || tagName == "table-cell" -> {
+                                    if (!isFirstCellInRow) {
+                                        currentPara.append("\t")
+                                    }
+                                    isFirstCellInRow = false
+                                }
+                                tagName == "table:table-row" || tagName == "table-row" -> {
+                                    isFirstCellInRow = true
+                                }
                             }
                         }
                         XmlPullParser.TEXT -> {
-                            if (inText) {
+                            if (inTextElement || parser.text.trim().isNotEmpty()) {
                                 currentPara.append(parser.text)
                             }
                         }
                         XmlPullParser.END_TAG -> {
                             val tagName = parser.name
-                            if (tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h") {
-                                inText = false
-                                if (currentPara.isNotEmpty()) {
-                                    textBuilder.append(currentPara.toString()).append("\n\n")
+                            when {
+                                tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h" -> {
+                                    inTextElement = false
+                                    if (currentPara.isNotEmpty()) {
+                                        textBuilder.append(currentPara.toString()).append("\n\n")
+                                        currentPara.clear()
+                                    }
+                                }
+                                tagName == "table:table-row" || tagName == "table-row" -> {
+                                    if (currentPara.isNotEmpty()) {
+                                        textBuilder.append(currentPara.toString()).append("\n")
+                                        currentPara.clear()
+                                    }
                                 }
                             }
                         }
                     }
                     eventType = parser.next()
+                }
+                if (currentPara.isNotEmpty()) {
+                    textBuilder.append(currentPara.toString())
                 }
             }
         } catch (e: Exception) {
@@ -195,7 +268,10 @@ class DocxDocumentParser(private val context: Context) {
         }
 
         val resultStr = textBuilder.toString().trim()
-        return@withContext DocxParseResult(if (resultStr.isBlank()) "Empty Document" else resultStr)
+        return@withContext DocxParseResult(
+            text = if (resultStr.isBlank()) "Empty Document" else resultStr,
+            extractedImages = extractedImages
+        )
     }
 
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
@@ -220,28 +296,87 @@ class DocxDocumentParser(private val context: Context) {
             
             // Check if file is empty or doesn't exist yet (new document case)
             if (!file.exists() || file.length() == 0L) {
-                // If it's a new document, we can write a basic ZIP structure with the target xml entry
+                // If it's a new document, create full standard ODT / DOCX ZIP container
                 java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
-                    val newEntry = java.util.zip.ZipEntry(targetEntry)
-                    zout.putNextEntry(newEntry)
-                    val updatedXmlBytes = if (isDocx) {
-                        generateDocxXml(text)
+                    if (isOdt) {
+                        // 1. mimetype (must be uncompressed/stored or first entry in ODT)
+                        val mimeEntry = java.util.zip.ZipEntry("mimetype")
+                        mimeEntry.method = java.util.zip.ZipEntry.STORED
+                        val mimeBytes = "application/vnd.oasis.opendocument.text".toByteArray(Charsets.UTF_8)
+                        mimeEntry.size = mimeBytes.size.toLong()
+                        val crc = java.util.zip.CRC32()
+                        crc.update(mimeBytes)
+                        mimeEntry.crc = crc.value
+                        zout.putNextEntry(mimeEntry)
+                        zout.write(mimeBytes)
+                        zout.closeEntry()
+
+                        // 2. META-INF/manifest.xml
+                        val manifestEntry = java.util.zip.ZipEntry("META-INF/manifest.xml")
+                        zout.putNextEntry(manifestEntry)
+                        zout.write(generateOdtManifestXml())
+                        zout.closeEntry()
+
+                        // 3. styles.xml
+                        val stylesEntry = java.util.zip.ZipEntry("styles.xml")
+                        zout.putNextEntry(stylesEntry)
+                        zout.write(generateOdtStylesXml())
+                        zout.closeEntry()
+
+                        // 4. content.xml
+                        val contentEntry = java.util.zip.ZipEntry("content.xml")
+                        zout.putNextEntry(contentEntry)
+                        zout.write(generateOdtXml(text))
+                        zout.closeEntry()
                     } else {
-                        generateOdtXml(text)
+                        // 1. [Content_Types].xml
+                        val ctEntry = java.util.zip.ZipEntry("[Content_Types].xml")
+                        zout.putNextEntry(ctEntry)
+                        zout.write(generateDocxContentTypesXml())
+                        zout.closeEntry()
+
+                        // 2. _rels/.rels
+                        val relsEntry = java.util.zip.ZipEntry("_rels/.rels")
+                        zout.putNextEntry(relsEntry)
+                        zout.write(generateDocxRelsXml())
+                        zout.closeEntry()
+
+                        // 3. word/_rels/document.xml.rels
+                        val docRelsEntry = java.util.zip.ZipEntry("word/_rels/document.xml.rels")
+                        zout.putNextEntry(docRelsEntry)
+                        zout.write(generateDocxDocumentRelsXml())
+                        zout.closeEntry()
+
+                        // 4. word/document.xml
+                        val newEntry = java.util.zip.ZipEntry(targetEntry)
+                        zout.putNextEntry(newEntry)
+                        zout.write(generateDocxXml(text))
+                        zout.closeEntry()
                     }
-                    zout.write(updatedXmlBytes)
-                    zout.closeEntry()
                 }
             } else {
                 java.util.zip.ZipInputStream(file.inputStream()).use { zin ->
                     java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
                         var entry = zin.nextEntry
                         var foundTarget = false
+                        var foundMime = false
+                        var foundManifest = false
+                        var foundStyles = false
+                        var foundContentTypes = false
+                        var foundRels = false
+
                         while (entry != null) {
-                            val newEntry = java.util.zip.ZipEntry(entry.name)
+                            val entryName = entry.name
+                            if (entryName == "mimetype") foundMime = true
+                            if (entryName == "META-INF/manifest.xml") foundManifest = true
+                            if (entryName == "styles.xml") foundStyles = true
+                            if (entryName == "[Content_Types].xml") foundContentTypes = true
+                            if (entryName == "_rels/.rels") foundRels = true
+
+                            val newEntry = java.util.zip.ZipEntry(entryName)
                             zout.putNextEntry(newEntry)
                             
-                            if (entry.name == targetEntry) {
+                            if (entryName == targetEntry) {
                                 foundTarget = true
                                 val updatedXmlBytes = if (isDocx) {
                                     generateDocxXml(text)
@@ -265,6 +400,34 @@ class DocxDocumentParser(private val context: Context) {
                             zout.write(updatedXmlBytes)
                             zout.closeEntry()
                         }
+
+                        if (isOdt) {
+                            if (!foundManifest) {
+                                val manifestEntry = java.util.zip.ZipEntry("META-INF/manifest.xml")
+                                zout.putNextEntry(manifestEntry)
+                                zout.write(generateOdtManifestXml())
+                                zout.closeEntry()
+                            }
+                            if (!foundStyles) {
+                                val stylesEntry = java.util.zip.ZipEntry("styles.xml")
+                                zout.putNextEntry(stylesEntry)
+                                zout.write(generateOdtStylesXml())
+                                zout.closeEntry()
+                            }
+                        } else if (isDocx) {
+                            if (!foundContentTypes) {
+                                val ctEntry = java.util.zip.ZipEntry("[Content_Types].xml")
+                                zout.putNextEntry(ctEntry)
+                                zout.write(generateDocxContentTypesXml())
+                                zout.closeEntry()
+                            }
+                            if (!foundRels) {
+                                val relsEntry = java.util.zip.ZipEntry("_rels/.rels")
+                                zout.putNextEntry(relsEntry)
+                                zout.write(generateDocxRelsXml())
+                                zout.closeEntry()
+                            }
+                        }
                     }
                 }
             }
@@ -283,6 +446,52 @@ class DocxDocumentParser(private val context: Context) {
         return@withContext success
     }
 
+    private fun generateOdtManifestXml(): ByteArray {
+        val xml = """<?xml version="1.0" encoding="UTF-8"?>
+<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+ <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+ <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+ <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
+</manifest:manifest>""".trimIndent()
+        return xml.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun generateOdtStylesXml(): ByteArray {
+        val xml = """<?xml version="1.0" encoding="UTF-8"?>
+<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.2">
+  <office:styles/>
+</office:document-styles>""".trimIndent()
+        return xml.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun generateDocxContentTypesXml(): ByteArray {
+        val xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>""".trimIndent()
+        return xml.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun generateDocxRelsXml(): ByteArray {
+        val xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>""".trimIndent()
+        return xml.toByteArray(Charsets.UTF_8)
+    }
+
+    private fun generateDocxDocumentRelsXml(): ByteArray {
+        val xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+</Relationships>""".trimIndent()
+        return xml.toByteArray(Charsets.UTF_8)
+    }
+
     private fun generateDocxXml(text: String): ByteArray {
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
@@ -294,7 +503,7 @@ class DocxDocumentParser(private val context: Context) {
             val escapedText = escapeXml(p)
             sb.append("    <w:p>\n")
             sb.append("      <w:r>\n")
-            sb.append("        <w:t>$escapedText</w:t>\n")
+            sb.append("        <w:t xml:space=\"preserve\">$escapedText</w:t>\n")
             sb.append("      </w:r>\n")
             sb.append("    </w:p>\n")
         }
