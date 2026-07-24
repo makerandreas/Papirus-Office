@@ -12,21 +12,26 @@ import java.util.zip.ZipInputStream
 data class DocxParseResult(
     val text: String,
     val extractedImages: Map<String, File> = emptyMap(),
-    val imageExtents: Map<String, Pair<Long, Long>> = emptyMap()
+    val imageExtents: Map<String, Pair<Long, Long>> = emptyMap(),
+    val parsedDocument: OfficeParsedDocument? = null
 )
 
 class DocxDocumentParser(private val context: Context) {
 
     private val imageExtractor = DocxImageExtractor(context)
+    private val officeParser = OfficeDocumentParser(context)
 
     suspend fun parseDocument(file: File): DocxParseResult = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext DocxParseResult("")
 
         val fileName = file.name.lowercase()
-        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || isZipFile(file)) {
-            return@withContext parseDocxFile(file)
-        } else if (fileName.endsWith(".odt")) {
-            return@withContext parseOdtFile(file)
+        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || isZipFile(file)) {
+            val parsedDoc = officeParser.parseDocument(file)
+            return@withContext DocxParseResult(
+                text = parsedDoc.plainText,
+                extractedImages = parsedDoc.extractedImages,
+                parsedDocument = parsedDoc
+            )
         } else {
             // Plain text fallback
             return@withContext try {
@@ -279,7 +284,11 @@ class DocxDocumentParser(private val context: Context) {
         val isDocx = fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".xlsx") || fileName.endsWith(".pptx")
         val isOdt = fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".odp")
         
-        if (!isDocx && !isOdt) {
+        if (isOdt) {
+            return@withContext officeParser.saveOdtDocument(file, text)
+        }
+
+        if (!isDocx) {
             // Write raw text for plain text fallback
             return@withContext try {
                 file.writeText(text)

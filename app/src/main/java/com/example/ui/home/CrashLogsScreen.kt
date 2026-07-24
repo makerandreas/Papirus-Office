@@ -116,6 +116,7 @@ fun CrashLogsScreen(
                         val tag = when {
                             stackTrace.contains("libreoffice") || stackTrace.contains("lok::") || exceptionType.contains("Signal") -> "Native Core"
                             stackTrace.contains("JNI") || exceptionType.contains("Serialization") -> "JNI Bridge"
+                            stackTrace.contains("DocParser") || exceptionType.contains("Xml") || exceptionType.contains("Tag") -> "Document Parser"
                             else -> "JVM UI"
                         }
                         
