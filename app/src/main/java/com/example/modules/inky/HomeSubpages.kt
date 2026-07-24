@@ -18,17 +18,46 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
-// Helper item for displaying standard M3 Expressive list rows
+// ==========================================
+// M3 Expressive Shared UI Base Components
+// (Derived from File Subpage Design Base)
+// ==========================================
+
+@Composable
+fun HomeSectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+fun HomeSectionDivider() {
+    Spacer(modifier = Modifier.height(12.dp))
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+        modifier = Modifier.padding(horizontal = 16.dp)
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+}
+
 @Composable
 fun M3ListItem(
     headlineText: String,
@@ -58,13 +87,13 @@ fun M3ListItem(
                 Text(
                     text = headlineText,
                     style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (supportingText != null) {
                     Text(
                         text = supportingText,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -78,7 +107,48 @@ fun M3ListItem(
     }
 }
 
-// 3-Column action row component for compact tools
+@Composable
+fun ExpressiveActionCard(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .height(80.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
 @Composable
 fun ThreeColumnRow(
     col1: @Composable RowScope.() -> Unit,
@@ -89,21 +159,24 @@ fun ThreeColumnRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Row { col1() }
+            Row(modifier = Modifier.fillMaxWidth()) { col1() }
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Row { col2() }
+            Row(modifier = Modifier.fillMaxWidth()) { col2() }
         }
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            Row { col3() }
+            Row(modifier = Modifier.fillMaxWidth()) { col3() }
         }
     }
 }
 
-// HomeSubpage - Main Dashboard Tab
+// ==========================================
+// Home Ribbon Tab Main Subpage
+// ==========================================
+
 @Composable
 fun HomeSubpage(
     context: Context,
@@ -124,218 +197,176 @@ fun HomeSubpage(
     onNavigateSubpage: (String) -> Unit,
     onShowFontSizeDialog: () -> Unit
 ) {
-    var showCapitalizationMenu by remember { mutableStateOf(false) }
     var showRtlState by remember { mutableStateOf(false) }
     var showParagraphMarks by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         // --- GRUP EDIT ---
-        Text(
-            text = "Edit",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Edit")
 
-        // Paste item with trailing options
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = Color.Transparent
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Click to Paste
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            Toast.makeText(context, "Pasting text from clipboard...", Toast.LENGTH_SHORT).show()
-                        }
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Rounded.ContentPaste,
-                        contentDescription = "Paste",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
-                    Text(
-                        "Paste",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Vertical Divider & Chevron to Paste Options
-                Box(
-                    modifier = Modifier
-                        .height(24.dp)
-                        .width(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+        // Paste Item
+        M3ListItem(
+            headlineText = "Paste",
+            supportingText = "Paste from clipboard",
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.ContentPaste,
+                    contentDescription = "Paste",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
                 )
-
-                IconButton(
-                    onClick = { onNavigateSubpage("paste_options") },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
+            },
+            trailingContent = {
+                IconButton(onClick = { onNavigateSubpage("paste_options") }) {
                     Icon(
                         Icons.Rounded.ChevronRight,
                         contentDescription = "Paste Options",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            },
+            onClick = {
+                Toast.makeText(context, "Pasting text from clipboard...", Toast.LENGTH_SHORT).show()
             }
-        }
+        )
 
-        // Row containing Cut, Copy, Format Painter
+        // Cut, Copy, Painter 3-Column Expressive Row
         ThreeColumnRow(
             col1 = {
-                FilledTonalButton(
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.ContentCut,
+                    label = "Cut",
                     onClick = { Toast.makeText(context, "Cut text", Toast.LENGTH_SHORT).show() },
-                    modifier = Modifier.fillMaxWidth().testTag("home_cut_btn"),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Rounded.ContentCut, contentDescription = "Cut", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Cut", fontSize = 11.sp)
-                }
+                    modifier = Modifier.fillMaxWidth().testTag("home_cut_btn")
+                )
             },
             col2 = {
-                FilledTonalButton(
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.ContentCopy,
+                    label = "Copy",
                     onClick = { Toast.makeText(context, "Copied text", Toast.LENGTH_SHORT).show() },
-                    modifier = Modifier.fillMaxWidth().testTag("home_copy_btn"),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Copy", fontSize = 11.sp)
-                }
+                    modifier = Modifier.fillMaxWidth().testTag("home_copy_btn")
+                )
             },
             col3 = {
-                FilledTonalButton(
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.FormatPaint,
+                    label = "Painter",
                     onClick = { Toast.makeText(context, "Format Painter activated", Toast.LENGTH_SHORT).show() },
-                    modifier = Modifier.fillMaxWidth().testTag("home_painter_btn"),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
-                ) {
-                    Icon(Icons.Rounded.FormatPaint, contentDescription = "Format Painter", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text("Painter", fontSize = 11.sp)
-                }
+                    modifier = Modifier.fillMaxWidth().testTag("home_painter_btn")
+                )
             }
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
         // --- GRUP CHARACTER ---
-        Text(
-            text = "Character",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Character")
 
-        // Font style selector (1 baris 2 kolom size representation)
         M3ListItem(
             headlineText = "Font style",
             supportingText = activeFontFamily,
-            leadingIcon = { Icon(Icons.Rounded.FontDownload, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Font") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FontDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("font_style") }
         )
 
-        // Font size selector
         M3ListItem(
             headlineText = "Font size",
             supportingText = "$activeFontSize pt",
-            leadingIcon = { Icon(Icons.Rounded.FormatSize, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.Edit, contentDescription = "Ubah Ukuran Font") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatSize,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.Edit, contentDescription = "Ubah Ukuran Font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = onShowFontSizeDialog
         )
 
-        // Bold, Italic, Underline (with options)
+        // Bold, Italic, Underline Expressive Cards
         ThreeColumnRow(
             col1 = {
-                IconToggleButton(
-                    checked = isBold,
-                    onCheckedChange = onBoldChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = IconButtonDefaults.iconToggleButtonColors(
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Bold", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.FormatBold,
+                    label = "Bold",
+                    isSelected = isBold,
+                    onClick = { onBoldChange(!isBold) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col2 = {
-                IconToggleButton(
-                    checked = isItalic,
-                    onCheckedChange = onItalicChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = IconButtonDefaults.iconToggleButtonColors(
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Italic", fontWeight = FontWeight.Normal, fontSize = 12.sp)
-                    }
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.FormatItalic,
+                    label = "Italic",
+                    isSelected = isItalic,
+                    onClick = { onItalicChange(!isItalic) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col3 = {
-                // Custom Underline action row with vertical divider & chevron down
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isUnderline) MaterialTheme.colorScheme.primaryContainer else Color.Transparent),
-                    color = Color.Transparent
+                        .height(80.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isUnderline) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
                             onClick = { onUnderlineChange(!isUnderline) },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                Icons.Rounded.FormatUnderlined,
-                                contentDescription = "Underline",
-                                tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Rounded.FormatUnderlined,
+                                    contentDescription = "Underline",
+                                    tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    "Underline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    color = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                         Box(
                             modifier = Modifier
-                                .height(20.dp)
+                                .height(32.dp)
                                 .width(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
+                                .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                         )
                         IconButton(
                             onClick = { onNavigateSubpage("underline_options") },
-                            modifier = Modifier.width(36.dp)
+                            modifier = Modifier.width(32.dp)
                         ) {
                             Icon(
                                 Icons.Rounded.KeyboardArrowDown,
                                 contentDescription = "Underline Options",
-                                modifier = Modifier.size(16.dp),
-                                tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -343,58 +374,51 @@ fun HomeSubpage(
             }
         )
 
-        // Strikethrough, Subscript, Superscript row
+        // Strikethrough, Subscript, Superscript Row
         ThreeColumnRow(
             col1 = {
-                IconToggleButton(
-                    checked = isStrikethrough,
-                    onCheckedChange = onStrikethroughChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = IconButtonDefaults.iconToggleButtonColors(
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.StrikethroughS, contentDescription = "Strikethrough")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Strike", fontSize = 11.sp)
-                    }
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.StrikethroughS,
+                    label = "Strikethrough",
+                    isSelected = isStrikethrough,
+                    onClick = { onStrikethroughChange(!isStrikethrough) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col2 = {
-                FilledTonalButton(
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.Subscript,
+                    label = "Subscript",
                     onClick = { Toast.makeText(context, "Subscript applied", Toast.LENGTH_SHORT).show() },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    Icon(Icons.Rounded.Subscript, contentDescription = "Subscript", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text("Sub", fontSize = 10.sp)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col3 = {
-                FilledTonalButton(
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.Superscript,
+                    label = "Superscript",
                     onClick = { Toast.makeText(context, "Superscript applied", Toast.LENGTH_SHORT).show() },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 2.dp)
-                ) {
-                    Icon(Icons.Rounded.Superscript, contentDescription = "Superscript", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text("Super", fontSize = 10.sp)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         )
 
-        // Change Capitalization Subpage Link
         M3ListItem(
             headlineText = "Change Capitalization",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Capitalization Options") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.TextFields,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Capitalization Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("change_capitalization") }
         )
 
-        // Font Color
         M3ListItem(
             headlineText = "Font Color",
             leadingIcon = {
@@ -406,11 +430,12 @@ fun HomeSubpage(
                         .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 )
             },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color") },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("font_color") }
         )
 
-        // Highlight Text Color
         M3ListItem(
             headlineText = "Highlight Text Color",
             leadingIcon = {
@@ -422,14 +447,22 @@ fun HomeSubpage(
                         .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 )
             },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color") },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("highlight_color") }
         )
 
-        // Delete formatting
         M3ListItem(
             headlineText = "Delete all formatting",
-            leadingIcon = { Icon(Icons.Rounded.FormatClear, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatClear,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             onClick = {
                 onBoldChange(false)
                 onItalicChange(false)
@@ -439,30 +472,30 @@ fun HomeSubpage(
             }
         )
 
-        // Character Options
         M3ListItem(
             headlineText = "Character Options",
-            leadingIcon = { Icon(Icons.Rounded.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             onClick = { Toast.makeText(context, "Character Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
         // --- GRUP PARAGRAPH ---
-        Text(
-            text = "Paragraph",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Paragraph")
 
-        // Alignment Row (4 Columns)
+        // Alignments 4-card row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val alignments = listOf(
                 TextAlign.Left to Icons.Rounded.FormatAlignLeft,
@@ -472,84 +505,124 @@ fun HomeSubpage(
             )
             alignments.forEach { (align, icon) ->
                 val isSelected = textAlignment == align
-                IconButton(
-                    onClick = { onTextAlignmentChange(align) },
+                Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                        .border(1.dp, if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .height(60.dp)
+                        .clickable { onTextAlignmentChange(align) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 ) {
-                    Icon(
-                        icon,
-                        contentDescription = "Align ${align.toString()}",
-                        tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = "Align ${align.toString()}",
+                            tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
         }
 
-        // Indent Row (2 Columns)
+        // Indent Cards
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            FilledTonalButton(
+            ExpressiveActionCard(
+                icon = Icons.Rounded.FormatIndentIncrease,
+                label = "Increase Indent",
                 onClick = { Toast.makeText(context, "Indent increased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Increase Indent", fontSize = 11.sp)
-            }
-            FilledTonalButton(
+            )
+            ExpressiveActionCard(
+                icon = Icons.Rounded.FormatIndentDecrease,
+                label = "Decrease Indent",
                 onClick = { Toast.makeText(context, "Indent decreased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Decrease Indent", fontSize = 11.sp)
-            }
+            )
         }
 
-        // Set line spacing
         M3ListItem(
             headlineText = "Set line spacing",
-            leadingIcon = { Icon(Icons.Rounded.FormatLineSpacing, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Spacing") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatLineSpacing,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Spacing", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("line_spacing") }
         )
 
-        // Create bulleted list
         M3ListItem(
             headlineText = "Create bulleted list",
-            leadingIcon = { Icon(Icons.Rounded.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Bullets") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatListBulleted,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Bullets", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("bulleted_list") }
         )
 
-        // Create numbered list
         M3ListItem(
             headlineText = "Create numbered list",
-            leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Numbers") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatListNumbered,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Numbers", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("numbered_list") }
         )
 
-        // Create multilevel list
         M3ListItem(
             headlineText = "Create multilevel list",
-            leadingIcon = { Icon(Icons.Rounded.FormatListBulleted, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) }, // icon representation
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Multilevel") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Layers,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Multilevel", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("multilevel_list") }
         )
 
-        // Toggle paragraph marks
         M3ListItem(
             headlineText = "Toggle paragraph marks",
-            leadingIcon = { Icon(Icons.Rounded.Notes, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Notes,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             trailingContent = {
                 Switch(
                     checked = showParagraphMarks,
@@ -559,17 +632,29 @@ fun HomeSubpage(
             onClick = { showParagraphMarks = !showParagraphMarks }
         )
 
-        // Sort text/table
         M3ListItem(
             headlineText = "Sort text/table",
-            leadingIcon = { Icon(Icons.Rounded.SortByAlpha, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.SortByAlpha,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             onClick = { Toast.makeText(context, "Sorting document...", Toast.LENGTH_SHORT).show() }
         )
 
-        // Toggle RTL writing direction
         M3ListItem(
             headlineText = "Toggle RTL writing direction",
-            leadingIcon = { Icon(Icons.Rounded.FormatTextdirectionRToL, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatTextdirectionRToL,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             trailingContent = {
                 Switch(
                     checked = showRtlState,
@@ -579,53 +664,83 @@ fun HomeSubpage(
             onClick = { showRtlState = !showRtlState }
         )
 
-        // Paragraph Shading Color
         M3ListItem(
             headlineText = "Paragraph Shading Color",
-            leadingIcon = { Icon(Icons.Rounded.FormatColorFill, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Shading Color") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatColorFill,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Shading Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("paragraph_shading") }
         )
 
-        // Paragraph Border
         M3ListItem(
             headlineText = "Paragraph Border",
-            leadingIcon = { Icon(Icons.Rounded.BorderAll, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Configure Border") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.BorderAll,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Configure Border", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("paragraph_border") }
         )
 
-        // Paragraph Options
         M3ListItem(
             headlineText = "Paragraph Options",
-            leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             onClick = { Toast.makeText(context, "Paragraph Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
         // --- GRUP STYLES ---
-        Text(
-            text = "Styles",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Styles")
 
-        // Style selector
         M3ListItem(
             headlineText = "Style selector",
             supportingText = "Select paragraph formatting style",
-            leadingIcon = { Icon(Icons.Rounded.Style, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Paragraph Styles") },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Style,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Paragraph Styles", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
             onClick = { onNavigateSubpage("paragraph_styles") }
         )
 
-        // Paragraph Style Options
         M3ListItem(
             headlineText = "Paragraph Style Options",
-            leadingIcon = { Icon(Icons.Rounded.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.EditNote,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
             onClick = { Toast.makeText(context, "Paragraph Style Options will be available soon", Toast.LENGTH_SHORT).show() }
         )
 
@@ -633,38 +748,42 @@ fun HomeSubpage(
     }
 }
 
+// ==========================================
+// Sub-Subpages
+// ==========================================
+
 // 1. PasteOptionsSubpage
 @Composable
 fun PasteOptionsSubpage(context: Context, onShowPasteSpecial: () -> Unit) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Paste Options")
         M3ListItem(
             headlineText = "Keep source formatting",
             supportingText = "Keep original style from the source",
-            leadingIcon = { Icon(Icons.Rounded.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            leadingIcon = { Icon(Icons.Rounded.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Pasted text with Keep Source Formatting", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Merge formatting",
             supportingText = "Merge source style with document style",
-            leadingIcon = { Icon(Icons.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            leadingIcon = { Icon(Icons.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Pasted text with Merge Formatting", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Paste unformatted text",
             supportingText = "Paste clean text without formatting",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Clean text pasted successfully", Toast.LENGTH_SHORT).show() }
         )
-        
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
-        
+
+        HomeSectionDivider()
+
+        HomeSectionHeader("Advanced Paste")
         M3ListItem(
             headlineText = "Paste Special...",
             supportingText = "Advanced formatting choices",
-            leadingIcon = { Icon(Icons.Rounded.SettingsApplications, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = {
-                onShowPasteSpecial()
-            }
+            leadingIcon = { Icon(Icons.Rounded.SettingsApplications, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            onClick = onShowPasteSpecial
         )
     }
 }
@@ -683,17 +802,12 @@ fun FontStyleSubpage(
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "Google Fonts Database",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
+        HomeSectionHeader("Google Fonts Database")
         fonts.forEach { fontName ->
             val isSelected = fontName == currentFont
             M3ListItem(
                 headlineText = fontName,
-                supportingText = if (isSelected) "Active" else "Tap to select",
+                supportingText = if (isSelected) "Active Font" else "Tap to apply",
                 leadingIcon = {
                     Icon(
                         Icons.Rounded.CheckCircle,
@@ -724,28 +838,23 @@ fun UnderlineOptionsSubpage(
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Color Settings")
         M3ListItem(
             headlineText = "Underline color",
-            supportingText = "Choose underline color",
-            leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Color") },
+            supportingText = "Choose underline color palette",
+            leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Color", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             onClick = onOpenColorPage
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
-        Text(
-            text = "Line Style",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
+        HomeSectionHeader("Line Style")
         lineStyles.forEach { style ->
             M3ListItem(
                 headlineText = style,
                 supportingText = "Apply this underline style",
-                leadingIcon = { Icon(Icons.Rounded.HorizontalRule, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+                leadingIcon = { Icon(Icons.Rounded.HorizontalRule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Underline style $style applied", Toast.LENGTH_SHORT).show()
                 }
@@ -763,11 +872,12 @@ fun LineSpacingSubpage(context: Context) {
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Line Spacing Presets")
         options.forEach { opt ->
             M3ListItem(
                 headlineText = opt,
                 supportingText = "Select line spacing $opt",
-                leadingIcon = { Icon(Icons.Rounded.LineStyle, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+                leadingIcon = { Icon(Icons.Rounded.LineStyle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Spacing $opt selected", Toast.LENGTH_SHORT).show()
                 }
@@ -785,11 +895,12 @@ fun BulletedListSubpage(context: Context) {
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Bullet Variants")
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = variant,
                 supportingText = "Apply this bullet style",
-                leadingIcon = { Icon(Icons.Rounded.RadioButtonChecked, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                leadingIcon = { Icon(Icons.Rounded.RadioButtonChecked, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Bulleted $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
@@ -806,11 +917,12 @@ fun NumberedListSubpage(context: Context) {
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Numbering Formats")
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = "Format $variant",
                 supportingText = "Use this numbering sequence",
-                leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Numbered $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
@@ -830,11 +942,12 @@ fun MultilevelListSubpage(context: Context) {
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Multilevel List Structures")
         variants.forEach { variant ->
             M3ListItem(
                 headlineText = variant,
                 supportingText = "Use this multilevel structure",
-                leadingIcon = { Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                leadingIcon = { Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Multilevel list $variant applied successfully", Toast.LENGTH_SHORT).show()
                 }
@@ -847,97 +960,91 @@ fun MultilevelListSubpage(context: Context) {
 @Composable
 fun ParagraphBorderSubpage(context: Context) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        // No border option
+        HomeSectionHeader("Quick Border")
         M3ListItem(
             headlineText = "No border",
-            supportingText = "No border lines",
-            leadingIcon = { Icon(Icons.Rounded.BorderClear, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            supportingText = "Remove all border lines",
+            leadingIcon = { Icon(Icons.Rounded.BorderClear, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Border cleared", Toast.LENGTH_SHORT).show() }
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
-        // Normal Category (4 columns representation)
-        Text(
-            text = "Normal Category",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Normal Category")
         ThreeColumnRow(
             col1 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Top Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderTop, contentDescription = "Top")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Top", fontSize = 11.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderTop,
+                    label = "Top",
+                    onClick = { Toast.makeText(context, "Normal Top Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col2 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Bottom Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderBottom, contentDescription = "Bottom")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Bottom", fontSize = 11.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderBottom,
+                    label = "Bottom",
+                    onClick = { Toast.makeText(context, "Normal Bottom Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col3 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Normal Side Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderOuter, contentDescription = "Borders")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Sides", fontSize = 11.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderOuter,
+                    label = "Sides",
+                    onClick = { Toast.makeText(context, "Normal Side Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         )
 
-        // Thick Category
-        Text(
-            text = "Thick Category",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-        )
+        HomeSectionHeader("Thick Category")
         ThreeColumnRow(
             col1 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Top Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderTop, contentDescription = "Top Thick")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Thick Top", fontSize = 10.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderTop,
+                    label = "Thick Top",
+                    onClick = { Toast.makeText(context, "Thick Top Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col2 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Bottom Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderBottom, contentDescription = "Bottom Thick")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Thick Bot", fontSize = 10.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderBottom,
+                    label = "Thick Bot",
+                    onClick = { Toast.makeText(context, "Thick Bottom Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             },
             col3 = {
-                FilledTonalButton(onClick = { Toast.makeText(context, "Thick Outer Border", Toast.LENGTH_SHORT).show() }) {
-                    Icon(Icons.Rounded.BorderOuter, contentDescription = "All Thick")
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Thick Box", fontSize = 10.sp)
-                }
+                ExpressiveActionCard(
+                    icon = Icons.Rounded.BorderOuter,
+                    label = "Thick Box",
+                    onClick = { Toast.makeText(context, "Thick Outer Border", Toast.LENGTH_SHORT).show() },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         )
 
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
-        // Grid Box models
+        HomeSectionHeader("Grid & Box Models")
         M3ListItem(
             headlineText = "Box and grid",
             supportingText = "Apply complete box and grid borders",
-            leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Box and Grid borders applied", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Box",
             supportingText = "Apply outer box border only",
-            leadingIcon = { Icon(Icons.Rounded.CheckBoxOutlineBlank, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = { Icon(Icons.Rounded.CheckBoxOutlineBlank, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Outer Box border applied", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Inside (Grid)",
             supportingText = "Inner grid lines only",
-            leadingIcon = { Icon(Icons.Rounded.GridGoldenratio, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
+            leadingIcon = { Icon(Icons.Rounded.GridGoldenratio, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Inner Grid border applied", Toast.LENGTH_SHORT).show() }
         )
     }
@@ -954,10 +1061,12 @@ fun ParagraphStylesSubpage(
     val styles = listOf("Normal", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle", "Footnote")
 
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Paragraph Styles")
         styles.forEach { styleName ->
             val isSelected = styleName == activeStyle
             M3ListItem(
                 headlineText = styleName,
+                supportingText = if (isSelected) "Active formatting" else "Tap to apply style",
                 leadingIcon = {
                     RadioButton(
                         selected = isSelected,
@@ -968,10 +1077,8 @@ fun ParagraphStylesSubpage(
                     )
                 },
                 trailingContent = {
-                    IconButton(onClick = {
-                        onNavigateStyleOptions(styleName)
-                    }) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Options for $styleName")
+                    IconButton(onClick = { onNavigateStyleOptions(styleName) }) {
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Options for $styleName", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 onClick = {
@@ -990,9 +1097,11 @@ fun CreateNewStyleSubpage(
     onSuccess: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Create Style")
         M3ListItem(
             headlineText = "Create New",
-            leadingIcon = { Icon(Icons.Rounded.AddBox, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            supportingText = "Define new custom style parameters",
+            leadingIcon = { Icon(Icons.Rounded.AddBox, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
                 Toast.makeText(context, "New style created successfully", Toast.LENGTH_SHORT).show()
                 onSuccess()
@@ -1000,7 +1109,8 @@ fun CreateNewStyleSubpage(
         )
         M3ListItem(
             headlineText = "Create New from Text",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            supportingText = "Save current text formatting as a style",
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
                 Toast.makeText(context, "New style from selected text saved successfully", Toast.LENGTH_SHORT).show()
                 onSuccess()
@@ -1017,9 +1127,11 @@ fun StyleOptionsSubpage(
     onSuccess: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Style Actions ($styleName)")
         M3ListItem(
             headlineText = "Edit",
-            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            supportingText = "Modify style attributes",
+            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
                 Toast.makeText(context, "Editing style $styleName...", Toast.LENGTH_SHORT).show()
                 onSuccess()
@@ -1027,7 +1139,8 @@ fun StyleOptionsSubpage(
         )
         M3ListItem(
             headlineText = "Update from Text",
-            leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            supportingText = "Redefine style matching active text selection",
+            leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
                 Toast.makeText(context, "Style $styleName updated", Toast.LENGTH_SHORT).show()
                 onSuccess()
@@ -1036,7 +1149,8 @@ fun StyleOptionsSubpage(
         if (styleName != "Normal") {
             M3ListItem(
                 headlineText = "Delete",
-                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                supportingText = "Remove style permanently",
+                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp)) },
                 onClick = {
                     Toast.makeText(context, "Style $styleName deleted successfully", Toast.LENGTH_SHORT).show()
                     onSuccess()
@@ -1046,7 +1160,47 @@ fun StyleOptionsSubpage(
     }
 }
 
-// 12. Expressive Custom Color Picker Page
+// 12. ChangeCapitalizationSubpage
+@Composable
+fun ChangeCapitalizationSubpage(context: Context) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Capitalization Options")
+        M3ListItem(
+            headlineText = "First Character Uppercase",
+            supportingText = "Capitalize first letter of selected text",
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            onClick = {
+                Toast.makeText(context, "First character capitalized", Toast.LENGTH_SHORT).show()
+            }
+        )
+        M3ListItem(
+            headlineText = "First word uppercase",
+            supportingText = "Capitalize first letter of each sentence",
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            onClick = {
+                Toast.makeText(context, "First word capitalized", Toast.LENGTH_SHORT).show()
+            }
+        )
+        M3ListItem(
+            headlineText = "ALL UPPERCASE",
+            supportingText = "Convert all characters to uppercase",
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            onClick = {
+                Toast.makeText(context, "ALL UPPERCASE", Toast.LENGTH_SHORT).show()
+            }
+        )
+        M3ListItem(
+            headlineText = "all lowercase",
+            supportingText = "Convert all characters to lowercase",
+            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            onClick = {
+                Toast.makeText(context, "all lowercase", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+}
+
+// 13. ColorPickerSubpage
 @Composable
 fun ColorPickerSubpage(
     currentColor: Color,
@@ -1070,7 +1224,8 @@ fun ColorPickerSubpage(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Color Presets:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        HomeSectionHeader("Color Presets ($title)")
+
         val presets = listOf(
             Color.Red, Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
             Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF00BCD4), Color(0xFF009688),
@@ -1102,9 +1257,9 @@ fun ColorPickerSubpage(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HomeSectionDivider()
 
-        Text("Material 3 Expressive Custom Color Picker:", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        HomeSectionHeader("Custom Color Picker")
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1113,9 +1268,9 @@ fun ColorPickerSubpage(
             Box(
                 modifier = Modifier
                     .size(60.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(Color(r, g, b))
-                    .border(1.dp, MaterialTheme.colorScheme.outline)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
             )
             Column {
                 Text("Color Preview", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
@@ -1174,7 +1329,7 @@ fun ColorPickerSubpage(
                     }
                 }
             },
-            label = { Text("Kode HEX") },
+            label = { Text("HEX Code") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace)
@@ -1182,7 +1337,7 @@ fun ColorPickerSubpage(
     }
 }
 
-// 13. Material 3 Expressive Font Size Dialog
+// 14. Font Size Dialog
 @Composable
 fun FontSizeDialog(
     currentSize: Int,
@@ -1211,7 +1366,6 @@ fun FontSizeDialog(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Font size field
                 OutlinedTextField(
                     value = sizeInput,
                     onValueChange = { input ->
@@ -1227,7 +1381,6 @@ fun FontSizeDialog(
                     singleLine = true
                 )
 
-                // Font size slider (max 96)
                 Text(
                     text = "Slide to adjust (max 96 pt):",
                     style = MaterialTheme.typography.labelMedium,
@@ -1268,7 +1421,7 @@ fun FontSizeDialog(
     }
 }
 
-// 14. Paste Special Dialog
+// 15. Paste Special Dialog
 @Composable
 fun PasteSpecialDialog(
     onDismiss: () -> Unit,
@@ -1330,38 +1483,3 @@ fun PasteSpecialDialog(
         }
     }
 }
-
-@Composable
-fun ChangeCapitalizationSubpage(context: Context) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        M3ListItem(
-            headlineText = "First Character Uppercase",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = {
-                Toast.makeText(context, "First character capitalized", Toast.LENGTH_SHORT).show()
-            }
-        )
-        M3ListItem(
-            headlineText = "First word uppercase",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = {
-                Toast.makeText(context, "First word capitalized", Toast.LENGTH_SHORT).show()
-            }
-        )
-        M3ListItem(
-            headlineText = "ALL UPPERCASE",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = {
-                Toast.makeText(context, "ALL UPPERCASE", Toast.LENGTH_SHORT).show()
-            }
-        )
-        M3ListItem(
-            headlineText = "all lowercase",
-            leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) },
-            onClick = {
-                Toast.makeText(context, "all lowercase", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
-}
-

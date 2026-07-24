@@ -103,14 +103,34 @@ class PapirusTextToolbar : TextToolbar {
             val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
             val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
-            val toolbarHeightPx = with(density) { if (mode != FctMode.COMPACT) 280.dp.toPx() else 56.dp.toPx() }
-            val minTopMarginPx = with(density) { 70.dp.toPx() }
+            val compactHeightPx = with(density) { 48.dp.toPx() }
+            val targetExpandedHeightPx = with(density) { 280.dp.toPx() }
+            val gapPx = with(density) { 10.dp.toPx() }
+            val minTopMarginPx = with(density) { 110.dp.toPx() }
+            val minBottomMarginPx = with(density) { 60.dp.toPx() }
             val paddingPx = with(density) { 16.dp.toPx() }.toInt()
 
-            val rawY = if (rectState.top - toolbarHeightPx >= minTopMarginPx) {
-                (rectState.top - toolbarHeightPx).roundToInt()
+            val spaceAbove = rectState.top - gapPx - minTopMarginPx
+            val spaceBelow = screenHeightPx - minBottomMarginPx - (rectState.bottom + gapPx)
+
+            // Determine if the toolbar should anchor ABOVE the cursor/selection or BELOW it.
+            // Using a consistent anchor decision for both COMPACT and EXPANDED modes prevents
+            // the popup from jumping or flipping across the cursor line when expanding.
+            val isAbove = spaceAbove >= targetExpandedHeightPx || (spaceAbove >= compactHeightPx && spaceAbove >= spaceBelow)
+
+            val maxExpandedHeightDp = if (isAbove) {
+                with(density) { spaceAbove.coerceIn(140.dp.toPx(), targetExpandedHeightPx).toDp() }
             } else {
-                (rectState.bottom + with(density) { 8.dp.toPx() }).roundToInt()
+                with(density) { spaceBelow.coerceIn(140.dp.toPx(), targetExpandedHeightPx).toDp() }
+            }
+
+            val maxExpandedHeightPx = with(density) { maxExpandedHeightDp.toPx() }
+            val currentHeightPx = if (mode == FctMode.COMPACT) compactHeightPx else maxExpandedHeightPx
+
+            val rawY = if (isAbove) {
+                (rectState.top - currentHeightPx - gapPx).roundToInt()
+            } else {
+                (rectState.bottom + gapPx).roundToInt()
             }
 
             val popupX = rectState.left.roundToInt().coerceIn(
@@ -119,7 +139,7 @@ class PapirusTextToolbar : TextToolbar {
             )
             val popupY = rawY.coerceIn(
                 paddingPx,
-                (screenHeightPx - with(density) { 220.dp.toPx() }).toInt().coerceAtLeast(paddingPx)
+                (screenHeightPx - currentHeightPx - paddingPx).toInt().coerceAtLeast(paddingPx)
             )
 
             Popup(
@@ -196,7 +216,7 @@ class PapirusTextToolbar : TextToolbar {
                                 Column(
                                     modifier = Modifier
                                         .width(260.dp)
-                                        .heightIn(max = 320.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
                                         .verticalScroll(rememberScrollState())
                                         .padding(vertical = 4.dp)
                                 ) {
@@ -367,7 +387,7 @@ class PapirusTextToolbar : TextToolbar {
                                 Column(
                                     modifier = Modifier
                                         .width(260.dp)
-                                        .heightIn(max = 320.dp)
+                                        .heightIn(max = maxExpandedHeightDp)
                                         .verticalScroll(rememberScrollState())
                                         .padding(vertical = 4.dp)
                                 ) {

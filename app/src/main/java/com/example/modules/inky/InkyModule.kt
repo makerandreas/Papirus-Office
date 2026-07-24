@@ -15,6 +15,9 @@ import com.example.ui.home.ShortcutCard
 import androidx.compose.ui.res.stringResource
 import com.example.R
 
+import androidx.compose.foundation.relocation.BringIntoViewResponder
+import androidx.compose.foundation.relocation.bringIntoViewResponder
+
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -117,7 +120,7 @@ fun partitionTextToPages(text: String, maxLinesPerPage: Int = 15): List<String> 
     return pages
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun InkyModule(
     isTablet: Boolean,
@@ -862,8 +865,22 @@ fun InkyModule(
         }
     }
 
-    LaunchedEffect(docBodyText.selection, docBodyText.text) {
-        delay(50)
+    @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+    val noOpBringIntoViewResponder = remember {
+        object : BringIntoViewResponder {
+            override fun calculateRectForParent(localRect: androidx.compose.ui.geometry.Rect): androidx.compose.ui.geometry.Rect {
+                return localRect
+            }
+
+            override suspend fun bringChildIntoView(localRect: () -> androidx.compose.ui.geometry.Rect?) {
+                // Intentionally empty: prevents default BasicTextField bringIntoView from
+                // scrolling the parent scrollState and pushing paper top padding off-screen.
+            }
+        }
+    }
+
+    LaunchedEffect(docBodyText.selection, docBodyText.text, isKeyboardVisible) {
+        delay(if (isKeyboardVisible) 150L else 50L)
         val cursorOffset = docBodyText.selection.start
         if (cursorOffset >= 0 && cursorOffset <= docBodyText.text.length) {
             val layoutResult = bodyTextLayoutResult
@@ -885,26 +902,33 @@ fun InkyModule(
                 val viewportWidth = viewportCoords.size.width
                 val viewportHeight = viewportCoords.size.height
                 
-                val paddingPx = 32 * density
+                val hPaddingPx = 32 * density
+                val topPaddingPx = 16 * density
+                val bottomPaddingPx = 16 * density
                 
                 val cursorLeft = cursorTopLeftInViewport.x
                 val cursorRight = cursorBottomRightInViewport.x
-                if (cursorLeft < paddingPx) {
-                    val delta = (cursorLeft - paddingPx).toInt()
+                if (cursorLeft < hPaddingPx) {
+                    val delta = (cursorLeft - hPaddingPx).toInt()
                     horizScrollState.scrollTo((horizScrollState.value + delta).coerceAtLeast(0))
-                } else if (cursorRight > viewportWidth - paddingPx) {
-                    val delta = (cursorRight - (viewportWidth - paddingPx)).toInt()
+                } else if (cursorRight > viewportWidth - hPaddingPx) {
+                    val delta = (cursorRight - (viewportWidth - hPaddingPx)).toInt()
                     horizScrollState.scrollTo(horizScrollState.value + delta)
                 }
                 
                 val cursorTop = cursorTopLeftInViewport.y
                 val cursorBottom = cursorBottomRightInViewport.y
-                if (cursorTop < paddingPx) {
-                    val delta = (cursorTop - paddingPx).toInt()
-                    scrollState.scrollTo((scrollState.value + delta).coerceAtLeast(0))
-                } else if (cursorBottom > viewportHeight - paddingPx) {
-                    val delta = (cursorBottom - (viewportHeight - paddingPx)).toInt()
-                    scrollState.scrollTo(scrollState.value + delta)
+                
+                // Only adjust vertical scroll if cursor is actually obscured / outside visible bounds
+                val isCursorVisibleVertically = cursorTop >= topPaddingPx && cursorBottom <= viewportHeight - bottomPaddingPx
+                if (!isCursorVisibleVertically) {
+                    if (cursorTop < topPaddingPx) {
+                        val delta = (cursorTop - topPaddingPx).toInt()
+                        scrollState.scrollTo((scrollState.value + delta).coerceAtLeast(0))
+                    } else if (cursorBottom > viewportHeight - bottomPaddingPx) {
+                        val delta = (cursorBottom - (viewportHeight - bottomPaddingPx)).toInt()
+                        scrollState.scrollTo((scrollState.value + delta).coerceAtLeast(0))
+                    }
                 }
             }
         }
@@ -1413,7 +1437,8 @@ fun InkyModule(
                                                     modifier = Modifier
                                                         .fillMaxSize()
                                                         .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                                        .focusRequester(focusRequester),
+                                                        .focusRequester(focusRequester)
+                                                        .bringIntoViewResponder(noOpBringIntoViewResponder),
                                                     onTextLayout = { bodyTextLayoutResult = it },
                                                     readOnly = !isEditMode,
                                                     textStyle = androidx.compose.ui.text.TextStyle(
