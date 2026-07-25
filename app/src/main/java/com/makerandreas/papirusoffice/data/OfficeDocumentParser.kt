@@ -419,6 +419,22 @@ class OfficeDocumentParser(private val context: Context) {
 
         _parsingProgress.postValue(ParsingProgress(60, context.getString(com.example.R.string.loading_status_processing)))
 
+        if (isOdt || isOds || detectedOdp) {
+            val odfImport = com.makerandreas.papirusoffice.data.odf.SvXMLImport(context, extractedImages)
+            val parsedDoc = odfImport.parseOdfXml(
+                xmlContent = xmlContent,
+                fileName = file.name,
+                isOdt = isOdt,
+                isOds = isOds,
+                isOdp = detectedOdp
+            )
+            if (!parsedDoc.isParsingFailed) {
+                _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
+                cacheRepository.saveCachedDocument(file, parsedDoc)
+                return@withContext parsedDoc
+            }
+        }
+
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
 

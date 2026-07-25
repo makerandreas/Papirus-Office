@@ -535,19 +535,19 @@ fun PapirusOfficeOptionsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetWarningDialog = false }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.reset_cancel_btn))
                 }
             }
         )
     }
 
-    // Popup 2: Restart Required Dialog
+    // Popup 2: Restart Required Dialog (Standardized UI to match Popup 1)
     if (showResetRestartDialog) {
         AlertDialog(
             onDismissRequest = {
                 showResetRestartDialog = false
                 PapirusConfigManager.performReset(context, restartNow = false)
-                Toast.makeText(context, "Reset disiapkan. Akan diterapkan saat aplikasi dibuka kembali.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                 onCloseOptions()
             },
             icon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -559,21 +559,25 @@ fun PapirusOfficeOptionsScreen(
                 )
             },
             confirmButton = {
-                Button(
+                TextButton(
                     onClick = {
                         showResetRestartDialog = false
                         PapirusConfigManager.performReset(context, restartNow = true)
                     }
                 ) {
-                    Text(stringResource(R.string.restart_now_btn))
+                    Text(
+                        text = stringResource(R.string.restart_now_btn),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
-                OutlinedButton(
+                TextButton(
                     onClick = {
                         showResetRestartDialog = false
                         PapirusConfigManager.performReset(context, restartNow = false)
-                        Toast.makeText(context, "Reset disiapkan. Akan diterapkan saat aplikasi dibuka kembali.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                         onCloseOptions()
                     }
                 ) {

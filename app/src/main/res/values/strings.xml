@@ -79,14 +79,17 @@
     <string name="options_search_hint">Search settings...</string>
 
     <!-- Reset Options Dialogs -->
-    <string name="reset_dialog_title">Reset Pengaturan Aplikasi</string>
-    <string name="reset_dialog_message">Tindakan ini akan menghapus semua konfigurasi pengguna dan mengembalikan pengaturan ke default Papirus Office. Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="doc_default_name">Document</string>
+    <string name="reset_dialog_title">Reset Application Settings</string>
+    <string name="reset_dialog_message">This action will delete all user configurations and restore settings to Papirus Office defaults. This action cannot be undone.</string>
     <string name="reset_confirm_btn">Reset</string>
-    <string name="restart_dialog_title">Restart Aplikasi Diperlukan</string>
-    <string name="restart_dialog_message">Aplikasi akan di-restart untuk menerapkan hasil reset. Pastikan semua dokumen yang belum tersimpan sudah disimpan, karena perubahan yang belum tersimpan akan hilang begitu aplikasi di-restart.</string>
-    <string name="restart_now_btn">Restart Sekarang</string>
-    <string name="restart_later_btn">Restart Nanti</string>
-    <string name="reset_success_message">Pengaturan aplikasi sukses direset.</string>
+    <string name="reset_cancel_btn">Cancel</string>
+    <string name="reset_prepared_toast">Reset prepared. Will be applied when the app is reopened.</string>
+    <string name="restart_dialog_title">Application Restart Required</string>
+    <string name="restart_dialog_message">The app needs to restart to apply the settings reset. Please ensure any unsaved documents are saved, as unsaved changes will be lost when the app restarts.</string>
+    <string name="restart_now_btn">Restart Now</string>
+    <string name="restart_later_btn">Restart Later</string>
+    <string name="reset_success_message">Application settings were reset successfully.</string>
 
     <string name="group_papirus_settings">Papirus Settings</string>
     <string name="group_load_and_save">Load and Save</string>

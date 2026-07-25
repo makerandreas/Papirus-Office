@@ -813,7 +813,7 @@ fun FullPageDocumentLoadingPopup(
     moduleName: String = "Writer",
     moduleColor: Color = Color(0xFF2563EB),
     isCreating: Boolean = false,
-    docName: String = "Inky_Dokumen.odt",
+    docName: String = "Document.odt",
     progressStatus: String = stringResource(R.string.loading_status_odf),
     onDismissRequest: () -> Unit = {}
 ) {
@@ -989,7 +989,7 @@ fun DocumentOpenFailedDialog(
 // --- BARU: Popup Dialog "Saving..." ---
 @Composable
 fun SavingProgressPopupDialog(
-    docName: String = "Inky_Dokumen.odt",
+    docName: String = "Document.odt",
     moduleColor: Color = Color(0xFF2563EB),
     statusText: String = stringResource(R.string.status_saving),
     onDismissRequest: () -> Unit = {}

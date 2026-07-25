@@ -147,14 +147,14 @@ fun InkyModule(
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var showRestartConfirmDialog by remember { mutableStateOf(false) }
     var currentSaveMimeType by remember { mutableStateOf("application/vnd.oasis.opendocument.text") }
-    var currentSaveDefaultFilename by remember { mutableStateOf("Inky_Dokumen.odt") }
+    var currentSaveDefaultFilename by remember { mutableStateOf("Document.odt") }
 
     var docTitle by remember {
         mutableStateOf(
             if (com.example.MainActivity.openedFilePath != null && com.example.MainActivity.openedFileType == "Inky") {
                 java.io.File(com.example.MainActivity.openedFilePath!!).name
             } else {
-                "Inky_Dokumen.odt"
+                "Document.odt"
             }
         )
     }
@@ -583,7 +583,7 @@ fun InkyModule(
 
     val handleLoadTemplate = { template: TemplateManager.TemplateItem ->
         val loadTemplate = {
-            val name = "${template.name.replace(" ", "_")}.odt"
+            val name = "Document.odt"
             val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
             
             val filePath = com.example.MainActivity.openedFilePath
@@ -627,8 +627,7 @@ fun InkyModule(
 
     val handleNewDocument = {
         val createNew = {
-            val idx = com.example.MainActivity.newDocIndex++
-            val name = "Document$idx.odt"
+            val name = "Document.odt"
             com.example.core.jni.LibreOfficeCore.createDocument(name)
             runDocumentLoading(true, name) {
                 docTitle = name
@@ -1495,77 +1494,23 @@ fun InkyModule(
                                     }
                                 }
                             } else {
-                                // --- EDITOR MODE: DYNAMIC EXPANDING CARD WITH PRINT PAGE BREAKS ---
-                                val linesCount = docBodyText.text.split("\n").size
-                                val baseEditorHeight = maxOf(452, 100 + linesCount * 22)
-                                
-                                Box(
-                                    modifier = Modifier
-                                        .width((320 * zoomScale).dp)
-                                        .height((baseEditorHeight * zoomScale).dp)
-                                        .shadow(elevation = 10.dp, shape = RoundedCornerShape(4.dp))
-                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
-                                    contentAlignment = Alignment.TopStart
+                                // --- EDITOR MODE: SEPARATE ELEGANT A4 PAGES (WYSIWYG MATCHING VIEWER) ---
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 8.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .requiredSize(320.dp, baseEditorHeight.dp)
-                                            .graphicsLayer {
-                                                scaleX = zoomScale
-                                                scaleY = zoomScale
-                                                transformOrigin = TransformOrigin(0f, 0f)
-                                            }
-                                            .background(pageBgColor)
-                                            .onGloballyPositioned { pageBoxCoordinates = it }
-                                            .pointerInput(Unit) {
-                                                detectTapGestures(
-                                                    onLongPress = { offset ->
-                                                        val windowOffset = pageBoxCoordinates?.localToWindow(offset) ?: offset
-                                                        val rect = androidx.compose.ui.geometry.Rect(
-                                                            left = windowOffset.x,
-                                                            top = windowOffset.y,
-                                                            right = windowOffset.x + 1f,
-                                                            bottom = windowOffset.y + 1f
-                                                        )
-                                                        customTextToolbar.show(rect)
-                                                    },
-                                                    onTap = {
-                                                        if (customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown) {
-                                                            customTextToolbar.hide()
-                                                        }
-                                                        focusRequester.requestFocus()
-                                                    }
-                                                )
-                                            }
-                                            .pointerInput(Unit) {
-                                                awaitPointerEventScope {
-                                                    while (true) {
-                                                        val event = awaitPointerEvent()
-                                                        val canceled = event.changes.any { it.isConsumed }
-                                                        if (!canceled) {
-                                                            if (event.changes.size >= 2) {
-                                                                val zoomChange = event.calculateZoom()
-                                                                if (zoomChange != 1f) {
-                                                                    val newScale = zoomScale * zoomChange
-                                                                    zoomScale = newScale.coerceIn(0.5f, 2.0f)
-                                                                }
-                                                                event.changes.forEach { change ->
-                                                                    if (change.positionChanged()) {
-                                                                        change.consume()
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                    ) {
-                                        Column(
+                                    pagesList.forEachIndexed { index, pageText ->
+                                        Box(
                                             modifier = Modifier
-                                                .fillMaxSize()
+                                                .width((320 * zoomScale).dp)
+                                                .height((452 * zoomScale).dp)
+                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                                .background(pageBgColor)
                                                 .padding(24.dp)
                                         ) {
-                                            Box(modifier = Modifier.weight(1f)) {
+                                            if (index == 0) {
                                                 androidx.compose.foundation.text.BasicTextField(
                                                     value = docBodyText,
                                                     onValueChange = {
@@ -1576,7 +1521,6 @@ fun InkyModule(
                                                         isSaved = false
                                                         triggerAutosave()
                                                         addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
-                                                        addLokitLog("lok::Document::renderTile(bounds=[x=0, y=0, w=1080])")
                                                     },
                                                     modifier = Modifier
                                                         .fillMaxSize()
@@ -1586,8 +1530,8 @@ fun InkyModule(
                                                     onTextLayout = { bodyTextLayoutResult = it },
                                                     readOnly = false,
                                                     textStyle = androidx.compose.ui.text.TextStyle(
-                                                        fontSize = activeFontSize.sp,
-                                                        lineHeight = (activeFontSize * lineSpacingFactor).sp,
+                                                        fontSize = (activeFontSize * zoomScale).sp,
+                                                        lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
                                                         fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
                                                         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                                         textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
@@ -1605,62 +1549,60 @@ fun InkyModule(
                                                         innerTextField()
                                                     }
                                                 )
-                                            }
-                                            if (docxImages.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(16.dp))
+                                            } else {
                                                 Text(
-                                                    text = "--- EMBEDDED IMAGES ---",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = textAccentColor,
-                                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                                    text = pageText,
+                                                    fontSize = (activeFontSize * zoomScale).sp,
+                                                    lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
+                                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                    textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                    fontFamily = when (activeFontFamily) {
+                                                        "Aptos Display" -> FontFamily.SansSerif
+                                                        "Calibri" -> FontFamily.SansSerif
+                                                        "Arial" -> FontFamily.SansSerif
+                                                        "Roboto" -> FontFamily.SansSerif
+                                                        else -> FontFamily.Default
+                                                    },
+                                                    color = textPrimaryColor,
+                                                    textAlign = textAlignment,
+                                                    modifier = Modifier.fillMaxSize()
                                                 )
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                docxImages.forEach { (imageName, imageFile) ->
-                                                    val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(vertical = 4.dp),
-                                                        contentAlignment = Alignment.Center
-                                                    ) {
-                                                        com.example.ui.components.DocxEmbeddedImage(
-                                                            imageFile = imageFile,
-                                                            extentCx = extent.first,
-                                                            extentCy = extent.second
-                                                        )
-                                                    }
-                                                }
                                             }
+                                            Text(
+                                                text = "Page ${index + 1} of ${pagesList.size}",
+                                                fontSize = (9 * zoomScale).sp,
+                                                color = Color.Gray.copy(alpha = 0.6f),
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .padding(bottom = 4.dp)
+                                            )
                                         }
-
-                                        // Subtle print page break divider lines
-                                        val pageHeightThreshold = 452
-                                        if (baseEditorHeight > pageHeightThreshold) {
-                                            val estimatedPageBreakCount = baseEditorHeight / pageHeightThreshold
-                                            for (p in 1..estimatedPageBreakCount) {
-                                                val breakY = p * pageHeightThreshold
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(top = (breakY - 12).dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.Center
-                                                    ) {
-                                                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                                                        Text(
-                                                            text = " Page ${p + 1} (Page Break) ",
-                                                            fontSize = 9.sp,
-                                                            color = Color.Gray.copy(alpha = 0.5f),
-                                                            fontWeight = FontWeight.Bold
-                                                        )
-                                                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color.Gray.copy(alpha = 0.3f)))
-                                                    }
-                                                }
+                                    }
+                                    if (docxImages.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "--- EMBEDDED IMAGES ---",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textAccentColor,
+                                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        docxImages.forEach { (imageName, imageFile) ->
+                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                com.example.ui.components.DocxEmbeddedImage(
+                                                    imageFile = imageFile,
+                                                    extentCx = extent.first,
+                                                    extentCy = extent.second
+                                                )
                                             }
                                         }
                                     }
@@ -2373,9 +2315,11 @@ fun InkyModule(
                     ) {
                         val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
                         val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
+                        val ribbonTabScrollState = rememberScrollState()
                         
                         LaunchedEffect(ribbonPagerState.currentPage) {
                             activeRibbonTab = ribbonTabs[ribbonPagerState.currentPage]
+                            ribbonTabScrollState.animateScrollTo((ribbonPagerState.currentPage * 75).dp.value.toInt())
                         }
                         if (activeInkySubpage.isNotEmpty()) {
                             // Subpage Header Bar
@@ -2524,13 +2468,10 @@ fun InkyModule(
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .horizontalScroll(rememberScrollState()),
+                                        .horizontalScroll(ribbonTabScrollState),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
-                                    val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
-                                    
                                     ribbonTabs.forEachIndexed { index, tab ->
                                         val isSelected = ribbonPagerState.currentPage == index
                                         Box(

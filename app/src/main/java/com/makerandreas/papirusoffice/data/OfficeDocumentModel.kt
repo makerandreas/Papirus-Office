@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data
 
+import com.makerandreas.papirusoffice.data.framework.*
 import java.io.File
 
 /**
@@ -66,4 +67,33 @@ data class OfficeParsedDocument(
     val isPptx: Boolean = false,
     val isParsingFailed: Boolean = false,
     val failureReason: String? = null
-)
+) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier {
+    
+    override val text: XText
+        get() = DocumentTextImpl(this)
+        
+    override val documentProperties: Any
+        get() = mapOf(
+            "CharacterCount" to plainText.length,
+            "ParagraphCount" to elements.filterIsInstance<OfficeDocumentElement.Paragraph>().size,
+            "WordCount" to plainText.split(Regex("\\s+")).count { it.isNotBlank() }
+        )
+
+    override fun reformat() {
+        // Implementation for reformatting layout
+    }
+}
+
+class DocumentTextImpl(private val document: OfficeParsedDocument) : XText {
+    override val text: XText get() = this
+    override val start: XTextRange get() = this // simplified
+    override val end: XTextRange get() = this // simplified
+    override var string: String
+        get() = document.plainText
+        set(value) {}
+
+    override fun insertString(range: XTextRange, string: String, absorb: Boolean) {}
+    override fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean) {}
+    override fun insertTextContent(range: XTextRange, content: XTextContent, absorb: Boolean) {}
+    override fun removeTextContent(content: XTextContent) {}
+}
