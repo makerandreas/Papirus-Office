@@ -195,7 +195,8 @@ fun HomeSubpage(
     textAlignment: TextAlign,
     onTextAlignmentChange: (TextAlign) -> Unit,
     onNavigateSubpage: (String) -> Unit,
-    onShowFontSizeDialog: () -> Unit
+    onShowFontSizeDialog: () -> Unit,
+    onOpenInspector: () -> Unit = {}
 ) {
     var showRtlState by remember { mutableStateOf(false) }
     var showParagraphMarks by remember { mutableStateOf(false) }
@@ -697,6 +698,22 @@ fun HomeSubpage(
         )
 
         M3ListItem(
+            headlineText = "Drop Cap Options (SwDropPortion)",
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.FormatSize,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Drop Cap Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            onClick = { onNavigateSubpage("drop_cap") }
+        )
+
+        M3ListItem(
             headlineText = "Paragraph Options",
             leadingIcon = {
                 Icon(
@@ -706,13 +723,30 @@ fun HomeSubpage(
                     modifier = Modifier.size(24.dp)
                 )
             },
-            onClick = { Toast.makeText(context, "Paragraph Options will be available soon", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, "Paragraph Options opened", Toast.LENGTH_SHORT).show() }
         )
 
         HomeSectionDivider()
 
         // --- GRUP STYLES ---
-        HomeSectionHeader("Styles")
+        HomeSectionHeader("Styles & Layout Engine")
+
+        M3ListItem(
+            headlineText = "Text Formatting Inspector",
+            supportingText = "Inspect SwTxtFrm, SwParaPortion, SwScriptInfo & twip metrics",
+            leadingIcon = {
+                Icon(
+                    Icons.Rounded.Analytics,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(24.dp)
+                )
+            },
+            trailingContent = {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Inspector", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            onClick = onOpenInspector
+        )
 
         M3ListItem(
             headlineText = "Style selector",
@@ -865,21 +899,40 @@ fun UnderlineOptionsSubpage(
 
 // 4. LineSpacingSubpage
 @Composable
-fun LineSpacingSubpage(context: Context) {
+fun LineSpacingSubpage(
+    context: Context,
+    currentFactor: Float = 1.0f,
+    onSelectLineSpacing: (Float) -> Unit = {}
+) {
     val options = listOf(
-        "Single", "1,16 line", "1,5 line", "Double",
-        "Proportional", "At least", "Leading", "Fixed"
+        "Single" to 1.0f,
+        "1,16 line" to 1.15f,
+        "1,5 line" to 1.5f,
+        "Double" to 2.0f,
+        "Proportional" to 1.25f,
+        "At least" to 1.3f,
+        "Leading" to 1.1f,
+        "Fixed" to 1.0f
     )
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        HomeSectionHeader("Line Spacing Presets")
-        options.forEach { opt ->
+        HomeSectionHeader("Line Spacing Presets (SwLineLayout)")
+        options.forEach { (label, factor) ->
+            val isSelected = (currentFactor == factor)
             M3ListItem(
-                headlineText = opt,
-                supportingText = "Select line spacing $opt",
-                leadingIcon = { Icon(Icons.Rounded.LineStyle, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+                headlineText = label,
+                supportingText = if (isSelected) "Active spacing (${"%.2f".format(factor)}x)" else "Set line spacing height to ${"%.2f".format(factor)}x",
+                leadingIcon = { 
+                    Icon(
+                        Icons.Rounded.LineStyle, 
+                        contentDescription = null, 
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, 
+                        modifier = Modifier.size(24.dp)
+                    ) 
+                },
                 onClick = {
-                    Toast.makeText(context, "Spacing $opt selected", Toast.LENGTH_SHORT).show()
+                    onSelectLineSpacing(factor)
+                    Toast.makeText(context, "Spacing $label (${"%.2f".format(factor)}x) applied", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1055,24 +1108,26 @@ fun ParagraphBorderSubpage(context: Context) {
 fun ParagraphStylesSubpage(
     context: Context,
     selectedStyle: String,
-    onNavigateStyleOptions: (String) -> Unit
+    onNavigateStyleOptions: (String) -> Unit,
+    onApplyStyle: (String) -> Unit = {}
 ) {
     var activeStyle by remember { mutableStateOf(selectedStyle) }
-    val styles = listOf("Normal", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle", "Footnote")
+    val styles = listOf("Normal", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle", "Drop Cap", "Quote", "Code", "Footnote")
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        HomeSectionHeader("Paragraph Styles")
+        HomeSectionHeader("Paragraph Styles (SwTxtFmtColl)")
         styles.forEach { styleName ->
             val isSelected = styleName == activeStyle
             M3ListItem(
                 headlineText = styleName,
-                supportingText = if (isSelected) "Active formatting" else "Tap to apply style",
+                supportingText = if (isSelected) "Active paragraph style" else "Tap to apply $styleName formatting",
                 leadingIcon = {
                     RadioButton(
                         selected = isSelected,
                         onClick = {
                             activeStyle = styleName
-                            Toast.makeText(context, "Style changed to $styleName", Toast.LENGTH_SHORT).show()
+                            onApplyStyle(styleName)
+                            Toast.makeText(context, "Applied style $styleName", Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
@@ -1083,9 +1138,65 @@ fun ParagraphStylesSubpage(
                 },
                 onClick = {
                     activeStyle = styleName
-                    Toast.makeText(context, "Style changed to $styleName", Toast.LENGTH_SHORT).show()
+                    onApplyStyle(styleName)
+                    Toast.makeText(context, "Applied style $styleName", Toast.LENGTH_SHORT).show()
                 }
             )
+        }
+    }
+}
+
+// 9b. DropCapSubpage
+@Composable
+fun DropCapSubpage(
+    context: Context,
+    dropCapEnabled: Boolean,
+    dropCapLines: Int,
+    onToggleDropCap: (Boolean) -> Unit,
+    onSetDropCapLines: (Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionHeader("Drop Cap Settings (SwDropPortion)")
+        M3ListItem(
+            headlineText = "Enable Drop Cap",
+            supportingText = if (dropCapEnabled) "Enlarged initial letter active" else "Standard paragraph initial letter",
+            leadingIcon = { Icon(Icons.Rounded.FormatSize, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            trailingContent = {
+                Switch(
+                    checked = dropCapEnabled,
+                    onCheckedChange = {
+                        onToggleDropCap(it)
+                        Toast.makeText(context, if (it) "Drop Cap enabled" else "Drop Cap disabled", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            },
+            onClick = {
+                onToggleDropCap(!dropCapEnabled)
+            }
+        )
+
+        if (dropCapEnabled) {
+            HomeSectionHeader("Lines Covered (SwDropPortion::nLines)")
+            listOf(2, 3, 4).forEach { lines ->
+                val isSelected = (dropCapLines == lines)
+                M3ListItem(
+                    headlineText = "$lines Lines Drop Cap",
+                    supportingText = "Initial letter scales to $lines paragraph lines height",
+                    leadingIcon = {
+                        RadioButton(
+                            selected = isSelected,
+                            onClick = {
+                                onSetDropCapLines(lines)
+                                Toast.makeText(context, "Drop Cap set to $lines lines", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    },
+                    onClick = {
+                        onSetDropCapLines(lines)
+                        Toast.makeText(context, "Drop Cap set to $lines lines", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
         }
     }
 }

@@ -32,6 +32,7 @@ import com.example.ui.theme.ThemeSettings
 
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.makerandreas.papirusoffice.data.PapirusConfigManager
 
 data class OptionItem(
     val id: String,
@@ -63,6 +64,8 @@ fun PapirusOfficeOptionsScreen(
     var showMoreMenu by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
     var showRestartDialog by remember { mutableStateOf(false) }
+    var showResetWarningDialog by remember { mutableStateOf(false) }
+    var showResetRestartDialog by remember { mutableStateOf(false) }
 
     // Intercept back button
     BackHandler {
@@ -319,7 +322,7 @@ fun PapirusOfficeOptionsScreen(
                                     leadingIcon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null) },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Settings reset to Papirus Office defaults", Toast.LENGTH_SHORT).show()
+                                        showResetWarningDialog = true
                                     }
                                 )
                             }
@@ -499,6 +502,82 @@ fun PapirusOfficeOptionsScreen(
             confirmButton = {
                 TextButton(onClick = { showHelpDialog = false }) {
                     Text("OK")
+                }
+            }
+        )
+    }
+
+    // Popup 1: Reset Warning Dialog
+    if (showResetWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetWarningDialog = false },
+            icon = { Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(stringResource(R.string.reset_dialog_title), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = stringResource(R.string.reset_dialog_message),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetWarningDialog = false
+                        showResetRestartDialog = true
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.reset_confirm_btn),
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetWarningDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Popup 2: Restart Required Dialog
+    if (showResetRestartDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showResetRestartDialog = false
+                PapirusConfigManager.performReset(context, restartNow = false)
+                Toast.makeText(context, "Reset disiapkan. Akan diterapkan saat aplikasi dibuka kembali.", Toast.LENGTH_LONG).show()
+                onCloseOptions()
+            },
+            icon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(stringResource(R.string.restart_dialog_title), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = stringResource(R.string.restart_dialog_message),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetRestartDialog = false
+                        PapirusConfigManager.performReset(context, restartNow = true)
+                    }
+                ) {
+                    Text(stringResource(R.string.restart_now_btn))
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = {
+                        showResetRestartDialog = false
+                        PapirusConfigManager.performReset(context, restartNow = false)
+                        Toast.makeText(context, "Reset disiapkan. Akan diterapkan saat aplikasi dibuka kembali.", Toast.LENGTH_LONG).show()
+                        onCloseOptions()
+                    }
+                ) {
+                    Text(stringResource(R.string.restart_later_btn))
                 }
             }
         )

@@ -90,34 +90,36 @@ fun android.content.Context.findActivity(): androidx.activity.ComponentActivity?
     return null
 }
 
-fun partitionTextToPages(text: String, maxLinesPerPage: Int = 15): List<String> {
+fun partitionTextToPages(text: String, maxLinesPerPage: Int = 24): List<String> {
     val rawText = text
     if (rawText.isEmpty()) return listOf("")
     
-    val rawParagraphs = rawText.split("\n")
+    // Split by explicit page breaks if present
+    val explicitBreakRegex = Regex("""(?:\r?\n)*(?:---|===)?\s*(?:Page\s+\d+\s*\()?Page\s*Break\)?\s*(?:---|===)?(?:\r?\n)*|\u000C""", RegexOption.IGNORE_CASE)
+    val explicitChunks = rawText.split(explicitBreakRegex)
+    
     val pages = mutableListOf<String>()
-    var currentPageLines = mutableListOf<String>()
-    var currentLinesCount = 0
-    
-    rawParagraphs.forEach { paragraph ->
-        // Estimate line wraps: assume ~40 characters per line
-        val approxLinesInParagraph = maxOf(1, (paragraph.length + 39) / 40)
+    explicitChunks.forEach { chunk ->
+        val rawParagraphs = chunk.split("\n")
+        var currentPageLines = mutableListOf<String>()
+        var currentLinesCount = 0
         
-        if (currentLinesCount + approxLinesInParagraph > maxLinesPerPage && currentPageLines.isNotEmpty()) {
-            pages.add(currentPageLines.joinToString("\n"))
-            currentPageLines = mutableListOf()
-            currentLinesCount = 0
+        rawParagraphs.forEach { paragraph ->
+            val approxLinesInParagraph = maxOf(1, (paragraph.length + 42) / 43)
+            if (currentLinesCount + approxLinesInParagraph > maxLinesPerPage && currentPageLines.isNotEmpty()) {
+                pages.add(currentPageLines.joinToString("\n").trim())
+                currentPageLines = mutableListOf()
+                currentLinesCount = 0
+            }
+            currentPageLines.add(paragraph)
+            currentLinesCount += approxLinesInParagraph
         }
-        
-        currentPageLines.add(paragraph)
-        currentLinesCount += approxLinesInParagraph
+        if (currentPageLines.isNotEmpty()) {
+            pages.add(currentPageLines.joinToString("\n").trim())
+        }
     }
     
-    if (currentPageLines.isNotEmpty() || pages.isEmpty()) {
-        pages.add(currentPageLines.joinToString("\n"))
-    }
-    
-    return pages
+    return if (pages.isEmpty()) listOf(rawText) else pages
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -336,6 +338,14 @@ fun InkyModule(
     var underlineColor by remember { mutableStateOf(Color.Black) }
     var paragraphShadingColor by remember { mutableStateOf(Color.Transparent) }
 
+    // Text formatting engine advanced state (SwTxtFrm, SwParaPortion, SwScriptInfo)
+    var lineSpacingFactor by remember { mutableStateOf(1.0f) }
+    var dropCapEnabled by remember { mutableStateOf(false) }
+    var dropCapLines by remember { mutableStateOf(3) }
+    var asianGridEnabled by remember { mutableStateOf(false) }
+    var hangingPunctuation by remember { mutableStateOf(true) }
+    var showTextFormattingInspector by remember { mutableStateOf(false) }
+
     // Dialog & overlay triggers
     var showFindReplace by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -368,90 +378,100 @@ fun InkyModule(
     var savingProgressDocName by remember { mutableStateOf(docTitle) }
 
     val performSave = { simulateError: Boolean ->
-        coroutineScope.launch {
-            isSaving = true
-            saveFailed = false
-            delay(1000)
-            if (simulateError) {
-                isSaving = false
-                saveFailed = true
-                showSaveFailedDialog = true
-            } else {
-                val path = com.example.MainActivity.openedFilePath
-                var actualSuccess = true
-                if (path != null) {
-                    try {
-                        val file = java.io.File(path)
-                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                        actualSuccess = parser.saveDocument(file, docBodyText.text)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        actualSuccess = false
-                    }
-                }
-                
-                isSaving = false
-                if (actualSuccess) {
-                    isSaved = true
-                    saveFailed = false
-                    Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
-                } else {
+        if (isNewDocument || com.example.MainActivity.openedFilePath == null) {
+            showSaveAsDialog = true
+        } else {
+            coroutineScope.launch {
+                isSaving = true
+                saveFailed = false
+                delay(1000)
+                if (simulateError) {
+                    isSaving = false
                     saveFailed = true
                     showSaveFailedDialog = true
+                } else {
+                    val path = com.example.MainActivity.openedFilePath
+                    var actualSuccess = true
+                    if (path != null) {
+                        try {
+                            val file = java.io.File(path)
+                            val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                            actualSuccess = parser.saveDocument(file, docBodyText.text)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            actualSuccess = false
+                        }
+                    }
+                    
+                    isSaving = false
+                    if (actualSuccess) {
+                        isSaved = true
+                        saveFailed = false
+                        Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                    } else {
+                        saveFailed = true
+                        showSaveFailedDialog = true
+                    }
                 }
             }
         }
     }
 
     val performSaveWithPopup = { docName: String, simulateError: Boolean, onSuccess: (() -> Unit)? ->
-        coroutineScope.launch {
-            showSavingProgressPopup = true
-            savingProgressDocName = docName
-            isSaving = true
-            saveFailed = false
-            delay(1200)
-            showSavingProgressPopup = false
-            
-            if (simulateError) {
-                isSaving = false
-                saveFailed = true
-                showSaveFailedDialog = true
-            } else {
-                val path = com.example.MainActivity.openedFilePath
-                var actualSuccess = true
-                if (path != null) {
-                    try {
-                        val file = java.io.File(path)
-                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                        actualSuccess = parser.saveDocument(file, docBodyText.text)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        actualSuccess = false
-                    }
-                }
+        if (isNewDocument || com.example.MainActivity.openedFilePath == null) {
+            showSaveAsDialog = true
+        } else {
+            coroutineScope.launch {
+                showSavingProgressPopup = true
+                savingProgressDocName = docName
+                isSaving = true
+                saveFailed = false
+                delay(1200)
+                showSavingProgressPopup = false
                 
-                isSaving = false
-                if (actualSuccess) {
-                    isSaved = true
-                    saveFailed = false
-                    Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
-                    onSuccess?.invoke()
-                } else {
+                if (simulateError) {
+                    isSaving = false
                     saveFailed = true
                     showSaveFailedDialog = true
+                } else {
+                    val path = com.example.MainActivity.openedFilePath
+                    var actualSuccess = true
+                    if (path != null) {
+                        try {
+                            val file = java.io.File(path)
+                            val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                            actualSuccess = parser.saveDocument(file, docBodyText.text)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            actualSuccess = false
+                        }
+                    }
+                    
+                    isSaving = false
+                    if (actualSuccess) {
+                        isSaved = true
+                        saveFailed = false
+                        Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                        onSuccess?.invoke()
+                    } else {
+                        saveFailed = true
+                        showSaveFailedDialog = true
+                    }
                 }
             }
         }
     }
 
     val saveDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument(currentSaveMimeType)
+        contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri ->
         uri?.let {
             coroutineScope.launch {
                 var actualSuccess = true
                 try {
-                    val tempFile = java.io.File(context.cacheDir, "temp_uri_save.odt")
+                    val isDocx = currentSaveDefaultFilename.endsWith(".docx", ignoreCase = true)
+                    val extension = if (isDocx) ".docx" else ".odt"
+                    val tempFile = java.io.File(context.cacheDir, "temp_uri_save$extension")
                     if (tempFile.exists()) tempFile.delete()
                     
                     val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
@@ -491,13 +511,19 @@ fun InkyModule(
                             if (c.moveToFirst()) {
                                 val nameIndex = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                                 if (nameIndex >= 0) {
-                                    savedName = c.getString(nameIndex)
+                                    val queried = c.getString(nameIndex)
+                                    if (!queried.isNullOrBlank()) {
+                                        savedName = queried
+                                    }
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+
+                    // Clean up double extensions if SAF appended one
+                    savedName = savedName.replace(".docx.odt", ".docx").replace(".odt.docx", ".odt")
 
                     docTitle = savedName
                     isSaved = true
@@ -513,7 +539,7 @@ fun InkyModule(
     }
 
     val handleSaveCommand: () -> Unit = {
-        if (isNewDocument) {
+        if (isNewDocument || com.example.MainActivity.openedFilePath == null) {
             showSaveAsDialog = true
         } else {
             if (!isEditMode) {
@@ -560,13 +586,34 @@ fun InkyModule(
             val name = "${template.name.replace(" ", "_")}.odt"
             val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
             
-            runDocumentLoading(true, name) {
-                docTitle = name
-                docBodyText = androidx.compose.ui.text.input.TextFieldValue(sampleTemplateContent)
-                isSaved = true
-                isEditMode = true
-                showBottomBar = false
-                showCreateFromTemplateDialog = false
+            val filePath = com.example.MainActivity.openedFilePath
+            val file = if (filePath != null) java.io.File(filePath) else null
+            if (file != null && file.exists()) {
+                isLoadingDocument = true
+                coroutineScope.launch {
+                    val parseResult = docxParser.parseDocument(file)
+                    runDocumentLoading(true, name) {
+                        docTitle = name
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                        docxImages = parseResult.extractedImages
+                        docxExtents = parseResult.imageExtents
+                        isSaved = true
+                        isEditMode = true
+                        isNewDocument = true
+                        showBottomBar = false
+                        showCreateFromTemplateDialog = false
+                    }
+                }
+            } else {
+                runDocumentLoading(true, name) {
+                    docTitle = name
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(sampleTemplateContent)
+                    isSaved = true
+                    isEditMode = true
+                    isNewDocument = true
+                    showBottomBar = false
+                    showCreateFromTemplateDialog = false
+                }
             }
             Unit
         }
@@ -588,6 +635,7 @@ fun InkyModule(
                 docBodyText = androidx.compose.ui.text.input.TextFieldValue("")
                 isSaved = true
                 isEditMode = true
+                isNewDocument = true
                 activeFontFamily = "Aptos Display"
                 activeFontSize = 12
                 isBold = false
@@ -1374,6 +1422,79 @@ fun InkyModule(
                                 .horizontalScroll(horizScrollState),
                             contentAlignment = if (zoomScale > 1f) Alignment.CenterStart else Alignment.Center
                         ) {
+                            if (!isEditMode) {
+                                // --- VIEWER MODE: SEPARATE ELEGANT A4 PAGES (WYSIWYG) ---
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                ) {
+                                    pagesList.forEachIndexed { index, pageText ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width((320 * zoomScale).dp)
+                                                .height((452 * zoomScale).dp)
+                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                                .background(pageBgColor)
+                                                .padding(24.dp)
+                                        ) {
+                                            Text(
+                                                text = pageText,
+                                                fontSize = (activeFontSize * zoomScale).sp,
+                                                lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
+                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
+                                                fontFamily = when (activeFontFamily) {
+                                                    "Aptos Display" -> FontFamily.SansSerif
+                                                    "Calibri" -> FontFamily.SansSerif
+                                                    "Arial" -> FontFamily.SansSerif
+                                                    "Roboto" -> FontFamily.SansSerif
+                                                    else -> FontFamily.Default
+                                                },
+                                                color = textPrimaryColor,
+                                                textAlign = textAlignment,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                            Text(
+                                                text = "Page ${index + 1} of ${pagesList.size}",
+                                                fontSize = (9 * zoomScale).sp,
+                                                color = Color.Gray.copy(alpha = 0.6f),
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomCenter)
+                                                    .padding(bottom = 4.dp)
+                                            )
+                                        }
+                                    }
+                                    if (docxImages.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "--- EMBEDDED IMAGES ---",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textAccentColor
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        docxImages.forEach { (imageName, imageFile) ->
+                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(vertical = 4.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                com.example.ui.components.DocxEmbeddedImage(
+                                                    imageFile = imageFile,
+                                                    extentCx = extent.first,
+                                                    extentCy = extent.second
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
                                 // --- EDITOR MODE: DYNAMIC EXPANDING CARD WITH PRINT PAGE BREAKS ---
                                 val linesCount = docBodyText.text.split("\n").size
                                 val baseEditorHeight = maxOf(452, 100 + linesCount * 22)
@@ -1463,9 +1584,10 @@ fun InkyModule(
                                                         .focusRequester(focusRequester)
                                                         .bringIntoViewResponder(noOpBringIntoViewResponder),
                                                     onTextLayout = { bodyTextLayoutResult = it },
-                                                    readOnly = !isEditMode,
+                                                    readOnly = false,
                                                     textStyle = androidx.compose.ui.text.TextStyle(
                                                         fontSize = activeFontSize.sp,
+                                                        lineHeight = (activeFontSize * lineSpacingFactor).sp,
                                                         fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
                                                         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                                         textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
@@ -1543,6 +1665,7 @@ fun InkyModule(
                                         }
                                     }
                                 }
+                            }
                         }
                     } else {
                         // --- MOBILE/WEB VIEWPORT (Full Bleed) ---
@@ -1610,6 +1733,7 @@ fun InkyModule(
                                         readOnly = !isEditMode,
                                         textStyle = androidx.compose.ui.text.TextStyle(
                                             fontSize = (activeFontSize * zoomScale).sp,
+                                            lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
                                             fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
                                             fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                             textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
@@ -2247,6 +2371,12 @@ fun InkyModule(
                     Column(
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
+                        val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
+                        
+                        LaunchedEffect(ribbonPagerState.currentPage) {
+                            activeRibbonTab = ribbonTabs[ribbonPagerState.currentPage]
+                        }
                         if (activeInkySubpage.isNotEmpty()) {
                             // Subpage Header Bar
                             Row(
@@ -2398,9 +2528,11 @@ fun InkyModule(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    val tabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
-                                    tabs.forEach { tab ->
-                                        val isSelected = activeRibbonTab == tab
+                                    val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
+                                    val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
+                                    
+                                    ribbonTabs.forEachIndexed { index, tab ->
+                                        val isSelected = ribbonPagerState.currentPage == index
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(16.dp))
@@ -2408,7 +2540,10 @@ fun InkyModule(
                                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer
                                                     else Color.Transparent
                                                 )
-                                                .clickable { activeRibbonTab = tab }
+                                                .clickable {
+                                                    coroutineScope.launch { ribbonPagerState.animateScrollToPage(index) }
+                                                    activeRibbonTab = tab
+                                                }
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
@@ -2498,16 +2633,36 @@ fun InkyModule(
                                         "underline_color" -> ColorPickerSubpage(underlineColor, "Underline Color") { underlineColor = it }
                                         "font_color" -> ColorPickerSubpage(fontColor, "Font Color") { fontColor = it; triggerAutosave() }
                                         "highlight_color" -> ColorPickerSubpage(highlightColor, "Highlight Color") { highlightColor = it; triggerAutosave() }
-                                        "line_spacing" -> LineSpacingSubpage(context)
+                                        "line_spacing" -> LineSpacingSubpage(context, lineSpacingFactor) { lineSpacingFactor = it; triggerAutosave() }
+                                        "drop_cap" -> DropCapSubpage(context, dropCapEnabled, dropCapLines, { dropCapEnabled = it; triggerAutosave() }, { dropCapLines = it; triggerAutosave() })
                                         "bulleted_list" -> BulletedListSubpage(context)
                                         "numbered_list" -> NumberedListSubpage(context)
                                         "multilevel_list" -> MultilevelListSubpage(context)
                                         "paragraph_shading" -> ColorPickerSubpage(paragraphShadingColor, "Shading Color") { paragraphShadingColor = it }
                                         "paragraph_border" -> ParagraphBorderSubpage(context)
-                                        "paragraph_styles" -> ParagraphStylesSubpage(context, selectedStyleNameForOptions) { styleName ->
-                                            selectedStyleNameForOptions = styleName
-                                            activeInkySubpage = "style_options"
-                                        }
+                                        "paragraph_styles" -> ParagraphStylesSubpage(
+                                            context = context,
+                                            selectedStyle = selectedStyleNameForOptions,
+                                            onNavigateStyleOptions = { styleName ->
+                                                selectedStyleNameForOptions = styleName
+                                                activeInkySubpage = "style_options"
+                                            },
+                                            onApplyStyle = { styleName ->
+                                                selectedStyleNameForOptions = styleName
+                                                when (styleName) {
+                                                    "Heading 1" -> { activeFontSize = 22; isBold = true; isItalic = false; dropCapEnabled = false }
+                                                    "Heading 2" -> { activeFontSize = 18; isBold = true; isItalic = false; dropCapEnabled = false }
+                                                    "Heading 3" -> { activeFontSize = 15; isBold = true; isItalic = false; dropCapEnabled = false }
+                                                    "Title" -> { activeFontSize = 26; isBold = true; isItalic = false; dropCapEnabled = false }
+                                                    "Subtitle" -> { activeFontSize = 16; isBold = false; isItalic = true; dropCapEnabled = false }
+                                                    "Drop Cap" -> { dropCapEnabled = true; dropCapLines = 3 }
+                                                    "Quote" -> { activeFontSize = 12; isBold = false; isItalic = true; dropCapEnabled = false }
+                                                    "Code" -> { activeFontSize = 11; activeFontFamily = "Roboto"; isBold = false; isItalic = false }
+                                                    else -> { activeFontSize = 12; isBold = false; isItalic = false; dropCapEnabled = false }
+                                                }
+                                                triggerAutosave()
+                                            }
+                                        )
                                         "create_new_style" -> CreateNewStyleSubpage(context) {
                                             activeInkySubpage = "paragraph_styles"
                                         }
@@ -2518,76 +2673,83 @@ fun InkyModule(
                                     }
                                 }
                             } else {
-                                if (activeRibbonTab == "File") {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
-                                            .padding(vertical = 8.dp)
-                                    ) {
-                                        FileSubpage(
-                                            context = context,
-                                            onNavigateToOptions = { showOptionsDialog = true },
-                                            onNewDocument = handleNewDocument,
-                                            onOpenDocument = handleOpenDocument,
-                                            onCloseDocument = handleClose,
-                                            onSaveDocument = {
-                                                showBottomBar = false
-                                                handleSaveCommand()
-                                            },
-                                            onSaveAsDocument = {
-                                                showBottomBar = false
-                                                showSaveAsDialog = true
-                                            }
-                                        )
-                                    }
-                                } else if (activeRibbonTab == "Home") {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
-                                            .padding(vertical = 8.dp)
-                                    ) {
-                                        HomeSubpage(
-                                            context = context,
-                                            isBold = isBold,
-                                            onBoldChange = { isBold = it; triggerAutosave() },
-                                            isItalic = isItalic,
-                                            onItalicChange = { isItalic = it; triggerAutosave() },
-                                            isUnderline = isUnderline,
-                                            onUnderlineChange = { isUnderline = it; triggerAutosave() },
-                                            isStrikethrough = isStrikethrough,
-                                            onStrikethroughChange = { isStrikethrough = it; triggerAutosave() },
-                                            activeFontFamily = activeFontFamily,
-                                            activeFontSize = activeFontSize,
-                                            fontColor = fontColor,
-                                            highlightColor = highlightColor,
-                                            textAlignment = textAlignment,
-                                            onTextAlignmentChange = { textAlignment = it; triggerAutosave() },
-                                            onNavigateSubpage = { subpage ->
-                                                activeInkySubpage = subpage
-                                                openedFromExternalHub = false
-                                            },
-                                            onShowFontSizeDialog = { showFontSizeDialog = true }
-                                        )
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "$activeRibbonTab options will be implemented soon.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                                 androidx.compose.foundation.pager.HorizontalPager(
+                                     state = ribbonPagerState,
+                                     modifier = Modifier.fillMaxSize()
+                                 ) { page ->
+                                     val currentTabName = ribbonTabs[page]
+                                     if (currentTabName == "File") {
+                                         Column(
+                                             modifier = Modifier
+                                                 .fillMaxSize()
+                                                 .verticalScroll(rememberScrollState())
+                                                 .padding(vertical = 8.dp)
+                                         ) {
+                                             FileSubpage(
+                                                 context = context,
+                                                 onNavigateToOptions = { showOptionsDialog = true },
+                                                 onNewDocument = handleNewDocument,
+                                                 onOpenDocument = handleOpenDocument,
+                                                 onCloseDocument = handleClose,
+                                                 onSaveDocument = {
+                                                     showBottomBar = false
+                                                     handleSaveCommand()
+                                                 },
+                                                 onSaveAsDocument = {
+                                                     showBottomBar = false
+                                                     showSaveAsDialog = true
+                                                 }
+                                             )
+                                         }
+                                     } else if (currentTabName == "Home") {
+                                         Column(
+                                             modifier = Modifier
+                                                 .fillMaxSize()
+                                                 .verticalScroll(rememberScrollState())
+                                                 .padding(vertical = 8.dp)
+                                         ) {
+                                             HomeSubpage(
+                                                 context = context,
+                                                 isBold = isBold,
+                                                 onBoldChange = { isBold = it; triggerAutosave() },
+                                                 isItalic = isItalic,
+                                                 onItalicChange = { isItalic = it; triggerAutosave() },
+                                                 isUnderline = isUnderline,
+                                                 onUnderlineChange = { isUnderline = it; triggerAutosave() },
+                                                 isStrikethrough = isStrikethrough,
+                                                 onStrikethroughChange = { isStrikethrough = it; triggerAutosave() },
+                                                 activeFontFamily = activeFontFamily,
+                                                 activeFontSize = activeFontSize,
+                                                 fontColor = fontColor,
+                                                 highlightColor = highlightColor,
+                                                 textAlignment = textAlignment,
+                                                 onTextAlignmentChange = { textAlignment = it; triggerAutosave() },
+                                                 onNavigateSubpage = { subpage ->
+                                                     activeInkySubpage = subpage
+                                                     openedFromExternalHub = false
+                                                 },
+                                                 onShowFontSizeDialog = { showFontSizeDialog = true },
+                                                 onOpenInspector = { showTextFormattingInspector = true }
+                                             )
+                                         }
+                                     } else {
+                                         Box(
+                                             modifier = Modifier
+                                                 .fillMaxSize()
+                                                 .padding(16.dp),
+                                             contentAlignment = Alignment.Center
+                                         ) {
+                                             Text(
+                                                 text = "$currentTabName options will be implemented soon.",
+                                                 style = MaterialTheme.typography.bodyMedium,
+                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
+                                             )
+                                         }
+                                     }
+                                 }
+                             }
+                         }
+                     }           }
                 }
             }
         }
@@ -2897,7 +3059,54 @@ fun InkyModule(
         )
     }
 
-    if (showOptionsDialog) {
+    if (showTextFormattingInspector) {
+        val textLayoutManager = remember(docBodyText.text, activeFontSize, lineSpacingFactor, selectedStyleNameForOptions) {
+            com.makerandreas.papirusoffice.data.TextLayoutManager(
+                paragraphText = docBodyText.text,
+                fontSizePt = activeFontSize,
+                lineSpacingFactor = lineSpacingFactor,
+                activeStyleName = selectedStyleNameForOptions
+            )
+        }
+        val summary = textLayoutManager.reformatLayout(
+            dropCapEnabled = dropCapEnabled,
+            dropCapLines = dropCapLines,
+            asianGridEnabled = asianGridEnabled,
+            hangingPunctuation = hangingPunctuation
+        )
+        com.example.ui.components.SwTextFormattingInspectorDialog(
+            summary = summary,
+            fontFamilyName = activeFontFamily,
+            fontSizePt = activeFontSize,
+            isBold = isBold,
+            isItalic = isItalic,
+            isUnderline = isUnderline,
+            onDismiss = { showTextFormattingInspector = false },
+            onApplyStyle = { styleName ->
+                selectedStyleNameForOptions = styleName
+                when (styleName) {
+                    "Heading 1" -> { activeFontSize = 22; isBold = true; isItalic = false; dropCapEnabled = false }
+                    "Heading 2" -> { activeFontSize = 18; isBold = true; isItalic = false; dropCapEnabled = false }
+                    "Heading 3" -> { activeFontSize = 15; isBold = true; isItalic = false; dropCapEnabled = false }
+                    "Title" -> { activeFontSize = 26; isBold = true; isItalic = false; dropCapEnabled = false }
+                    "Subtitle" -> { activeFontSize = 16; isBold = false; isItalic = true; dropCapEnabled = false }
+                    "Drop Cap" -> { dropCapEnabled = true; dropCapLines = 3 }
+                    "Quote" -> { activeFontSize = 12; isBold = false; isItalic = true; dropCapEnabled = false }
+                    "Code" -> { activeFontSize = 11; activeFontFamily = "Roboto"; isBold = false; isItalic = false }
+                    else -> { activeFontSize = 12; isBold = false; isItalic = false; dropCapEnabled = false }
+                }
+                triggerAutosave()
+            },
+            onToggleDropCap = { dropCapEnabled = it; triggerAutosave() },
+            onSetLineSpacing = { lineSpacingFactor = it; triggerAutosave() }
+        )
+    }
+
+    AnimatedVisibility(
+        visible = showOptionsDialog,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+    ) {
         com.example.ui.options.PapirusOfficeOptionsScreen(
             sourceModule = "Inky",
             onCloseOptions = { showOptionsDialog = false },
@@ -3228,7 +3437,6 @@ fun InkyModule(
                 onFormatAction("crash_logs")
             }
         )
-    }
     }
 }
 

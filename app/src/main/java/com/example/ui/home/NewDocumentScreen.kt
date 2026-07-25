@@ -61,7 +61,10 @@ fun NewDocumentScreen(
 ) {
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var activeSubTab by remember { mutableStateOf("Create New") } // "Create New" or "Create from Template"
+    
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
+    val activeSubTab = if (pagerState.currentPage == 0) "Create New" else "Create from Template"
     var selectedTemplateFilter by remember { mutableStateOf("All") } // "All", "ODT", "ODS", "ODP"
 
     val handleBack = {
@@ -74,8 +77,8 @@ fun NewDocumentScreen(
     val context = LocalContext.current
     
     // Automatically close template search bar when switching away from "Create from Template"
-    LaunchedEffect(activeSubTab) {
-        if (activeSubTab != "Create from Template") {
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != 1) {
             isSearchActive = false
             searchQuery = ""
         }
@@ -93,7 +96,9 @@ fun NewDocumentScreen(
                             text = stringResource(R.string.create_new_document),
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 20.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
@@ -109,7 +114,7 @@ fun NewDocumentScreen(
                     },
                     actions = {
                         // Only show search button in "Create from Template" tab
-                        if (activeSubTab == "Create from Template") {
+                        if (pagerState.currentPage == 1) {
                             IconButton(
                                 onClick = { isSearchActive = !isSearchActive },
                                 modifier = Modifier.testTag("template_search_btn")
@@ -122,12 +127,13 @@ fun NewDocumentScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                     )
                 )
 
                 // Inline Search Bar for template search
-                AnimatedVisibility(visible = isSearchActive && activeSubTab == "Create from Template") {
+                AnimatedVisibility(visible = isSearchActive && pagerState.currentPage == 1) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
@@ -156,12 +162,13 @@ fun NewDocumentScreen(
         },
         bottomBar = {
             NavigationBar(
+                containerColor = MaterialTheme.colorScheme.background,
                 modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 NavigationBarItem(
-                    selected = activeSubTab == "Create New",
+                    selected = pagerState.currentPage == 0,
                     onClick = { 
-                        activeSubTab = "Create New" 
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         isSearchActive = false
                     },
                     icon = { Icon(Icons.Rounded.NoteAdd, contentDescription = "Create New Document Tab") },
@@ -169,8 +176,10 @@ fun NewDocumentScreen(
                     modifier = Modifier.testTag("tab_create_new")
                 )
                 NavigationBarItem(
-                    selected = activeSubTab == "Create from Template",
-                    onClick = { activeSubTab = "Create from Template" },
+                    selected = pagerState.currentPage == 1,
+                    onClick = { 
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                    },
                     icon = { Icon(Icons.Rounded.DashboardCustomize, contentDescription = "Create from Template Tab") },
                     label = { Text(stringResource(R.string.tab_from_template)) },
                     modifier = Modifier.testTag("tab_from_template")
@@ -184,34 +193,19 @@ fun NewDocumentScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            AnimatedContent(
-                targetState = activeSubTab,
-                transitionSpec = {
-                    if (targetState == "Create from Template") {
-                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
-                            slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
-                        )
-                    } else {
-                        (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
-                            slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-                        )
-                    }
-                },
-                label = "NewDocSubTabTransition"
-            ) { targetSubTab ->
-                when (targetSubTab) {
-                    "Create New" -> {
-                        CreateNewDocumentList(onNavigateToModule = onNavigateToModule)
-                    }
-                    "Create from Template" -> {
-                        CreateFromTemplateView(
-                            isOnline = isOnline,
-                            selectedFilter = selectedTemplateFilter,
-                            searchQuery = searchQuery,
-                            onFilterSelected = { selectedTemplateFilter = it },
-                            onNavigateToModule = onNavigateToModule
-                        )
-                    }
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> CreateNewDocumentList(onNavigateToModule = onNavigateToModule)
+                    1 -> CreateFromTemplateView(
+                        isOnline = isOnline,
+                        selectedFilter = selectedTemplateFilter,
+                        searchQuery = searchQuery,
+                        onFilterSelected = { selectedTemplateFilter = it },
+                        onNavigateToModule = onNavigateToModule
+                    )
                 }
             }
         }

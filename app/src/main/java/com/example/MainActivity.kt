@@ -169,7 +169,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
 
     // Master Workspace Navigation State
     // "welcome" (Onboarding), "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
-    var currentWorkspace by remember { mutableStateOf("home") }
+    var currentWorkspace by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("home") }
 
     LaunchedEffect(MainActivity.openedFilePath, MainActivity.openedFileType) {
         val path = MainActivity.openedFilePath
@@ -248,7 +248,9 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                             Text(
                                 text = if (currentWorkspace == "home") "Papirus Office" else "Papirus — $currentWorkspace Workspace",
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.titleLarge
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                         }
                     },

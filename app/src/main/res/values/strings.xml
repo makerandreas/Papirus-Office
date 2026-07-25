@@ -78,6 +78,16 @@
     <string name="options_reset">Reset</string>
     <string name="options_search_hint">Search settings...</string>
 
+    <!-- Reset Options Dialogs -->
+    <string name="reset_dialog_title">Reset Pengaturan Aplikasi</string>
+    <string name="reset_dialog_message">Tindakan ini akan menghapus semua konfigurasi pengguna dan mengembalikan pengaturan ke default Papirus Office. Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="reset_confirm_btn">Reset</string>
+    <string name="restart_dialog_title">Restart Aplikasi Diperlukan</string>
+    <string name="restart_dialog_message">Aplikasi akan di-restart untuk menerapkan hasil reset. Pastikan semua dokumen yang belum tersimpan sudah disimpan, karena perubahan yang belum tersimpan akan hilang begitu aplikasi di-restart.</string>
+    <string name="restart_now_btn">Restart Sekarang</string>
+    <string name="restart_later_btn">Restart Nanti</string>
+    <string name="reset_success_message">Pengaturan aplikasi sukses direset.</string>
+
     <string name="group_papirus_settings">Papirus Settings</string>
     <string name="group_load_and_save">Load and Save</string>
 

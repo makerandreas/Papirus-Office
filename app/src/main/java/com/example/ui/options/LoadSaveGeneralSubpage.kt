@@ -23,33 +23,37 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.R
 
+import com.makerandreas.papirusoffice.data.PapirusConfigManager
+
 @Composable
 fun LoadSaveGeneralSubpage(
     activeSubSubpage: String?,
     onNavigateSubSubpage: (String?) -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("papirus_options_prefs", Context.MODE_PRIVATE) }
+    LaunchedEffect(Unit) {
+        PapirusConfigManager.initialize(context)
+    }
 
-    // Persistent States with Defaults
-    var loadUserSpecificSettings by remember { mutableStateOf(prefs.getBoolean("load_user_specific_settings", true)) }
-    var loadPrinterSettings by remember { mutableStateOf(prefs.getBoolean("load_printer_settings", true)) }
+    // Persistent States with Defaults read from PapirusConfigManager
+    var loadUserSpecificSettings by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "load_user_specific_settings", true)) }
+    var loadPrinterSettings by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "load_printer_settings", true)) }
 
-    var autoRecoveryEnabled by remember { mutableStateOf(prefs.getBoolean("auto_recovery_enabled", true)) }
-    var autoRecoveryInterval by remember { mutableIntStateOf(prefs.getInt("auto_recovery_interval", 10)) }
-    var autoSaveDocumentToo by remember { mutableStateOf(prefs.getBoolean("auto_save_document_too", false)) }
+    var autoRecoveryEnabled by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "auto_recovery_enabled", true)) }
+    var autoRecoveryInterval by remember { mutableIntStateOf(PapirusConfigManager.getInt(context, "LoadAndSave", "auto_recovery_interval", 10)) }
+    var autoSaveDocumentToo by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "auto_save_document_too", false)) }
 
-    var editDocPropertiesBeforeSaving by remember { mutableStateOf(prefs.getBoolean("edit_doc_properties_before_saving", false)) }
+    var editDocPropertiesBeforeSaving by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "edit_doc_properties_before_saving", false)) }
 
-    var alwaysCreateBackupCopy by remember { mutableStateOf(prefs.getBoolean("always_create_backup_copy", true)) }
-    var placeBackupInSameFolder by remember { mutableStateOf(prefs.getBoolean("place_backup_in_same_folder", false)) }
+    var alwaysCreateBackupCopy by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "always_create_backup_copy", true)) }
+    var placeBackupInSameFolder by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "place_backup_in_same_folder", false)) }
 
-    var saveUrlsRelativeFileSystem by remember { mutableStateOf(prefs.getBoolean("save_urls_relative_file_system", true)) }
-    var saveUrlsRelativeInternet by remember { mutableStateOf(prefs.getBoolean("save_urls_relative_internet", true)) }
+    var saveUrlsRelativeFileSystem by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "save_urls_relative_file_system", true)) }
+    var saveUrlsRelativeInternet by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "save_urls_relative_internet", true)) }
 
-    var odfFormatVersion by remember { mutableStateOf(prefs.getString("odf_format_version", "1.4 Extended (recommended)") ?: "1.4 Extended (recommended)") }
-    var alwaysSaveAs by remember { mutableStateOf(prefs.getString("always_save_as", "OpenDocument") ?: "OpenDocument") }
-    var warnWhenNotSavingOdf by remember { mutableStateOf(prefs.getBoolean("warn_when_not_saving_odf", true)) }
+    var odfFormatVersion by remember { mutableStateOf(PapirusConfigManager.getString(context, "LoadAndSave", "odf_format_version", "1.4 Extended (recommended)")) }
+    var alwaysSaveAs by remember { mutableStateOf(PapirusConfigManager.getString(context, "LoadAndSave", "always_save_as", "OpenDocument")) }
+    var warnWhenNotSavingOdf by remember { mutableStateOf(PapirusConfigManager.getBoolean(context, "LoadAndSave", "warn_when_not_saving_odf", true)) }
 
     // Menu and Dialog states
     var showIntervalDialog by remember { mutableStateOf(false) }
@@ -106,7 +110,7 @@ fun LoadSaveGeneralSubpage(
                                 checked = autoRecoveryEnabled,
                                 onCheckedChange = {
                                     autoRecoveryEnabled = it
-                                    prefs.edit().putBoolean("auto_recovery_enabled", it).apply()
+                                    PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_enabled", it)
                                 },
                                 modifier = Modifier.testTag("switch_top_auto_recovery")
                             )
@@ -171,7 +175,7 @@ fun LoadSaveGeneralSubpage(
                                 checked = autoSaveDocumentToo,
                                 onCheckedChange = {
                                     autoSaveDocumentToo = it
-                                    prefs.edit().putBoolean("auto_save_document_too", it).apply()
+                                    PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_save_document_too", it)
                                 },
                                 modifier = Modifier.testTag("switch_auto_save_doc")
                             )
@@ -207,7 +211,7 @@ fun LoadSaveGeneralSubpage(
                                 checked = alwaysCreateBackupCopy,
                                 onCheckedChange = {
                                     alwaysCreateBackupCopy = it
-                                    prefs.edit().putBoolean("always_create_backup_copy", it).apply()
+                                    PapirusConfigManager.saveValue(context, "LoadAndSave", "always_create_backup_copy", it)
                                 },
                                 modifier = Modifier.testTag("switch_top_backup_copy")
                             )
@@ -240,7 +244,7 @@ fun LoadSaveGeneralSubpage(
                                 checked = placeBackupInSameFolder,
                                 onCheckedChange = {
                                     placeBackupInSameFolder = it
-                                    prefs.edit().putBoolean("place_backup_in_same_folder", it).apply()
+                                    PapirusConfigManager.saveValue(context, "LoadAndSave", "place_backup_in_same_folder", it)
                                 },
                                 modifier = Modifier.testTag("switch_place_backup_same_folder")
                             )
@@ -274,7 +278,7 @@ fun LoadSaveGeneralSubpage(
                             checked = loadUserSpecificSettings,
                             onCheckedChange = {
                                 loadUserSpecificSettings = it
-                                prefs.edit().putBoolean("load_user_specific_settings", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "load_user_specific_settings", it)
                             },
                             testTag = "switch_load_user_settings"
                         )
@@ -290,7 +294,7 @@ fun LoadSaveGeneralSubpage(
                             checked = loadPrinterSettings,
                             onCheckedChange = {
                                 loadPrinterSettings = it
-                                prefs.edit().putBoolean("load_printer_settings", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "load_printer_settings", it)
                             },
                             testTag = "switch_load_printer_settings"
                         )
@@ -312,7 +316,7 @@ fun LoadSaveGeneralSubpage(
                             switchChecked = autoRecoveryEnabled,
                             onSwitchChange = {
                                 autoRecoveryEnabled = it
-                                prefs.edit().putBoolean("auto_recovery_enabled", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_enabled", it)
                             },
                             onNavigate = { onNavigateSubSubpage("auto_recovery") },
                             switchTestTag = "switch_auto_recovery"
@@ -329,7 +333,7 @@ fun LoadSaveGeneralSubpage(
                             checked = editDocPropertiesBeforeSaving,
                             onCheckedChange = {
                                 editDocPropertiesBeforeSaving = it
-                                prefs.edit().putBoolean("edit_doc_properties_before_saving", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "edit_doc_properties_before_saving", it)
                             },
                             testTag = "switch_edit_doc_props"
                         )
@@ -345,7 +349,7 @@ fun LoadSaveGeneralSubpage(
                             switchChecked = alwaysCreateBackupCopy,
                             onSwitchChange = {
                                 alwaysCreateBackupCopy = it
-                                prefs.edit().putBoolean("always_create_backup_copy", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "always_create_backup_copy", it)
                             },
                             onNavigate = { onNavigateSubSubpage("backup_copies") },
                             switchTestTag = "switch_backup_copy"
@@ -362,7 +366,7 @@ fun LoadSaveGeneralSubpage(
                             checked = saveUrlsRelativeFileSystem,
                             onCheckedChange = {
                                 saveUrlsRelativeFileSystem = it
-                                prefs.edit().putBoolean("save_urls_relative_file_system", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "save_urls_relative_file_system", it)
                             },
                             testTag = "switch_save_urls_file_system"
                         )
@@ -378,7 +382,7 @@ fun LoadSaveGeneralSubpage(
                             checked = saveUrlsRelativeInternet,
                             onCheckedChange = {
                                 saveUrlsRelativeInternet = it
-                                prefs.edit().putBoolean("save_urls_relative_internet", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "save_urls_relative_internet", it)
                             },
                             testTag = "switch_save_urls_internet"
                         )
@@ -417,7 +421,7 @@ fun LoadSaveGeneralSubpage(
                                         text = { Text(versionOption) },
                                         onClick = {
                                             odfFormatVersion = versionOption
-                                            prefs.edit().putString("odf_format_version", versionOption).apply()
+                                            PapirusConfigManager.saveValue(context, "LoadAndSave", "odf_format_version", versionOption)
                                             showOdfVersionMenu = false
                                         }
                                     )
@@ -450,7 +454,7 @@ fun LoadSaveGeneralSubpage(
                                         text = { Text(formatOption) },
                                         onClick = {
                                             alwaysSaveAs = formatOption
-                                            prefs.edit().putString("always_save_as", formatOption).apply()
+                                            PapirusConfigManager.saveValue(context, "LoadAndSave", "always_save_as", formatOption)
                                             showAlwaysSaveAsMenu = false
                                         }
                                     )
@@ -469,7 +473,7 @@ fun LoadSaveGeneralSubpage(
                             checked = warnWhenNotSavingOdf,
                             onCheckedChange = {
                                 warnWhenNotSavingOdf = it
-                                prefs.edit().putBoolean("warn_when_not_saving_odf", it).apply()
+                                PapirusConfigManager.saveValue(context, "LoadAndSave", "warn_when_not_saving_odf", it)
                             },
                             testTag = "switch_warn_non_odf"
                         )
@@ -504,7 +508,7 @@ fun LoadSaveGeneralSubpage(
                         val minutes = tempIntervalText.toIntOrNull() ?: 10
                         val validMinutes = if (minutes > 0) minutes else 10
                         autoRecoveryInterval = validMinutes
-                        prefs.edit().putInt("auto_recovery_interval", validMinutes).apply()
+                        PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_interval", validMinutes)
                         showIntervalDialog = false
                         Toast.makeText(context, "Auto Recovery set to every $validMinutes minutes", Toast.LENGTH_SHORT).show()
                     }

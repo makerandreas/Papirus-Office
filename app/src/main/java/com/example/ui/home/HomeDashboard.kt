@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.makerandreas.papirusoffice.data.PapirusConfigManager
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -200,23 +202,35 @@ fun HomeDashboard(
     onDynamicColorChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var activeTab by remember { mutableStateOf("Recents") } // Recents, Files, Google Drive
+    val coroutineScope = rememberCoroutineScope()
+    
+    val tabs = listOf("Recents", "Files", "Google Drive")
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { tabs.size })
+    val activeTab = tabs[pagerState.currentPage]
     
     // Search queries
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
 
     // Auto-close search bar when switching subpages (Recents, Files, Google Drive)
-    LaunchedEffect(activeTab) {
+    LaunchedEffect(pagerState.currentPage) {
         isSearchActive = false
         searchQuery = ""
     }
 
     // Dialog & Options states
     var showMoreMenu by remember { mutableStateOf(false) }
-    var showOptionsDialog by remember { mutableStateOf(false) }
+    var showOptionsDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var showNewDocDialog by remember { mutableStateOf(false) }
     var showFabMenu by remember { mutableStateOf(false) }
+    var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        PapirusConfigManager.initialize(context)
+        PapirusConfigManager.checkAndShowResetSuccessPopup(context) { msg ->
+            resetSuccessMessage = msg
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -228,6 +242,8 @@ fun HomeDashboard(
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 24.sp,
                             color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(start = 4.dp)
                         )
                     },
@@ -282,7 +298,8 @@ fun HomeDashboard(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)
+                        containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
                     )
                 )
 
@@ -315,23 +332,30 @@ fun HomeDashboard(
         },
         bottomBar = {
             NavigationBar(
+                containerColor = MaterialTheme.colorScheme.background,
                 modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
             ) {
                 NavigationBarItem(
-                    selected = activeTab == "Recents",
-                    onClick = { activeTab = "Recents" },
+                    selected = pagerState.currentPage == 0,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                    },
                     icon = { Icon(Icons.Rounded.History, contentDescription = "Recents tab") },
                     label = { Text("Recents") }
                 )
                 NavigationBarItem(
-                    selected = activeTab == "Files",
-                    onClick = { activeTab = "Files" },
+                    selected = pagerState.currentPage == 1,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                    },
                     icon = { Icon(Icons.Rounded.Folder, contentDescription = "Files tab") },
                     label = { Text("Files") }
                 )
                 NavigationBarItem(
-                    selected = activeTab == "Google Drive",
-                    onClick = { activeTab = "Google Drive" },
+                    selected = pagerState.currentPage == 2,
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                    },
                     icon = { Icon(Icons.Rounded.Cloud, contentDescription = "Google Drive tab") },
                     label = { Text("Google Drive") }
                 )
@@ -357,46 +381,50 @@ fun HomeDashboard(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            AnimatedContent(
-                targetState = activeTab,
-                transitionSpec = {
-                    val tabOrder = listOf("Recents", "Files", "Google Drive")
-                    val initialIdx = tabOrder.indexOf(initialState)
-                    val targetIdx = tabOrder.indexOf(targetState)
-                    if (targetIdx >= initialIdx) {
-                        (slideInHorizontally(initialOffsetX = { it }) + fadeIn()).togetherWith(
-                            slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
-                        )
-                    } else {
-                        (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()).togetherWith(
-                            slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-                        )
-                    }
-                },
-                label = "HomeTabTransition"
-            ) { targetTab ->
-                when (targetTab) {
-                    "Recents" -> RecentsSubPage(
+            androidx.compose.foundation.pager.HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> RecentsSubPage(
                         searchQuery = searchQuery,
                         onNavigateToModule = onNavigateToModule
                     )
-                    "Files" -> FilesSubPage(
+                    1 -> FilesSubPage(
                         onNavigateToModule = onNavigateToModule
                     )
-                    "Google Drive" -> GoogleDriveSubPage()
+                    2 -> GoogleDriveSubPage()
                 }
             }
         }
     }
 
     // ==========================================
-    // PAPIRUS OFFICE OPTIONS SCREEN
+    // PAPIRUS OFFICE OPTIONS SCREEN WITH SLIDE ANIMATION & PREDICTIVE BACK
     // ==========================================
-    if (showOptionsDialog) {
+    AnimatedVisibility(
+        visible = showOptionsDialog,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+    ) {
         com.example.ui.options.PapirusOfficeOptionsScreen(
             sourceModule = "general",
             onCloseOptions = { showOptionsDialog = false },
             onDynamicColorChange = onDynamicColorChange
+        )
+    }
+
+    if (resetSuccessMessage != null) {
+        AlertDialog(
+            onDismissRequest = { resetSuccessMessage = null },
+            icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text(stringResource(R.string.reset_dialog_title), fontWeight = FontWeight.Bold) },
+            text = { Text(resetSuccessMessage!!) },
+            confirmButton = {
+                Button(onClick = { resetSuccessMessage = null }) {
+                    Text("OK")
+                }
+            }
         )
     }
 }
