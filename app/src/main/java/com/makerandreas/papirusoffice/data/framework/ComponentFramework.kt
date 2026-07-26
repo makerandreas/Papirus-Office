@@ -54,6 +54,28 @@ interface XServiceInfo {
     fun supportsService(serviceName: String): Boolean
 }
 
+interface XSingleServiceFactory {
+    fun createInstance(): Any
+    fun createInstanceWithArguments(arguments: Array<Any>): Any
+}
+
+interface XMultiServiceFactory {
+    fun createInstance(serviceSpecifier: String): Any
+    fun createInstanceWithArguments(serviceSpecifier: String, arguments: Array<Any>): Any
+    val availableServiceNames: Array<String>
+}
+
+interface XComponentContext {
+    fun getValueByName(name: String): Any?
+    fun getServiceManager(): XMultiComponentFactory
+}
+
+interface XMultiComponentFactory {
+    fun createInstanceWithContext(serviceSpecifier: String, context: XComponentContext): Any
+    fun createInstanceWithArgumentsAndContext(serviceSpecifier: String, arguments: Array<Any>, context: XComponentContext): Any
+    val availableServiceNames: Array<String>
+}
+
 interface XNamed {
     var name: String
 }
@@ -98,6 +120,18 @@ interface XController : XComponent {
     fun suspend(suspend: Boolean): Boolean
     fun getViewData(): Any?
     fun restoreViewData(data: Any)
+}
+
+interface XSelectionSupplier {
+    fun select(selection: Any): Boolean
+    fun getSelection(): Any?
+    fun addSelectionChangeListener(listener: XEventListener)
+    fun removeSelectionChangeListener(listener: XEventListener)
+}
+
+interface XViewDataSupplier {
+    fun getViewData(): XIndexAccess
+    fun setViewData(data: XIndexAccess)
 }
 
 /**

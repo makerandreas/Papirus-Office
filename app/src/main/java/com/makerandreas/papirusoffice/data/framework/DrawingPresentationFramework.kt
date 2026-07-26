@@ -27,6 +27,10 @@ interface XDrawPageDuplicator {
     fun duplicate(page: XDrawPage): XDrawPage
 }
 
+interface XControlShape : XShape {
+    var control: Any? // Represents XControlModel from Forms
+}
+
 interface XShapeGroup : XShape {
     // Methods specific to shape groups
 }
@@ -265,6 +269,55 @@ object AnimationEffect {
     const val WAVYLINE_FROM_BOTTOM: Short = 18
 }
 
+data class Hatch(
+    var Style: Short = 0,
+    var Color: Int = 0,
+    var Distance: Int = 0,
+    var Angle: Short = 0
+)
+
+object HatchStyle {
+    const val SINGLE: Short = 0
+    const val DOUBLE: Short = 1
+    const val TRIPLE: Short = 2
+}
+
+object BitmapMode {
+    const val REPEAT: Short = 0
+    const val STRETCH: Short = 1
+    const val NO_REPEAT: Short = 2
+}
+
+object DrawShapeTypes {
+    const val RECTANGLE = "com.sun.star.drawing.RectangleShape"
+    const val ELLIPSE = "com.sun.star.drawing.EllipseShape"
+    const val LINE = "com.sun.star.drawing.LineShape"
+    const val POLYGON = "com.sun.star.drawing.PolygonShape"
+    const val POLY_POLYGON = "com.sun.star.drawing.PolyPolygonShape"
+    const val POLY_POLYGON_BEZIER = "com.sun.star.drawing.PolyPolygonBezierShape"
+    const val CLOSED_BEZIER = "com.sun.star.drawing.ClosedBezierShape"
+    const val OPEN_BEZIER = "com.sun.star.drawing.OpenBezierShape"
+    const val GRAPHIC_OBJECT = "com.sun.star.drawing.GraphicObjectShape"
+    const val TEXT = "com.sun.star.drawing.TextShape"
+    const val CONNECTOR = "com.sun.star.drawing.ConnectorShape"
+    const val CAPTION = "com.sun.star.drawing.CaptionShape"
+    const val MEASURE = "com.sun.star.drawing.MeasureShape"
+    const val FRAME = "com.sun.star.drawing.FrameShape"
+    const val OLE2 = "com.sun.star.drawing.OLE2Shape"
+    const val PAGE = "com.sun.star.drawing.PageShape"
+    const val GROUP = "com.sun.star.drawing.GroupShape"
+    const val CONTROL = "com.sun.star.drawing.ControlShape"
+    const val TITLE_TEXT = "com.sun.star.presentation.TitleTextShape"
+    const val OUTLINER = "com.sun.star.presentation.OutlinerShape"
+    const val SUBTITLE = "com.sun.star.presentation.SubtitleShape"
+    const val NOTES = "com.sun.star.presentation.NotesShape"
+    const val HANDOUT = "com.sun.star.presentation.HandoutShape"
+    const val HEADER = "com.sun.star.presentation.HeaderShape"
+    const val FOOTER = "com.sun.star.presentation.FooterShape"
+    const val SLIDE_NUMBER = "com.sun.star.presentation.SlideNumberShape"
+    const val DATE_TIME = "com.sun.star.presentation.DateTimeShape"
+}
+
 data class HomogenMatrixLine3(
     var Column1: Double = 0.0,
     var Column2: Double = 0.0,
@@ -276,3 +329,4 @@ data class HomogenMatrix3(
     var Line2: HomogenMatrixLine3 = HomogenMatrixLine3(),
     var Line3: HomogenMatrixLine3 = HomogenMatrixLine3()
 )
+

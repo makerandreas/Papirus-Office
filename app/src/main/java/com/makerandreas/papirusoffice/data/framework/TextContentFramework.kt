@@ -215,6 +215,16 @@ interface XIndexAccess {
     fun getByIndex(index: Int): Any
 }
 
+interface XIndexContainer : XIndexAccess {
+    fun insertByIndex(index: Int, element: Any)
+    fun removeByIndex(index: Int)
+}
+
+interface XIdentifierContainer {
+    fun insert(element: Any): Int
+    fun removeByIdentifier(identifier: Int)
+}
+
 interface XEnumerationAccess {
     fun createEnumeration(): XEnumeration
 }
