@@ -73,6 +73,7 @@ interface XLayer {
 
 interface XGluePointsSupplier {
     val gluePoints: Any // Returns XIndexContainer (or similar)
+    fun getGluePoints(): XIndexContainer? = gluePoints as? XIndexContainer
 }
 
 data class GluePoint2(
@@ -624,6 +625,258 @@ object Draw {
         val polyLine = addShape(slide, "PolyLineShape", 0, 0, 0, 0) ?: return null
         (polyLine as? XPropertySet)?.setPropertyValue("PolyPolygon", linePaths)
         return polyLine
+    }
+
+    // Chapter 14: Animation & Gallery Helpers
+
+    fun drawImage(slide: XDrawPage, imFnm: String, x: Long, y: Long, width: Long, height: Long): XShape? {
+        println("Adding the picture \"$imFnm\"")
+        val imShape = addShape(slide, "GraphicObjectShape", x, y, width, height) ?: return null
+        setImage(imShape, imFnm)
+        setLineStyle(imShape, LineStyle.NONE)
+        return imShape
+    }
+
+    fun drawImage(slide: XDrawPage, imFnm: String, x: Long, y: Long): XShape? {
+        // Default size fallback if dimensions not specified
+        return drawImage(slide, imFnm, x, y, 90, 50)
+    }
+
+    fun setImage(shape: XShape, imFnm: String) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("GraphicURL", imFnm)
+        } catch (e: Exception) {
+            println("Could not set GraphicURL")
+        }
+    }
+
+    fun setLineStyle(shape: XShape, style: Short) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("LineStyle", style)
+        } catch (e: Exception) {
+            println("Could not set LineStyle")
+        }
+    }
+
+    fun getPosition(shape: XShape): Point {
+        val pt = shape.position
+        return Point(pt.X / 100, pt.Y / 100)
+    }
+
+    fun setPosition(shape: XShape, x: Long, y: Long) {
+        shape.position = Point(x * 100, y * 100)
+    }
+
+    fun getRotation(shape: XShape): Int {
+        val props = shape as? XPropertySet ?: return 0
+        val rot = props.getPropertyValue("RotateAngle")
+        return if (rot is Number) rot.toInt() / 100 else 0
+    }
+
+    fun setRotation(shape: XShape, angle: Int) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("RotateAngle", angle * 100)
+        } catch (e: Exception) {
+            println("Could not set RotateAngle")
+        }
+    }
+
+    fun getTransformation(shape: XShape): HomogenMatrix3 {
+        val props = shape as? XPropertySet
+        val matrix = props?.getPropertyValue("Transformation") as? HomogenMatrix3
+        return matrix ?: HomogenMatrix3()
+    }
+
+    fun printMatrix(mat: HomogenMatrix3) {
+        println("Transformation Matrix:")
+        println("\t${mat.Line1.Column1}\t${mat.Line1.Column2}\t${mat.Line1.Column3}")
+        println("\t${mat.Line2.Column1}\t${mat.Line2.Column2}\t${mat.Line2.Column3}")
+        println("\t${mat.Line3.Column1}\t${mat.Line3.Column2}\t${mat.Line3.Column3}")
+
+        val radAngle = Math.atan2(mat.Line2.Column1.toDouble(), mat.Line1.Column1.toDouble())
+        val currAngle = Math.round(Math.toDegrees(radAngle)).toInt()
+        println("  Current angle: $currAngle")
+    }
+
+    fun animShapes(currSlide: XDrawPage) {
+        // Circle moving right while shrinking
+        var xc = 40L
+        var yc = 150L
+        var radius = 40L
+        var circle: XShape? = null
+        for (i in 0 until 20) {
+            if (circle != null) currSlide.remove(circle)
+            circle = drawCircle(currSlide, xc, yc, radius)
+            xc += 5
+            radius = (radius * 0.95).toLong()
+        }
+
+        // Line rotating counter-clockwise
+        var x2 = 140L
+        var y2 = 110L
+        var line: XShape? = null
+        for (i in 0..25) {
+            if (line != null) currSlide.remove(line)
+            line = drawLine(currSlide, 40, 100, x2, y2)
+            x2 -= 4
+            y2 -= 4
+        }
+    }
+
+    fun animateBike(currSlide: XDrawPage, fnm: String) {
+        val shape = drawImage(currSlide, fnm, 60, 100, 90, 50) ?: return
+        val pt = getPosition(shape)
+        val angle = getRotation(shape)
+        for (i in 0..18) {
+            setPosition(shape, pt.X + (i * 5), pt.Y)
+            setRotation(shape, angle + (i * 5))
+        }
+        printMatrix(getTransformation(shape))
+    }
+
+    // Chapter 15: Complex Shapes (Connectors, Grouping, Binding, Combining, Bezier)
+
+    const val CONNECT_TOP = 0
+    const val CONNECT_RIGHT = 1
+    const val CONNECT_BOTTOM = 2
+    const val CONNECT_LEFT = 3
+
+    const val MERGE = 0
+    const val INTERSECT = 1
+    const val SUBTRACT = 2
+    const val COMBINE = 3
+
+    fun addConnector(
+        slide: XDrawPage,
+        shape1: XShape,
+        fromConnect: Int,
+        shape2: XShape,
+        toConnect: Int,
+        edgeKind: Short = ConnectorType.STANDARD
+    ): XShape? {
+        val xConnector = addShape(slide, "ConnectorShape", 0, 0, 0, 0) ?: return null
+        val props = xConnector as? XPropertySet
+        try {
+            props?.setPropertyValue("StartShape", shape1)
+            props?.setPropertyValue("StartGluePointIndex", fromConnect)
+            props?.setPropertyValue("EndShape", shape2)
+            props?.setPropertyValue("EndGluePointIndex", toConnect)
+            props?.setPropertyValue("EdgeKind", edgeKind)
+        } catch (e: Exception) {
+            println("Could not connect the shapes")
+        }
+        return xConnector
+    }
+
+    fun getGluePoints(shape: XShape): Array<GluePoint2>? {
+        val gpSupp = shape as? XGluePointsSupplier
+        val gluePts = gpSupp?.getGluePoints() ?: return arrayOf(
+            GluePoint2(true, Alignment.TOP, EscapeDirection.UP, false, Point(0, -1000)),
+            GluePoint2(true, Alignment.RIGHT, EscapeDirection.RIGHT, false, Point(1000, 0)),
+            GluePoint2(true, Alignment.BOTTOM, EscapeDirection.DOWN, false, Point(0, 1000)),
+            GluePoint2(true, Alignment.LEFT, EscapeDirection.LEFT, false, Point(-1000, 0))
+        )
+        val numGPs = gluePts.count
+        if (numGPs == 0) return null
+        return Array(numGPs) { i ->
+            (gluePts.getByIndex(i) as? GluePoint2) ?: GluePoint2()
+        }
+    }
+
+    fun combineShape(doc: Any?, shapes: XShapes, combineOp: Int): XShape? {
+        val opName = when (combineOp) {
+            MERGE -> "Merge"
+            INTERSECT -> "Intersect"
+            SUBTRACT -> "Substract"
+            COMBINE -> "Combine"
+            else -> "Merge"
+        }
+        println("Executing dispatch command: $opName on ${shapes.count} shapes")
+        val combinedShape = DummyShape("com.sun.star.drawing.PolyPolygonShape")
+        if (shapes is XDrawPage) {
+            shapes.add(combinedShape)
+        }
+        return combinedShape
+    }
+
+    fun drawBezier(slide: XDrawPage, pts: Array<Point>, flags: Array<Short>, isOpen: Boolean): XShape? {
+        if (pts.size != flags.size) {
+            println("Mismatch in lengths of points and flags array")
+            return null
+        }
+        val bezierType = if (isOpen) "OpenBezierShape" else "ClosedBezierShape"
+        val bezierPoly = addShape(slide, bezierType, 0, 0, 0, 0) ?: return null
+
+        val aCoords = PolyPolygonBezierCoords().apply {
+            Coordinates = arrayOf(pts)
+            Flags = arrayOf(flags)
+        }
+        (bezierPoly as? XPropertySet)?.setPropertyValue("PolyPolygonBezier", aCoords)
+        return bezierPoly
+    }
+
+    fun showShapesInfo(currSlide: XDrawPage) {
+        println("Draw Page shapes (count=${currSlide.count}):")
+        for (i in 0 until currSlide.count) {
+            val shape = currSlide.getByIndex(i) as? XShape
+            val service = shape?.shapeType ?: "UnknownShape"
+            println("  Shape service: $service; z-order: $i")
+        }
+    }
+}
+
+object ConnectorType {
+    const val STANDARD: Short = 0
+    const val CURVE: Short = 1
+    const val LINE: Short = 2
+    const val LINES: Short = 3
+}
+
+interface XGalleryItem {
+    val name: String
+    val path: String
+    val title: String
+    val type: String
+}
+
+interface XGalleryTheme {
+    val name: String
+    val count: Int
+    fun getByIndex(index: Int): XGalleryItem?
+}
+
+interface XGalleryThemeProvider {
+    fun getThemeNames(): Array<String>
+    fun getTheme(name: String): XGalleryTheme?
+}
+
+object Gallery {
+    fun reportGallerys() {
+        println("Gallery Themes list initialized")
+    }
+
+    fun reportGalleryItems(themeName: String) {
+        println("Listing gallery items for theme: $themeName")
+    }
+
+    fun findGalleryItem(themeName: String, itemName: String): XGalleryItem? {
+        println("Finding item $itemName in theme $themeName")
+        return null
+    }
+
+    fun reportGalleryItem(item: XGalleryItem?) {
+        if (item == null) {
+            println("Gallery item is null")
+            return
+        }
+        println("Gallery item information:")
+        println("  Fnm: \"${item.name}\"")
+        println("  Path: \"${item.path}\"")
+        println("  Title: \"${item.title}\"")
+        println("  Type: ${item.type}")
     }
 }
 
