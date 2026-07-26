@@ -38,6 +38,15 @@ object PapirusConfigManager {
     @Synchronized
     fun initialize(context: Context) {
         ensureDefaultConfigExists(context)
+        val userFile = getUserConfigFile(context)
+        if (!userFile.exists()) {
+            try {
+                getDefaultConfigFile(context).copyTo(userFile, overwrite = true)
+                Log.d(TAG, "Copied DefaultConfig.ini to UserConfig.ini on initial start.")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error copying DefaultConfig.ini to UserConfig.ini", e)
+            }
+        }
         loadConfigs(context)
         isInitialized = true
     }

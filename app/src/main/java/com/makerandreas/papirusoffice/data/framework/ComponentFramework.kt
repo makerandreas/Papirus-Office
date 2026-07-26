@@ -14,7 +14,49 @@ interface XEventListener {
     fun disposing(source: EventObject)
 }
 
-data class EventObject(val source: Any)
+open class EventObject(val source: Any)
+
+interface XPropertySet {
+    fun getPropertySetInfo(): XPropertySetInfo
+    fun setPropertyValue(propertyName: String, value: Any)
+    fun getPropertyValue(propertyName: String): Any
+    fun addPropertyChangeListener(propertyName: String, listener: Any)
+    fun removePropertyChangeListener(propertyName: String, listener: Any)
+    fun addVetoableChangeListener(propertyName: String, listener: Any)
+    fun removeVetoableChangeListener(propertyName: String, listener: Any)
+}
+
+interface XMultiPropertySet {
+    fun getPropertySetInfo(): XPropertySetInfo
+    fun setPropertyValues(propertyNames: Array<String>, values: Array<Any>)
+    fun getPropertyValues(propertyNames: Array<String>): Array<Any>
+    fun addPropertiesChangeListener(propertyNames: Array<String>, listener: Any)
+    fun removePropertiesChangeListener(listener: Any)
+    fun firePropertiesChangeEvent(propertyNames: Array<String>, listener: Any)
+}
+
+interface XPropertySetInfo {
+    fun getProperties(): Array<Property>
+    fun getPropertyByName(name: String): Property
+    fun hasPropertyByName(name: String): Boolean
+}
+
+data class Property(
+    val Name: String,
+    val Handle: Int,
+    val Type: Any,
+    val Attributes: Short
+)
+
+interface XServiceInfo {
+    val implementationName: String
+    val supportedServiceNames: Array<String>
+    fun supportsService(serviceName: String): Boolean
+}
+
+interface XNamed {
+    var name: String
+}
 
 /**
  * Base interface for all disposable components.

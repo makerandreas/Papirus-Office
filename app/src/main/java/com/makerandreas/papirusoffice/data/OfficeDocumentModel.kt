@@ -67,7 +67,7 @@ data class OfficeParsedDocument(
     val isPptx: Boolean = false,
     val isParsingFailed: Boolean = false,
     val failureReason: String? = null
-) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier {
+) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier, XReplaceable {
     
     override val text: XText
         get() = DocumentTextImpl(this)
@@ -82,6 +82,13 @@ data class OfficeParsedDocument(
     override fun reformat() {
         // Implementation for reformatting layout
     }
+
+    override fun createReplaceDescriptor(): XReplaceDescriptor = throw NotImplementedError()
+    override fun replaceAll(descriptor: XSearchDescriptor): Long = throw NotImplementedError()
+    override fun createSearchDescriptor(): XSearchDescriptor = throw NotImplementedError()
+    override fun findAll(descriptor: XSearchDescriptor): Any = throw NotImplementedError()
+    override fun findFirst(descriptor: XSearchDescriptor): Any? = throw NotImplementedError()
+    override fun findNext(startAt: Any, descriptor: XSearchDescriptor): Any? = throw NotImplementedError()
 }
 
 class DocumentTextImpl(private val document: OfficeParsedDocument) : XText {
@@ -92,6 +99,8 @@ class DocumentTextImpl(private val document: OfficeParsedDocument) : XText {
         get() = document.plainText
         set(value) {}
 
+    override fun createTextCursor(): XTextCursor = throw NotImplementedError()
+    override fun createTextCursorByRange(textPosition: XTextRange): XTextCursor = throw NotImplementedError()
     override fun insertString(range: XTextRange, string: String, absorb: Boolean) {}
     override fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean) {}
     override fun insertTextContent(range: XTextRange, content: XTextContent, absorb: Boolean) {}

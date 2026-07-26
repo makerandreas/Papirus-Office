@@ -12,8 +12,24 @@ interface XTextRange {
 }
 
 interface XSimpleText : XTextRange {
+    fun createTextCursor(): XTextCursor
+    fun createTextCursorByRange(textPosition: XTextRange): XTextCursor
     fun insertString(range: XTextRange, string: String, absorb: Boolean)
     fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean)
+}
+
+interface XRelativeTextContentInsert {
+    fun insertTextContentBefore(newContent: XTextContent, precedentContent: XTextContent)
+    fun insertTextContentAfter(newContent: XTextContent, precedentContent: XTextContent)
+}
+
+interface XTextRangeCompare {
+    fun compareRegionStarts(range1: XTextRange, range2: XTextRange): Short
+    fun compareRegionEnds(range1: XTextRange, range2: XTextRange): Short
+}
+
+interface XDocumentInsertable {
+    fun insertDocumentFromURL(url: String, options: Array<PropertyValue>)
 }
 
 interface XText : XSimpleText {
@@ -141,7 +157,7 @@ interface XReplaceDescriptor : XSearchDescriptor {
 
 interface XSearchable {
     fun createSearchDescriptor(): XSearchDescriptor
-    fun findAll(descriptor: XSearchDescriptor): List<Any>
+    fun findAll(descriptor: XSearchDescriptor): Any // Represents XIndexAccess
     fun findFirst(descriptor: XSearchDescriptor): Any?
     fun findNext(startAt: Any, descriptor: XSearchDescriptor): Any?
 }
