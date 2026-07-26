@@ -330,3 +330,387 @@ data class HomogenMatrix3(
     var Line3: HomogenMatrixLine3 = HomogenMatrixLine3()
 )
 
+object CircleKind {
+    const val FULL: Short = 0
+    const val SECTION: Short = 1
+    const val CUT: Short = 2
+    const val ARC: Short = 3
+}
+
+object Draw {
+    fun isShapesBased(doc: Any?): Boolean {
+        return doc is XDrawPagesSupplier
+    }
+
+    fun getSlidesCount(doc: Any?): Int {
+        val slides = getSlides(doc)
+        return slides?.count ?: 0
+    }
+
+    fun getSlides(doc: Any?): XDrawPages? {
+        return (doc as? XDrawPagesSupplier)?.drawPages
+    }
+
+    fun getSlide(doc: Any?, idx: Int): XDrawPage? {
+        val slides = getSlides(doc) ?: return null
+        return getSlide(slides, idx)
+    }
+
+    fun getSlide(slides: XDrawPages, idx: Int): XDrawPage? {
+        return try {
+            slides.getByIndex(idx) as? XDrawPage
+        } catch (e: Exception) {
+            println("Could not get slide $idx")
+            null
+        }
+    }
+
+    fun getSlideSize(xDrawPage: XDrawPage): Size? {
+        return try {
+            val props = xDrawPage as? XPropertySet ?: return null
+            val width = (props.getPropertyValue("Width") as? Number)?.toLong() ?: 0L
+            val height = (props.getPropertyValue("Height") as? Number)?.toLong() ?: 0L
+            Size(width / 100, height / 100)
+        } catch (e: Exception) {
+            println("Could not get page dimensions")
+            null
+        }
+    }
+
+    fun makeShape(shapeType: String, x: Long, y: Long, width: Long, height: Long): XShape? {
+        return try {
+            val fullType = if (shapeType.startsWith("com.sun.star.")) shapeType else "com.sun.star.drawing.$shapeType"
+            val shape = DummyShape(fullType)
+            shape.position = Point(x * 100, y * 100)
+            shape.size = Size(width * 100, height * 100)
+            shape
+        } catch (e: Exception) {
+            println("Unable to create shape: $shapeType")
+            null
+        }
+    }
+
+    fun addShape(slide: XDrawPage, shapeType: String, x: Long, y: Long, width: Long, height: Long): XShape? {
+        val shape = makeShape(shapeType, x, y, width, height)
+        if (shape != null) {
+            slide.add(shape)
+        }
+        return shape
+    }
+
+    fun drawLine(slide: XDrawPage, x1: Long, y1: Long, x2: Long, y2: Long): XShape? {
+        if (x1 == x2 && y1 == y2) {
+            println("Line is a point")
+            return null
+        }
+        val width = x2 - x1
+        val height = y2 - y1
+        return addShape(slide, "LineShape", x1, y1, width, height)
+    }
+
+    fun drawPolarLine(slide: XDrawPage, x: Long, y: Long, angle: Double, length: Long): XShape? {
+        val rad = Math.toRadians(angle)
+        val x2 = (x + length * Math.cos(rad)).toLong()
+        val y2 = (y + length * Math.sin(rad)).toLong()
+        return drawLine(slide, x, y, x2, y2)
+    }
+
+    fun setDashedLine(shape: XShape, isDashed: Boolean) {
+        val ld = LineDash().apply {
+            Dots = 0
+            DotLen = 100
+            Dashes = 5
+            DashLen = 200
+            Distance = 200
+        }
+        val props = shape as? XPropertySet ?: return
+        try {
+            if (isDashed) {
+                props.setPropertyValue("LineStyle", LineStyle.DASH)
+                props.setPropertyValue("LineDash", ld)
+            } else {
+                props.setPropertyValue("LineStyle", LineStyle.SOLID)
+            }
+        } catch (e: Exception) {
+            println("Could not set dashed line property")
+        }
+    }
+
+    fun drawEllipse(slide: XDrawPage, x: Long, y: Long, width: Long, height: Long): XShape? {
+        return addShape(slide, "EllipseShape", x, y, width, height)
+    }
+
+    fun drawCircle(slide: XDrawPage, x: Long, y: Long, radius: Long): XShape? {
+        return drawEllipse(slide, x - radius, y - radius, radius * 2, radius * 2)
+    }
+
+    fun drawRectangle(slide: XDrawPage, x: Long, y: Long, width: Long, height: Long): XShape? {
+        return addShape(slide, "RectangleShape", x, y, width, height)
+    }
+
+    fun setGradientColor(shape: XShape, name: String) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillStyle", FillStyle.GRADIENT)
+            props.setPropertyValue("FillGradientName", name)
+        } catch (e: Exception) {
+            println("Could not set gradient color name $name")
+        }
+    }
+
+    fun setGradientColor(shape: XShape, startColor: Int, endColor: Int, angle: Int = 0) {
+        val grad = Gradient().apply {
+            Style = GradientStyle.LINEAR
+            StartColor = startColor
+            EndColor = endColor
+            Angle = (angle * 10).toShort()
+            Border = 0
+            XOffset = 0
+            YOffset = 0
+            StartIntensity = 100
+            EndIntensity = 100
+            StepCount = 10
+        }
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillStyle", FillStyle.GRADIENT)
+            props.setPropertyValue("FillGradient", grad)
+        } catch (e: Exception) {
+            println("Could not set gradient colors")
+        }
+    }
+
+    fun setHatchingColor(shape: XShape, name: String) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillStyle", FillStyle.HATCH)
+            props.setPropertyValue("FillHatchName", name)
+        } catch (e: Exception) {
+            println("Could not set hatching color name $name")
+        }
+    }
+
+    fun setBitmapColor(shape: XShape, name: String) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillStyle", FillStyle.BITMAP)
+            props.setPropertyValue("FillBitmapName", name)
+        } catch (e: Exception) {
+            println("Could not set bitmap color name $name")
+        }
+    }
+
+    fun setBitmapFileColor(shape: XShape, fnm: String) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillStyle", FillStyle.BITMAP)
+            props.setPropertyValue("FillBitmapURL", fnm)
+        } catch (e: Exception) {
+            println("Could not set bitmap file color $fnm")
+        }
+    }
+
+    fun setTransparency(shape: XShape, level: Int) {
+        val props = shape as? XPropertySet ?: return
+        try {
+            props.setPropertyValue("FillTransparence", level.toShort())
+        } catch (e: Exception) {
+            println("Could not set transparency")
+        }
+    }
+
+    fun drawText(slide: XDrawPage, msg: String, x: Long, y: Long, width: Long, height: Long, fontSize: Int = 0): XShape? {
+        val shape = addShape(slide, "TextShape", x, y, width, height) ?: return null
+        addText(shape, msg, fontSize)
+        return shape
+    }
+
+    fun addText(shape: XShape, msg: String, fontSize: Int = 0) {
+        val xText = shape as? XText ?: return
+        val cursor = xText.createTextCursor()
+        cursor.gotoEnd(false)
+        if (fontSize > 0) {
+            (cursor as? XPropertySet)?.setPropertyValue("CharHeight", fontSize.toFloat())
+        }
+        val range = cursor as? XTextRange
+        range?.string = msg
+    }
+
+    fun getTextProperties(xShape: XShape): XPropertySet? {
+        val xText = xShape as? XText ?: return null
+        val cursor = xText.createTextCursor()
+        cursor.gotoStart(false)
+        cursor.gotoEnd(true)
+        return cursor as? XPropertySet
+    }
+
+    fun findShapeByName(slide: XDrawPage, shapeName: String): XShape? {
+        val shapes = getShapes(slide)
+        for (shape in shapes) {
+            val props = shape as? XPropertySet
+            val nm = props?.getPropertyValue("Name") as? String
+            if (shapeName == nm) return shape
+        }
+        return null
+    }
+
+    fun getShapes(slide: XDrawPage): List<XShape> {
+        val list = mutableListOf<XShape>()
+        for (i in 0 until slide.count) {
+            val s = slide.getByIndex(i) as? XShape
+            if (s != null) list.add(s)
+        }
+        return list
+    }
+
+    fun reportPosSize(shape: XShape?) {
+        if (shape == null) {
+            println("The shape is null")
+            return
+        }
+        val props = shape as? XPropertySet
+        val nm = props?.getPropertyValue("Name")
+        println("Shape name: $nm")
+        println("  Type: ${shape.shapeType}")
+        val pt = shape.position
+        val sz = shape.size
+        println("  Position/size: (${pt.X / 100}, ${pt.Y / 100}) / (${sz.Width / 100}, ${sz.Height / 100})")
+    }
+
+    fun drawFormula(slide: XDrawPage, formula: String, x: Long, y: Long, width: Long, height: Long): XShape? {
+        val shape = addShape(slide, "OLE2Shape", x, y, width, height) ?: return null
+        val props = shape as? XPropertySet
+        props?.setPropertyValue("CLSID", "078B7ABA-54FC-457F-8551-A48011E4826C")
+        val model = props?.getPropertyValue("Model") as? XModel
+        if (model is XPropertySet) {
+            model.setPropertyValue("Formula", formula)
+        }
+        return shape
+    }
+
+    fun drawPolygon(slide: XDrawPage, x: Long, y: Long, radius: Long, nSides: Int): XShape? {
+        val polygon = addShape(slide, "PolyPolygonShape", 0, 0, 0, 0) ?: return null
+        val pts = genPolygonPoints(x, y, radius, nSides)
+        val polys = arrayOf(pts)
+        (polygon as? XPropertySet)?.setPropertyValue("PolyPolygon", polys)
+        return polygon
+    }
+
+    fun genPolygonPoints(x: Long, y: Long, radius: Long, nSides: Int): Array<Point> {
+        var sides = nSides
+        if (sides < 3) sides = 3
+        if (sides > 30) sides = 30
+        val pts = Array(sides) { Point() }
+        val angleStep = Math.PI / sides
+        for (i in 0 until sides) {
+            pts[i] = Point(
+                Math.round((x * 100) + (radius * 100) * Math.cos(i * 2 * angleStep)),
+                Math.round((y * 100) + (radius * 100) * Math.sin(i * 2 * angleStep))
+            )
+        }
+        return pts
+    }
+
+    fun drawLines(slide: XDrawPage, xs: LongArray, ys: LongArray): XShape? {
+        if (xs.size != ys.size) {
+            println("The two arrays must be the same length")
+            return null
+        }
+        val numPoints = xs.size
+        val pts = Array(numPoints) { i ->
+            Point(xs[i] * 100, ys[i] * 100)
+        }
+        val linePaths = arrayOf(pts)
+        val polyLine = addShape(slide, "PolyLineShape", 0, 0, 0, 0) ?: return null
+        (polyLine as? XPropertySet)?.setPropertyValue("PolyPolygon", linePaths)
+        return polyLine
+    }
+}
+
+open class DummyShape(override val shapeType: String) : XShape, XPropertySet, XText {
+    override var position: Point = Point()
+    override var size: Size = Size()
+    private val propertyMap = mutableMapOf<String, Any?>()
+
+    override fun getPropertySetInfo(): XPropertySetInfo {
+        return object : XPropertySetInfo {
+            override fun getProperties(): Array<Property> = emptyArray()
+            override fun getPropertyByName(name: String): Property = Property(name, 0, String::class.java, 0)
+            override fun hasPropertyByName(name: String): Boolean = true
+        }
+    }
+
+    override fun setPropertyValue(propertyName: String, value: Any) {
+        propertyMap[propertyName] = value
+    }
+
+    override fun getPropertyValue(propertyName: String): Any {
+        return propertyMap[propertyName] ?: ""
+    }
+
+    override fun addPropertyChangeListener(propertyName: String, listener: Any) {}
+    override fun removePropertyChangeListener(propertyName: String, listener: Any) {}
+    override fun addVetoableChangeListener(propertyName: String, listener: Any) {}
+    override fun removeVetoableChangeListener(propertyName: String, listener: Any) {}
+
+    private var textContent: String = ""
+
+    override fun createTextCursor(): XTextCursor {
+        return DummyTextCursor(this)
+    }
+
+    override fun createTextCursorByRange(textPosition: XTextRange): XTextCursor {
+        return DummyTextCursor(this)
+    }
+
+    override fun insertString(range: XTextRange, string: String, absorb: Boolean) {
+        textContent += string
+    }
+
+    override fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean) {}
+
+    override fun insertTextContent(range: XTextRange, content: XTextContent, absorb: Boolean) {}
+    override fun removeTextContent(content: XTextContent) {}
+
+    override val text: XText get() = this
+    override val start: XTextRange get() = this
+    override val end: XTextRange get() = this
+    override var string: String
+        get() = textContent
+        set(value) { textContent = value }
+}
+
+class DummyTextCursor(private val hostRange: XTextRange) : XTextCursor, XPropertySet {
+    private val propertyMap = mutableMapOf<String, Any?>()
+
+    override fun collapseToStart() {}
+    override fun collapseToEnd() {}
+    override fun isCollapsed(): Boolean = true
+    override fun goLeft(count: Short, expand: Boolean): Boolean = true
+    override fun goRight(count: Short, expand: Boolean): Boolean = true
+    override fun gotoStart(expand: Boolean) {}
+    override fun gotoEnd(expand: Boolean) {}
+    override fun gotoRange(range: XTextRange, expand: Boolean) {}
+
+    override val text: XText get() = hostRange.text
+    override val start: XTextRange get() = hostRange.start
+    override val end: XTextRange get() = hostRange.end
+    override var string: String
+        get() = hostRange.string
+        set(value) { hostRange.string = value }
+
+    override fun getPropertySetInfo(): XPropertySetInfo {
+        return object : XPropertySetInfo {
+            override fun getProperties(): Array<Property> = emptyArray()
+            override fun getPropertyByName(name: String): Property = Property(name, 0, String::class.java, 0)
+            override fun hasPropertyByName(name: String): Boolean = true
+        }
+    }
+    override fun setPropertyValue(propertyName: String, value: Any) { propertyMap[propertyName] = value }
+    override fun getPropertyValue(propertyName: String): Any = propertyMap[propertyName] ?: ""
+    override fun addPropertyChangeListener(propertyName: String, listener: Any) {}
+    override fun removePropertyChangeListener(propertyName: String, listener: Any) {}
+    override fun addVetoableChangeListener(propertyName: String, listener: Any) {}
+    override fun removeVetoableChangeListener(propertyName: String, listener: Any) {}
+}
+
