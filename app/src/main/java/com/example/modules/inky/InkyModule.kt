@@ -192,6 +192,32 @@ fun InkyModule(
     var docxExtents by remember { mutableStateOf<Map<String, Pair<Long, Long>>>(emptyMap()) }
     var isParsingDoc by remember { mutableStateOf(false) }
 
+    val inkyMetadataRepo = remember(context) {
+        val db = com.makerandreas.papirusoffice.data.cache.DocumentDatabase.getInstance(context)
+        com.makerandreas.papirusoffice.data.cache.InkyDocumentMetadataRepository(db.inkyDocumentMetadataDao())
+    }
+
+    val updateInkyMetadata: suspend (String, String, String) -> Unit = { path, name, text ->
+        val existing = inkyMetadataRepo.getMetadata(path)
+        val cleanText = text.trim()
+        val words = if (cleanText.isEmpty()) 0 else cleanText.split(Regex("\\s+")).count { word -> word.any { it.isLetterOrDigit() } }
+        val chars = text.length
+        val paragraphs = if (cleanText.isEmpty()) 0 else text.split("\n").count { it.isNotBlank() }
+        val now = System.currentTimeMillis()
+        val entity = com.makerandreas.papirusoffice.data.cache.InkyDocumentMetadataEntity(
+            filePath = path,
+            fileName = name,
+            createdAt = existing?.createdAt ?: now,
+            lastModifiedAt = now,
+            author = existing?.author ?: "Papirus Office User",
+            wordCount = words,
+            characterCount = chars,
+            paragraphCount = paragraphs,
+            fileType = if (name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT"
+        )
+        inkyMetadataRepo.saveOrUpdateMetadata(entity)
+    }
+
     var docBodyText by remember {
         mutableStateOf(
             androidx.compose.ui.text.input.TextFieldValue("")
@@ -228,8 +254,31 @@ fun InkyModule(
                             docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                             docxImages = parseResult.extractedImages
                             docxExtents = parseResult.imageExtents
+                            updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
                         }
                     }
+                }
+            }
+        } else if (com.example.MainActivity.openedFilePath == null) {
+            // Load Normal.ott template automatically as the base for new Inky documents
+            isNewDocument = true
+            isSaved = true
+            docTitle = "Document.odt"
+            loadingDocName = "Document.odt"
+            isLoadingDocument = true
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val templateFile = com.example.core.util.TemplateManager.getInkyNormalTemplateFile(context)
+                val parseResult = if (templateFile != null && templateFile.exists()) {
+                    docxParser.parseDocument(templateFile)
+                } else {
+                    com.makerandreas.papirusoffice.data.DocxParseResult("")
+                }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    isLoadingDocument = false
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                    docxImages = parseResult.extractedImages
+                    docxExtents = parseResult.imageExtents
+                    updateInkyMetadata("templates/inky/Normal.ott", "Document.odt", parseResult.text)
                 }
             }
         }
@@ -451,6 +500,9 @@ fun InkyModule(
                     if (actualSuccess) {
                         isSaved = true
                         saveFailed = false
+                        if (path != null) {
+                            updateInkyMetadata(path, docTitle, docBodyText.text)
+                        }
                         Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
                         onSuccess?.invoke()
                     } else {
@@ -528,6 +580,7 @@ fun InkyModule(
                     docTitle = savedName
                     isSaved = true
                     isNewDocument = false
+                    updateInkyMetadata(it.toString(), savedName, docBodyText.text)
                     Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
                     pendingActionAfterSave?.invoke()
                     pendingActionAfterSave = null
@@ -631,7 +684,17 @@ fun InkyModule(
             com.example.core.jni.LibreOfficeCore.createDocument(name)
             runDocumentLoading(true, name) {
                 docTitle = name
-                docBodyText = androidx.compose.ui.text.input.TextFieldValue("")
+                coroutineScope.launch {
+                    val templateFile = com.example.core.util.TemplateManager.getInkyNormalTemplateFile(context)
+                    val parseResult = if (templateFile != null && templateFile.exists()) {
+                        docxParser.parseDocument(templateFile)
+                    } else {
+                        com.makerandreas.papirusoffice.data.DocxParseResult("")
+                    }
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                    docxImages = parseResult.extractedImages
+                    docxExtents = parseResult.imageExtents
+                }
                 isSaved = true
                 isEditMode = true
                 isNewDocument = true
@@ -2639,6 +2702,33 @@ fun InkyModule(
                                                  onSaveAsDocument = {
                                                      showBottomBar = false
                                                      showSaveAsDialog = true
+                                                 },
+                                                 onDocumentProperties = {
+                                                     coroutineScope.launch {
+                                                         val currentPath = com.example.MainActivity.openedFilePath ?: "templates/inky/Normal.ott"
+                                                         var meta = inkyMetadataRepo.getMetadata(currentPath)
+                                                         if (meta == null) {
+                                                             updateInkyMetadata(currentPath, docTitle, docBodyText.text)
+                                                             meta = inkyMetadataRepo.getMetadata(currentPath)
+                                                         }
+                                                         if (meta != null) {
+                                                             val dateFmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                                                             val createdStr = dateFmt.format(java.util.Date(meta.createdAt))
+                                                             val modifiedStr = dateFmt.format(java.util.Date(meta.lastModifiedAt))
+                                                             Toast.makeText(
+                                                                 context,
+                                                                 "Document Properties (Room DB):\n" +
+                                                                 "File: ${meta.fileName} (${meta.fileType})\n" +
+                                                                 "Author: ${meta.author}\n" +
+                                                                 "Created: $createdStr\n" +
+                                                                 "Modified: $modifiedStr\n" +
+                                                                 "Words: ${meta.wordCount} | Chars: ${meta.characterCount} | Paragraphs: ${meta.paragraphCount}",
+                                                                 Toast.LENGTH_LONG
+                                                             ).show()
+                                                         } else {
+                                                             Toast.makeText(context, "No metadata available for this document", Toast.LENGTH_SHORT).show()
+                                                         }
+                                                     }
                                                  }
                                              )
                                          }
@@ -3392,7 +3482,8 @@ private fun FileSubpage(
     onOpenDocument: () -> Unit,
     onCloseDocument: () -> Unit,
     onSaveDocument: () -> Unit,
-    onSaveAsDocument: () -> Unit
+    onSaveAsDocument: () -> Unit,
+    onDocumentProperties: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
@@ -3474,7 +3565,7 @@ private fun FileSubpage(
             icon = Icons.Rounded.Info,
             title = "Document properties"
         ) {
-            Toast.makeText(context, "Properties: 1 page, 340 words, 2,130 characters", Toast.LENGTH_LONG).show()
+            onDocumentProperties()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Image,

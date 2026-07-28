@@ -17,6 +17,30 @@ import kotlinx.coroutines.withContext
 object TemplateManager {
     private const val TAG = "TemplateManager"
 
+    /**
+     * Extracts the empty default Inky template file (templates/inky/Normal.ott) from app assets.
+     * This OTT file serves as the base structure whenever a new Inky document is created.
+     */
+    fun getInkyNormalTemplateFile(context: Context): File? {
+        return try {
+            val templateDir = File(context.cacheDir, "templates/inky")
+            if (!templateDir.exists()) {
+                templateDir.mkdirs()
+            }
+            val targetFile = File(templateDir, "Normal.ott")
+            context.assets.open("templates/inky/Normal.ott").use { input ->
+                FileOutputStream(targetFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            Log.d(TAG, "Successfully extracted Inky Normal.ott template to: ${targetFile.absolutePath}")
+            targetFile
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to extract Normal.ott template from assets", e)
+            null
+        }
+    }
+
     data class TemplateItem(
         val name: String,
         val type: String, // ODT, ODS, ODP

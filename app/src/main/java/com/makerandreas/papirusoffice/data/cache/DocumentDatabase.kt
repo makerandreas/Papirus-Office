@@ -8,10 +8,15 @@ import androidx.room.RoomDatabase
 /**
  * Room Database for Papirus Office local cache.
  */
-@Database(entities = [DocumentCacheEntity::class], version = 1, exportSchema = false)
+@Database(
+    entities = [DocumentCacheEntity::class, InkyDocumentMetadataEntity::class],
+    version = 2,
+    exportSchema = false
+)
 abstract class DocumentDatabase : RoomDatabase() {
 
     abstract fun documentCacheDao(): DocumentCacheDao
+    abstract fun inkyDocumentMetadataDao(): InkyDocumentMetadataDao
 
     companion object {
         @Volatile
