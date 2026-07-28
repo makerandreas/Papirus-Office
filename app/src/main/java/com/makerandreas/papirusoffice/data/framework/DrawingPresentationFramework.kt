@@ -76,6 +76,12 @@ interface XGluePointsSupplier {
     fun getGluePoints(): XIndexContainer? = gluePoints as? XIndexContainer
 }
 
+data class HomogenMatrixLine3(var Column1: Double = 0.0, var Column2: Double = 0.0, var Column3: Double = 0.0)
+data class HomogenMatrix3(
+    var Line1: HomogenMatrixLine3 = HomogenMatrixLine3(),
+    var Line2: HomogenMatrixLine3 = HomogenMatrixLine3(),
+    var Line3: HomogenMatrixLine3 = HomogenMatrixLine3()
+)
 data class GluePoint2(
     var IsRelative: Boolean = false,
     var PositionAlignment: Short = 0, // Alignment
@@ -308,40 +314,6 @@ object DrawShapeTypes {
     const val PAGE = "com.sun.star.drawing.PageShape"
     const val GROUP = "com.sun.star.drawing.GroupShape"
     const val CONTROL = "com.sun.star.drawing.ControlShape"
-    const val TITLE_TEXT = "com.sun.star.presentation.TitleTextShape"
-    const val OUTLINER = "com.sun.star.presentation.OutlinerShape"
-    const val SUBTITLE = "com.sun.star.presentation.SubtitleShape"
-    const val NOTES = "com.sun.star.presentation.NotesShape"
-    const val HANDOUT = "com.sun.star.presentation.HandoutShape"
-    const val HEADER = "com.sun.star.presentation.HeaderShape"
-    const val FOOTER = "com.sun.star.presentation.FooterShape"
-    const val SLIDE_NUMBER = "com.sun.star.presentation.SlideNumberShape"
-    const val DATE_TIME = "com.sun.star.presentation.DateTimeShape"
-}
-
-data class HomogenMatrixLine3(
-    var Column1: Double = 0.0,
-    var Column2: Double = 0.0,
-    var Column3: Double = 0.0
-)
-
-data class HomogenMatrix3(
-    var Line1: HomogenMatrixLine3 = HomogenMatrixLine3(),
-    var Line2: HomogenMatrixLine3 = HomogenMatrixLine3(),
-    var Line3: HomogenMatrixLine3 = HomogenMatrixLine3()
-)
-
-object CircleKind {
-    const val FULL: Short = 0
-    const val SECTION: Short = 1
-    const val CUT: Short = 2
-    const val ARC: Short = 3
-}
-
-object Draw {
-    fun isShapesBased(doc: Any?): Boolean {
-        return doc is XDrawPagesSupplier
-    }
 
     fun getSlidesCount(doc: Any?): Int {
         val slides = getSlides(doc)
@@ -398,7 +370,6 @@ object Draw {
         }
         return shape
     }
-
     fun drawLine(slide: XDrawPage, x1: Long, y1: Long, x2: Long, y2: Long): XShape? {
         if (x1 == x2 && y1 == y2) {
             println("Line is a point")
@@ -525,7 +496,6 @@ object Draw {
         addText(shape, msg, fontSize)
         return shape
     }
-
     fun addText(shape: XShape, msg: String, fontSize: Int = 0) {
         val xText = shape as? XText ?: return
         val cursor = xText.createTextCursor()
@@ -550,11 +520,10 @@ object Draw {
         for (shape in shapes) {
             val props = shape as? XPropertySet
             val nm = props?.getPropertyValue("Name") as? String
-            if (shapeName == nm) return shape
+            if (nm == shapeName) return shape
         }
         return null
     }
-
     fun getShapes(slide: XDrawPage): List<XShape> {
         val list = mutableListOf<XShape>()
         for (i in 0 until slide.count) {
@@ -588,7 +557,6 @@ object Draw {
         }
         return shape
     }
-
     fun drawPolygon(slide: XDrawPage, x: Long, y: Long, radius: Long, nSides: Int): XShape? {
         val polygon = addShape(slide, "PolyPolygonShape", 0, 0, 0, 0) ?: return null
         val pts = genPolygonPoints(x, y, radius, nSides)
@@ -857,16 +825,13 @@ object Gallery {
     fun reportGallerys() {
         println("Gallery Themes list initialized")
     }
-
     fun reportGalleryItems(themeName: String) {
         println("Listing gallery items for theme: $themeName")
     }
-
     fun findGalleryItem(themeName: String, itemName: String): XGalleryItem? {
         println("Finding item $itemName in theme $themeName")
         return null
     }
-
     fun reportGalleryItem(item: XGalleryItem?) {
         if (item == null) {
             println("Gallery item is null")
@@ -884,7 +849,6 @@ open class DummyShape(override val shapeType: String) : XShape, XPropertySet, XT
     override var position: Point = Point()
     override var size: Size = Size()
     private val propertyMap = mutableMapOf<String, Any?>()
-
     override fun getPropertySetInfo(): XPropertySetInfo {
         return object : XPropertySetInfo {
             override fun getProperties(): Array<Property> = emptyArray()
@@ -892,39 +856,29 @@ open class DummyShape(override val shapeType: String) : XShape, XPropertySet, XT
             override fun hasPropertyByName(name: String): Boolean = true
         }
     }
-
     override fun setPropertyValue(propertyName: String, value: Any) {
         propertyMap[propertyName] = value
     }
-
     override fun getPropertyValue(propertyName: String): Any {
         return propertyMap[propertyName] ?: ""
     }
-
     override fun addPropertyChangeListener(propertyName: String, listener: Any) {}
     override fun removePropertyChangeListener(propertyName: String, listener: Any) {}
     override fun addVetoableChangeListener(propertyName: String, listener: Any) {}
     override fun removeVetoableChangeListener(propertyName: String, listener: Any) {}
-
     private var textContent: String = ""
-
     override fun createTextCursor(): XTextCursor {
         return DummyTextCursor(this)
     }
-
     override fun createTextCursorByRange(textPosition: XTextRange): XTextCursor {
         return DummyTextCursor(this)
     }
-
     override fun insertString(range: XTextRange, string: String, absorb: Boolean) {
         textContent += string
     }
-
     override fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean) {}
-
     override fun insertTextContent(range: XTextRange, content: XTextContent, absorb: Boolean) {}
     override fun removeTextContent(content: XTextContent) {}
-
     override val text: XText get() = this
     override val start: XTextRange get() = this
     override val end: XTextRange get() = this
@@ -935,7 +889,6 @@ open class DummyShape(override val shapeType: String) : XShape, XPropertySet, XT
 
 class DummyTextCursor(private val hostRange: XTextRange) : XTextCursor, XPropertySet {
     private val propertyMap = mutableMapOf<String, Any?>()
-
     override fun collapseToStart() {}
     override fun collapseToEnd() {}
     override fun isCollapsed(): Boolean = true
@@ -944,14 +897,12 @@ class DummyTextCursor(private val hostRange: XTextRange) : XTextCursor, XPropert
     override fun gotoStart(expand: Boolean) {}
     override fun gotoEnd(expand: Boolean) {}
     override fun gotoRange(range: XTextRange, expand: Boolean) {}
-
     override val text: XText get() = hostRange.text
     override val start: XTextRange get() = hostRange.start
     override val end: XTextRange get() = hostRange.end
     override var string: String
         get() = hostRange.string
         set(value) { hostRange.string = value }
-
     override fun getPropertySetInfo(): XPropertySetInfo {
         return object : XPropertySetInfo {
             override fun getProperties(): Array<Property> = emptyArray()
@@ -967,3 +918,93 @@ class DummyTextCursor(private val hostRange: XTextRange) : XTextCursor, XPropert
     override fun removeVetoableChangeListener(propertyName: String, listener: Any) {}
 }
 
+typealias Draw = DrawShapeTypes
+
+const val LAYOUT_TITLE_SUB = 0
+const val LAYOUT_TITLE_BULLETS = 1
+const val LAYOUT_TITLE_ONLY = 19
+const val LAYOUT_BLANK = 20
+
+const val TITLE_TEXT = "com.sun.star.presentation.TitleTextShape"
+const val SUBTITLE_TEXT = "com.sun.star.presentation.SubtitleShape"
+const val BULLETS_TEXT = "com.sun.star.presentation.OutlinerShape"
+
+fun addSlide(doc: Any?): XDrawPage? {
+    val slides = Draw.getSlides(doc) ?: return null
+    val idx = slides.count
+    return slides.insertNewByIndex(idx) as? XDrawPage
+}
+
+fun titleSlide(currSlide: XDrawPage, title: String, subTitle: String) {
+    val props = currSlide as? XPropertySet
+    props?.setPropertyValue("Layout", LAYOUT_TITLE_SUB.toShort())
+    
+    val titleShape = findShapeByType(currSlide, TITLE_TEXT)
+    (titleShape as? XText)?.let { it.string = title }
+    
+    val subTitleShape = findShapeByType(currSlide, SUBTITLE_TEXT)
+    (subTitleShape as? XText)?.let { it.string = subTitle }
+}
+
+fun bulletsSlide(currSlide: XDrawPage, title: String): XText? {
+    val props = currSlide as? XPropertySet
+    props?.setPropertyValue("Layout", LAYOUT_TITLE_BULLETS.toShort())
+
+    val titleShape = findShapeByType(currSlide, TITLE_TEXT)
+    (titleShape as? XText)?.let { it.string = title }
+
+    val bulletsShape = findShapeByType(currSlide, BULLETS_TEXT)
+    return bulletsShape as? XText
+}
+
+fun titleOnlySlide(currSlide: XDrawPage, header: String) {
+    val props = currSlide as? XPropertySet
+    props?.setPropertyValue("Layout", LAYOUT_TITLE_ONLY.toShort())
+
+    val titleShape = findShapeByType(currSlide, TITLE_TEXT)
+    (titleShape as? XText)?.let { it.string = header }
+}
+
+fun blankSlide(currSlide: XDrawPage) {
+    val props = currSlide as? XPropertySet
+    props?.setPropertyValue("Layout", LAYOUT_BLANK.toShort())
+}
+
+fun addBullet(bullsText: XText?, level: Int, text: String) {
+    if (bullsText == null) return
+    val tr = bullsText.end
+    (tr as? XPropertySet)?.setPropertyValue("NumberingLevel", level.toShort())
+    tr.string = "$text\n"
+}
+
+fun findShapeByType(slide: XDrawPage, shapeType: String): XShape? {
+    val shapes = Draw.getShapes(slide)
+    for (shape in shapes) {
+        if (shape.shapeType == shapeType) return shape
+    }
+    return null
+}
+
+fun drawImageOffset(slide: XDrawPage, imFnm: String, xOffset: Double, yOffset: Double): XShape? {
+    var xOff = xOffset
+    var yOff = yOffset
+    if (xOff < 0 || xOff >= 1) xOff = 0.5
+    if (yOff < 0 || yOff >= 1) yOff = 0.5
+
+    val slideSize = Draw.getSlideSize(slide) ?: return null
+    val x = Math.round(slideSize.Width * xOff).toLong()
+    val y = Math.round(slideSize.Height * yOff).toLong()
+    
+    val width = 50L  // arbitrary width for now
+    val height = 50L // arbitrary height for now
+
+    return Draw.addShape(slide, "GraphicObjectShape", x, y, width, height)
+}
+
+fun drawMedia(slide: XDrawPage, fnm: String, x: Long, y: Long, width: Long, height: Long): XShape? {
+    val shape = Draw.addShape(slide, "MediaShape", x, y, width, height)
+    val props = shape as? XPropertySet
+    props?.setPropertyValue("MediaURL", fnm)
+    props?.setPropertyValue("Loop", true)
+    return shape
+}

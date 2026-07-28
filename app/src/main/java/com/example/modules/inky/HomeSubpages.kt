@@ -2,6 +2,13 @@ package com.example.modules.inky
 
 import android.content.Context
 import android.widget.Toast
+import com.makerandreas.papirusoffice.data.PapirusAssetEngine
+import com.makerandreas.papirusoffice.data.FontProvider
+import com.makerandreas.papirusoffice.data.FontViewModel
+import com.makerandreas.papirusoffice.data.FontUiState
+import com.makerandreas.papirusoffice.data.FontInfo
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -827,34 +834,79 @@ fun PasteOptionsSubpage(context: Context, onShowPasteSpecial: () -> Unit) {
 fun FontStyleSubpage(
     context: Context,
     currentFont: String,
+    fontViewModel: FontViewModel = viewModel(),
     onFontSelected: (String) -> Unit
 ) {
-    val fonts = listOf(
-        "Aptos Display", "Calibri", "Arial", "Roboto", "Space Grotesk",
-        "JetBrains Mono", "Montserrat", "Playfair Display", "Inter",
-        "Merriweather", "Lora", "Open Sans", "Poppins"
-    )
+    LaunchedEffect(context) {
+        fontViewModel.loadFonts(context)
+    }
+
+    val uiState by fontViewModel.uiState.collectAsStateWithLifecycle()
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        HomeSectionHeader("Google Fonts Database")
-        fonts.forEach { fontName ->
-            val isSelected = fontName == currentFont
-            M3ListItem(
-                headlineText = fontName,
-                supportingText = if (isSelected) "Active Font" else "Tap to apply",
-                leadingIcon = {
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                },
-                onClick = {
-                    onFontSelected(fontName)
-                    Toast.makeText(context, "Font changed to $fontName", Toast.LENGTH_SHORT).show()
+        HomeSectionHeader("Storage Fonts (/storage/emulated/0/Fonts)")
+
+        when (val state = uiState) {
+            is FontUiState.Loading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
                 }
-            )
+            }
+            is FontUiState.Error -> {
+                Text(
+                    text = state.message,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            is FontUiState.Success -> {
+                val fonts = state.fonts
+                if (fonts.isNotEmpty()) {
+                    fonts.forEach { fontInfo ->
+                        val isSelected = (currentFont == fontInfo.displayName ||
+                                currentFont == fontInfo.familyName ||
+                                currentFont == fontInfo.fileName)
+                        M3ListItem(
+                            headlineText = fontInfo.displayName,
+                            supportingText = if (isSelected) "Active Font (${fontInfo.fileName} - ${fontInfo.extension})" else fontInfo.filePath,
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Rounded.FontDownload,
+                                    contentDescription = null,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            },
+                            trailingContent = {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Rounded.CheckCircle,
+                                        contentDescription = "Active",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            },
+                            onClick = {
+                                fontViewModel.selectFont(fontInfo.displayName)
+                                onFontSelected(fontInfo.displayName)
+                                Toast.makeText(context, "Font changed to ${fontInfo.displayName}", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "No compatible fonts found in /storage/emulated/0/Fonts",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
         }
     }
 }

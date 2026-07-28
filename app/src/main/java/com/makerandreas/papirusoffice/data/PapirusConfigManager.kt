@@ -37,6 +37,7 @@ object PapirusConfigManager {
      */
     @Synchronized
     fun initialize(context: Context) {
+        PapirusAssetEngine.initialize(context)
         ensureDefaultConfigExists(context)
         val userFile = getUserConfigFile(context)
         if (!userFile.exists()) {

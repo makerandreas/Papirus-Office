@@ -26,9 +26,11 @@ class PathSettings(private val context: Context) {
         predefinedPaths["Dictionary"] = "$userDir/wordbook"
         predefinedPaths["Favorite"] = "$userDir/config/folders"
         predefinedPaths["Filter"] = "$userDir/filter"
+        predefinedPaths["Font"] = "$userDir/fonts"
         predefinedPaths["Gallery"] = "$userDir/gallery"
         predefinedPaths["Graphic"] = "$userDir/gallery"
         predefinedPaths["Help"] = "$userDir/help"
+        predefinedPaths["Hyphenation"] = "$userDir/hyphenation"
         predefinedPaths["Linguistic"] = "$userDir/dict"
         predefinedPaths["Module"] = userDir
         predefinedPaths["Palette"] = "$userDir/config"
@@ -55,11 +57,7 @@ class PathSettings(private val context: Context) {
     }
 
     fun setPropertyValue(propertyName: String, value: String) {
-        if (predefinedPaths.containsKey(propertyName)) {
-            predefinedPaths[propertyName] = value
-        } else {
-            throw IllegalArgumentException("Unknown path property: $propertyName")
-        }
+        predefinedPaths[propertyName] = value
     }
 
     fun substituteVariables(text: String, substRequired: Boolean = false): String {
