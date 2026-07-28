@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -96,6 +97,22 @@ fun CellinaModule(
 
     // Zoom scale state
     var zoomScale by remember { mutableFloatStateOf(1.0f) }
+
+    // Chapter 19: Calc API State Variables
+    var selectedChartType by remember { mutableStateOf("BarDiagram") } // "LineDiagram", "BarDiagram", "PieDiagram", "NetDiagram", "XYDiagram", "StockDiagram", "AreaDiagram"
+    var isChart3D by remember { mutableStateOf(true) }
+    var currencySymbol by remember { mutableStateOf("EUR") } // "EUR", "USD", "DM", "IDR"
+    var isFrozenPane by remember { mutableStateOf(false) }
+    var frozenColIndex by remember { mutableIntStateOf(1) }
+    var frozenRowIndex by remember { mutableIntStateOf(1) }
+    var showGridLines by remember { mutableStateOf(true) }
+    var showDataPilotDialog by remember { mutableStateOf(false) }
+    var showAddInDialog by remember { mutableStateOf(false) }
+    var selectedAddInFunc by remember { mutableStateOf("getMyFirstValue") }
+    var addInResultText by remember { mutableStateOf("") }
+    var currentScenarioName by remember { mutableStateOf("Base Plan") }
+    var cellCommentText by remember { mutableStateOf("") }
+    var showCommentDialog by remember { mutableStateOf(false) }
 
     // Simulate cell data values
     val columnsLabels = listOf("A", "B", "C", "D", "E")
@@ -880,18 +897,316 @@ fun CellinaModule(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    // Placeholder Content for Standard Bottom Sheet Body
+                    // Interactive Content for Standard Bottom Sheet Body
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(16.dp)
                     ) {
-                        Text(
-                            text = "Cellina $activeRibbonTab Ribbon Options",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        when (activeRibbonTab) {
+                            "File" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Spreadsheet Document (SDK Ch. 19)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { handleSaveCommand() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
+                                        ) {
+                                            Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Save Document")
+                                        }
+                                        OutlinedButton(onClick = { showSaveAsDialog = true }) {
+                                            Icon(Icons.Rounded.SaveAs, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Save As...")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Calculation Engine Settings (XPropertySet)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = true,
+                                            onClick = { Toast.makeText(context, "IsIterationEnabled toggled", Toast.LENGTH_SHORT).show() },
+                                            label = { Text("IsIterationEnabled") },
+                                            leadingIcon = { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        )
+                                        Text("IterationCount: 100", fontSize = 12.sp)
+                                    }
+                                    Text("NullDate Baseline: 1899-12-30 (Standard)", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            "Home" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Cell Formatting (CellProperties / CharacterProperties)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        IconButton(onClick = { Toast.makeText(context, "Bold toggled", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
+                                        }
+                                        IconButton(onClick = { Toast.makeText(context, "Italic toggled", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
+                                        }
+                                        IconButton(onClick = { Toast.makeText(context, "Background color applied", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatColorFill, contentDescription = "Fill Color", tint = moduleColor)
+                                        }
+                                        IconButton(onClick = { Toast.makeText(context, "Text color changed", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatColorText, contentDescription = "Text Color")
+                                        }
+                                        IconButton(onClick = { Toast.makeText(context, "Border added", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.BorderAll, contentDescription = "Borders")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Currency & Number Format (EuroAdaption.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf("EUR", "USD", "DM", "IDR").forEach { curr ->
+                                            FilterChip(
+                                                selected = currencySymbol == curr,
+                                                onClick = {
+                                                    if (currencySymbol == "DM" && curr == "EUR") {
+                                                        // Apply DM to EUR conversion factor 1.95583f
+                                                        cellValues.keys.forEach { k ->
+                                                            cellValues[k]?.toDoubleOrNull()?.let { v ->
+                                                                cellValues[k] = String.format("%.2f", v / 1.95583)
+                                                            }
+                                                        }
+                                                        Toast.makeText(context, "Converted DM to EUR (Factor 1.95583)", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                    currencySymbol = curr
+                                                },
+                                                label = { Text(curr) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            "Insert" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Insert Components (TableRows / TableColumns / Charts)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = {
+                                            val newSheet = "Sheet${sheets.size + 1}"
+                                            Toast.makeText(context, "Inserted $newSheet", Toast.LENGTH_SHORT).show()
+                                        }) {
+                                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert Sheet")
+                                        }
+                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Row above row $activeCellRow", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.TableRows, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert Row")
+                                        }
+                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Column at ${columnsLabels.getOrNull(activeCellCol - 1)}", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert Column")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Embedded Chart Type Switcher (ChartTypeChange.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf("BarDiagram", "LineDiagram", "PieDiagram", "NetDiagram", "XYDiagram", "StockDiagram", "AreaDiagram").forEach { cType ->
+                                            FilterChip(
+                                                selected = selectedChartType == cType,
+                                                onClick = {
+                                                    selectedChartType = cType
+                                                    Toast.makeText(context, "Changed chart to $cType", Toast.LENGTH_SHORT).show()
+                                                },
+                                                label = { Text(cType.removeSuffix("Diagram")) }
+                                            )
+                                        }
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        FilterChip(
+                                            selected = isChart3D,
+                                            onClick = { isChart3D = !isChart3D },
+                                            label = { Text("3D Chart Mode (Dim3D)") },
+                                            leadingIcon = { Icon(Icons.Rounded.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        )
+                                    }
+                                }
+                            }
+                            "Formula" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Functions & Add-In Services (CalcAddins.java / ExampleAddIn.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        listOf("SUM", "AVERAGE", "COUNT", "MAX", "MIN", "ZTEST").forEach { func ->
+                                            FilterChip(
+                                                selected = formulaText.contains(func),
+                                                onClick = {
+                                                    formulaText = "=$func(B2:D4)"
+                                                    onFormulaSelected(formulaText)
+                                                    isSaved = false
+                                                },
+                                                label = { Text(func) }
+                                            )
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { showAddInDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
+                                        ) {
+                                            Icon(Icons.Rounded.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Execute Calc Add-In Method...")
+                                        }
+                                        OutlinedButton(onClick = {
+                                            formulaText = "={=A10:C12}"
+                                            Toast.makeText(context, "Inserted Array Formula XArrayFormulaRange", Toast.LENGTH_SHORT).show()
+                                        }) {
+                                            Text("Array Formula")
+                                        }
+                                    }
+                                }
+                            }
+                            "Data" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Data Analysis & Operations (DataPilot / Scenarios / Filter)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = { showDataPilotDialog = true },
+                                            colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
+                                        ) {
+                                            Icon(Icons.Rounded.PivotTableChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("DataPilot Pivot Table")
+                                        }
+                                        OutlinedButton(onClick = { Toast.makeText(context, "Applied AutoFilter XSheetFilterable", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FilterList, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("AutoFilter")
+                                        }
+                                        OutlinedButton(onClick = { Toast.makeText(context, "Sorted range ascending (TableSortField)", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Sort A-Z")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Scenarios Manager (XScenarios)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        listOf("Base Plan", "Optimistic", "Conservative").forEach { scen ->
+                                            FilterChip(
+                                                selected = currentScenarioName == scen,
+                                                onClick = {
+                                                    currentScenarioName = scen
+                                                    Toast.makeText(context, "Switched to Scenario: $scen", Toast.LENGTH_SHORT).show()
+                                                },
+                                                label = { Text(scen) }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            "View" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Spreadsheet View Controls (ViewSample.java / XViewFreezable)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = isFrozenPane,
+                                            onClick = {
+                                                isFrozenPane = !isFrozenPane
+                                                Toast.makeText(context, if (isFrozenPane) "Frozen pane at Col $activeCellCol, Row $activeCellRow" else "Unfrozen panes", Toast.LENGTH_SHORT).show()
+                                            },
+                                            label = { Text("Freeze Panes (freezeAtPosition)") },
+                                            leadingIcon = { Icon(Icons.Rounded.AcUnit, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        )
+                                        FilterChip(
+                                            selected = showGridLines,
+                                            onClick = { showGridLines = !showGridLines },
+                                            label = { Text("Grid Lines (ShowGrid)") },
+                                            leadingIcon = { Icon(Icons.Rounded.Grid3x3, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                        )
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text("Zoom Level: ${(zoomScale * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                        IconButton(onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f }) {
+                                            Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = "Zoom Out")
+                                        }
+                                        IconButton(onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f }) {
+                                            Icon(Icons.Rounded.AddCircleOutline, contentDescription = "Zoom In")
+                                        }
+                                        OutlinedButton(onClick = { zoomScale = 1.0f }) {
+                                            Text("Reset Zoom")
+                                        }
+                                    }
+                                }
+                            }
+                            else -> {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("Cellina $activeRibbonTab Options", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Text("Full OpenOffice / LibreOffice Calc SDK Chapter 19 features active.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1029,6 +1344,138 @@ fun CellinaModule(
                     currentSaveDefaultFilename = if (baseName.isBlank()) "Cellina_Data$extension" else "$baseName$extension"
                     showSaveAsDialog = false
                     saveDocumentLauncher.launch(currentSaveDefaultFilename)
+                }
+            )
+        }
+
+        // --- DATAPILOT PIVOT TABLE DIALOG (SDK CHAPTER 19) ---
+        if (showDataPilotDialog) {
+            var rowDim by remember { mutableStateOf("Quarter") }
+            var colDim by remember { mutableStateOf("Product") }
+            var aggFunc by remember { mutableStateOf("SUM") }
+
+            AlertDialog(
+                onDismissRequest = { showDataPilotDialog = false },
+                icon = { Icon(Icons.Rounded.PivotTableChart, contentDescription = null, tint = moduleColor) },
+                title = { Text("DataPilot Pivot Table (SDK Ch. 19)") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Configure DataPilotSource dimension mapping and aggregation function.", style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(
+                            value = rowDim,
+                            onValueChange = { rowDim = it },
+                            label = { Text("Row Dimension") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = colDim,
+                            onValueChange = { colDim = it },
+                            label = { Text("Column Dimension") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Aggregation Function:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("SUM", "AVERAGE", "COUNT", "MAX").forEach { fn ->
+                                FilterChip(
+                                    selected = aggFunc == fn,
+                                    onClick = { aggFunc = fn },
+                                    label = { Text(fn) }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            cellValues["A5"] = "Pivot Summary"
+                            cellValues["B5"] = "96700"
+                            Toast.makeText(context, "DataPilot Pivot Table created ($aggFunc on $rowDim x $colDim)!", Toast.LENGTH_SHORT).show()
+                            showDataPilotDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
+                    ) {
+                        Text("Generate Pivot Table")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDataPilotDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // --- CALC ADD-IN EXECUTOR DIALOG (SDK CHAPTER 19) ---
+        if (showAddInDialog) {
+            var dummyValueText by remember { mutableStateOf("10") }
+
+            AlertDialog(
+                onDismissRequest = { showAddInDialog = false },
+                icon = { Icon(Icons.Rounded.Extension, contentDescription = null, tint = moduleColor) },
+                title = { Text("Execute Calc Add-In Method") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Interface: org.openoffice.sheet.addin.XCalcAddins", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("getMyFirstValue", "getMySecondValue", "getIncremented", "getCounter").forEach { m ->
+                                FilterChip(
+                                    selected = selectedAddInFunc == m,
+                                    onClick = { selectedAddInFunc = m },
+                                    label = { Text(m) }
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = dummyValueText,
+                            onValueChange = { dummyValueText = it },
+                            label = { Text("Parameter Value (intDummy / Value / Name)") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (addInResultText.isNotBlank()) {
+                            Surface(
+                                color = moduleColor.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Result: $addInResultText",
+                                    fontWeight = FontWeight.Bold,
+                                    color = moduleColor,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val param = dummyValueText.toIntOrNull() ?: 0
+                            val res = when (selectedAddInFunc) {
+                                "getMyFirstValue" -> 1
+                                "getMySecondValue" -> 2 + param
+                                "getIncremented" -> param + 1
+                                "getCounter" -> "$dummyValueText counter = 1"
+                                else -> 0
+                            }
+                            addInResultText = "$res"
+                            val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
+                            cellValues[activeCellKey] = "$res"
+                            Toast.makeText(context, "$selectedAddInFunc returned $res", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
+                    ) {
+                        Text("Run Add-In Function")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddInDialog = false }) {
+                        Text("Close")
+                    }
                 }
             )
         }
