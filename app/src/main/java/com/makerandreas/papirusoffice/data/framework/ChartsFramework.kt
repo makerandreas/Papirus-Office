@@ -102,6 +102,19 @@ data class Direction3D(
 )
 
 // ---------------------------------------------------------
+interface XFormattedString {
+    var string: String
+}
+
+interface XTitle {
+    var text: Array<XFormattedString>
+}
+
+interface XTitled {
+    var titleObject: XTitle?
+}
+
+// ---------------------------------------------------------
 // Chart2 API (New Chart API)
 // ---------------------------------------------------------
 
@@ -149,6 +162,41 @@ interface XDataProvider {
     fun detectArguments(dataSource: Any): Array<PropertyValue>
     fun createDataSequenceByRangeRepresentation(rangeRepresentation: String): Any // XDataSequence
     fun createDataSequenceByValueArray(role: String, valueArray: String): Any // XDataSequence
+}
+
+// ---------------------------------------------------------
+// Chart2 Template Names (Chapter 28, 29, 30)
+// ---------------------------------------------------------
+
+object Chart2Templates {
+    const val COLUMN = "Column"
+    const val STACKED_COLUMN = "StackedColumn"
+    const val PERCENT_STACKED_COLUMN = "PercentStackedColumn"
+    const val BAR = "Bar"
+    const val STACKED_BAR = "StackedBar"
+    const val PERCENT_STACKED_BAR = "PercentStackedBar"
+    const val PIE = "Pie"
+    const val PIE_ALL_EXPLODED = "PieAllExploded"
+    const val THREE_D_PIE = "ThreeDPie"
+    const val THREE_D_PIE_ALL_EXPLODED = "ThreeDPieAllExploded"
+    const val DONUT = "Donut"
+    const val DONUT_ALL_EXPLODED = "DonutAllExploded"
+    const val THREE_D_DONUT = "ThreeDDonut"
+    const val AREA = "Area"
+    const val STACKED_AREA = "StackedArea"
+    const val PERCENT_STACKED_AREA = "PercentStackedArea"
+    const val LINE = "Line"
+    const val LINE_SYMBOL = "LineSymbol"
+    const val STACKED_LINE_SYMBOL = "StackedLineSymbol"
+    const val COLUMN_WITH_LINE = "ColumnWithLine"
+}
+
+object ChartDataPointLabel {
+    const val DP_NONE = 0
+    const val DP_NUMBER = 1
+    const val DP_PERCENT = 2
+    const val DP_TEXT = 4
+    const val DP_SYMBOL = 8
 }
 
 // ---------------------------------------------------------

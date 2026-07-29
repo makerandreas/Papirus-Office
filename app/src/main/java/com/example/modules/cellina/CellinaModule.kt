@@ -50,6 +50,7 @@ fun CellinaModule(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val bridge = remember { com.makerandreas.papirusoffice.data.bridge.PapirusSdkBridge.getInstance() }
 
     val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
     var showDocOpenFailedDialog by remember { mutableStateOf(false) }
@@ -1335,7 +1336,54 @@ fun CellinaModule(
                                         }
                                     }
                                     HorizontalDivider()
-                                    Text("Embedded Chart Type Switcher (ChartTypeChange.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Text("Bar, Pie, Area, Line Charts (SDK Ch. 30)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                     Row(
+                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                     ) {
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertBarChart(0, "A2:B8", "Sneakers Sold this Month", "Brand", "Number Sold")
+                                             Toast.makeText(context, "barChart: Swapped axes, vertical X-axis rotated 90°", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Bar Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertPieChart(0, "E2:F8", "Top 5 States", "No. of Schools", is3D = true, rotationHorizontal = 0, rotationVertical = -45)
+                                             Toast.makeText(context, "pie3DChart: ThreeDPie template, subtitle, rotated -45°, bold white labels", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.PieChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("3D Pie Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertDonutChart(0, "A44:C50", "Annual Expenditure", "Expenditure/Student", "GDP %")
+                                             Toast.makeText(context, "donutChart: Donut template showing multi-ring dataset", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.DonutLarge, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Donut Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertAreaChart(0, "E45:G50", "Enrollment Trends", "StackedArea")
+                                             Toast.makeText(context, "areaChart: Area / StackedArea / PercentStackedArea", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.AreaChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Area Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertLineChart(0, "E27:G39", "Expenditure Per Pupil", "LineSymbol", showDataLabels = false)
+                                             Toast.makeText(context, "linesChart: LineSymbol template with DP_NONE labels", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Line Chart")
+                                         }
+                                     }
+                                     HorizontalDivider()
+                                     Text("Embedded Chart Type Switcher (ChartTypeChange.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(
                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)

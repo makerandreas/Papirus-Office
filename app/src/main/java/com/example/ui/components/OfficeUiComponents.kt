@@ -850,6 +850,7 @@ fun FullPageDocumentLoadingPopup(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = moduleName,
                             style = MaterialTheme.typography.headlineLarge,
@@ -858,40 +859,22 @@ fun FullPageDocumentLoadingPopup(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
-                    // Area Tengah: Loading Indicator khas Material 3 Expressive
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(96.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(72.dp),
-                            color = moduleColor,
-                            strokeWidth = 6.dp,
-                            trackColor = moduleColor.copy(alpha = 0.15f)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(48.dp))
-
-                    // Area Bawah: 2 baris teks rata tengah
-                    // Baris 1: "Opening [docName]..." atau "Creating document..."
-                    Text(
-                        text = if (isCreating) {
+                    // Area Tengah: Loading Indicator Animasi Kustom Papirus Engine
+                    com.makerandreas.papirusoffice.ui.components.PapirusEngineLoadingIndicator(
+                        moduleName = moduleName,
+                        moduleColor = moduleColor,
+                        statusMessage = if (isCreating) {
                             androidx.compose.ui.res.stringResource(com.example.R.string.loading_creating_doc)
                         } else {
                             androidx.compose.ui.res.stringResource(com.example.R.string.loading_opening_file, docName)
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface
+                        }
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // Baris 2: Status/progres pembuatan/pembukaan dokumen
+                    // Baris Status / Progres Rendering Dokumen
                     Text(
                         text = progressStatus,
                         style = MaterialTheme.typography.bodyMedium,

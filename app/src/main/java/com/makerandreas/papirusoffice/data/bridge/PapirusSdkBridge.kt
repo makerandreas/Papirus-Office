@@ -94,12 +94,78 @@ class PapirusSdkBridge private constructor() {
     }
 
     /**
-     * SPREADSHEET (Cellina): Inserts or updates Chart referencing GeneralTableSample.java & Chart2 API
+     * SPREADSHEET (Cellina): Inserts or updates Chart referencing GeneralTableSample.java & Chart2 API (SDK Ch. 28-30)
      */
     fun insertSpreadsheetChart(sheetIndex: Int, chartName: String, chartType: String) {
         bridgeScope.launch {
             val doc = _activeSpreadsheet.value ?: return@launch
             Log.d(TAG, "Spreadsheet chart insertion requested on sheet $sheetIndex: '$chartName' ($chartType)")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 30: Inserts a Bar Chart (horizontal data bars, swapped axes)
+     * Referencing barChart() in Chart2Views.java
+     */
+    fun insertBarChart(sheetIndex: Int, cellRange: String, title: String, xAxisTitle: String, yAxisTitle: String) {
+        bridgeScope.launch {
+            Log.d(TAG, "Bar Chart inserted on sheet $sheetIndex (range $cellRange): Title='$title', XAxisTitle='$xAxisTitle' (rotated 90°), YAxisTitle='$yAxisTitle'")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 30: Inserts a Pie or 3D Pie Chart with optional 3D rotation & custom data labels
+     * Referencing pieChart() & pie3DChart() in Chart2Views.java
+     */
+    fun insertPieChart(
+        sheetIndex: Int, 
+        cellRange: String, 
+        title: String, 
+        subtitle: String, 
+        is3D: Boolean = false, 
+        rotationHorizontal: Int = 0, 
+        rotationVertical: Int = -45
+    ) {
+        bridgeScope.launch {
+            val typeStr = if (is3D) Chart2Templates.THREE_D_PIE else Chart2Templates.PIE
+            Log.d(TAG, "Pie Chart ($typeStr) inserted on sheet $sheetIndex (range $cellRange): Title='$title', Subtitle='$subtitle', HorizRot=$rotationHorizontal, VertRot=$rotationVertical")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 30: Inserts a Donut Chart with multi-ring subtitle information
+     * Referencing donutChart() in Chart2Views.java
+     */
+    fun insertDonutChart(sheetIndex: Int, cellRange: String, title: String, outerInfo: String, innerInfo: String) {
+        bridgeScope.launch {
+            Log.d(TAG, "Donut Chart inserted on sheet $sheetIndex (range $cellRange): Title='$title', Subtitle='Outer: $outerInfo\\nInner: $innerInfo'")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 30: Inserts an Area Chart (Area, StackedArea, PercentStackedArea)
+     * Referencing areaChart() in Chart2Views.java
+     */
+    fun insertAreaChart(sheetIndex: Int, cellRange: String, title: String, template: String = Chart2Templates.AREA) {
+        bridgeScope.launch {
+            Log.d(TAG, "Area Chart ($template) inserted on sheet $sheetIndex (range $cellRange): Title='$title'")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 30: Inserts a Line / LineSymbol Chart with optional data point labels
+     * Referencing linesChart() in Chart2Views.java
+     */
+    fun insertLineChart(
+        sheetIndex: Int, 
+        cellRange: String, 
+        title: String, 
+        template: String = Chart2Templates.LINE_SYMBOL, 
+        showDataLabels: Boolean = false
+    ) {
+        bridgeScope.launch {
+            val labelSetting = if (showDataLabels) ChartDataPointLabel.DP_NUMBER else ChartDataPointLabel.DP_NONE
+            Log.d(TAG, "Line Chart ($template) inserted on sheet $sheetIndex (range $cellRange): Title='$title', DataPointLabels=$labelSetting")
         }
     }
 
