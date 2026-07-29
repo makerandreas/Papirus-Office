@@ -1357,6 +1357,32 @@ interface XTableChartsSupplier {
     fun getCharts(): XTableCharts
 }
 
+interface XFormattedString {
+    fun setString(text: String)
+    fun getString(): String
+}
+
+interface XTitle {
+    fun setText(text: Array<XFormattedString>)
+    fun getText(): Array<XFormattedString>
+}
+
+interface XTitled {
+    fun setTitleObject(title: XTitle)
+    fun getTitleObject(): XTitle?
+}
+
+interface XAxis
+
+interface XLegend
+
+object DataPointGeometry3D {
+    const val CUBOID = 0
+    const val CYLINDER = 1
+    const val CONE = 2
+    const val PYRAMID = 3
+}
+
 fun createMockShape(): XShape = object : XShape {
     override var position: Point = Point(0, 0)
     override var size: Size = Size(100, 100)
@@ -1369,6 +1395,10 @@ object Chart2 {
     const val DP_CATEGORY = 2
     const val DP_SYMBOL = 3
     const val DP_NONE = 4
+
+    const val X_AXIS = 0
+    const val Y_AXIS = 1
+    const val Z_AXIS = 2
 
     fun addTableChart(sheet: XSpreadsheet, chartName: String, cellsRange: CellRangeAddress, cellName: String, width: Int, height: Int) {
         println("Added TableChart $chartName at $cellName size ${width}x${height}")
@@ -1436,7 +1466,19 @@ object Chart2 {
         }
     }
 
+    fun findChartType(chartDoc: XChartDocument, chartType: String): XChartType? {
+        return object : XChartType {
+            override fun getChartType(): String = "com.sun.star.chart2.${chartType}"
+        }
+    }
+
     fun getDataSeries(chartDoc: XChartDocument): Array<XDataSeries> {
+        return arrayOf(object : XDataSeries {
+            override fun getDataPointByIndex(index: Int): Any = mutableMapOf<String, Any>()
+        })
+    }
+
+    fun getDataSeries(chartDoc: XChartDocument, chartType: String): Array<XDataSeries> {
         return arrayOf(object : XDataSeries {
             override fun getDataPointByIndex(index: Int): Any = mutableMapOf<String, Any>()
         })
@@ -1453,5 +1495,97 @@ object Chart2 {
     fun hasCategories(diagramName: String): Boolean {
         val name = diagramName.lowercase()
         return !name.contains("scatter") && !name.contains("bubble")
+    }
+
+    fun createTitle(titleString: String): XTitle {
+        val fmtStr: XFormattedString = object : XFormattedString {
+            private var str = titleString
+            override fun setString(text: String) { str = text }
+            override fun getString(): String = str
+        }
+        return object : XTitle {
+            private var titleArray: Array<XFormattedString> = arrayOf(fmtStr)
+            override fun setText(text: Array<XFormattedString>) { titleArray = text }
+            override fun getText(): Array<XFormattedString> = titleArray
+        }
+    }
+
+    fun setTitle(chartDoc: XChartDocument, title: String) {
+        println("Chart title: \"$title\"")
+    }
+
+    fun setXTitleFont(xtitle: XTitle, fontName: String, ptSize: Int) {
+        println("Set title font: $fontName $ptSize pt")
+    }
+
+    fun getAxis(chartDoc: XChartDocument, axisVal: Int, idx: Int): XAxis {
+        return object : XAxis {}
+    }
+
+    fun getXAxis(chartDoc: XChartDocument): XAxis = getAxis(chartDoc, X_AXIS, 0)
+    fun getYAxis(chartDoc: XChartDocument): XAxis = getAxis(chartDoc, Y_AXIS, 0)
+    fun getXAxis2(chartDoc: XChartDocument): XAxis = getAxis(chartDoc, X_AXIS, 1)
+    fun getYAxis2(chartDoc: XChartDocument): XAxis = getAxis(chartDoc, Y_AXIS, 1)
+
+    fun setAxisTitle(chartDoc: XChartDocument, title: String, axisVal: Int, idx: Int) {
+        println("Set Axis ($axisVal, $idx) title: $title")
+    }
+
+    fun setXAxisTitle(chartDoc: XChartDocument, title: String) = setAxisTitle(chartDoc, title, X_AXIS, 0)
+    fun setYAxisTitle(chartDoc: XChartDocument, title: String) = setAxisTitle(chartDoc, title, Y_AXIS, 0)
+    fun setXAxis2Title(chartDoc: XChartDocument, title: String) = setAxisTitle(chartDoc, title, X_AXIS, 1)
+    fun setYAxis2Title(chartDoc: XChartDocument, title: String) = setAxisTitle(chartDoc, title, Y_AXIS, 1)
+
+    fun rotateAxisTitle(chartDoc: XChartDocument, axisVal: Int, idx: Int, angle: Int) {
+        println("Rotated Axis ($axisVal, $idx) title by $angle degrees")
+    }
+
+    fun rotateYAxisTitle(chartDoc: XChartDocument, angle: Int) = rotateAxisTitle(chartDoc, Y_AXIS, 0, angle)
+
+    fun getAxisTitle(chartDoc: XChartDocument, axisVal: Int, idx: Int): XTitle? {
+        return createTitle("Axis Title ($axisVal)")
+    }
+
+    fun getChartTemplates(chartDoc: XChartDocument): Array<String> {
+        return arrayOf(
+            "com.sun.star.chart2.template.Area",
+            "com.sun.star.chart2.template.Bar",
+            "com.sun.star.chart2.template.Bubble",
+            "com.sun.star.chart2.template.Column",
+            "com.sun.star.chart2.template.ColumnWithLine",
+            "com.sun.star.chart2.template.Line",
+            "com.sun.star.chart2.template.Net",
+            "com.sun.star.chart2.template.Pie",
+            "com.sun.star.chart2.template.ScatterLine",
+            "com.sun.star.chart2.template.StockOpenLowHighClose",
+            "com.sun.star.chart2.template.ThreeDColumnDeep",
+            "com.sun.star.chart2.template.ThreeDColumnFlat",
+            "com.sun.star.chart2.template.ThreeDPie"
+        )
+    }
+
+    fun viewLegend(chartDoc: XChartDocument, isVisible: Boolean) {
+        println("Legend visible set to: $isVisible")
+    }
+
+    fun showAxisLabel(chartDoc: XChartDocument, axisVal: Int, idx: Int, isVisible: Boolean) {
+        println("Axis ($axisVal, $idx) labels visible: $isVisible")
+    }
+
+    fun setChartShape3D(chartDoc: XChartDocument, shape: String) {
+        val shapeVal = when(shape.lowercase()) {
+            "box", "cuboid" -> DataPointGeometry3D.CUBOID
+            "cylinder" -> DataPointGeometry3D.CYLINDER
+            "cone" -> DataPointGeometry3D.CONE
+            "pyramid" -> DataPointGeometry3D.PYRAMID
+            else -> DataPointGeometry3D.CUBOID
+        }
+        println("Set 3D Column shape to: $shape ($shapeVal)")
+    }
+
+    fun printChartTypes(chartDoc: XChartDocument) {
+        val types = arrayOf("com.sun.star.chart2.ColumnChartType")
+        println("No. of chart types: ${types.size}")
+        types.forEach { println("  $it") }
     }
 }

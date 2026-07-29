@@ -1,7 +1,0 @@
-SoftMaker Office uses the Hunspell library to provide spell-checking for languages not supported by SoftMaker's own dictionaries. We thank the Hunspell developer team for their great work.
-
-Hunspell is tri-licensed under the GPL, LGPL, and MPL licenses. SoftMaker chooses to license Hunspell from the Hunspell developers under the MPL (Mozilla Public License).
-
-Please note that the MPL only applies to Hunspell and not to any other part of SoftMaker Office which is closed-source software.
-
-SoftMaker has not made any modifications to the source code of Hunspell. This means that you can download the latest source code of Hunspell directly from the Hunspell web site at http://hunspell.sourceforge.net

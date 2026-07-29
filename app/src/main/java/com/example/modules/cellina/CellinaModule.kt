@@ -1300,6 +1300,41 @@ fun CellinaModule(
                                         }
                                     }
                                     HorizontalDivider()
+                                    Text("Column Charts (SDK Ch. 29)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "colChart: Title, X/Y Axis Titles (Rotated 90°)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Single Column")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "multColChart: Multi-series Column Chart with Legend", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Multiple Columns")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "3D Column: ThreeDColumnDeep / Flat (Cylinder, Pyramid, Cone)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("3D Column Shapes")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "colLineChart: ColumnWithLine Template (ColumnChartType + LineChartType)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Column + Line Combo")
+                                        }
+                                    }
+                                    HorizontalDivider()
                                     Text("Embedded Chart Type Switcher (ChartTypeChange.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(
                                         modifier = Modifier.horizontalScroll(rememberScrollState()),

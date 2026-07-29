@@ -102,6 +102,56 @@ data class Direction3D(
 )
 
 // ---------------------------------------------------------
+// Chart2 API (New Chart API)
+// ---------------------------------------------------------
+
+interface XChartDocument2 : XModel {
+    var firstDiagram: XDiagram2
+    val dataProvider: XDataProvider
+    fun createInternalDataProvider(cloneExistingData: Boolean)
+}
+
+interface XDiagram2 {
+    var coordinateSystems: Array<XCoordinateSystem>
+    var legend: Any // XLegend
+    val defaultColorScheme: Any // XColorScheme
+    fun setDiagramData(dataSource: Any, arguments: Array<PropertyValue>)
+}
+
+interface XCoordinateSystem {
+    var coordinateSystemType: String
+    val dimension: Int
+    fun getAxisByDimension(dimension: Int, index: Int): Any // XAxis
+    fun setAxisByDimension(dimension: Int, axis: Any, index: Int)
+    val chartTypes: Array<XChartType>
+    fun setChartTypes(chartTypes: Array<XChartType>)
+    fun addChartType(chartType: XChartType)
+    fun removeChartType(chartType: XChartType)
+}
+
+interface XChartType {
+    val chartType: String
+    fun createCoordinateSystem(dimension: Int): XCoordinateSystem
+    val dataSeries: Array<XDataSeries>
+    fun setDataSeries(dataSeries: Array<XDataSeries>)
+    fun addDataSeries(dataSeries: XDataSeries)
+    fun removeDataSeries(dataSeries: XDataSeries)
+}
+
+interface XDataSeries {
+    // Defines a series of data
+    fun getDataPointByIndex(index: Int): Any // XPropertySet
+    fun resetDataPoint(index: Int)
+}
+
+interface XDataProvider {
+    fun createDataSource(arguments: Array<PropertyValue>): Any // XDataSource
+    fun detectArguments(dataSource: Any): Array<PropertyValue>
+    fun createDataSequenceByRangeRepresentation(rangeRepresentation: String): Any // XDataSequence
+    fun createDataSequenceByValueArray(role: String, valueArray: String): Any // XDataSequence
+}
+
+// ---------------------------------------------------------
 // Chart Settings Enums
 // ---------------------------------------------------------
 
@@ -156,6 +206,22 @@ object ChartSolidType {
     const val CYLINDER: Short = 1
     const val CONE: Short = 2
     const val PYRAMID: Short = 3
+}
+
+// ---------------------------------------------------------
+// Chart Types
+// ---------------------------------------------------------
+
+object ChartTypes {
+    const val BAR_DIAGRAM = "com.sun.star.chart.BarDiagram" // Used for Column and Bar charts
+    const val LINE_DIAGRAM = "com.sun.star.chart.LineDiagram"
+    const val PIE_DIAGRAM = "com.sun.star.chart.PieDiagram"
+    const val AREA_DIAGRAM = "com.sun.star.chart.AreaDiagram"
+    const val XY_DIAGRAM = "com.sun.star.chart.XYDiagram"
+    const val DONUT_DIAGRAM = "com.sun.star.chart.DonutDiagram"
+    const val NET_DIAGRAM = "com.sun.star.chart.NetDiagram"
+    const val STOCK_DIAGRAM = "com.sun.star.chart.StockDiagram"
+    const val BUBBLE_DIAGRAM = "com.sun.star.chart.BubbleDiagram"
 }
 
 // ---------------------------------------------------------
