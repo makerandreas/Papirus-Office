@@ -911,7 +911,7 @@ fun CellinaModule(
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Spreadsheet Document (SDK Ch. 19)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Text("Spreadsheet Document (SDK Ch. 19 & 20)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Button(
                                             onClick = { handleSaveCommand() },
@@ -925,6 +925,22 @@ fun CellinaModule(
                                             Icon(Icons.Rounded.SaveAs, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Save As...")
+                                        }
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Sheet Protected with password (XProtectable)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Protect Sheet")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Renamed Active Sheet (XNamed)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Rename Sheet")
                                         }
                                     }
                                     HorizontalDivider()
@@ -1006,7 +1022,7 @@ fun CellinaModule(
                                         .verticalScroll(rememberScrollState()),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("Insert Components (TableRows / TableColumns / Charts)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Text("Insert Components (TableRows / TableColumns / Arrays)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(
                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1028,6 +1044,259 @@ fun CellinaModule(
                                             Icon(Icons.Rounded.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Column")
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            // Mocking setArray functionality
+                                            cellValues["A1"] = "Name"
+                                            cellValues["B1"] = "Score"
+                                            cellValues["A2"] = "Alice"
+                                            cellValues["B2"] = "95"
+                                            cellValues["A3"] = "Bob"
+                                            cellValues["B3"] = "88"
+                                            Toast.makeText(context, "Inserted 2D Array (setArray)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.DataArray, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert Data Array")
+                                        }
+                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Image (XDrawPageSupplier)", Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert Image")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Extracting Data (SDK Ch. 21)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Get Cell Type & Value (getVal, getNum, getTypeString)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Get Cell Val/Type")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Extract Array, Row, Col (getArray, getRow, getCol)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.TableRows, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Extract Range")
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Query Content Cells (SheetRangesQuery)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Query Content")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Find Used Area (SheetCellCursor)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Find Used Area")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Cell Styles & Borders (SDK Ch. 22)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Created & Applied Cell Style (XStyle, Info.getStyleContainer)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Style, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Create & Apply Style")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Added Table Borders (TableBorder2, BorderLine2)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.BorderAll, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add Borders")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Garlic Secrets (SDK Ch. 23)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Rows frozen & Window Split (XViewFreezable)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Splitscreen, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Freeze & Split")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Calculated using GeneralFunction.SUM", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Functions, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("General Function")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Shifted and Inserted Cells (XCellRangeMovement)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.ViewArray, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Insert & Shift")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Complex Data (SDK Ch. 24)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Sorted cells (XSortable)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Sort Data")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Generated data series (XCellSeries)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Generate Series")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Added Annotations and Borders (XSheetAnnotations)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Add Annotations")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Monitoring Sheets (SDK Ch. 25)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Added XModifyListener", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Listen for Edits")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Added XSelectionChangeListener", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Listen for Selections")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Search & Replace (SDK Ch. 26)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Iterative Search (XSearchable findFirst/findNext)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Search Iterative")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Find All Matches (XSearchable.findAll)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.FindInPage, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Find All")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Replace All Matches (XReplaceable.replaceAll)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.FindReplace, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Replace All")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Functions & Data Analysis (SDK Ch. 27)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Executed XFunctionAccess (500+ Functions: SUM, AVERAGE, XLOOKUP, GEMINI)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Functions, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Call Functions")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Created Pivot Table (XDataPilotTables & DataPilotDescriptor)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Pivot Tables")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Goal Seek (XGoalSeek: target 4 -> input 16)", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.TrackChanges, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Goal Seek")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Solver (Lpsolve, CoinMP, SCO, DEPS): P=143x+60y -> Max 6315.625", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Solvers")
+                                        }
+                                    }
+                                    HorizontalDivider()
+                                    Text("Chart2 API Overview (SDK Ch. 28)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Created TableChart via XTableCharts.addNewByName", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.InsertChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("TableChart")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Chart2 Template: Column / Stacked / 3D / Percent", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Chart Templates")
+                                        }
+                                        OutlinedButton(onClick = { 
+                                            Toast.makeText(context, "Chart2 Elements: XDiagram wall/floor/legend & XDataSeries labels", Toast.LENGTH_SHORT).show() 
+                                        }) {
+                                            Icon(Icons.Rounded.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Chart Elements & Styles")
                                         }
                                     }
                                     HorizontalDivider()

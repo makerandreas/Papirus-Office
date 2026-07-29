@@ -13,9 +13,6 @@ interface XChartDocument : XModel {
     val area: Any // Represents an XPropertySet
     var diagram: XDiagram
 
-    fun connectController(controller: Any /* XController */)
-    fun disconnectController(controller: Any /* XController */)
-    var currentController: Any /* XController */
     val currentSelection: Any /* XInterface */
 }
 
