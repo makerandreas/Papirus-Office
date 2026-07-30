@@ -171,7 +171,7 @@ class DocxDocumentParser(private val context: Context) {
         }
 
         val extractedText = textBuilder.toString().trim()
-        val finalResultText = if (extractedText.isBlank()) "Empty Document" else extractedText
+        val finalResultText = if (extractedText.isBlank()) "" else extractedText
 
         return@withContext DocxParseResult(
             text = finalResultText,
@@ -276,7 +276,7 @@ class DocxDocumentParser(private val context: Context) {
 
         val resultStr = textBuilder.toString().trim()
         return@withContext DocxParseResult(
-            text = if (resultStr.isBlank()) "Empty Document" else resultStr,
+            text = if (resultStr.isBlank()) "" else resultStr,
             extractedImages = extractedImages
         )
     }

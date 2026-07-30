@@ -107,17 +107,22 @@ object FontProvider {
                         .replace(" Bold", "", ignoreCase = true)
                         .replace(" Italic", "", ignoreCase = true)
                         .replace(" BoldItalic", "", ignoreCase = true)
+                        .replace("Bold", "", ignoreCase = true)
+                        .replace("Italic", "", ignoreCase = true)
                         .trim()
 
-                    val fontInfo = FontInfo(
-                        fileName = file.name,
-                        displayName = cleanName,
-                        familyName = if (familyName.isNotEmpty()) familyName else cleanName,
-                        filePath = file.absolutePath,
-                        extension = file.extension.uppercase(),
-                        isCompatible = true
-                    )
-                    fontMap[file.name] = fontInfo
+                    // Avoid duplicate families
+                    if (!fontMap.containsKey(familyName)) {
+                        val fontInfo = FontInfo(
+                            fileName = file.name,
+                            displayName = familyName, // Display the family name instead of the variant name
+                            familyName = familyName,
+                            filePath = file.absolutePath,
+                            extension = file.extension.uppercase(),
+                            isCompatible = true
+                        )
+                        fontMap[familyName] = fontInfo
+                    }
                 }
             }
         }

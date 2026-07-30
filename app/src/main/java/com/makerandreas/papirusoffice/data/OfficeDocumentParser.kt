@@ -723,7 +723,7 @@ class OfficeDocumentParser(private val context: Context) {
         val parsedDoc = OfficeParsedDocument(
             elements = elements,
             rawXml = xmlContent,
-            plainText = if (plainTextResult.isBlank()) "Empty Document" else plainTextResult,
+            plainText = if (plainTextResult.isBlank()) "" else plainTextResult,
             extractedImages = extractedImages,
             isOdt = isOdt,
             isDocx = isDocx,

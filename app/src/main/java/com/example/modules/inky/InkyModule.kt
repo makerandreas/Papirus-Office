@@ -375,7 +375,7 @@ fun InkyModule(
     }
 
     // Text formatting state
-    var activeFontFamily by remember { mutableStateOf("Aptos Display") }
+    var activeFontFamily by remember { mutableStateOf("Liberation Serif") }
     var activeFontSize by remember { mutableStateOf(12) }
     var isBold by remember { mutableStateOf(false) }
     var isItalic by remember { mutableStateOf(false) }
@@ -1509,7 +1509,7 @@ fun InkyModule(
                                                 fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                                 textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
                                                 fontFamily = when (activeFontFamily) {
-                                                    "Aptos Display" -> FontFamily.SansSerif
+                                                    "Liberation Serif" -> FontFamily.Serif
                                                     "Calibri" -> FontFamily.SansSerif
                                                     "Arial" -> FontFamily.SansSerif
                                                     "Roboto" -> FontFamily.SansSerif
@@ -1518,15 +1518,6 @@ fun InkyModule(
                                                 color = textPrimaryColor,
                                                 textAlign = textAlignment,
                                                 modifier = Modifier.fillMaxSize()
-                                            )
-                                            Text(
-                                                text = "Page ${index + 1} of ${pagesList.size}",
-                                                fontSize = (9 * zoomScale).sp,
-                                                color = Color.Gray.copy(alpha = 0.6f),
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomCenter)
-                                                    .padding(bottom = 4.dp)
                                             )
                                         }
                                     }
@@ -1599,7 +1590,7 @@ fun InkyModule(
                                                         fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                                         textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
                                                         fontFamily = when (activeFontFamily) {
-                                                            "Aptos Display" -> FontFamily.SansSerif
+                                                            "Liberation Serif" -> FontFamily.Serif
                                                             "Calibri" -> FontFamily.SansSerif
                                                             "Arial" -> FontFamily.SansSerif
                                                             "Roboto" -> FontFamily.SansSerif
@@ -1621,7 +1612,7 @@ fun InkyModule(
                                                     fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                                     textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
                                                     fontFamily = when (activeFontFamily) {
-                                                        "Aptos Display" -> FontFamily.SansSerif
+                                                        "Liberation Serif" -> FontFamily.Serif
                                                         "Calibri" -> FontFamily.SansSerif
                                                         "Arial" -> FontFamily.SansSerif
                                                         "Roboto" -> FontFamily.SansSerif
@@ -1632,15 +1623,6 @@ fun InkyModule(
                                                     modifier = Modifier.fillMaxSize()
                                                 )
                                             }
-                                            Text(
-                                                text = "Page ${index + 1} of ${pagesList.size}",
-                                                fontSize = (9 * zoomScale).sp,
-                                                color = Color.Gray.copy(alpha = 0.6f),
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomCenter)
-                                                    .padding(bottom = 4.dp)
-                                            )
                                         }
                                     }
                                     if (docxImages.isNotEmpty()) {
@@ -1743,7 +1725,7 @@ fun InkyModule(
                                             fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
                                             textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
                                             fontFamily = when (activeFontFamily) {
-                                                "Aptos Display" -> FontFamily.SansSerif
+                                                "Liberation Serif" -> FontFamily.Serif
                                                 "Calibri" -> FontFamily.SansSerif
                                                 "Arial" -> FontFamily.SansSerif
                                                 "Roboto" -> FontFamily.SansSerif

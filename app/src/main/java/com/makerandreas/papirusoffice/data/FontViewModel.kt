@@ -41,9 +41,30 @@ class FontViewModel : ViewModel() {
             _uiState.value = FontUiState.Loading
             try {
                 val scannedFonts = FontProvider.scanAvailableFonts(context)
-                _fontsList.value = scannedFonts
+                
+                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                val network = connectivityManager.activeNetwork
+                val capabilities = connectivityManager.getNetworkCapabilities(network)
+                val isConnected = capabilities != null && 
+                    (capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) || 
+                     capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR))
+
+                val combinedFonts = if (isConnected) {
+                    val googleFonts = listOf(
+                        FontInfo("OpenSans.ttf", "Open Sans", "Open Sans", "Google Fonts (Cloud)", "TTF", true),
+                        FontInfo("Lato.ttf", "Lato", "Lato", "Google Fonts (Cloud)", "TTF", true),
+                        FontInfo("Montserrat.ttf", "Montserrat", "Montserrat", "Google Fonts (Cloud)", "TTF", true),
+                        FontInfo("Poppins.ttf", "Poppins", "Poppins", "Google Fonts (Cloud)", "TTF", true),
+                        FontInfo("Oswald.ttf", "Oswald", "Oswald", "Google Fonts (Cloud)", "TTF", true)
+                    )
+                    (scannedFonts + googleFonts).sortedBy { it.displayName }
+                } else {
+                    scannedFonts
+                }
+                
+                _fontsList.value = combinedFonts
                 _uiState.value = FontUiState.Success(
-                    fonts = scannedFonts,
+                    fonts = combinedFonts,
                     selectedFont = _selectedFont.value
                 )
             } catch (e: Exception) {
