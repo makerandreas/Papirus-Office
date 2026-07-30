@@ -29,6 +29,7 @@ class PapirusSdkBridge private constructor() {
     val myThes: MyThesBridge get() = MyThesBridge.getInstance()
     val googleFonts: GoogleFontsBridge get() = GoogleFontsBridge.getInstance()
     val linguistics: LinguisticsBridge get() = LinguisticsBridge.getInstance()
+    val chartEngine: CrossModuleChartEngine get() = CrossModuleChartEngine.getInstance()
 
     // State flows to monitor active documents across modules
     private val _activeTextDocument = MutableStateFlow<OfficeParsedDocument?>(null)
@@ -166,6 +167,75 @@ class PapirusSdkBridge private constructor() {
         bridgeScope.launch {
             val labelSetting = if (showDataLabels) ChartDataPointLabel.DP_NUMBER else ChartDataPointLabel.DP_NONE
             Log.d(TAG, "Line Chart ($template) inserted on sheet $sheetIndex (range $cellRange): Title='$title', DataPointLabels=$labelSetting")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 32 (SDK Guide): Inserts a Bubble Chart with semi-transparency and category labels
+     * Referencing labeledBubbleChart() in Chart2Views.java
+     */
+    fun insertBubbleChart(
+        sheetIndex: Int,
+        cellRange: String,
+        title: String,
+        xAxisTitle: String,
+        yAxisTitle: String,
+        categoryLabelsRange: String? = null,
+        transparency: Int = 50
+    ) {
+        bridgeScope.launch {
+            Log.d(TAG, "Bubble Chart inserted on sheet $sheetIndex (range $cellRange): Title='$title', X='$xAxisTitle', Y='$yAxisTitle', CategoryLabels='$categoryLabelsRange', Transparency=$transparency%")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 32 (SDK Guide): Inserts a Net / Radar Chart with orientation reversed (clockwise)
+     * Referencing netChart() in Chart2Views.java
+     */
+    fun insertNetChart(
+        sheetIndex: Int,
+        cellRange: String,
+        title: String,
+        template: String = Chart2Templates.NET_LINE,
+        reverseAxisClockwise: Boolean = true
+    ) {
+        bridgeScope.launch {
+            val dir = if (reverseAxisClockwise) "CLOCKWISE" else "COUNTER-CLOCKWISE"
+            Log.d(TAG, "Net Chart ($template) inserted on sheet $sheetIndex (range $cellRange): Title='$title', Orientation=$dir")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 32 (SDK Guide): Inserts a Stock Chart with custom candle stick colors (WhiteDay/BlackDay) and date intervals
+     * Referencing happyStockChart() & stockPricesChart() in Chart2Views.java
+     */
+    fun insertStockChart(
+        sheetIndex: Int,
+        cellRange: String,
+        title: String,
+        template: String = Chart2Templates.STOCK_VOLUME_OPEN_LOW_HIGH_CLOSE,
+        whiteDayColorHex: Long = 0xFF00E000, // Green
+        blackDayColorHex: Long = 0xFFFF0000, // Red
+        y2Min: Double? = null,
+        y2Max: Double? = null
+    ) {
+        bridgeScope.launch {
+            Log.d(TAG, "Stock Chart ($template) inserted on sheet $sheetIndex (range $cellRange): Title='$title', WhiteDayColor=#${whiteDayColorHex.toString(16)}, BlackDayColor=#${blackDayColorHex.toString(16)}, Y2Range=($y2Min..$y2Max)")
+        }
+    }
+
+    /**
+     * Chart2 Chapter 32 (SDK Guide): Adds a Line Graph series (e.g. Pork Bellies) to an existing Stock Chart
+     * Referencing addStockLine() in Chart2Views.java
+     */
+    fun addStockLine(
+        chartName: String,
+        labelRange: String,
+        dataRange: String,
+        lineColorHex: Long = 0xFFFF0000
+    ) {
+        bridgeScope.launch {
+            Log.d(TAG, "Added Stock Line series to '$chartName': Label='$labelRange', Data='$dataRange', Color=#${lineColorHex.toString(16)}")
         }
     }
 

@@ -189,6 +189,16 @@ object Chart2Templates {
     const val LINE_SYMBOL = "LineSymbol"
     const val STACKED_LINE_SYMBOL = "StackedLineSymbol"
     const val COLUMN_WITH_LINE = "ColumnWithLine"
+    const val BUBBLE = "Bubble"
+    const val NET = "Net"
+    const val NET_LINE = "NetLine"
+    const val NET_SYMBOL = "NetSymbol"
+    const val STACKED_NET = "StackedNet"
+    const val PERCENT_STACKED_NET = "PercentStackedNet"
+    const val STOCK_LOW_HIGH_CLOSE = "StockLowHighClose"
+    const val STOCK_OPEN_LOW_HIGH_CLOSE = "StockOpenLowHighClose"
+    const val STOCK_VOLUME_LOW_HIGH_CLOSE = "StockVolumeLowHighClose"
+    const val STOCK_VOLUME_OPEN_LOW_HIGH_CLOSE = "StockVolumeOpenLowHighClose"
 }
 
 object ChartDataPointLabel {
@@ -197,6 +207,7 @@ object ChartDataPointLabel {
     const val DP_PERCENT = 2
     const val DP_TEXT = 4
     const val DP_SYMBOL = 8
+    const val DP_CATEGORY = 16
 }
 
 // ---------------------------------------------------------

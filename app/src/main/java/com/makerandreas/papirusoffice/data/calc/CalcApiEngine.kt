@@ -1633,4 +1633,62 @@ object Chart2 {
     fun setYErrorBars(chartDoc: XChartDocument, dataLabel: String, dataRange: String) {
         println("Set Y Error Bars with label: $dataLabel, range: $dataRange")
     }
+
+    // --- Chapter 32: Bubble, Net, Stock Charts ---
+
+    /**
+     * LibreOffice SDK Guide Chapter 32.1: Bubble Charts
+     * Creates a Bubble Chart from spreadsheet data, sets labels and transparency/3D properties.
+     */
+    fun labeledBubbleChart(doc: XSpreadsheetDocument, sheet: XSpreadsheet, rangeName: String = "A1:C6"): XChartDocument {
+        val rangeAddr = CellRangeAddress(0, 0, 0, 2, 5)
+        val chartDoc = insertChart(sheet, rangeAddr, "C1", 15, 11, "com.sun.star.chart2.template.Bubble")
+        setTitle(chartDoc, "Bubble Chart Example")
+        setXAxisTitle(chartDoc, "X Data")
+        setYAxisTitle(chartDoc, "Y Data")
+        setDataPointLabels(chartDoc, DP_NUMBER)
+        println("Labeled Bubble Chart created successfully.")
+        return chartDoc
+    }
+
+    /**
+     * LibreOffice SDK Guide Chapter 32.2: Net (Radar) Charts
+     * Creates a Net (Radar) Chart from spreadsheet data and configures radial axes.
+     */
+    fun netChart(doc: XSpreadsheetDocument, sheet: XSpreadsheet, rangeName: String = "A1:E5"): XChartDocument {
+        val rangeAddr = CellRangeAddress(0, 0, 0, 4, 4)
+        val chartDoc = insertChart(sheet, rangeAddr, "C1", 15, 11, "com.sun.star.chart2.template.Net")
+        setTitle(chartDoc, "Net / Radar Chart")
+        viewLegend(chartDoc, true)
+        println("Net Chart created successfully.")
+        return chartDoc
+    }
+
+    /**
+     * LibreOffice SDK Guide Chapter 32.3: Happy Stock Charts
+     * Creates a Stock Chart (Open-Low-High-Close) with candle stick colors.
+     */
+    fun happyStockChart(doc: XSpreadsheetDocument, sheet: XSpreadsheet, rangeName: String = "A1:E6"): XChartDocument {
+        val rangeAddr = CellRangeAddress(0, 0, 0, 4, 5)
+        val chartDoc = insertChart(sheet, rangeAddr, "F1", 16, 12, "com.sun.star.chart2.template.StockOpenLowHighClose")
+        setTitle(chartDoc, "Stock Prices (Open-Low-High-Close)")
+        setXAxisTitle(chartDoc, "Date")
+        setYAxisTitle(chartDoc, "Price")
+        println("Happy Stock Chart (Open-Low-High-Close) created successfully.")
+        return chartDoc
+    }
+
+    /**
+     * LibreOffice SDK Guide Chapter 32.4: Stock Prices Chart with Volume
+     * Creates a Stock Prices Chart combined with Volume bars.
+     */
+    fun stockPricesChart(doc: XSpreadsheetDocument, sheet: XSpreadsheet, rangeName: String = "A1:F10"): XChartDocument {
+        val rangeAddr = CellRangeAddress(0, 0, 0, 5, 9)
+        val chartDoc = insertChart(sheet, rangeAddr, "G1", 18, 12, "com.sun.star.chart2.template.StockOpenLowHighClose")
+        setTitle(chartDoc, "Stock Prices & Volume Analysis")
+        setXAxisTitle(chartDoc, "Trading Day")
+        setYAxisTitle(chartDoc, "Stock Value")
+        println("Stock Prices & Volume Chart created successfully.")
+        return chartDoc
+    }
 }

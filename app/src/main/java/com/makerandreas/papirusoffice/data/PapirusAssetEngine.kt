@@ -20,6 +20,10 @@ object PapirusAssetEngine {
     const val ASSETS_FONTS_DIR = "fonts"
     const val ASSETS_HUNSPELL_DIR = "hunspell"
     const val ASSETS_HYPHENATION_DIR = "hyphenation"
+    const val ASSETS_SHARE_DIR = "share"
+    const val ASSETS_PROGRAM_DIR = "program"
+    const val ASSETS_UNPACK_DIR = "unpack"
+    const val ASSETS_DEXOPT_DIR = "dexopt"
 
     data class FontItem(
         val fileName: String,
@@ -49,6 +53,10 @@ object PapirusAssetEngine {
             syncAssetFolderToStorage(context, ASSETS_FONTS_DIR, File(internalAssetsDir, "fonts"))
             syncAssetFolderToStorage(context, ASSETS_HUNSPELL_DIR, File(internalAssetsDir, "hunspell"))
             syncAssetFolderToStorage(context, ASSETS_HYPHENATION_DIR, File(internalAssetsDir, "hyphenation"))
+            syncAssetFolderToStorage(context, ASSETS_SHARE_DIR, File(internalAssetsDir, "share"))
+            syncAssetFolderToStorage(context, ASSETS_PROGRAM_DIR, File(internalAssetsDir, "program"))
+            syncAssetFolderToStorage(context, ASSETS_UNPACK_DIR, File(internalAssetsDir, "unpack"))
+            syncAssetFolderToStorage(context, ASSETS_DEXOPT_DIR, File(internalAssetsDir, "dexopt"))
 
             // Initialize and configure PathSettings
             pathSettings = PathSettings(context).apply {
@@ -56,6 +64,9 @@ object PapirusAssetEngine {
                 setPropertyValue("Linguistic", File(internalAssetsDir, "hunspell").absolutePath)
                 setPropertyValue("Dictionary", File(internalAssetsDir, "hunspell/en-US").absolutePath)
                 setPropertyValue("Hyphenation", File(internalAssetsDir, "hyphenation").absolutePath)
+                setPropertyValue("Share", File(internalAssetsDir, "share").absolutePath)
+                setPropertyValue("Program", File(internalAssetsDir, "program").absolutePath)
+                setPropertyValue("Unpack", File(internalAssetsDir, "unpack").absolutePath)
             }
 
             isConnected = true

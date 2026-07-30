@@ -47,7 +47,8 @@ data class SlideItem(
     var isMaster: Boolean = false,
     var showFooter: Boolean = true,
     var showSlideNumber: Boolean = true,
-    var footerText: String = "Papirus Slidia Presentation"
+    var footerText: String = "Papirus Slidia Presentation",
+    var chartImagePath: String? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,6 +107,7 @@ fun SlidiaModule(
     var transitionSpeed by remember { mutableStateOf("Fast") } // "Slow", "Medium", "Fast"
     var usePenMode by remember { mutableStateOf(false) }
     var showCustomShowDialog by remember { mutableStateOf(false) }
+    var showUniversalChartSheet by remember { mutableStateOf(false) }
     var customShowName by remember { mutableStateOf("Executive Summary") }
     var customShowIndicesText by remember { mutableStateOf("1, 3, 5") }
     var activePlaylistIndices by remember { mutableStateOf<List<Int>?>(null) }

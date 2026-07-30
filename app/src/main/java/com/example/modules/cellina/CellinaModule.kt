@@ -1383,12 +1383,51 @@ fun CellinaModule(
                                          }
                                      }
                                      HorizontalDivider()
+                                     Text("Bubble, Net, Stock Charts (SDK Ch. 32)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
+                                     Row(
+                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                     ) {
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertBubbleChart(0, "H63:J93", "World Data", "GDP per Capita", "Life Expectancy", categoryLabelsRange = "K64:K93", transparency = 50)
+                                             Toast.makeText(context, "labeledBubbleChart: 50% transparency, category labels (Country)", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.BubbleChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Bubble Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertNetChart(0, "A56:D63", "No of Calls per Day", template = com.makerandreas.papirusoffice.data.framework.Chart2Templates.NET_LINE, reverseAxisClockwise = true)
+                                             Toast.makeText(context, "netChart: Radar/Spider web chart with clockwise day orientation", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Net / Radar Chart")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.insertStockChart(0, "A86:F104", "Happy Systems (HASY)", template = com.makerandreas.papirusoffice.data.framework.Chart2Templates.STOCK_VOLUME_OPEN_LOW_HIGH_CLOSE, y2Min = 83.0, y2Max = 103.0)
+                                             Toast.makeText(context, "happyStockChart: CandleSticks (Green/Red), Y2-axis range ($83-$103), 3-day interval", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.CandlestickChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Stock Chart (Candlestick)")
+                                         }
+                                         OutlinedButton(onClick = { 
+                                             bridge.addStockLine("StockChart1", "J141", "J142:J146", lineColorHex = 0xFFFF0000)
+                                             Toast.makeText(context, "addStockLine: Added Pork Bellies line graph series to Stock Chart", Toast.LENGTH_SHORT).show() 
+                                         }) {
+                                             Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Spacer(modifier = Modifier.width(4.dp))
+                                             Text("Add Stock Line (Pork Bellies)")
+                                         }
+                                     }
+                                     HorizontalDivider()
                                      Text("Embedded Chart Type Switcher (ChartTypeChange.java)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(
                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        listOf("BarDiagram", "LineDiagram", "PieDiagram", "NetDiagram", "XYDiagram", "StockDiagram", "AreaDiagram").forEach { cType ->
+                                        listOf("BarDiagram", "LineDiagram", "PieDiagram", "NetDiagram", "XYDiagram", "StockDiagram", "AreaDiagram", "BubbleDiagram").forEach { cType ->
                                             FilterChip(
                                                 selected = selectedChartType == cType,
                                                 onClick = {

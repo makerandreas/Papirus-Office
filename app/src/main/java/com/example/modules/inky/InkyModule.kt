@@ -9,6 +9,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.components.SaveAsDialog
+import com.example.ui.components.CloudSyncBar
+import com.example.ui.components.GeminiCopilotDialog
 import com.example.core.util.TemplateManager
 import com.example.ui.home.RecentFilesTracker
 import com.example.ui.home.ShortcutCard
@@ -166,6 +168,7 @@ fun InkyModule(
     var showOptionsDialog by remember { mutableStateOf(false) }
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showPasteSpecialDialog by remember { mutableStateOf(false) }
+    var showUniversalChartSheet by remember { mutableStateOf(false) }
 
 
 
@@ -1383,6 +1386,20 @@ fun InkyModule(
             }
             }
 
+            // --- FIREBASE CLOUD SYNC & AUTH BAR ---
+            CloudSyncBar(
+                currentDocumentTitle = docTitle,
+                currentDocumentContent = docBodyText.text,
+                moduleType = "WRITER",
+                onLoadDocumentFromCloud = { cloudDoc ->
+                    docTitle = cloudDoc.title
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(cloudDoc.content)
+                    isNewDocument = false
+                    isSaved = true
+                    Toast.makeText(context, "Loaded cloud document: ${cloudDoc.title}", Toast.LENGTH_SHORT).show()
+                }
+            )
+
             // --- FIND AND REPLACE OVERLAY BAR ---
             AnimatedVisibility(visible = showFindReplace) {
                 Card(
@@ -1780,6 +1797,28 @@ fun InkyModule(
 
                     Spacer(modifier = Modifier.height(16.dp))
                 }
+                }
+
+                // --- FLOATING GEMINI COPILOT FAB ---
+                if (!showBottomBar) {
+                    FloatingActionButton(
+                        onClick = { showAiAssistant = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = if (!isEditMode) 90.dp else 24.dp, end = 24.dp)
+                            .testTag("fab_gemini_copilot"),
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = "Gemini Copilot")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Gemini Copilot", fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
 
                 // --- FLOATING ACTION BUTTON (Viewer Mode Only) ---
@@ -3008,66 +3047,19 @@ fun InkyModule(
 
     // --- OPT-IN GEMINI CO-AUTHOR ASSISTANT DIALOG ---
     if (showAiAssistant) {
-        AlertDialog(
-            onDismissRequest = { showAiAssistant = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Inky AI Copilot")
-                }
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Google Gemini integration is strictly opt-in and operates with zero data retention for developer compliance.", fontSize = 11.sp, color = Color.Gray)
-                    
-                    OutlinedTextField(
-                        value = aiPrompt,
-                        onValueChange = { aiPrompt = it },
-                        label = { Text("Ask Copilot (e.g., summarize, improve, proofread)") },
-                        modifier = Modifier.fillMaxWidth().testTag("ai_prompt")
-                    )
-
-                    if (isLoadingAi) {
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else if (aiResponse.isNotEmpty()) {
-                        Text("Response:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                .padding(8.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            Text(aiResponse, fontSize = 12.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        isLoadingAi = true
-                        coroutineScope.launch {
-                            val response = GeminiAiService.generateContent(
-                                context = context,
-                                prompt = aiPrompt,
-                                systemInstruction = "You are helping edit an ODF document inside Papirus Inky."
-                            )
-                            aiResponse = response
-                            isLoadingAi = false
-                        }
-                    },
-                    enabled = aiPrompt.isNotEmpty() && !isLoadingAi
-                ) {
-                    Text("Analyze")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAiAssistant = false }) {
-                    Text("Close")
-                }
+        GeminiCopilotDialog(
+            currentDocumentText = docBodyText.text,
+            moduleType = "WRITER",
+            onDismiss = { showAiAssistant = false },
+            onInsertTextToDocument = { generatedText ->
+                val currentText = docBodyText.text
+                val newText = if (currentText.isEmpty()) generatedText else "$currentText\n\n$generatedText"
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                    text = newText,
+                    selection = androidx.compose.ui.text.TextRange(newText.length)
+                )
+                isSaved = false
+                Toast.makeText(context, "Text inserted from Gemini Copilot!", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3176,6 +3168,26 @@ fun InkyModule(
                 currentSaveDefaultFilename = if (baseName.isBlank()) "Inky_Dokumen$extension" else "$baseName$extension"
                 showSaveAsDialog = false
                 saveDocumentLauncher.launch(currentSaveDefaultFilename)
+            }
+        )
+    }
+
+    if (showUniversalChartSheet) {
+        com.example.ui.components.UniversalChartSheet(
+            activeModuleName = "Inky",
+            onDismiss = { showUniversalChartSheet = false },
+            onInsertChart = { chartData ->
+                val result = com.makerandreas.papirusoffice.data.framework.CrossModuleChartEngine.getInstance().pasteChartToWriter(
+                    context = context,
+                    docTitle = docTitle,
+                    chartData = chartData
+                )
+                if (result is com.makerandreas.papirusoffice.data.framework.ChartEmbedResult.Success) {
+                    docBodyText = docBodyText.copy(
+                        text = docBodyText.text + "\n\n[Chart Embedded: ${chartData.title}]\nCaption: ${result.caption}\n"
+                    )
+                    isSaved = false
+                }
             }
         )
     }

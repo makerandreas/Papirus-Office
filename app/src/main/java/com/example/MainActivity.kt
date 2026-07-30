@@ -129,6 +129,15 @@ class MainActivity : ComponentActivity() {
             defaultHandler?.uncaughtException(thread, throwable)
         }
         
+        // Initialize Firebase if needed
+        try {
+            if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
+                com.google.firebase.FirebaseApp.initializeApp(this)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainActivity", "FirebaseApp init: ${e.message}")
+        }
+
         // Initialize JNI LibreOffice Core configuration
         val cacheDir = cacheDir.absolutePath
         LibreOfficeCore.initialize(

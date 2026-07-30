@@ -1,7 +1,9 @@
 package com.makerandreas.papirusoffice.data
 
+import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
+import com.example.core.ai.GeminiAiService
 import com.example.core.util.TemplateManager
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -14,24 +16,51 @@ import kotlinx.coroutines.withContext
 class TemplateSearchRepository {
     private val TAG = "TemplateSearchRepository"
 
-    // Loaded dynamically from BuildConfig securely managed via AI Studio Secrets & Secrets Gradle Plugin
     private val apiKey = BuildConfig.GOOGLE_CSE_API_KEY
     private val searchEngineId = BuildConfig.GOOGLE_CSE_CX
 
-    /**
-     * Membangun URL kueri otomatis yang mengunci pencarian khusus berkas templat dokumen
-     */
     fun buildTemplateSearchUrl(query: String): String {
         val encodedQuery = URLEncoder.encode("$query filetype:odt OR filetype:docx OR filetype:ott", "UTF-8")
         return "https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$searchEngineId&q=$encodedQuery"
     }
 
     /**
-     * Executes Google CSE query to search for real document templates online.
-     * Parses the results into TemplateManager.TemplateItem list.
+     * Search templates using AI Search Grounding powered by Gemini (Google Search Tool)
+     */
+    suspend fun searchTemplatesWithAiGrounding(context: Context, query: String): List<TemplateManager.TemplateItem> = withContext(Dispatchers.IO) {
+        val prompt = "Search for high quality document templates online related to '$query'. Provide 4 template recommendations with titles, description, and source links."
+        
+        val groundedResult = GeminiAiService.generateWithSearchGrounding(context, prompt)
+        val templates = mutableListOf<TemplateManager.TemplateItem>()
+
+        if (groundedResult.citations.isNotEmpty()) {
+            groundedResult.citations.forEach { citation ->
+                templates.add(
+                    TemplateManager.TemplateItem(
+                        name = citation.title,
+                        type = if (query.lowercase().contains("sheet") || query.lowercase().contains("calc")) "ODS" else if (query.lowercase().contains("slide") || query.lowercase().contains("presentation")) "ODP" else "ODT",
+                        url = citation.url,
+                        description = "Grounded Search Result: ${citation.title}"
+                    )
+                )
+            }
+        } else if (groundedResult.textResponse.isNotEmpty()) {
+            templates.add(
+                TemplateManager.TemplateItem(
+                    name = "$query Template (AI Generated Idea)",
+                    type = "ODT",
+                    url = "https://templates.office.com",
+                    description = groundedResult.textResponse.take(150) + "..."
+                )
+            )
+        }
+        templates
+    }
+
+    /**
+     * Search online templates using Google Custom Search Engine with fallback
      */
     suspend fun searchOnlineTemplates(query: String): List<TemplateManager.TemplateItem> = withContext(Dispatchers.IO) {
-        // Guard against placeholder / empty API Keys
         if (apiKey.isEmpty() || apiKey == "YOUR_CSE_API_KEY" || searchEngineId.isEmpty() || searchEngineId == "YOUR_CSE_CX") {
             Log.d(TAG, "Google CSE credentials are not configured or are placeholder values. Skipping CSE query.")
             return@withContext emptyList()
@@ -69,13 +98,11 @@ class TemplateSearchRepository {
                     val snippet = item.optString("snippet", "")
 
                     if (link.isNotEmpty()) {
-                        // Determine type based on link extension
                         val lowerLink = link.lowercase()
                         val type = when {
                             lowerLink.endsWith(".odt") -> "ODT"
                             lowerLink.endsWith(".ods") -> "ODS"
                             lowerLink.endsWith(".odp") -> "ODP"
-                            lowerLink.endsWith(".docx") -> "ODT" // Map docx to writer
                             else -> "ODT"
                         }
 
