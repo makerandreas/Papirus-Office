@@ -1400,6 +1400,14 @@ object Chart2 {
     const val Y_AXIS = 1
     const val Z_AXIS = 2
 
+    // Regression & Scaling Curves
+    const val LINEAR = 1
+    const val LOGARITHMIC = 2
+    const val EXPONENTIAL = 3
+    const val POWER = 4
+    const val POLYNOMIAL = 5
+    const val MOVING_AVERAGE = 6
+
     fun addTableChart(sheet: XSpreadsheet, chartName: String, cellsRange: CellRangeAddress, cellName: String, width: Int, height: Int) {
         println("Added TableChart $chartName at $cellName size ${width}x${height}")
     }
@@ -1587,5 +1595,42 @@ object Chart2 {
         val types = arrayOf("com.sun.star.chart2.ColumnChartType")
         println("No. of chart types: ${types.size}")
         types.forEach { println("  $it") }
+    }
+
+    // --- Scatter Charts & Regressions ---
+    fun calcRegressions(chartDoc: XChartDocument) {
+        println("Calculating regressions (Linear, Logarithmic, Exponential, Power, Polynomial, Moving Average)...")
+    }
+
+    fun drawRegressionCurve(chartDoc: XChartDocument, curveKind: Int) {
+        val curveName = when(curveKind) {
+            LINEAR -> "LINEAR"
+            LOGARITHMIC -> "LOGARITHMIC"
+            EXPONENTIAL -> "EXPONENTIAL"
+            POWER -> "POWER"
+            POLYNOMIAL -> "POLYNOMIAL"
+            MOVING_AVERAGE -> "MOVING_AVERAGE"
+            else -> "UNKNOWN"
+        }
+        println("Drawing regression curve: $curveName")
+    }
+
+    fun scaleAxis(chartDoc: XChartDocument, axisVal: Int, idx: Int, scaleType: Int) {
+        val scaleName = when(scaleType) {
+            LINEAR -> "LINEAR"
+            LOGARITHMIC -> "LOGARITHMIC"
+            EXPONENTIAL -> "EXPONENTIAL"
+            POWER -> "POWER"
+            else -> "UNKNOWN"
+        }
+        val axisName = if (axisVal == X_AXIS) "X Axis" else if (axisVal == Y_AXIS) "Y Axis" else "Z Axis"
+        println("Scaling $axisName to $scaleName")
+    }
+
+    fun scaleXAxis(chartDoc: XChartDocument, scaleType: Int) = scaleAxis(chartDoc, X_AXIS, 0, scaleType)
+    fun scaleYAxis(chartDoc: XChartDocument, scaleType: Int) = scaleAxis(chartDoc, Y_AXIS, 0, scaleType)
+
+    fun setYErrorBars(chartDoc: XChartDocument, dataLabel: String, dataRange: String) {
+        println("Set Y Error Bars with label: $dataLabel, range: $dataRange")
     }
 }
