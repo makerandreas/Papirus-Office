@@ -1,0 +1,24 @@
+{
+  "items": [
+    {
+      "family": "Roboto",
+      "variants": ["regular", "italic", "700", "700italic"],
+      "subsets": ["latin"],
+      "category": "sans-serif",
+      "files": {
+        "regular": "http://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf",
+        "700": "http://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc9.ttf"
+      }
+    },
+    {
+      "family": "Open Sans",
+      "variants": ["regular", "italic", "700", "700italic"],
+      "subsets": ["latin"],
+      "category": "sans-serif",
+      "files": {
+        "regular": "http://fonts.gstatic.com/s/opensans/v34/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVc.ttf",
+        "700": "http://fonts.gstatic.com/s/opensans/v34/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsg-1x4gaVc.ttf"
+      }
+    }
+  ]
+}
