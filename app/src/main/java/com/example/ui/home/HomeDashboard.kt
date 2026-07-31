@@ -224,6 +224,10 @@ fun HomeDashboard(
     var showNewDocDialog by remember { mutableStateOf(false) }
     var showFabMenu by remember { mutableStateOf(false) }
     var showUniversalPrintSheet by remember { mutableStateOf(false) }
+    var showUniversalEmailSheet by remember { mutableStateOf(false) }
+    var showUniversalClipboardSheet by remember { mutableStateOf(false) }
+    var showUniversalXmlImportSheet by remember { mutableStateOf(false) }
+    var showUniversalOdfSheet by remember { mutableStateOf(false) }
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -277,6 +281,38 @@ fun HomeDashboard(
                                     onClick = {
                                         showMoreMenu = false
                                         showUniversalPrintSheet = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) },
+                                    text = { Text("Emailing & SDK Examples") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showUniversalEmailSheet = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                                    text = { Text("Clipboard & SDK Examples") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showUniversalClipboardSheet = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.Code, contentDescription = null) },
+                                    text = { Text("XML Importing & SDK Examples") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showUniversalXmlImportSheet = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.FolderZip, contentDescription = null) },
+                                    text = { Text("Simple ODF & Package Examples") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showUniversalOdfSheet = true
                                     }
                                 )
                                 DropdownMenuItem(
@@ -427,6 +463,33 @@ fun HomeDashboard(
         com.example.ui.components.UniversalPrintSheet(
             activeModuleName = "Inky",
             onDismiss = { showUniversalPrintSheet = false }
+        )
+    }
+
+    if (showUniversalEmailSheet) {
+        com.example.ui.components.UniversalEmailSheet(
+            activeModuleName = "Inky",
+            docTitle = "Financial_Statement_Q1.ods",
+            docContent = "Excel sheets or ODS sheet simulation.",
+            onDismiss = { showUniversalEmailSheet = false }
+        )
+    }
+
+    if (showUniversalClipboardSheet) {
+        com.example.ui.components.UniversalClipboardSheet(
+            onDismiss = { showUniversalClipboardSheet = false }
+        )
+    }
+
+    if (showUniversalXmlImportSheet) {
+        com.example.ui.components.UniversalXmlImportSheet(
+            onDismiss = { showUniversalXmlImportSheet = false }
+        )
+    }
+
+    if (showUniversalOdfSheet) {
+        com.example.ui.components.UniversalOdfSheet(
+            onDismiss = { showUniversalOdfSheet = false }
         )
     }
 

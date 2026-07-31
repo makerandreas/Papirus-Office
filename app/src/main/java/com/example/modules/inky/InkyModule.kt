@@ -171,6 +171,10 @@ fun InkyModule(
     var showUniversalChartSheet by remember { mutableStateOf(false) }
     var showUniversalFormsSheet by remember { mutableStateOf(false) }
     var showUniversalPrintSheet by remember { mutableStateOf(false) }
+    var showUniversalEmailSheet by remember { mutableStateOf(false) }
+    var showUniversalClipboardSheet by remember { mutableStateOf(false) }
+    var showUniversalXmlImportSheet by remember { mutableStateOf(false) }
+    var showUniversalOdfSheet by remember { mutableStateOf(false) }
 
 
 
@@ -1231,9 +1235,33 @@ fun InkyModule(
                                         text = { Text("Share") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Opening Share Sheet...", Toast.LENGTH_SHORT).show()
+                                            showUniversalEmailSheet = true
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Clipboard Framework") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showUniversalClipboardSheet = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = "Clipboard Framework") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("XML Importing") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showUniversalXmlImportSheet = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Code, contentDescription = "XML Importing") }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Simple ODF") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showUniversalOdfSheet = true
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.FolderZip, contentDescription = "Simple ODF") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Save") },
@@ -2752,6 +2780,12 @@ fun InkyModule(
                                                              Toast.makeText(context, "No metadata available for this document", Toast.LENGTH_SHORT).show()
                                                          }
                                                      }
+                                                 },
+                                                 onPrintDocument = {
+                                                     showUniversalPrintSheet = true
+                                                 },
+                                                 onShareDocument = {
+                                                     showUniversalEmailSheet = true
                                                  }
                                              )
                                          }
@@ -3214,6 +3248,33 @@ fun InkyModule(
         )
     }
 
+    if (showUniversalEmailSheet) {
+        com.example.ui.components.UniversalEmailSheet(
+            activeModuleName = "Inky",
+            docTitle = docTitle,
+            docContent = docBodyText.text,
+            onDismiss = { showUniversalEmailSheet = false }
+        )
+    }
+
+    if (showUniversalClipboardSheet) {
+        com.example.ui.components.UniversalClipboardSheet(
+            onDismiss = { showUniversalClipboardSheet = false }
+        )
+    }
+
+    if (showUniversalXmlImportSheet) {
+        com.example.ui.components.UniversalXmlImportSheet(
+            onDismiss = { showUniversalXmlImportSheet = false }
+        )
+    }
+
+    if (showUniversalOdfSheet) {
+        com.example.ui.components.UniversalOdfSheet(
+            onDismiss = { showUniversalOdfSheet = false }
+        )
+    }
+
     // --- CREATE FROM TEMPLATE DIALOG ---
     if (showCreateFromTemplateDialog) {
         var templateList by remember { mutableStateOf<List<TemplateManager.TemplateItem>>(emptyList()) }
@@ -3500,7 +3561,8 @@ private fun FileSubpage(
     onSaveDocument: () -> Unit,
     onSaveAsDocument: () -> Unit,
     onDocumentProperties: () -> Unit = {},
-    onPrintDocument: () -> Unit = {}
+    onPrintDocument: () -> Unit = {},
+    onShareDocument: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
@@ -3545,7 +3607,7 @@ private fun FileSubpage(
             icon = Icons.Rounded.Share,
             title = "Share"
         ) {
-            Toast.makeText(context, "Opening Android Share Sheet...", Toast.LENGTH_SHORT).show()
+            onShareDocument()
         }
         FileMenuListItem(
             icon = Icons.Rounded.DoneAll,
