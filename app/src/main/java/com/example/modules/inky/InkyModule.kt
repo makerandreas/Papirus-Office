@@ -1,5 +1,6 @@
 package com.example.modules.inky
 import android.util.Log
+import com.makerandreas.papirusoffice.data.toOfficeDocument
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.input.key.*
@@ -227,6 +228,21 @@ fun InkyModule(
         inkyMetadataRepo.saveOrUpdateMetadata(entity)
     }
 
+    val updateActiveSession = { file: java.io.File, parsedDoc: com.makerandreas.papirusoffice.data.OfficeParsedDocument? ->
+        if (parsedDoc != null) {
+            val officeDoc = parsedDoc.toOfficeDocument()
+            val session = com.makerandreas.papirusoffice.data.DocumentSession(
+                engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
+                document = officeDoc,
+                file = com.makerandreas.papirusoffice.data.OfficeFile(file)
+            )
+            com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
+        }
+    }
+
+    val currentSessionState by com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.collectAsState()
+    var layoutCursor by remember { mutableStateOf(com.makerandreas.papirusoffice.data.DocumentCursor()) }
+
     var docBodyText by remember {
         mutableStateOf(
             androidx.compose.ui.text.input.TextFieldValue("")
@@ -264,6 +280,7 @@ fun InkyModule(
                             docxImages = parseResult.extractedImages
                             docxExtents = parseResult.imageExtents
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
+                            updateActiveSession(f, parseResult.parsedDocument)
                         }
                     }
                 }
@@ -1533,42 +1550,40 @@ fun InkyModule(
                         ) {
                             if (!isEditMode) {
                                 // --- VIEWER MODE: SEPARATE ELEGANT A4 PAGES (WYSIWYG) ---
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    pagesList.forEachIndexed { index, pageText ->
-                                        Box(
-                                            modifier = Modifier
-                                                .width((320 * zoomScale).dp)
-                                                .height((452 * zoomScale).dp)
-                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                                .background(pageBgColor)
-                                                .padding(24.dp)
-                                        ) {
-                                            Text(
-                                                text = pageText,
-                                                fontSize = (activeFontSize * zoomScale).sp,
-                                                lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
-                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                fontFamily = when (activeFontFamily) {
-                                                    "Liberation Serif" -> FontFamily.Serif
-                                                    "Calibri" -> FontFamily.SansSerif
-                                                    "Arial" -> FontFamily.SansSerif
-                                                    "Roboto" -> FontFamily.SansSerif
-                                                    else -> FontFamily.Default
-                                                },
-                                                color = textPrimaryColor,
-                                                textAlign = textAlignment,
-                                                modifier = Modifier.fillMaxSize()
+                                val displayDoc = remember(currentSessionState, docBodyText.text, textAlignment) {
+                                    currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
+                                        body = com.makerandreas.papirusoffice.data.DocumentBody(
+                                            elements = listOf(
+                                                com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement(
+                                                    com.makerandreas.papirusoffice.data.OfficeParagraph(
+                                                        text = docBodyText.text,
+                                                        alignment = when (textAlignment) {
+                                                            TextAlign.Center -> "Center"
+                                                            TextAlign.Right -> "Right"
+                                                            TextAlign.Justify -> "Justify"
+                                                            else -> "Left"
+                                                        }
+                                                    )
+                                                )
                                             )
-                                        }
-                                    }
-                                    if (docxImages.isNotEmpty()) {
+                                        )
+                                    )
+                                }
+
+                                LayoutDrivenDocumentRenderer(
+                                    document = displayDoc,
+                                    zoomScale = zoomScale,
+                                    isEditMode = false,
+                                    cursor = layoutCursor,
+                                    onCursorChange = { layoutCursor = it }
+                                )
+
+                                if (docxImages.isNotEmpty()) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    ) {
                                         Spacer(modifier = Modifier.height(16.dp))
                                         Text(
                                             text = "--- EMBEDDED IMAGES ---",
@@ -2972,6 +2987,7 @@ fun InkyModule(
                         docxExtents = parseResult.imageExtents
                         isSaved = true
                         isParsingDoc = false
+                        updateActiveSession(file, parseResult.parsedDocument)
                         RecentFilesTracker.addFile(context, filePath, fileType)
                         Toast.makeText(context, "Opened ${file.name}", Toast.LENGTH_SHORT).show()
                     }
