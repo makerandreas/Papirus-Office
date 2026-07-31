@@ -64,10 +64,12 @@ android {
     val geminiKey = System.getenv("GEMINI_API_KEY") ?: ""
     val cseCx = System.getenv("GOOGLE_CSE_CX") ?: ""
     val cseApiKey = System.getenv("GOOGLE_CSE_API_KEY") ?: ""
+    val fontsApiKey = System.getenv("GOOGLE_FONTS_REST_API") ?: System.getenv("GOOGLE_FONTS_API_KEY") ?: ""
 
     buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     buildConfigField("String", "GOOGLE_CSE_CX", "\"$cseCx\"")
     buildConfigField("String", "GOOGLE_CSE_API_KEY", "\"$cseApiKey\"")
+    buildConfigField("String", "GOOGLE_FONTS_REST_API", "\"$fontsApiKey\"")
   }
 
   signingConfigs {

@@ -43,6 +43,35 @@ class GoogleFontsBridge private constructor() {
     }
 
     /**
+     * Refreshes the Google Fonts catalog from Google Fonts REST API via GoogleFontsRepository
+     */
+    suspend fun refreshCatalogFromRestApi(context: Context) = withContext(Dispatchers.IO) {
+        try {
+            val repo = com.makerandreas.papirusoffice.core.fonts.GoogleFontsRepository(context)
+            val fontItems = repo.getFontsList()
+            if (fontItems.isNotEmpty()) {
+                val mapped = fontItems.map { item ->
+                    val downloadUrl = item.files?.get("regular")
+                        ?: item.files?.get("400")
+                        ?: item.files?.values?.firstOrNull()
+                        ?: "https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.ttf"
+                    GoogleFontMetadata(
+                        family = item.family,
+                        category = item.category ?: "sans-serif",
+                        downloadUrl = downloadUrl,
+                        variants = item.variants
+                    )
+                }
+                _availableFonts.value = mapped
+                syncWithInstalledFonts(context)
+                Log.d(TAG, "Refreshed catalog with ${mapped.size} fonts from REST API.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error refreshing font catalog from REST API: ${e.localizedMessage}", e)
+        }
+    }
+
+    /**
      * Pre-populates catalog with popular open-source Google Fonts
      */
     private fun loadCatalog() {

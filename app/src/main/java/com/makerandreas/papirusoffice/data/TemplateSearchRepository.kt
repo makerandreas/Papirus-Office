@@ -16,12 +16,11 @@ import kotlinx.coroutines.withContext
 class TemplateSearchRepository {
     private val TAG = "TemplateSearchRepository"
 
-    private val apiKey = BuildConfig.GOOGLE_CSE_API_KEY
     private val searchEngineId = BuildConfig.GOOGLE_CSE_CX
 
-    fun buildTemplateSearchUrl(query: String): String {
-        val encodedQuery = URLEncoder.encode("$query filetype:odt OR filetype:docx OR filetype:ott", "UTF-8")
-        return "https://www.googleapis.com/customsearch/v1?key=$apiKey&cx=$searchEngineId&q=$encodedQuery"
+    fun buildTemplateSearchUrl(key: String, query: String): String {
+        val encodedQuery = URLEncoder.encode("$query filetype:ott OR filetype:ots OR filetype:otp OR filetype:odt OR filetype:ods OR filetype:odp", "UTF-8")
+        return "https://www.googleapis.com/customsearch/v1?key=$key&cx=$searchEngineId&q=$encodedQuery"
     }
 
     /**
@@ -38,7 +37,7 @@ class TemplateSearchRepository {
                 templates.add(
                     TemplateManager.TemplateItem(
                         name = citation.title,
-                        type = if (query.lowercase().contains("sheet") || query.lowercase().contains("calc")) "ODS" else if (query.lowercase().contains("slide") || query.lowercase().contains("presentation")) "ODP" else "ODT",
+                        type = if (query.lowercase().contains("sheet") || query.lowercase().contains("calc") || query.lowercase().contains("ots")) "OTS" else if (query.lowercase().contains("slide") || query.lowercase().contains("presentation") || query.lowercase().contains("otp")) "OTP" else "OTT",
                         url = citation.url,
                         description = "Grounded Search Result: ${citation.title}"
                     )
@@ -48,7 +47,7 @@ class TemplateSearchRepository {
             templates.add(
                 TemplateManager.TemplateItem(
                     name = "$query Template (AI Generated Idea)",
-                    type = "ODT",
+                    type = "OTT",
                     url = "https://templates.office.com",
                     description = groundedResult.textResponse.take(150) + "..."
                 )
@@ -58,21 +57,21 @@ class TemplateSearchRepository {
     }
 
     /**
-     * Search online templates using Google Custom Search Engine with fallback
+     * Search online templates using Google Custom Search Engine with API Key fallback
      */
     suspend fun searchOnlineTemplates(query: String): List<TemplateManager.TemplateItem> = withContext(Dispatchers.IO) {
-        if (apiKey.isEmpty() || apiKey == "YOUR_CSE_API_KEY" || searchEngineId.isEmpty() || searchEngineId == "YOUR_CSE_CX") {
-            Log.d(TAG, "Google CSE credentials are not configured or are placeholder values. Skipping CSE query.")
+        if (searchEngineId.isEmpty() || searchEngineId == "YOUR_CSE_CX") {
+            Log.d(TAG, "Google CSE CX is not configured. Skipping CSE query.")
             return@withContext emptyList()
         }
 
-        val url = buildTemplateSearchUrl(query)
-        Log.d(TAG, "Querying Google CSE: $url")
+        val results = ApiKeyManager.executeWithFallback("Google CSE Template Search") { key ->
+            val url = buildTemplateSearchUrl(key, query)
+            Log.d(TAG, "Querying Google CSE with key prefix [${key.take(6)}...]: $url")
 
-        try {
             val client = OkHttpClient.Builder()
-                .connectTimeout(15, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(12, TimeUnit.SECONDS)
                 .build()
 
             val request = Request.Builder()
@@ -82,15 +81,15 @@ class TemplateSearchRepository {
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e(TAG, "Google CSE request failed with HTTP code: ${response.code}")
-                    return@withContext emptyList()
+                    Log.e(TAG, "Google CSE request failed HTTP ${response.code} with key prefix [${key.take(6)}...]")
+                    return@use null
                 }
 
-                val bodyString = response.body?.string() ?: return@withContext emptyList()
+                val bodyString = response.body?.string() ?: return@use null
                 val jsonObject = JSONObject(bodyString)
-                val itemsArray = jsonObject.optJSONArray("items") ?: return@withContext emptyList()
+                val itemsArray = jsonObject.optJSONArray("items") ?: return@use emptyList<TemplateManager.TemplateItem>()
 
-                val results = mutableListOf<TemplateManager.TemplateItem>()
+                val list = mutableListOf<TemplateManager.TemplateItem>()
                 for (i in 0 until itemsArray.length()) {
                     val item = itemsArray.getJSONObject(i)
                     val title = item.optString("title", "Online Template")
@@ -100,15 +99,18 @@ class TemplateSearchRepository {
                     if (link.isNotEmpty()) {
                         val lowerLink = link.lowercase()
                         val type = when {
+                            lowerLink.endsWith(".ott") -> "OTT"
+                            lowerLink.endsWith(".ots") -> "OTS"
+                            lowerLink.endsWith(".otp") -> "OTP"
                             lowerLink.endsWith(".odt") -> "ODT"
                             lowerLink.endsWith(".ods") -> "ODS"
                             lowerLink.endsWith(".odp") -> "ODP"
-                            else -> "ODT"
+                            else -> "OTT"
                         }
 
-                        results.add(
+                        list.add(
                             TemplateManager.TemplateItem(
-                                name = title.replace(".odt", "").replace(".docx", "").trim(),
+                                name = title.replace(".ott", "").replace(".ots", "").replace(".otp", "").replace(".odt", "").trim(),
                                 type = type,
                                 url = link,
                                 description = snippet
@@ -116,11 +118,10 @@ class TemplateSearchRepository {
                         )
                     }
                 }
-                return@withContext results
+                list
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error performing Google CSE search: ${e.localizedMessage}", e)
-            emptyList()
         }
+
+        results ?: emptyList()
     }
 }
