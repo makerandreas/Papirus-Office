@@ -170,6 +170,7 @@ fun InkyModule(
     var showPasteSpecialDialog by remember { mutableStateOf(false) }
     var showUniversalChartSheet by remember { mutableStateOf(false) }
     var showUniversalFormsSheet by remember { mutableStateOf(false) }
+    var showUniversalPrintSheet by remember { mutableStateOf(false) }
 
 
 
@@ -1288,7 +1289,7 @@ fun InkyModule(
                                         text = { Text("Print") },
                                         onClick = {
                                             showMoreMenu = false
-                                            Toast.makeText(context, "Connecting printer...", Toast.LENGTH_SHORT).show()
+                                            showUniversalPrintSheet = true
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
                                     )
@@ -3206,6 +3207,13 @@ fun InkyModule(
         )
     }
 
+    if (showUniversalPrintSheet) {
+        com.example.ui.components.UniversalPrintSheet(
+            activeModuleName = "Inky",
+            onDismiss = { showUniversalPrintSheet = false }
+        )
+    }
+
     // --- CREATE FROM TEMPLATE DIALOG ---
     if (showCreateFromTemplateDialog) {
         var templateList by remember { mutableStateOf<List<TemplateManager.TemplateItem>>(emptyList()) }
@@ -3491,7 +3499,8 @@ private fun FileSubpage(
     onCloseDocument: () -> Unit,
     onSaveDocument: () -> Unit,
     onSaveAsDocument: () -> Unit,
-    onDocumentProperties: () -> Unit = {}
+    onDocumentProperties: () -> Unit = {},
+    onPrintDocument: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
@@ -3553,10 +3562,10 @@ private fun FileSubpage(
         FileMenuSectionHeader("Print")
         FileMenuThreeColumnRow(
             item1 = Triple(Icons.Rounded.Print, "Print") {
-                Toast.makeText(context, "Preparing print job...", Toast.LENGTH_SHORT).show()
+                onPrintDocument()
             },
             item2 = Triple(Icons.Rounded.RemoveRedEye, "Preview") {
-                Toast.makeText(context, "Generating print preview...", Toast.LENGTH_SHORT).show()
+                onPrintDocument()
             },
             item3 = Triple(Icons.Rounded.CallMerge, "Merge") {
                 Toast.makeText(context, "Print merge wizard...", Toast.LENGTH_SHORT).show()

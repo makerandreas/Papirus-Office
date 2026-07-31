@@ -223,6 +223,7 @@ fun HomeDashboard(
     var showOptionsDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var showNewDocDialog by remember { mutableStateOf(false) }
     var showFabMenu by remember { mutableStateOf(false) }
+    var showUniversalPrintSheet by remember { mutableStateOf(false) }
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -270,6 +271,14 @@ fun HomeDashboard(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = null) },
+                                    text = { Text("Printing & SDK Examples") },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showUniversalPrintSheet = true
+                                    }
+                                )
                                 DropdownMenuItem(
                                     leadingIcon = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
                                     text = { Text("Crash Log") },
@@ -411,6 +420,13 @@ fun HomeDashboard(
             sourceModule = "general",
             onCloseOptions = { showOptionsDialog = false },
             onDynamicColorChange = onDynamicColorChange
+        )
+    }
+
+    if (showUniversalPrintSheet) {
+        com.example.ui.components.UniversalPrintSheet(
+            activeModuleName = "Inky",
+            onDismiss = { showUniversalPrintSheet = false }
         )
     }
 
