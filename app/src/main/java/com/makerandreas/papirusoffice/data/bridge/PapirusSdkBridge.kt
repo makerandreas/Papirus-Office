@@ -30,6 +30,7 @@ class PapirusSdkBridge private constructor() {
     val googleFonts: GoogleFontsBridge get() = GoogleFontsBridge.getInstance()
     val linguistics: LinguisticsBridge get() = LinguisticsBridge.getInstance()
     val chartEngine: CrossModuleChartEngine get() = CrossModuleChartEngine.getInstance()
+    val formsEngine: PapirusFormsEngine get() = PapirusFormsEngine.getInstance()
 
     // State flows to monitor active documents across modules
     private val _activeTextDocument = MutableStateFlow<OfficeParsedDocument?>(null)

@@ -114,6 +114,7 @@ fun CellinaModule(
     var currentScenarioName by remember { mutableStateOf("Base Plan") }
     var cellCommentText by remember { mutableStateOf("") }
     var showCommentDialog by remember { mutableStateOf(false) }
+    var showUniversalFormsSheet by remember { mutableStateOf(false) }
 
     // Simulate cell data values
     val columnsLabels = listOf("A", "B", "C", "D", "E")
@@ -1867,6 +1868,18 @@ fun CellinaModule(
                     TextButton(onClick = { showAddInDialog = false }) {
                         Text("Close")
                     }
+                }
+            )
+        }
+
+        if (showUniversalFormsSheet) {
+            com.example.ui.components.UniversalFormsSheet(
+                activeModuleName = "Cellina",
+                onDismiss = { showUniversalFormsSheet = false },
+                onInsertFormToDoc = { formSchema ->
+                    val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
+                    cellValues[activeCellKey] = "[Form: ${formSchema.title}]"
+                    Toast.makeText(context, "Inserted form reference into $activeCellKey", Toast.LENGTH_SHORT).show()
                 }
             )
         }

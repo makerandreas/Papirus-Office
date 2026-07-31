@@ -169,6 +169,7 @@ fun InkyModule(
     var showFontSizeDialog by remember { mutableStateOf(false) }
     var showPasteSpecialDialog by remember { mutableStateOf(false) }
     var showUniversalChartSheet by remember { mutableStateOf(false) }
+    var showUniversalFormsSheet by remember { mutableStateOf(false) }
 
 
 
@@ -3188,6 +3189,19 @@ fun InkyModule(
                     )
                     isSaved = false
                 }
+            }
+        )
+    }
+
+    if (showUniversalFormsSheet) {
+        com.example.ui.components.UniversalFormsSheet(
+            activeModuleName = "Inky",
+            onDismiss = { showUniversalFormsSheet = false },
+            onInsertFormToDoc = { formSchema ->
+                docBodyText = docBodyText.copy(
+                    text = docBodyText.text + "\n\n[Form Controls Embedded: ${formSchema.title}]\nQuestions: ${formSchema.questions.size} fields added.\n"
+                )
+                isSaved = false
             }
         )
     }
