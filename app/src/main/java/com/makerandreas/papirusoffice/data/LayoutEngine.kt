@@ -92,8 +92,27 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
     private val paragraphLayoutCache = mutableMapOf<Int, ParagraphLayout>()
 
     // Simple text measurement system using default Android system sizes scaled
-    private val textPaint = Paint().apply {
-        isAntiAlias = true
+    private val textPaint: Paint? by lazy {
+        try {
+            Paint().apply { isAntiAlias = true }
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    private var fallbackTextSize: Float = 14f * 2.5f
+
+    private fun getPaintTextSize(): Float {
+        return textPaint?.textSize ?: fallbackTextSize
+    }
+
+    private fun setPaintTextSize(size: Float) {
+        textPaint?.let { it.textSize = size }
+        fallbackTextSize = size
+    }
+
+    private fun measureTextWidth(text: String): Float {
+        return textPaint?.measureText(text) ?: (text.length * 8.0f)
     }
 
     fun clearCache() {
@@ -114,7 +133,7 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         }
 
         val style = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
-        textPaint.textSize = style.fontSizeSp * 2.5f // rough dp-to-px scaling factor for virtual measuring
+        setPaintTextSize(style.fontSizeSp * 2.5f) // rough dp-to-px scaling factor for virtual measuring
 
         val words = paragraph.text.split(" ")
         val lines = mutableListOf<LineLayout>()
@@ -127,7 +146,7 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         for (word in words) {
             val spaceText = if (currentLineText.isNotEmpty()) " " else ""
             val testWord = spaceText + word
-            val wordWidth = textPaint.measureText(testWord)
+            val wordWidth = measureTextWidth(testWord)
 
             if (currentLineWidth + wordWidth > maxLineWidth && currentLineText.isNotEmpty()) {
                 val lineStr = currentLineText.toString()
@@ -136,15 +155,15 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
                         text = lineStr,
                         runs = paragraph.runs,
                         width = currentLineWidth,
-                        height = textPaint.textSize * 1.2f,
-                        baseline = textPaint.textSize,
+                        height = getPaintTextSize() * 1.2f,
+                        baseline = getPaintTextSize(),
                         startOffset = startCharOffset,
                         endOffset = startCharOffset + lineStr.length
                     )
                 )
                 startCharOffset += lineStr.length + 1
                 currentLineText = StringBuilder(word)
-                currentLineWidth = textPaint.measureText(word)
+                currentLineWidth = measureTextWidth(word)
             } else {
                 currentLineText.append(testWord)
                 currentLineWidth += wordWidth
@@ -158,8 +177,8 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
                     text = lineStr,
                     runs = paragraph.runs,
                     width = currentLineWidth,
-                    height = textPaint.textSize * 1.2f,
-                    baseline = textPaint.textSize,
+                    height = getPaintTextSize() * 1.2f,
+                    baseline = getPaintTextSize(),
                     startOffset = startCharOffset,
                     endOffset = startCharOffset + lineStr.length
                 )
@@ -176,7 +195,7 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
             paragraphIndex = paragraphIndex,
             lines = lines,
             width = pageWidthDp - 80f, // minus margin
-            height = max(totalHeight, textPaint.textSize * 1.5f),
+            height = max(totalHeight, getPaintTextSize() * 1.5f),
             boundingBox = OfficeRect(0f, 0f, pageWidthDp - 80f, totalHeight)
         )
 
