@@ -250,6 +250,8 @@ fun PapirusOfficeOptionsScreen(
                     val headerTitle = when {
                         activeSubSubpage == "auto_recovery" -> "Save Auto Recovery Options"
                         activeSubSubpage == "backup_copies" -> "Always Create Backup Copy"
+                        activeSubSubpage == "double_tap_fold" -> "Double Tap to Fold Outline"
+                        activeSubpage?.id == "inky_view" -> "Inky: View"
                         activeSubpage != null -> activeSubpage!!.title
                         else -> "Papirus Office Options"
                     }
@@ -450,7 +452,10 @@ fun PapirusOfficeOptionsScreen(
                                 SecuritySettingCard(context = context)
                             }
                             "inky_view" -> {
-                                InkyViewSettingsSubpage()
+                                InkyViewSettingsSubpage(
+                                    activeSubSubpage = activeSubSubpage,
+                                    onNavigateSubSubpage = { activeSubSubpage = it }
+                                )
                             }
                             else -> {
                                 // Default Empty / Placeholder Subpage Card
@@ -466,6 +471,18 @@ fun PapirusOfficeOptionsScreen(
     // Contextual Help Dialog
     if (showHelpDialog) {
         val (helpTitle, helpBody) = when {
+            activeSubpage?.id == "inky_view" -> {
+                when (activeSubSubpage) {
+                    "double_tap_fold" -> Pair(
+                        "Help: Double Tap to Fold Outline",
+                        "Double-tap any heading in the document to instantly collapse or expand all content underneath it, including text, images, tables, and frames. Enabling 'Include sub-levels' will also collapse lower-level subheadings."
+                    )
+                    else -> Pair(
+                        "Help: Inky View Options",
+                        "This page allows you to control how document elements (images, tables, drawings, comments, hidden text, and helplines) and zoom levels are displayed in the Inky Writer editor."
+                    )
+                }
+            }
             activeSubpage?.id == "load_save_general" -> {
                 when (activeSubSubpage) {
                     "auto_recovery" -> Pair(

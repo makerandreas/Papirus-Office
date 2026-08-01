@@ -377,6 +377,10 @@ fun InkyModule(
     var showSetReminderDialog by remember { mutableStateOf(false) }
     var reminderNoteText by remember { mutableStateOf("") }
 
+    // Navigate By state
+    var selectedNavigateBy by remember { mutableStateOf("Pengingat") }
+    var showNavigateByMenu by remember { mutableStateOf(false) }
+
     val pagesList = remember(docBodyText.text) {
         partitionTextToPages(docBodyText.text)
     }
@@ -1986,39 +1990,100 @@ fun InkyModule(
                                 .testTag("btn_page_indicator")
                         )
 
-                        // Reminders navigation if there are any reminders
-                        val remindersList = reminderManager.getReminders()
-                        if (remindersList.isNotEmpty()) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                IconButton(
-                                    onClick = {
-                                        val prev = reminderManager.previousReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
-                                        if (prev != null) {
-                                            layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
-                                                elementIndex = prev.paragraphIndex,
-                                                paragraphIndex = prev.paragraphIndex,
-                                                runIndex = 0,
-                                                offset = prev.offset
-                                            )
-                                            // Scroll to position
-                                            val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
-                                            val pages = layoutEngine.performLayout(displayDoc).pages
-                                            val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
-                                                page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
-                                                    elem.paragraphLayout?.paragraphIndex == prev.paragraphIndex
-                                                }
-                                            }
-                                            documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
-                                            Toast.makeText(context, "Navigated to reminder: ${prev.note}", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    modifier = Modifier.size(24.dp).testTag("btn_prev_reminder")
+                        // Navigate By dropdown & navigation buttons
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clickable { showNavigateByMenu = true }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .testTag("dropdown_navigate_by")
                                 ) {
-                                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev Reminder", modifier = Modifier.size(16.dp))
+                                    Text(
+                                        text = "Navigate By: $selectedNavigateBy",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Navigate By Menu",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
+
+                                DropdownMenu(
+                                    expanded = showNavigateByMenu,
+                                    onDismissRequest = { showNavigateByMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("Page") },
+                                        onClick = {
+                                            selectedNavigateBy = "Page"
+                                            showNavigateByMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Heading") },
+                                        onClick = {
+                                            selectedNavigateBy = "Heading"
+                                            showNavigateByMenu = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Pengingat (Reminder)") },
+                                        onClick = {
+                                            selectedNavigateBy = "Pengingat"
+                                            showNavigateByMenu = false
+                                        }
+                                    )
+                                }
+                            }
+
+                            val remindersList = reminderManager.getReminders()
+
+                            IconButton(
+                                onClick = {
+                                    when (selectedNavigateBy) {
+                                        "Page" -> documentNavigator.previousPage()
+                                        "Heading" -> {
+                                            Toast.makeText(context, "Navigating to previous heading", Toast.LENGTH_SHORT).show()
+                                        }
+                                        "Pengingat", "Reminder" -> {
+                                            val prev = reminderManager.previousReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
+                                            if (prev != null) {
+                                                layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
+                                                    elementIndex = prev.paragraphIndex,
+                                                    paragraphIndex = prev.paragraphIndex,
+                                                    runIndex = 0,
+                                                    offset = prev.offset
+                                                )
+                                                val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
+                                                val pages = layoutEngine.performLayout(displayDoc).pages
+                                                val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
+                                                    page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
+                                                        elem.paragraphLayout?.paragraphIndex == prev.paragraphIndex
+                                                    }
+                                                }
+                                                documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
+                                                Toast.makeText(context, "Navigated to reminder: ${prev.note}", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "No previous reminder set", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(24.dp).testTag("btn_prev_nav")
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous Item", modifier = Modifier.size(16.dp))
+                            }
+
+                            if (selectedNavigateBy == "Pengingat" || selectedNavigateBy == "Reminder") {
                                 Icon(Icons.Default.AddAlert, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                                 Text(
                                     text = "${remindersList.size}/5",
@@ -2026,32 +2091,42 @@ fun InkyModule(
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
-                                IconButton(
-                                    onClick = {
-                                        val next = reminderManager.nextReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
-                                        if (next != null) {
-                                            layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
-                                                elementIndex = next.paragraphIndex,
-                                                paragraphIndex = next.paragraphIndex,
-                                                runIndex = 0,
-                                                offset = next.offset
-                                            )
-                                            // Scroll to position
-                                            val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
-                                            val pages = layoutEngine.performLayout(displayDoc).pages
-                                            val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
-                                                page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
-                                                    elem.paragraphLayout?.paragraphIndex == next.paragraphIndex
-                                                }
-                                            }
-                                            documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
-                                            Toast.makeText(context, "Navigated to reminder: ${next.note}", Toast.LENGTH_SHORT).show()
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    when (selectedNavigateBy) {
+                                        "Page" -> documentNavigator.nextPage()
+                                        "Heading" -> {
+                                            Toast.makeText(context, "Navigating to next heading", Toast.LENGTH_SHORT).show()
                                         }
-                                    },
-                                    modifier = Modifier.size(24.dp).testTag("btn_next_reminder")
-                                ) {
-                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Reminder", modifier = Modifier.size(16.dp))
-                                }
+                                        "Pengingat", "Reminder" -> {
+                                            val next = reminderManager.nextReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
+                                            if (next != null) {
+                                                layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
+                                                    elementIndex = next.paragraphIndex,
+                                                    paragraphIndex = next.paragraphIndex,
+                                                    runIndex = 0,
+                                                    offset = next.offset
+                                                )
+                                                val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
+                                                val pages = layoutEngine.performLayout(displayDoc).pages
+                                                val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
+                                                    page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
+                                                        elem.paragraphLayout?.paragraphIndex == next.paragraphIndex
+                                                    }
+                                                }
+                                                documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
+                                                Toast.makeText(context, "Navigated to reminder: ${next.note}", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "No next reminder set", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(24.dp).testTag("btn_next_nav")
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Item", modifier = Modifier.size(16.dp))
                             }
                         }
 
@@ -3262,19 +3337,18 @@ fun InkyModule(
     if (showGoToPageDialog) {
         AlertDialog(
             onDismissRequest = { showGoToPageDialog = false },
-            title = { Text("Go to Page") },
+            title = { Text("Go to...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text("Enter a page number between 1 and $totalDocPages to navigate immediately.", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = targetPageText,
-                        onValueChange = { 
-                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                targetPageText = it
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.all { char -> char.isDigit() }) {
+                                targetPageText = input
                             }
                         },
-                        label = { Text("Page Number") },
+                        placeholder = { Text("Type page number here (max. $totalDocPages)") },
+                        singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
                             imeAction = androidx.compose.ui.text.input.ImeAction.Done
@@ -3307,12 +3381,15 @@ fun InkyModule(
                     },
                     modifier = Modifier.testTag("btn_confirm_go_to_page")
                 ) {
-                    Text("Go")
+                    Text("Go to")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showGoToPageDialog = false }) {
-                    Text("Cancel")
+                TextButton(
+                    onClick = { showGoToPageDialog = false },
+                    modifier = Modifier.testTag("btn_close_go_to_page")
+                ) {
+                    Text("Close")
                 }
             }
         )

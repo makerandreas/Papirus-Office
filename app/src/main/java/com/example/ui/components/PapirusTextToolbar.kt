@@ -391,6 +391,17 @@ class PapirusTextToolbar : TextToolbar {
                                             onClick = { mode = FctMode.SYNONYMS }
                                         )
                                     }
+
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+                                    FctMenuItem(
+                                        icon = Icons.Default.BookmarkAdd,
+                                        label = "Set Reminder",
+                                        onClick = {
+                                            hide()
+                                            onSetReminderClick()
+                                        }
+                                    )
                                 }
                             }
 
