@@ -185,4 +185,44 @@ class DocumentEnginesUnitTest {
         para = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
         assertEquals("Hello World", para.paragraph.text)
     }
+
+    @Test
+    fun testOutlineFoldingAndReminders() {
+        val heading = OfficeParagraph(text = "Intro", styleName = "Heading 1")
+        val p1 = OfficeParagraph(text = "Nested text under heading", styleName = "Normal")
+        val doc = OfficeDocument(
+            body = DocumentBody(elements = listOf(
+                OfficeDocElement.ParagraphElement(heading),
+                OfficeDocElement.ParagraphElement(p1)
+            ))
+        )
+        val outlineEngine = OutlineEngineImpl()
+        outlineEngine.buildOutline(doc)
+        
+        // Element index 1 is the child paragraph of heading at index 0
+        assertFalse(outlineEngine.isElementHidden(1))
+        
+        outlineEngine.toggle(0)
+        assertTrue(outlineEngine.isElementHidden(1))
+        
+        outlineEngine.toggle(0)
+        assertFalse(outlineEngine.isElementHidden(1))
+        
+        val reminderManager = ReminderManager()
+        assertTrue(reminderManager.getReminders().isEmpty())
+        
+        reminderManager.setReminder(1, 10, "Review intro")
+        val reminders = reminderManager.getReminders()
+        assertEquals(1, reminders.size)
+        assertEquals("Review intro", reminders[0].note)
+        
+        // Navigation previous/next
+        val next = reminderManager.nextReminder(1, 5)
+        assertNotNull(next)
+        assertEquals(10, next?.offset)
+        
+        val prev = reminderManager.previousReminder(1, 15)
+        assertNotNull(prev)
+        assertEquals(10, prev?.offset)
+    }
 }

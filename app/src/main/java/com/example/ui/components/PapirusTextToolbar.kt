@@ -103,7 +103,8 @@ class PapirusTextToolbar : TextToolbar {
         onGenerateTextClick: () -> Unit = {},
         onProofreadClick: () -> Unit = {},
         onTranslateClick: () -> Unit = {},
-        onRewriteClick: (style: String) -> Unit = {}
+        onRewriteClick: (style: String) -> Unit = {},
+        onSetReminderClick: () -> Unit = {}
     ) {
         if (statusState == TextToolbarStatus.Shown) {
             var mode by remember { mutableStateOf(FctMode.COMPACT) }
@@ -293,6 +294,16 @@ class PapirusTextToolbar : TextToolbar {
                                         onClick = {
                                             hide()
                                             onSectionOptionsClick()
+                                        }
+                                    )
+
+                                    // Set Reminder
+                                    FctMenuItem(
+                                        icon = Icons.Default.AddAlert,
+                                        label = "Set Reminder",
+                                        onClick = {
+                                            hide()
+                                            onSetReminderClick()
                                         }
                                     )
 

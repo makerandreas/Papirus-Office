@@ -449,6 +449,9 @@ fun PapirusOfficeOptionsScreen(
                             "security" -> {
                                 SecuritySettingCard(context = context)
                             }
+                            "inky_view" -> {
+                                InkyViewSettingsSubpage()
+                            }
                             else -> {
                                 // Default Empty / Placeholder Subpage Card
                                 EmptySubpageCard(subpage = subpage)

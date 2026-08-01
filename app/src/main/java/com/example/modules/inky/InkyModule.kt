@@ -135,6 +135,8 @@ fun InkyModule(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val preferencesRepository = remember { com.makerandreas.papirusoffice.data.InkyPreferencesRepository(context) }
+    val viewOptions by preferencesRepository.viewOptionsFlow.collectAsState(initial = com.makerandreas.papirusoffice.data.InkyViewOptions())
     val scrollState = rememberScrollState()
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
@@ -195,6 +197,29 @@ fun InkyModule(
 
     // Zoom and dynamic typing states
     var zoomScale by remember { mutableStateOf(1.0f) }
+
+    LaunchedEffect(viewOptions) {
+        val calculated = when (viewOptions.zoomMode) {
+            com.makerandreas.papirusoffice.data.ZoomMode.HUNDRED -> 1.0f
+            com.makerandreas.papirusoffice.data.ZoomMode.FIT_WIDTH -> 1.35f
+            com.makerandreas.papirusoffice.data.ZoomMode.CUSTOM -> viewOptions.customZoomPercent.toFloat() / 100f
+            com.makerandreas.papirusoffice.data.ZoomMode.LAST -> 1.15f
+        }
+        if (Math.abs(zoomScale - calculated) > 0.01f) {
+            zoomScale = calculated
+        }
+    }
+
+    LaunchedEffect(zoomScale) {
+        val calculatedPercent = (zoomScale * 100).toInt().coerceIn(25, 400)
+        if (calculatedPercent != viewOptions.customZoomPercent) {
+            preferencesRepository.updateCustomZoomPercent(calculatedPercent)
+            if (viewOptions.zoomMode != com.makerandreas.papirusoffice.data.ZoomMode.CUSTOM) {
+                preferencesRepository.updateZoomMode(com.makerandreas.papirusoffice.data.ZoomMode.CUSTOM)
+            }
+        }
+    }
+
     var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
 
     val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
@@ -340,11 +365,23 @@ fun InkyModule(
         }
     }
 
+    val outlineEngine = remember { com.makerandreas.papirusoffice.data.OutlineEngineImpl() }
+    val reminderManager = remember { com.makerandreas.papirusoffice.data.ReminderManager() }
+    val layoutEngine = remember { com.makerandreas.papirusoffice.data.LayoutEngine() }
+
+    // Go to Page Dialog state
+    var showGoToPageDialog by remember { mutableStateOf(false) }
+    var targetPageText by remember { mutableStateOf("") }
+
+    // Set Reminder Dialog state
+    var showSetReminderDialog by remember { mutableStateOf(false) }
+    var reminderNoteText by remember { mutableStateOf("") }
+
     val pagesList = remember(docBodyText.text) {
         partitionTextToPages(docBodyText.text)
     }
 
-    val pageCount = remember(pagesList) {
+    val totalDocPages = remember(pagesList) {
         pagesList.size
     }
 
@@ -360,13 +397,31 @@ fun InkyModule(
         }
     }
 
-    val currentPage = remember(wordsBeforeCursor, wordCount, pageCount) {
-        if (wordCount == 0 || pageCount <= 1) {
+    val currentDocPage = remember(wordsBeforeCursor, wordCount, totalDocPages) {
+        if (wordCount == 0 || totalDocPages <= 1) {
             1
         } else {
             val ratio = wordsBeforeCursor.toFloat() / wordCount.toFloat()
-            val page = (ratio * pageCount).toInt() + 1
-            page.coerceIn(1, pageCount)
+            val page = (ratio * totalDocPages).toInt() + 1
+            page.coerceIn(1, totalDocPages)
+        }
+    }
+
+    val documentNavigator = remember(scrollState, totalDocPages, viewOptions) {
+        object : com.makerandreas.papirusoffice.data.DocumentNavigator {
+            override fun goToPage(page: Int) {
+                coroutineScope.launch {
+                    val ratio = (page - 1).toFloat() / totalDocPages.coerceAtLeast(1).toFloat()
+                    val targetScroll = (ratio * scrollState.maxValue).toInt()
+                    if (viewOptions.enableSmoothScrolling) {
+                        scrollState.animateScrollTo(targetScroll)
+                    } else {
+                        scrollState.scrollTo(targetScroll)
+                    }
+                }
+            }
+            override fun currentPage(): Int = currentDocPage
+            override fun pageCount(): Int = totalDocPages
         }
     }
 
@@ -1085,6 +1140,10 @@ fun InkyModule(
                         } else if (event.key == androidx.compose.ui.input.key.Key.N) {
                             handleNewDocument()
                             true
+                        } else if (event.key == androidx.compose.ui.input.key.Key.G) {
+                            targetPageText = currentDocPage.toString()
+                            showGoToPageDialog = true
+                            true
                         } else if (event.key == androidx.compose.ui.input.key.Key.O) {
                             handleOpenDocument()
                             true
@@ -1575,7 +1634,11 @@ fun InkyModule(
                                     zoomScale = zoomScale,
                                     isEditMode = false,
                                     cursor = layoutCursor,
-                                    onCursorChange = { layoutCursor = it }
+                                    onCursorChange = { layoutCursor = it },
+                                    outlineEngine = outlineEngine,
+                                    enableOutlineFolding = viewOptions.enableOutlineFolding,
+                                    showImages = viewOptions.showImages,
+                                    showTables = viewOptions.showTables
                                 )
 
                                 if (docxImages.isNotEmpty()) {
@@ -1910,11 +1973,88 @@ fun InkyModule(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Page $currentPage of $pageCount",
+                            text = "Page $currentDocPage of $totalDocPages",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable {
+                                    targetPageText = currentDocPage.toString()
+                                    showGoToPageDialog = true
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .testTag("btn_page_indicator")
                         )
+
+                        // Reminders navigation if there are any reminders
+                        val remindersList = reminderManager.getReminders()
+                        if (remindersList.isNotEmpty()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(
+                                    onClick = {
+                                        val prev = reminderManager.previousReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
+                                        if (prev != null) {
+                                            layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
+                                                elementIndex = prev.paragraphIndex,
+                                                paragraphIndex = prev.paragraphIndex,
+                                                runIndex = 0,
+                                                offset = prev.offset
+                                            )
+                                            // Scroll to position
+                                            val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
+                                            val pages = layoutEngine.performLayout(displayDoc).pages
+                                            val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
+                                                page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
+                                                    elem.paragraphLayout?.paragraphIndex == prev.paragraphIndex
+                                                }
+                                            }
+                                            documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
+                                            Toast.makeText(context, "Navigated to reminder: ${prev.note}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.size(24.dp).testTag("btn_prev_reminder")
+                                ) {
+                                    Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Prev Reminder", modifier = Modifier.size(16.dp))
+                                }
+                                Icon(Icons.Default.AddAlert, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                                Text(
+                                    text = "${remindersList.size}/5",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val next = reminderManager.nextReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
+                                        if (next != null) {
+                                            layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
+                                                elementIndex = next.paragraphIndex,
+                                                paragraphIndex = next.paragraphIndex,
+                                                runIndex = 0,
+                                                offset = next.offset
+                                            )
+                                            // Scroll to position
+                                            val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
+                                            val pages = layoutEngine.performLayout(displayDoc).pages
+                                            val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
+                                                page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
+                                                    elem.paragraphLayout?.paragraphIndex == next.paragraphIndex
+                                                }
+                                            }
+                                            documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
+                                            Toast.makeText(context, "Navigated to reminder: ${next.note}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.size(24.dp).testTag("btn_next_reminder")
+                                ) {
+                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Reminder", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+
                         Text(
                             text = "$wordCount words",
                             fontSize = 11.sp,
@@ -3094,6 +3234,9 @@ fun InkyModule(
             val sample = if (selectedTextSnippet.isNotEmpty()) selectedTextSnippet else docBodyText.text.take(200)
             aiPrompt = "Rewrite the following text in $style style: \"$sample\""
             showAiAssistant = true
+        },
+        onSetReminderClick = {
+            showSetReminderDialog = true
         }
     )
 
@@ -3112,6 +3255,105 @@ fun InkyModule(
                 )
                 isSaved = false
                 Toast.makeText(context, "Text inserted from Gemini Copilot!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showGoToPageDialog) {
+        AlertDialog(
+            onDismissRequest = { showGoToPageDialog = false },
+            title = { Text("Go to Page") },
+            text = {
+                Column {
+                    Text("Enter a page number between 1 and $totalDocPages to navigate immediately.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = targetPageText,
+                        onValueChange = { 
+                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                targetPageText = it
+                            }
+                        },
+                        label = { Text("Page Number") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = {
+                                val p = targetPageText.toIntOrNull()
+                                if (p != null && p in 1..totalDocPages) {
+                                    documentNavigator.goToPage(p)
+                                    showGoToPageDialog = false
+                                } else {
+                                    Toast.makeText(context, "Invalid page number. Must be between 1 and $totalDocPages", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ),
+                        modifier = Modifier.fillMaxWidth().testTag("input_go_to_page")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val p = targetPageText.toIntOrNull()
+                        if (p != null && p in 1..totalDocPages) {
+                            documentNavigator.goToPage(p)
+                            showGoToPageDialog = false
+                        } else {
+                            Toast.makeText(context, "Please enter a valid page number (1-$totalDocPages)", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_confirm_go_to_page")
+                ) {
+                    Text("Go")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGoToPageDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showSetReminderDialog) {
+        AlertDialog(
+            onDismissRequest = { showSetReminderDialog = false },
+            title = { Text("Set Document Reminder") },
+            text = {
+                Column {
+                    Text("Add an in-memory reminder at the current cursor position. Up to 5 reminders are kept.", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = reminderNoteText,
+                        onValueChange = { reminderNoteText = it },
+                        label = { Text("Reminder note") },
+                        placeholder = { Text("e.g. Check spelling here") },
+                        modifier = Modifier.fillMaxWidth().testTag("input_reminder_note")
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cursorPara = layoutCursor.paragraphIndex
+                        val cursorOffset = layoutCursor.offset
+                        reminderManager.setReminder(cursorPara, cursorOffset, reminderNoteText)
+                        reminderNoteText = ""
+                        showSetReminderDialog = false
+                        Toast.makeText(context, "Reminder set at paragraph $cursorPara", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.testTag("btn_save_reminder")
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSetReminderDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }

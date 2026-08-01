@@ -207,7 +207,13 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
      * PAGINATION ENGINE (Phase 5)
      * Fits elements nicely across multiple pages
      */
-    fun performLayout(document: OfficeDocument, forceRebuildAll: Boolean = false): DocumentLayoutResult {
+    fun performLayout(
+        document: OfficeDocument,
+        outlineEngine: OutlineEngine? = null,
+        showImages: Boolean = true,
+        showTables: Boolean = true,
+        forceRebuildAll: Boolean = false
+    ): DocumentLayoutResult {
         if (forceRebuildAll) {
             clearCache()
         }
@@ -221,6 +227,16 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         val rawElements = document.body.elements
 
         rawElements.forEachIndexed { index, element ->
+            if (outlineEngine != null && outlineEngine.isElementHidden(index)) {
+                return@forEachIndexed
+            }
+            if (!showImages && (element is OfficeDocElement.ImageElement || element is OfficeImage)) {
+                return@forEachIndexed
+            }
+            if (!showTables && (element is OfficeDocElement.TableElement || element is OfficeTable)) {
+                return@forEachIndexed
+            }
+
             when (element) {
                 is OfficeDocElement.ParagraphElement -> {
                     val pLayout = layoutParagraph(index, element.paragraph, document.styles, forceRebuildAll)

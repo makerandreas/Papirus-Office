@@ -31,10 +31,22 @@ fun LayoutDrivenDocumentRenderer(
     isEditMode: Boolean,
     cursor: DocumentCursor,
     onCursorChange: (DocumentCursor) -> Unit,
+    outlineEngine: OutlineEngine? = null,
+    enableOutlineFolding: Boolean = true,
+    showImages: Boolean = true,
+    showTables: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    var layoutTrigger by remember { mutableStateOf(0) }
     val layoutEngine = remember { LayoutEngine() }
-    val layoutResult = remember(document) { layoutEngine.performLayout(document) }
+    val layoutResult = remember(document, layoutTrigger, showImages, showTables, enableOutlineFolding) {
+        layoutEngine.performLayout(
+            document = document,
+            outlineEngine = if (enableOutlineFolding) outlineEngine else null,
+            showImages = showImages,
+            showTables = showTables
+        )
+    }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -96,6 +108,21 @@ fun LayoutDrivenDocumentRenderer(
                                 val p = element.paragraph
                                 val isCurrentPara = cursor.paragraphIndex == elemLayout.paragraphLayout?.paragraphIndex
 
+                                val isHeading = p.styleName?.contains("Heading") == true
+                                val headingModifier = if (isHeading && enableOutlineFolding && outlineEngine != null) {
+                                    Modifier.pointerInput(p) {
+                                        detectTapGestures(
+                                            onDoubleTap = {
+                                                val pIdx = elemLayout.paragraphLayout?.paragraphIndex
+                                                if (pIdx != null) {
+                                                    outlineEngine.toggle(pIdx)
+                                                    layoutTrigger++
+                                                }
+                                            }
+                                        )
+                                    }
+                                } else Modifier
+
                                 Text(
                                     text = if (isCurrentPara && isEditMode) {
                                         // Simple caret visualization inside paragraph
@@ -106,14 +133,14 @@ fun LayoutDrivenDocumentRenderer(
                                     lineHeight = (18 * zoomScale).sp,
                                     color = Color.Black,
                                     fontFamily = FontFamily.Default,
-                                    fontWeight = if (p.styleName?.contains("Heading") == true) FontWeight.Bold else FontWeight.Normal,
+                                    fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
                                     textAlign = when (p.alignment) {
                                         "Center" -> TextAlign.Center
                                         "Right" -> TextAlign.Right
                                         "Justify" -> TextAlign.Justify
                                         else -> TextAlign.Left
                                     },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth().then(headingModifier)
                                 )
                             }
                             is OfficeDocElement.TableElement -> {
