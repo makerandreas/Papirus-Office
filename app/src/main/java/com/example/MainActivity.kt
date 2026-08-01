@@ -147,8 +147,12 @@ class MainActivity : ComponentActivity() {
         )
 
         // Schedule periodic Room cache cleanup worker
-        com.makerandreas.papirusoffice.data.cache.DocumentCacheCleanupWorker.schedulePeriodicCleanup(this)
-        com.makerandreas.papirusoffice.data.worker.PapirusWorkScheduler.schedulePeriodicCacheCleanup(this)
+        try {
+            com.makerandreas.papirusoffice.data.cache.DocumentCacheCleanupWorker.schedulePeriodicCleanup(this)
+            com.makerandreas.papirusoffice.data.worker.PapirusWorkScheduler.schedulePeriodicCacheCleanup(this)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "WorkScheduler initialization skipped/failed: ${e.message}")
+        }
 
         enableEdgeToEdge()
         setContent {

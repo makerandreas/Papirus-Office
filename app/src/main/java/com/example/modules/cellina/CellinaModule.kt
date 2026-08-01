@@ -1700,25 +1700,31 @@ fun CellinaModule(
         if (showUnsavedChangesDialog) {
             AlertDialog(
                 onDismissRequest = { showUnsavedChangesDialog = false },
-                title = { Text(stringResource(R.string.unsaved_changes_title), style = MaterialTheme.typography.headlineSmall) },
+                title = { Text(stringResource(R.string.unsaved_changes_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                 text = { Text(stringResource(R.string.unsaved_changes_msg, docTitle), style = MaterialTheme.typography.bodyMedium) },
                 confirmButton = {
-                    TextButton(onClick = {
-                        showUnsavedChangesDialog = false
-                        performSaveWithPopup(docTitle, false) {
-                            pendingActionAfterSave?.invoke()
-                            pendingActionAfterSave = null
-                        }
-                    }) {
+                    Button(
+                        onClick = {
+                            showUnsavedChangesDialog = false
+                            performSaveWithPopup(docTitle, false) {
+                                pendingActionAfterSave?.invoke()
+                                pendingActionAfterSave = null
+                            }
+                        },
+                        modifier = Modifier.testTag("btn_unsaved_save_cellina")
+                    ) {
                         Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = {
-                        showUnsavedChangesDialog = false
-                        pendingActionAfterSave?.invoke()
-                        pendingActionAfterSave = null
-                    }) {
+                    OutlinedButton(
+                        onClick = {
+                            showUnsavedChangesDialog = false
+                            pendingActionAfterSave?.invoke()
+                            pendingActionAfterSave = null
+                        },
+                        modifier = Modifier.testTag("btn_unsaved_dont_save_cellina")
+                    ) {
                         Text(stringResource(R.string.dont_save), color = MaterialTheme.colorScheme.error)
                     }
                 }

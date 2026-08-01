@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.ai.GeminiAiService
@@ -261,6 +262,8 @@ fun PapirusOfficeOptionsScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -531,7 +534,6 @@ fun PapirusOfficeOptionsScreen(
     if (showResetWarningDialog) {
         AlertDialog(
             onDismissRequest = { showResetWarningDialog = false },
-            icon = { Icon(Icons.Rounded.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
             title = { Text(stringResource(R.string.reset_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
@@ -540,28 +542,35 @@ fun PapirusOfficeOptionsScreen(
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showResetWarningDialog = false
                         showResetRestartDialog = true
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    modifier = Modifier.testTag("btn_reset_confirm")
                 ) {
                     Text(
                         text = stringResource(R.string.reset_confirm_btn),
-                        color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetWarningDialog = false }) {
+                OutlinedButton(
+                    onClick = { showResetWarningDialog = false },
+                    modifier = Modifier.testTag("btn_reset_cancel")
+                ) {
                     Text(stringResource(R.string.reset_cancel_btn))
                 }
             }
         )
     }
 
-    // Popup 2: Restart Required Dialog (Standardized UI to match Popup 1)
+    // Popup 2: Restart Required Dialog
     if (showResetRestartDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -570,7 +579,6 @@ fun PapirusOfficeOptionsScreen(
                 Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                 onCloseOptions()
             },
-            icon = { Icon(Icons.Rounded.RestartAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text(stringResource(R.string.restart_dialog_title), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
@@ -579,27 +587,28 @@ fun PapirusOfficeOptionsScreen(
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showResetRestartDialog = false
                         PapirusConfigManager.performReset(context, restartNow = true)
-                    }
+                    },
+                    modifier = Modifier.testTag("btn_restart_now")
                 ) {
                     Text(
                         text = stringResource(R.string.restart_now_btn),
-                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
                 }
             },
             dismissButton = {
-                TextButton(
+                OutlinedButton(
                     onClick = {
                         showResetRestartDialog = false
                         PapirusConfigManager.performReset(context, restartNow = false)
                         Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                         onCloseOptions()
-                    }
+                    },
+                    modifier = Modifier.testTag("btn_restart_later")
                 ) {
                     Text(stringResource(R.string.restart_later_btn))
                 }

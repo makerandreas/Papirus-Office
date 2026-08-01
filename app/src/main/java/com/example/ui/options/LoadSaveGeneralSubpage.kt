@@ -89,7 +89,10 @@ fun LoadSaveGeneralSubpage(
                     // Top Expressive Card Container for the primary option
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -103,7 +106,7 @@ fun LoadSaveGeneralSubpage(
                                 text = stringResource(R.string.save_auto_recovery_title),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.weight(1f)
                             )
                             Switch(
@@ -112,12 +115,20 @@ fun LoadSaveGeneralSubpage(
                                     autoRecoveryEnabled = it
                                     PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_enabled", it)
                                 },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
                                 modifier = Modifier.testTag("switch_top_auto_recovery")
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    val isAutoRecoveryEnabled = autoRecoveryEnabled
+                    val textColor = if (isAutoRecoveryEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    val subtitleColor = if (isAutoRecoveryEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
 
                     Column(
                         modifier = Modifier
@@ -129,7 +140,7 @@ fun LoadSaveGeneralSubpage(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = isAutoRecoveryEnabled) {
                                     tempIntervalText = autoRecoveryInterval.toString()
                                     showIntervalDialog = true
                                 }
@@ -141,12 +152,12 @@ fun LoadSaveGeneralSubpage(
                                     text = stringResource(R.string.save_every),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = textColor
                                 )
                                 Text(
                                     text = stringResource(R.string.save_every_minutes, autoRecoveryInterval),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = subtitleColor
                                 )
                             }
                         }
@@ -168,11 +179,12 @@ fun LoadSaveGeneralSubpage(
                                 text = stringResource(R.string.auto_save_doc_too),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = textColor,
                                 modifier = Modifier.weight(1f)
                             )
                             Switch(
-                                checked = autoSaveDocumentToo,
+                                checked = autoSaveDocumentToo && isAutoRecoveryEnabled,
+                                enabled = isAutoRecoveryEnabled,
                                 onCheckedChange = {
                                     autoSaveDocumentToo = it
                                     PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_save_document_too", it)
@@ -190,7 +202,10 @@ fun LoadSaveGeneralSubpage(
                     // Top Expressive Card Container for the primary option
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -204,7 +219,7 @@ fun LoadSaveGeneralSubpage(
                                 text = stringResource(R.string.always_create_backup_copy),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.weight(1f)
                             )
                             Switch(
@@ -213,12 +228,19 @@ fun LoadSaveGeneralSubpage(
                                     alwaysCreateBackupCopy = it
                                     PapirusConfigManager.saveValue(context, "LoadAndSave", "always_create_backup_copy", it)
                                 },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
                                 modifier = Modifier.testTag("switch_top_backup_copy")
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    val isBackupEnabled = alwaysCreateBackupCopy
+                    val textColor = if (isBackupEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
 
                     Column(
                         modifier = Modifier
@@ -237,11 +259,12 @@ fun LoadSaveGeneralSubpage(
                                 text = stringResource(R.string.place_backup_same_folder),
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = textColor,
                                 modifier = Modifier.weight(1f)
                             )
                             Switch(
-                                checked = placeBackupInSameFolder,
+                                checked = placeBackupInSameFolder && isBackupEnabled,
+                                enabled = isBackupEnabled,
                                 onCheckedChange = {
                                     placeBackupInSameFolder = it
                                     PapirusConfigManager.saveValue(context, "LoadAndSave", "place_backup_in_same_folder", it)

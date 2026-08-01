@@ -377,10 +377,6 @@ fun InkyModule(
     var showSetReminderDialog by remember { mutableStateOf(false) }
     var reminderNoteText by remember { mutableStateOf("") }
 
-    // Navigate By state
-    var selectedNavigateBy by remember { mutableStateOf("Pengingat") }
-    var showNavigateByMenu by remember { mutableStateOf(false) }
-
     val pagesList = remember(docBodyText.text) {
         partitionTextToPages(docBodyText.text)
     }
@@ -1990,151 +1986,13 @@ fun InkyModule(
                                 .testTag("btn_page_indicator")
                         )
 
-                        // Navigate By dropdown & navigation buttons
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .clickable { showNavigateByMenu = true }
-                                        .padding(horizontal = 4.dp, vertical = 2.dp)
-                                        .testTag("dropdown_navigate_by")
-                                ) {
-                                    Text(
-                                        text = "Navigate By: $selectedNavigateBy",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = "Navigate By Menu",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-
-                                DropdownMenu(
-                                    expanded = showNavigateByMenu,
-                                    onDismissRequest = { showNavigateByMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Page") },
-                                        onClick = {
-                                            selectedNavigateBy = "Page"
-                                            showNavigateByMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Heading") },
-                                        onClick = {
-                                            selectedNavigateBy = "Heading"
-                                            showNavigateByMenu = false
-                                        }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Pengingat (Reminder)") },
-                                        onClick = {
-                                            selectedNavigateBy = "Pengingat"
-                                            showNavigateByMenu = false
-                                        }
-                                    )
-                                }
-                            }
-
-                            val remindersList = reminderManager.getReminders()
-
-                            IconButton(
-                                onClick = {
-                                    when (selectedNavigateBy) {
-                                        "Page" -> documentNavigator.previousPage()
-                                        "Heading" -> {
-                                            Toast.makeText(context, "Navigating to previous heading", Toast.LENGTH_SHORT).show()
-                                        }
-                                        "Pengingat", "Reminder" -> {
-                                            val prev = reminderManager.previousReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
-                                            if (prev != null) {
-                                                layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
-                                                    elementIndex = prev.paragraphIndex,
-                                                    paragraphIndex = prev.paragraphIndex,
-                                                    runIndex = 0,
-                                                    offset = prev.offset
-                                                )
-                                                val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
-                                                val pages = layoutEngine.performLayout(displayDoc).pages
-                                                val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
-                                                    page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
-                                                        elem.paragraphLayout?.paragraphIndex == prev.paragraphIndex
-                                                    }
-                                                }
-                                                documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
-                                                Toast.makeText(context, "Navigated to reminder: ${prev.note}", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "No previous reminder set", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.size(24.dp).testTag("btn_prev_nav")
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowLeft, contentDescription = "Previous Item", modifier = Modifier.size(16.dp))
-                            }
-
-                            if (selectedNavigateBy == "Pengingat" || selectedNavigateBy == "Reminder") {
-                                Icon(Icons.Default.AddAlert, contentDescription = "Reminders", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                                Text(
-                                    text = "${remindersList.size}/5",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    when (selectedNavigateBy) {
-                                        "Page" -> documentNavigator.nextPage()
-                                        "Heading" -> {
-                                            Toast.makeText(context, "Navigating to next heading", Toast.LENGTH_SHORT).show()
-                                        }
-                                        "Pengingat", "Reminder" -> {
-                                            val next = reminderManager.nextReminder(layoutCursor.paragraphIndex, layoutCursor.offset)
-                                            if (next != null) {
-                                                layoutCursor = com.makerandreas.papirusoffice.data.DocumentCursor(
-                                                    elementIndex = next.paragraphIndex,
-                                                    paragraphIndex = next.paragraphIndex,
-                                                    runIndex = 0,
-                                                    offset = next.offset
-                                                )
-                                                val displayDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument()
-                                                val pages = layoutEngine.performLayout(displayDoc).pages
-                                                val targetPage = pages.find { page: com.makerandreas.papirusoffice.data.PageLayout ->
-                                                    page.elements.any { elem: com.makerandreas.papirusoffice.data.PageElementLayout ->
-                                                        elem.paragraphLayout?.paragraphIndex == next.paragraphIndex
-                                                    }
-                                                }
-                                                documentNavigator.goToPage(targetPage?.pageNumber ?: 1)
-                                                Toast.makeText(context, "Navigated to reminder: ${next.note}", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                Toast.makeText(context, "No next reminder set", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.size(24.dp).testTag("btn_next_nav")
-                            ) {
-                                Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Next Item", modifier = Modifier.size(16.dp))
-                            }
-                        }
-
                         Text(
                             text = "$wordCount words",
                             fontSize = 11.sp,
-                            color = Color.Gray
+                            color = Color.Gray,
+                            modifier = Modifier.testTag("text_word_count")
                         )
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -2144,7 +2002,7 @@ fun InkyModule(
                                     customTextToolbar.hide()
                                     if (zoomScale > 0.5f) zoomScale -= 0.1f
                                 },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp).testTag("btn_zoom_out")
                             ) {
                                 Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
                             }
@@ -2152,17 +2010,20 @@ fun InkyModule(
                                 text = "Zoom: ${(zoomScale * 100).toInt()}%",
                                 fontSize = 11.sp,
                                 color = Color.Gray,
-                                modifier = Modifier.clickable {
-                                    customTextToolbar.hide()
-                                    zoomScale = 1.0f
-                                }
+                                modifier = Modifier
+                                    .clickable {
+                                        customTextToolbar.hide()
+                                        zoomScale = 1.0f
+                                    }
+                                    .padding(horizontal = 2.dp, vertical = 2.dp)
+                                    .testTag("text_zoom_percent")
                             )
                             IconButton(
                                 onClick = {
                                     customTextToolbar.hide()
                                     if (zoomScale < 2.0f) zoomScale += 0.1f
                                 },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp).testTag("btn_zoom_in")
                             ) {
                                 Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
                             }
@@ -3152,7 +3013,7 @@ fun InkyModule(
         AlertDialog(
             onDismissRequest = { showUnsavedChangesDialog = false },
             title = {
-                Text(stringResource(R.string.unsaved_changes_title), style = MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.unsaved_changes_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             },
             text = {
                 Text(
@@ -3161,22 +3022,28 @@ fun InkyModule(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showUnsavedChangesDialog = false
-                    performSaveWithPopup(docTitle, false) {
-                        pendingActionAfterSave?.invoke()
-                        pendingActionAfterSave = null
-                    }
-                }) {
+                Button(
+                    onClick = {
+                        showUnsavedChangesDialog = false
+                        performSaveWithPopup(docTitle, false) {
+                            pendingActionAfterSave?.invoke()
+                            pendingActionAfterSave = null
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_unsaved_save")
+                ) {
                     Text(stringResource(R.string.save), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showUnsavedChangesDialog = false
-                    pendingActionAfterSave?.invoke()
-                    pendingActionAfterSave = null
-                }) {
+                OutlinedButton(
+                    onClick = {
+                        showUnsavedChangesDialog = false
+                        pendingActionAfterSave?.invoke()
+                        pendingActionAfterSave = null
+                    },
+                    modifier = Modifier.testTag("btn_unsaved_dont_save")
+                ) {
                     Text(stringResource(R.string.dont_save), color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -3381,15 +3248,15 @@ fun InkyModule(
                     },
                     modifier = Modifier.testTag("btn_confirm_go_to_page")
                 ) {
-                    Text("Go to")
+                    Text("Go to", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                TextButton(
+                OutlinedButton(
                     onClick = { showGoToPageDialog = false },
                     modifier = Modifier.testTag("btn_close_go_to_page")
                 ) {
-                    Text("Close")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -4460,7 +4327,10 @@ fun OpenDocumentDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismissRequest) {
+                    OutlinedButton(
+                        onClick = onDismissRequest,
+                        modifier = Modifier.testTag("btn_open_doc_cancel")
+                    ) {
                         Text(stringResource(R.string.cancel))
                     }
                     Spacer(modifier = Modifier.width(12.dp))

@@ -61,7 +61,7 @@ fun SaveAsDialog(
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showNonOdfWarning = false
                         onConfirmSave("Microsoft Office", ooxmlExt, ooxmlMime)
@@ -72,7 +72,7 @@ fun SaveAsDialog(
                 }
             },
             dismissButton = {
-                TextButton(
+                OutlinedButton(
                     onClick = {
                         showNonOdfWarning = false
                     },
@@ -231,7 +231,7 @@ fun SaveAsDialog(
                 }
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         if (selectedFormatOption == "Microsoft Office" && warnNonOdf) {
                             showNonOdfWarning = true
@@ -250,7 +250,7 @@ fun SaveAsDialog(
                 }
             },
             dismissButton = {
-                TextButton(
+                OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.testTag("btn_save_as_cancel")
                 ) {

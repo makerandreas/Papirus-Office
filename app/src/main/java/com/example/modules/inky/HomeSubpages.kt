@@ -1564,7 +1564,10 @@ fun FontSizeDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("font_size_cancel")
+                    ) {
                         Text("Cancel")
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -1576,7 +1579,7 @@ fun FontSizeDialog(
                         },
                         modifier = Modifier.testTag("font_size_confirm_ok")
                     ) {
-                        Text("OK")
+                        Text("OK", fontWeight = FontWeight.Bold)
                     }
                 }
             }
