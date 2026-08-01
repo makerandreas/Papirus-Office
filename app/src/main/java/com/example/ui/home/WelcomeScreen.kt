@@ -159,6 +159,13 @@ fun WelcomeScreen(
             ) {
                 Text(stringResource(R.string.welcome_open_settings_btn))
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onAccessGranted,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("Continue with App Storage")
+            }
         } else {
             Text(
                 text = stringResource(R.string.welcome_desc),
@@ -172,6 +179,13 @@ fun WelcomeScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Text(stringResource(R.string.welcome_grant_btn))
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = onAccessGranted,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                Text("Continue with App Storage")
             }
         }
     }

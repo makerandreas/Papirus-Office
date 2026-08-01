@@ -231,7 +231,9 @@ fun HomeDashboard(
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        PapirusConfigManager.initialize(context)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            PapirusConfigManager.initialize(context)
+        }
         PapirusConfigManager.checkAndShowResetSuccessPopup(context) { msg ->
             resetSuccessMessage = msg
         }

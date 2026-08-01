@@ -87,28 +87,30 @@ object PapirusAssetEngine {
         val assetManager = context.assets
         try {
             val list = assetManager.list(assetPath) ?: return
+            if (list.isEmpty()) return
+
             for (fileOrDir in list) {
                 val subAssetPath = if (assetPath.isEmpty()) fileOrDir else "$assetPath/$fileOrDir"
-                val subList = assetManager.list(subAssetPath)
                 val destFile = File(targetDir, fileOrDir)
 
-                if (!subList.isNullOrEmpty()) {
-                    // It's a directory
-                    syncAssetFolderToStorage(context, subAssetPath, destFile)
-                } else {
-                    // It's a file
-                    if (!destFile.exists() || destFile.length() == 0L) {
-                        try {
-                            assetManager.open(subAssetPath).use { input ->
-                                FileOutputStream(destFile).use { output ->
-                                    input.copyTo(output)
-                                }
+                var copiedAsFile = false
+                try {
+                    assetManager.open(subAssetPath).use { input ->
+                        copiedAsFile = true
+                        if (!destFile.exists() || destFile.length() == 0L) {
+                            FileOutputStream(destFile).use { output ->
+                                input.copyTo(output)
                             }
                             Log.d(TAG, "Copied asset $subAssetPath to ${destFile.absolutePath}")
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to copy asset $subAssetPath", e)
                         }
                     }
+                } catch (e: Exception) {
+                    copiedAsFile = false
+                }
+
+                if (!copiedAsFile) {
+                    // It's a directory
+                    syncAssetFolderToStorage(context, subAssetPath, destFile)
                 }
             }
         } catch (e: Exception) {
