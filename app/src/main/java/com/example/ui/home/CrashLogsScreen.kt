@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.example.ui.theme.GoogleSansCodeFontFamily
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -546,7 +547,7 @@ fun CrashLogsScreen(
                                 // Exception Type
                                 Text(
                                     text = log.exceptionType,
-                                    fontFamily = FontFamily.Monospace,
+                                    fontFamily = GoogleSansCodeFontFamily,
                                     fontSize = 12.sp,
                                     color = Color(0xFFEF4444),
                                     fontWeight = FontWeight.SemiBold
@@ -753,7 +754,7 @@ fun CrashLogsScreen(
                             Text(
                                 text = activeLog.stackTrace,
                                 color = Color(0xFF34D399), // Monospace terminal green
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = GoogleSansCodeFontFamily,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp,
                                 modifier = Modifier
