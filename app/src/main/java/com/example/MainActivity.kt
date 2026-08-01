@@ -99,34 +99,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize global system crash notification handler & log manager
+        com.makerandreas.papirusoffice.data.crash.CrashHandlerManager.init(this)
+
         handleIntent(intent)
         
-        // Setup uncaught exception handler to capture real crashes in crash.log
-        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            try {
-                val file = java.io.File(filesDir, "crash.log")
-                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                val dateStr = sdf.format(java.util.Date())
-                val stackTraceString = android.util.Log.getStackTraceString(throwable)
-                
-                val content = """
-                    === CRASH REPORT ===
-                    Timestamp: $dateStr
-                    Thread: ${thread.name}
-                    Exception: ${throwable.javaClass.name}
-                    Message: ${throwable.message ?: "No message provided"}
-                    
-                    StackTrace:
-                    $stackTraceString
-                    === END CRASH REPORT ===
-                """.trimIndent()
-                
-                file.appendText(content + "\n\n")
-            } catch (e: Exception) {
-                e.printStackTrace()
+        // Request POST_NOTIFICATIONS permission for Android 13+ if needed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
             }
-            defaultHandler?.uncaughtException(thread, throwable)
         }
         
         // Initialize Firebase if needed
@@ -184,6 +167,13 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     // Master Workspace Navigation State
     // "welcome" (Onboarding), "home" (Start Center / Dashboard), "Inky" (Writer), "Cellina" (Calc), "Slidia" (Impress), "Pagella" (PDF)
     var currentWorkspace by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("home") }
+
+    val activity = context as? android.app.Activity
+    LaunchedEffect(activity?.intent) {
+        if (activity?.intent?.getBooleanExtra("OPEN_CRASH_LOGS", false) == true) {
+            currentWorkspace = "crash_logs"
+        }
+    }
 
     LaunchedEffect(MainActivity.openedFilePath, MainActivity.openedFileType) {
         val path = MainActivity.openedFilePath

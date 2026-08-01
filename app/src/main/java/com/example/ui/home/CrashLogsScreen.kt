@@ -227,6 +227,22 @@ fun CrashLogsScreen(
         }
     }
 
+    fun testCrashNotification() {
+        val sampleSummary = "RuntimeException: Papirus Office system crash simulation"
+        val sampleStackTrace = """
+            java.lang.RuntimeException: Papirus Office system crash simulation
+                at com.example.ui.home.CrashLogsScreenKt.testCrashNotification(CrashLogsScreen.kt:235)
+                at com.makerandreas.papirusoffice.data.crash.CrashHandlerManager.sendCrashNotification(CrashHandlerManager.kt:70)
+                at com.example.MainActivity.onCreate(MainActivity.kt:105)
+        """.trimIndent()
+        com.makerandreas.papirusoffice.data.crash.CrashHandlerManager.sendCrashNotification(
+            context = context,
+            errorSummary = sampleSummary,
+            stackTrace = sampleStackTrace
+        )
+        Toast.makeText(context, "System Crash Notification sent!", Toast.LENGTH_SHORT).show()
+    }
+
     fun simulateNewCrash() {
         Toast.makeText(context, "Crashing application now...", Toast.LENGTH_SHORT).show()
         throw java.lang.RuntimeException("Real simulated crash via Expressive Debug Station!")
@@ -267,6 +283,13 @@ fun CrashLogsScreen(
                     }
                 },
                 actions = {
+                    // Test System Crash Notification
+                    IconButton(
+                        onClick = { testCrashNotification() },
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                    ) {
+                        Icon(Icons.Default.NotificationsActive, contentDescription = "Test System Crash Notification")
+                    }
                     // Save All action
                     IconButton(
                         onClick = {

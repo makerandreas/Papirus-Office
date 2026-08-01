@@ -9,21 +9,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Define the Google Sans Flex FontFamily for general UI
-val GoogleSansFlexFontFamily = FontFamily(
-    Font(R.font.google_sans_flex_light, FontWeight.Light),
-    Font(R.font.google_sans_flex_regular, FontWeight.Normal),
-    Font(R.font.google_sans_flex_medium, FontWeight.Medium),
-    Font(R.font.google_sans_flex_bold, FontWeight.Bold)
-)
+// Define the Google Sans Flex FontFamily for general UI (falling back to SansSerif for system safety)
+val GoogleSansFlexFontFamily = FontFamily.SansSerif
 
 // Define the Google Sans Code FontFamily for monospace and code displays
-val GoogleSansCodeFontFamily = FontFamily(
-    Font(R.font.google_sans_code_regular, FontWeight.Normal),
-    Font(R.font.google_sans_code_medium, FontWeight.Medium),
-    Font(R.font.google_sans_code_bold, FontWeight.Bold),
-    Font(R.font.google_sans_code_italic, FontWeight.Normal, style = FontStyle.Italic)
-)
+val GoogleSansCodeFontFamily = FontFamily.Monospace
 
 // Set of Material typography styles to start with using Google Sans Flex as default
 val Typography = Typography(
