@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Dropdown / Category selector for Navigation mode in Papirus Writer.
  */
 enum class NavigateBy {
+    ALL,
     PAGE,
     HEADING,
     TABLE,
@@ -47,7 +48,7 @@ data class NavTargetSignal(
  */
 data class NavigatorState(
     val index: DocumentIndex = DocumentIndex(),
-    val navigateBy: NavigateBy = NavigateBy.HEADING,
+    val navigateBy: NavigateBy = NavigateBy.ALL,
     val activeHeadingId: String? = null,
     val activeItemId: String? = null,
     val currentPage: Int = 1,
@@ -357,7 +358,7 @@ class NavigationEngine(
 
     fun next(by: NavigateBy = _state.value.navigateBy) {
         when (by) {
-            NavigateBy.PAGE -> goToPage(_state.value.currentPage + 1)
+            NavigateBy.ALL, NavigateBy.PAGE -> goToPage(_state.value.currentPage + 1)
             NavigateBy.HEADING -> iterateList(flattenHeadings(_state.value.index.headings).map { it.id }, isNext = true) { goToHeading(it) }
             NavigateBy.TABLE -> iterateList(_state.value.index.tables.map { it.id }, isNext = true) { goToTable(it) }
             NavigateBy.IMAGE -> iterateList(_state.value.index.images.map { it.id }, isNext = true) { goToImage(it) }
@@ -376,7 +377,7 @@ class NavigationEngine(
 
     fun previous(by: NavigateBy = _state.value.navigateBy) {
         when (by) {
-            NavigateBy.PAGE -> goToPage(_state.value.currentPage - 1)
+            NavigateBy.ALL, NavigateBy.PAGE -> goToPage(_state.value.currentPage - 1)
             NavigateBy.HEADING -> iterateList(flattenHeadings(_state.value.index.headings).map { it.id }, isNext = false) { goToHeading(it) }
             NavigateBy.TABLE -> iterateList(_state.value.index.tables.map { it.id }, isNext = false) { goToTable(it) }
             NavigateBy.IMAGE -> iterateList(_state.value.index.images.map { it.id }, isNext = false) { goToImage(it) }

@@ -4,18 +4,19 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontLoadingStrategy
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Google Sans Flex (Title & Headline)
+// Google Sans Flex / Display (Title & Headline - fallback to standard stable Google Sans)
 val GoogleSansFlexFontFamily: FontFamily = try {
     FontFamily(
-        Font(R.font.google_sans_flex_light, FontWeight.Light),
-        Font(R.font.google_sans_flex_regular, FontWeight.Normal),
-        Font(R.font.google_sans_flex_medium, FontWeight.Medium),
-        Font(R.font.google_sans_flex_bold, FontWeight.Bold)
+        Font(R.font.google_sans_light, FontWeight.Light, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_regular, FontWeight.Normal, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_medium, FontWeight.Medium, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_bold, FontWeight.Bold, loadingStrategy = FontLoadingStrategy.OptionalLocal)
     )
 } catch (t: Throwable) {
     FontFamily.SansSerif
@@ -24,11 +25,11 @@ val GoogleSansFlexFontFamily: FontFamily = try {
 // Google Sans Standard (Body, Main, Subtitle, Label)
 val GoogleSansFontFamily: FontFamily = try {
     FontFamily(
-        Font(R.font.google_sans_light, FontWeight.Light),
-        Font(R.font.google_sans_regular, FontWeight.Normal),
-        Font(R.font.google_sans_medium, FontWeight.Medium),
-        Font(R.font.google_sans_bold, FontWeight.Bold),
-        Font(R.font.google_sans_italic, FontWeight.Normal, style = FontStyle.Italic)
+        Font(R.font.google_sans_light, FontWeight.Light, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_regular, FontWeight.Normal, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_medium, FontWeight.Medium, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_bold, FontWeight.Bold, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_italic, FontWeight.Normal, style = FontStyle.Italic, loadingStrategy = FontLoadingStrategy.OptionalLocal)
     )
 } catch (t: Throwable) {
     FontFamily.SansSerif
@@ -37,10 +38,10 @@ val GoogleSansFontFamily: FontFamily = try {
 // Google Sans Code (Monospace & Code Displays)
 val GoogleSansCodeFontFamily: FontFamily = try {
     FontFamily(
-        Font(R.font.google_sans_code_regular, FontWeight.Normal),
-        Font(R.font.google_sans_code_medium, FontWeight.Medium),
-        Font(R.font.google_sans_code_bold, FontWeight.Bold),
-        Font(R.font.google_sans_code_italic, FontWeight.Normal, style = FontStyle.Italic)
+        Font(R.font.google_sans_code_regular, FontWeight.Normal, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_code_medium, FontWeight.Medium, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_code_bold, FontWeight.Bold, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_code_italic, FontWeight.Normal, style = FontStyle.Italic, loadingStrategy = FontLoadingStrategy.OptionalLocal)
     )
 } catch (t: Throwable) {
     FontFamily.Monospace

@@ -268,11 +268,24 @@ fun InkyModule(
     val currentSessionState by com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.collectAsState()
     var layoutCursor by remember { mutableStateOf(com.makerandreas.papirusoffice.data.DocumentCursor()) }
 
+    val navEngine = remember(currentSessionState) {
+        currentSessionState?.navigationEngine ?: com.makerandreas.papirusoffice.data.navigation.NavigationEngine()
+    }
+
     var docBodyText by remember {
         mutableStateOf(
             androidx.compose.ui.text.input.TextFieldValue("")
         )
     }
+
+    LaunchedEffect(docBodyText.text, docTitle, currentSessionState?.document) {
+        val activeDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
+            metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle)
+        )
+        navEngine.updateDocument(activeDoc)
+    }
+
+    val navEngineState by navEngine.state.collectAsState()
 
     var isLoadingDocument by remember { mutableStateOf(false) }
     var isCreatingDoc by remember { mutableStateOf(false) }
@@ -422,6 +435,14 @@ fun InkyModule(
             }
             override fun currentPage(): Int = currentDocPage
             override fun pageCount(): Int = totalDocPages
+        }
+    }
+
+    LaunchedEffect(navEngineState.navTargetSignal) {
+        val signal = navEngineState.navTargetSignal
+        if (signal != null) {
+            documentNavigator.goToPage(signal.targetPageIndex)
+            navEngine.clearNavSignal()
         }
     }
 
@@ -1133,20 +1154,28 @@ fun InkyModule(
                 .fillMaxSize()
                 .background(docBgColor)
                 .onPreviewKeyEvent { event ->
-                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.isCtrlPressed) {
-                        if (event.isShiftPressed && event.key == androidx.compose.ui.input.key.Key.N) {
-                            showCreateFromTemplateDialog = true
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                        if (event.key == androidx.compose.ui.input.key.Key.F5) {
+                            showBottomBar = true
+                            bottomBarDeck = "navigator"
                             true
-                        } else if (event.key == androidx.compose.ui.input.key.Key.N) {
-                            handleNewDocument()
-                            true
-                        } else if (event.key == androidx.compose.ui.input.key.Key.G) {
-                            targetPageText = currentDocPage.toString()
-                            showGoToPageDialog = true
-                            true
-                        } else if (event.key == androidx.compose.ui.input.key.Key.O) {
-                            handleOpenDocument()
-                            true
+                        } else if (event.isCtrlPressed) {
+                            if (event.isShiftPressed && event.key == androidx.compose.ui.input.key.Key.N) {
+                                showCreateFromTemplateDialog = true
+                                true
+                            } else if (event.key == androidx.compose.ui.input.key.Key.N) {
+                                handleNewDocument()
+                                true
+                            } else if (event.key == androidx.compose.ui.input.key.Key.G) {
+                                targetPageText = currentDocPage.toString()
+                                showGoToPageDialog = true
+                                true
+                            } else if (event.key == androidx.compose.ui.input.key.Key.O) {
+                                handleOpenDocument()
+                                true
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
@@ -1249,6 +1278,15 @@ fun InkyModule(
                                             performSave(true)
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Open Navigation Bar") },
+                                        onClick = {
+                                            showMoreMenu = false
+                                            showBottomBar = true
+                                            bottomBarDeck = "navigator"
+                                        },
+                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
                                     )
                                     DropdownMenuItem(
                                         text = { Text("Print") },
@@ -2518,6 +2556,45 @@ fun InkyModule(
                     Column(
                         modifier = Modifier.fillMaxSize()
                     ) {
+                        if (bottomBarDeck == "navigator") {
+                            com.example.ui.components.NavigatorSheetContent(
+                                navEngine = navEngine,
+                                isEditMode = isEditMode,
+                                onOpenNavigateBy = { bottomBarDeck = "navigate_by" },
+                                onUndo = {
+                                    customTextToolbar.hide()
+                                    triggerAutosave()
+                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                },
+                                onRedo = {
+                                    customTextToolbar.hide()
+                                    triggerAutosave()
+                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=REDO)")
+                                },
+                                onClose = { showBottomBar = false }
+                            )
+                        } else if (bottomBarDeck == "navigate_by") {
+                            com.example.ui.components.NavigateBySheetContent(
+                                navEngine = navEngine,
+                                isEditMode = isEditMode,
+                                onBackToNavigator = { bottomBarDeck = "navigator" },
+                                onUndo = {
+                                    customTextToolbar.hide()
+                                    triggerAutosave()
+                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                },
+                                onRedo = {
+                                    customTextToolbar.hide()
+                                    triggerAutosave()
+                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                    addLokitLog("lok::Document::postWindow(event=REDO)")
+                                },
+                                onClose = { showBottomBar = false }
+                            )
+                        } else {
                         val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
                         val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
                         val ribbonTabScrollState = rememberScrollState()
@@ -2928,7 +3005,8 @@ fun InkyModule(
                                  }
                              }
                          }
-                     }           }
+                     }
+                 }
                 }
             }
         }
@@ -3748,6 +3826,7 @@ fun InkyModule(
             }
         )
     }
+}
 }
 
 // ==========================================

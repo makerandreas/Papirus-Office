@@ -124,16 +124,18 @@ object CrashHandlerManager {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            // Action 3: Share stacktrace
-            val shareIntent = Intent(context, CrashNotificationReceiver::class.java).apply {
-                action = CrashNotificationReceiver.ACTION_SHARE_STACKTRACE
-                putExtra(CrashNotificationReceiver.EXTRA_STACKTRACE, stackTrace)
-                putExtra(CrashNotificationReceiver.EXTRA_ERROR_SUMMARY, errorSummary)
+            // Action 3: Share stacktrace (Direct Activity PendingIntent to bypass background activity launch restrictions)
+            val shareText = "Headline: Papirus Office crashed!\nSummary: $errorSummary\n\n=== StackTrace ===\n$stackTrace"
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Papirus Office Crash Report")
+                putExtra(Intent.EXTRA_TEXT, shareText)
             }
-            val sharePendingIntent = PendingIntent.getBroadcast(
+            val chooserIntent = Intent.createChooser(sendIntent, "Share Crash Report via")
+            val sharePendingIntent = PendingIntent.getActivity(
                 context,
                 103,
-                shareIntent,
+                chooserIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 

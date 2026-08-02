@@ -206,4 +206,29 @@
     <string name="aboutLicensesTitle">Licenses &amp; Credits</string>
     <string name="aboutLicensesDesc">This suite builds on top of LibreOffice SDK, Microsoft OpenXML specifications, and ECMA-376 standards. Licensed under GNU LGPL v3 and Mozilla Public License 2.0.</string>
     <string name="aboutDeveloperNote">Design with ❤️ from An Open-source and AI Enthusiast</string>
+    <!-- Navigator Strings -->
+    <string name="navigator_title">Navigator</string>
+    <string name="navigate_by_title">Navigate by...</string>
+    <string name="navigate_by_all">All</string>
+    <string name="no_objects_to_navigate">There are no objects to navigate</string>
+    <string name="navigate_by_headings">Headings</string>
+    <string name="navigate_by_tables">Tables</string>
+    <string name="navigate_by_images">Images</string>
+    <string name="navigate_by_bookmarks">Bookmarks</string>
+    <string name="navigate_by_comments">Comments</string>
+    <string name="navigate_by_sections">Sections</string>
+    <string name="navigate_by_frames">Frames</string>
+    <string name="navigate_by_fields">Fields</string>
+    <string name="navigate_by_footnotes">Footnotes</string>
+    <string name="navigate_by_ole">OLE objects</string>
+    <string name="navigate_by_drawing">Drawing objects</string>
+    <string name="navigate_by_page">Page</string>
+    <string name="navigate_by_reminder">Reminder</string>
+    <string name="navigate_by_indexes">Indexes</string>
+    <string name="navigate_by_selection">Selection</string>
+    <string name="navigate_by_recency">Recency</string>
+    <string name="nav_previous">Previous</string>
+    <string name="nav_next">Next</string>
+    <string name="object_is_hidden">This object is hidden</string>
+    <string name="open_navigation_bar">Open Navigation Bar</string>
 </resources>
