@@ -9,13 +9,47 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-// Define the Google Sans Flex FontFamily for general UI (falling back to SansSerif for system safety)
-val GoogleSansFlexFontFamily = FontFamily.SansSerif
+// Google Sans Flex (Title & Headline)
+val GoogleSansFlexFontFamily: FontFamily = try {
+    FontFamily(
+        Font(R.font.google_sans_flex_light, FontWeight.Light),
+        Font(R.font.google_sans_flex_regular, FontWeight.Normal),
+        Font(R.font.google_sans_flex_medium, FontWeight.Medium),
+        Font(R.font.google_sans_flex_bold, FontWeight.Bold)
+    )
+} catch (t: Throwable) {
+    FontFamily.SansSerif
+}
 
-// Define the Google Sans Code FontFamily for monospace and code displays
-val GoogleSansCodeFontFamily = FontFamily.Monospace
+// Google Sans Standard (Body, Main, Subtitle, Label)
+val GoogleSansFontFamily: FontFamily = try {
+    FontFamily(
+        Font(R.font.google_sans_light, FontWeight.Light),
+        Font(R.font.google_sans_regular, FontWeight.Normal),
+        Font(R.font.google_sans_medium, FontWeight.Medium),
+        Font(R.font.google_sans_bold, FontWeight.Bold),
+        Font(R.font.google_sans_italic, FontWeight.Normal, style = FontStyle.Italic)
+    )
+} catch (t: Throwable) {
+    FontFamily.SansSerif
+}
 
-// Set of Material typography styles to start with using Google Sans Flex as default
+// Google Sans Code (Monospace & Code Displays)
+val GoogleSansCodeFontFamily: FontFamily = try {
+    FontFamily(
+        Font(R.font.google_sans_code_regular, FontWeight.Normal),
+        Font(R.font.google_sans_code_medium, FontWeight.Medium),
+        Font(R.font.google_sans_code_bold, FontWeight.Bold),
+        Font(R.font.google_sans_code_italic, FontWeight.Normal, style = FontStyle.Italic)
+    )
+} catch (t: Throwable) {
+    FontFamily.Monospace
+}
+
+// Set of Material typography styles mapped according to Papirus Office guidelines:
+// - Title & Headline -> Google Sans Flex
+// - Subtitle, Body, Main & Label -> Google Sans Standard
+// - Monospace & Code -> Google Sans Code
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = GoogleSansFlexFontFamily,
@@ -81,42 +115,42 @@ val Typography = Typography(
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.4.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = GoogleSansFlexFontFamily,
+        fontFamily = GoogleSansFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 16.sp,
