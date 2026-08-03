@@ -231,4 +231,12 @@
     <string name="nav_next">Next</string>
     <string name="object_is_hidden">This object is hidden</string>
     <string name="open_navigation_bar">Open Navigation Bar</string>
+
+    <!-- Undo and Redo Actions Sheet -->
+    <string name="actionsToUndoTitle">Actions to Undo</string>
+    <string name="actionsToRedoTitle">Actions to Redo</string>
+    <string name="actionsToUndoGroupHeader">Actions to Undo: %1$d</string>
+    <string name="actionsToRedoGroupHeader">Actions to Redo: %1$d</string>
+    <string name="noActionsToUndo">No actions to undo</string>
+    <string name="noActionsToRedo">No actions to redo</string>
 </resources>

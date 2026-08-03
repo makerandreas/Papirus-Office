@@ -46,75 +46,66 @@ class DocumentTransaction(val name: String) {
 class EditingEngine(
     var document: OfficeDocument,
     var cursor: DocumentCursor = DocumentCursor(),
-    val layoutEngine: LayoutEngine = LayoutEngine()
+    val layoutEngine: LayoutEngine = LayoutEngine(),
+    val undoManager: com.makerandreas.papirusoffice.data.undo.UndoManager = com.makerandreas.papirusoffice.data.undo.UndoManager()
 ) {
-    private val undoStack = Stack<DocumentTransaction>()
-    private val redoStack = Stack<DocumentTransaction>()
-    private var currentTransaction: DocumentTransaction? = null
-
-    fun beginTransaction(name: String) {
-        currentTransaction = DocumentTransaction(name)
+    fun beginTransaction(name: String, icon: String = "edit", commandType: String = "TYPING") {
+        undoManager.beginTransaction(name, icon, commandType)
     }
 
-    fun commitTransaction() {
-        val tx = currentTransaction ?: return
-        if (tx.isNotEmpty()) {
-            undoStack.push(tx)
-            redoStack.clear()
-        }
-        currentTransaction = null
+    suspend fun commitTransaction() {
+        undoManager.commitTransaction()
     }
 
-    fun rollbackTransaction() {
-        currentTransaction = null
+    suspend fun rollbackTransaction() {
+        undoManager.rollbackTransaction()
     }
 
-    fun executeCommand(command: DocumentCommand) {
-        val tx = currentTransaction
-        if (tx != null) {
-            document = command.execute(document)
-            tx.addCommand(command)
-        } else {
-            beginTransaction("Command: ${command.javaClass.simpleName}")
-            document = command.execute(document)
-            currentTransaction?.addCommand(command)
-            commitTransaction()
-        }
+    suspend fun recordAction(action: com.makerandreas.papirusoffice.data.undo.UndoAction) {
+        undoManager.recordAction(action)
     }
 
-    fun undo() {
-        if (undoStack.isNotEmpty()) {
-            val tx = undoStack.pop()
-            document = tx.undo(document)
-            redoStack.push(tx)
-        }
+    suspend fun undo(): Boolean {
+        return undoManager.undo()
     }
 
-    fun redo() {
-        if (redoStack.isNotEmpty()) {
-            val tx = redoStack.pop()
-            document = tx.execute(document)
-            undoStack.push(tx)
-        }
+    suspend fun redo(): Boolean {
+        return undoManager.redo()
     }
 
-    fun canUndo(): Boolean = undoStack.isNotEmpty()
-    fun canRedo(): Boolean = redoStack.isNotEmpty()
+    fun canUndo(): Boolean = undoManager.canUndo()
+    fun canRedo(): Boolean = undoManager.canRedo()
 
     // Decoupled Editing APIs
-    fun insertText(text: String) {
-        executeCommand(InsertTextCommand(cursor.paragraphIndex, cursor.offset, text))
+    suspend fun insertText(text: String) {
+        val action = com.makerandreas.papirusoffice.data.undo.InsertTextAction(
+            paragraphIndex = cursor.paragraphIndex,
+            offset = cursor.offset,
+            insertedText = text,
+            getDocument = { document },
+            updateDocument = { document = it }
+        )
+        action.redo()
+        recordAction(action)
         cursor = cursor.copy(offset = cursor.offset + text.length)
     }
 
-    fun deleteBackward() {
+    suspend fun deleteBackward() {
         if (cursor.offset > 0) {
             val pIdx = cursor.paragraphIndex
             val element = document.body.elements.getOrNull(pIdx)
             if (element is OfficeDocElement.ParagraphElement) {
                 val text = element.paragraph.text
                 val charToDelete = text[cursor.offset - 1].toString()
-                executeCommand(DeleteTextCommand(pIdx, cursor.offset - 1, charToDelete))
+                val action = com.makerandreas.papirusoffice.data.undo.DeleteTextAction(
+                    paragraphIndex = pIdx,
+                    offset = cursor.offset - 1,
+                    deletedText = charToDelete,
+                    getDocument = { document },
+                    updateDocument = { document = it }
+                )
+                action.redo()
+                recordAction(action)
                 cursor = cursor.copy(offset = cursor.offset - 1)
             }
         } else if (cursor.paragraphIndex > 0) {
@@ -122,7 +113,7 @@ class EditingEngine(
         }
     }
 
-    fun splitParagraph() {
+    suspend fun splitParagraph() {
         val pIdx = cursor.paragraphIndex
         val element = document.body.elements.getOrNull(pIdx)
         if (element is OfficeDocElement.ParagraphElement) {
@@ -130,36 +121,87 @@ class EditingEngine(
             val leftText = originalText.substring(0, cursor.offset)
             val rightText = originalText.substring(cursor.offset)
 
-            executeCommand(SplitParagraphCommand(pIdx, leftText, rightText))
+            val action = com.makerandreas.papirusoffice.data.undo.SplitParagraphAction(
+                paragraphIndex = pIdx,
+                leftText = leftText,
+                rightText = rightText,
+                getDocument = { document },
+                updateDocument = { document = it }
+            )
+            action.redo()
+            recordAction(action)
             cursor = cursor.copy(paragraphIndex = pIdx + 1, elementIndex = pIdx + 1, offset = 0)
         }
     }
 
-    fun mergeParagraphs(targetIdx: Int, sourceIdx: Int) {
+    suspend fun mergeParagraphs(targetIdx: Int, sourceIdx: Int) {
         val targetElem = document.body.elements.getOrNull(targetIdx)
         val sourceElem = document.body.elements.getOrNull(sourceIdx)
         if (targetElem is OfficeDocElement.ParagraphElement && sourceElem is OfficeDocElement.ParagraphElement) {
             val targetText = targetElem.paragraph.text
             val sourceText = sourceElem.paragraph.text
 
-            executeCommand(MergeParagraphsCommand(targetIdx, sourceIdx, targetText, sourceText))
+            val action = com.makerandreas.papirusoffice.data.undo.MergeParagraphAction(
+                targetIdx = targetIdx,
+                sourceIdx = sourceIdx,
+                targetText = targetText,
+                sourceText = sourceText,
+                getDocument = { document },
+                updateDocument = { document = it }
+            )
+            action.redo()
+            recordAction(action)
             cursor = cursor.copy(paragraphIndex = targetIdx, elementIndex = targetIdx, offset = targetText.length)
         }
     }
 
-    fun insertTable(rows: Int, cols: Int) {
+    suspend fun insertTable(rows: Int, cols: Int) {
         val cells = List(cols) { OfficeTableCell("") }
         val tableRows = List(rows) { OfficeTableRow(cells) }
         val table = OfficeTable(rows = tableRows, numColumns = cols)
-        executeCommand(InsertTableCommand(cursor.paragraphIndex + 1, table))
+
+        val action = com.makerandreas.papirusoffice.data.undo.InsertTableAction(
+            insertIndex = cursor.paragraphIndex + 1,
+            table = table,
+            getDocument = { document },
+            updateDocument = { document = it }
+        )
+        action.redo()
+        recordAction(action)
     }
 
-    fun insertImage(imagePath: String, file: File?, widthDp: Float = 250f, heightDp: Float = 200f) {
+    suspend fun insertImage(imagePath: String, file: File?, widthDp: Float = 250f, heightDp: Float = 200f) {
         val image = OfficeImage(imagePath, file, widthDp, heightDp)
-        executeCommand(InsertImageCommand(cursor.paragraphIndex + 1, image))
+        val action = com.makerandreas.papirusoffice.data.undo.InsertImageAction(
+            insertIndex = cursor.paragraphIndex + 1,
+            image = image,
+            getDocument = { document },
+            updateDocument = { document = it }
+        )
+        action.redo()
+        recordAction(action)
     }
 
-    fun insertBookmark(name: String) {
+    suspend fun executeCommand(command: DocumentCommand) {
+        val action = object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+            override val title: String = "Command: ${command.javaClass.simpleName}"
+            override val timestamp: Long = System.currentTimeMillis()
+            override val icon: String = "extension"
+            override val commandType: String = "DOCUMENT_COMMAND"
+
+            override suspend fun undo() {
+                document = command.undo(document)
+            }
+
+            override suspend fun redo() {
+                document = command.execute(document)
+            }
+        }
+        action.redo()
+        recordAction(action)
+    }
+
+    suspend fun insertBookmark(name: String) {
         executeCommand(InsertBookmarkCommand(cursor.paragraphIndex, name))
     }
 }

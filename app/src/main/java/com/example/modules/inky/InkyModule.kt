@@ -29,6 +29,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.Key
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -266,6 +268,8 @@ fun InkyModule(
     }
 
     val currentSessionState by com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.collectAsState()
+    val canUndo by (currentSessionState?.undoManager?.historyManager?.canUndo ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
+    val canRedo by (currentSessionState?.undoManager?.historyManager?.canRedo ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
     var layoutCursor by remember { mutableStateOf(com.makerandreas.papirusoffice.data.DocumentCursor()) }
 
     val navEngine = remember(currentSessionState) {
@@ -277,6 +281,8 @@ fun InkyModule(
             androidx.compose.ui.text.input.TextFieldValue("")
         )
     }
+
+    var lastTextRecordedValue by remember { mutableStateOf("") }
 
     LaunchedEffect(docBodyText.text, docTitle, currentSessionState?.document) {
         val activeDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -315,6 +321,7 @@ fun InkyModule(
                             docOpenFailedError = parseResult.parsedDocument.failureReason
                         } else {
                             docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                            lastTextRecordedValue = parseResult.text
                             docxImages = parseResult.extractedImages
                             docxExtents = parseResult.imageExtents
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
@@ -340,9 +347,22 @@ fun InkyModule(
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     isLoadingDocument = false
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                    lastTextRecordedValue = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
                     updateInkyMetadata("templates/inky/Normal.ott", "Document.odt", parseResult.text)
+
+                    // Set active session for the default loaded template
+                    val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
+                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = "Document.odt")
+                    )
+                    val dummyFile = java.io.File(context.filesDir, "Document.odt")
+                    val session = com.makerandreas.papirusoffice.data.DocumentSession(
+                        engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
+                        document = officeDoc,
+                        file = com.makerandreas.papirusoffice.data.OfficeFile(dummyFile)
+                    )
+                    com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
                 }
             }
         }
@@ -513,6 +533,7 @@ fun InkyModule(
     var activeRibbonTab by remember { mutableStateOf("Home") } // File, Home, Insert, Layout, References, Mailings, Review, View
     var showRibbonTabMenu by remember { mutableStateOf(false) }
     var activeInkySubpage by remember { mutableStateOf("") }
+    var previousInkySubpage by remember { mutableStateOf("") }
     var selectedStyleNameForOptions by remember { mutableStateOf("Normal") }
     var openedFromExternalHub by remember { mutableStateOf(false) }
 
@@ -750,6 +771,7 @@ fun InkyModule(
                     runDocumentLoading(true, name) {
                         docTitle = name
                         docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                        lastTextRecordedValue = parseResult.text
                         docxImages = parseResult.extractedImages
                         docxExtents = parseResult.imageExtents
                         isSaved = true
@@ -757,17 +779,41 @@ fun InkyModule(
                         isNewDocument = true
                         showBottomBar = false
                         showCreateFromTemplateDialog = false
+
+                        // Set active session!
+                        val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
+                            metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = name)
+                        )
+                        val session = com.makerandreas.papirusoffice.data.DocumentSession(
+                            engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
+                            document = officeDoc,
+                            file = com.makerandreas.papirusoffice.data.OfficeFile(file)
+                        )
+                        com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
                     }
                 }
             } else {
                 runDocumentLoading(true, name) {
                     docTitle = name
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(sampleTemplateContent)
+                    lastTextRecordedValue = sampleTemplateContent
                     isSaved = true
                     isEditMode = true
                     isNewDocument = true
                     showBottomBar = false
                     showCreateFromTemplateDialog = false
+
+                    // Set active session!
+                    val officeDoc = com.makerandreas.papirusoffice.data.OfficeDocument(
+                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = name)
+                    )
+                    val dummyFile = java.io.File(context.filesDir, name)
+                    val session = com.makerandreas.papirusoffice.data.DocumentSession(
+                        engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
+                        document = officeDoc,
+                        file = com.makerandreas.papirusoffice.data.OfficeFile(dummyFile)
+                    )
+                    com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
                 }
             }
             Unit
@@ -794,8 +840,21 @@ fun InkyModule(
                         com.makerandreas.papirusoffice.data.DocxParseResult("")
                     }
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                    lastTextRecordedValue = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
+
+                    // Set active session!
+                    val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
+                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = name)
+                    )
+                    val dummyFile = java.io.File(context.filesDir, name)
+                    val session = com.makerandreas.papirusoffice.data.DocumentSession(
+                        engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
+                        document = officeDoc,
+                        file = com.makerandreas.papirusoffice.data.OfficeFile(dummyFile)
+                    )
+                    com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
                 }
                 isSaved = true
                 isEditMode = true
@@ -985,6 +1044,50 @@ fun InkyModule(
                     e.printStackTrace()
                 }
             }
+        }
+    }
+
+    LaunchedEffect(currentSessionState) {
+        lastTextRecordedValue = docBodyText.text
+    }
+
+    LaunchedEffect(docBodyText.text) {
+        if (docBodyText.text != lastTextRecordedValue) {
+            kotlinx.coroutines.delay(1000) // Debounce typing for 1 second
+            val oldValue = lastTextRecordedValue
+            val newValue = docBodyText.text
+            val diff = newValue.length - oldValue.length
+            val title = when {
+                diff > 0 -> {
+                    val added = newValue.substring(oldValue.length.coerceAtMost(newValue.length))
+                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
+                }
+                diff < 0 -> "Delete text"
+                else -> "Edit Document"
+            }
+
+            currentSessionState?.undoManager?.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                override val title = title
+                override val timestamp = System.currentTimeMillis()
+                override val icon = if (diff >= 0) "text_fields" else "backspace"
+                override val commandType = "EDIT_TEXT"
+                override suspend fun undo() {
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                        text = oldValue,
+                        selection = androidx.compose.ui.text.TextRange(oldValue.length)
+                    )
+                    lastTextRecordedValue = oldValue
+                }
+                override suspend fun redo() {
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                        text = newValue,
+                        selection = androidx.compose.ui.text.TextRange(newValue.length)
+                    )
+                    lastTextRecordedValue = newValue
+                }
+            })
+            lastTextRecordedValue = newValue
+            triggerAutosave()
         }
     }
 
@@ -2563,17 +2666,33 @@ fun InkyModule(
                                 onOpenNavigateBy = { bottomBarDeck = "navigate_by" },
                                 onUndo = {
                                     customTextToolbar.hide()
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        val success = currentSessionState?.undoManager?.undo() ?: false
+                                        if (success) {
+                                            triggerAutosave()
+                                            Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                     addLokitLog("lok::Document::postWindow(event=UNDO)")
                                 },
                                 onRedo = {
                                     customTextToolbar.hide()
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        val success = currentSessionState?.undoManager?.redo() ?: false
+                                        if (success) {
+                                            triggerAutosave()
+                                            Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                     addLokitLog("lok::Document::postWindow(event=REDO)")
                                 },
-                                onClose = { showBottomBar = false }
+                                onClose = { showBottomBar = false },
+                                canUndo = canUndo,
+                                canRedo = canRedo
                             )
                         } else if (bottomBarDeck == "navigate_by") {
                             com.example.ui.components.NavigateBySheetContent(
@@ -2582,17 +2701,33 @@ fun InkyModule(
                                 onBackToNavigator = { bottomBarDeck = "navigator" },
                                 onUndo = {
                                     customTextToolbar.hide()
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        val success = currentSessionState?.undoManager?.undo() ?: false
+                                        if (success) {
+                                            triggerAutosave()
+                                            Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                     addLokitLog("lok::Document::postWindow(event=UNDO)")
                                 },
                                 onRedo = {
                                     customTextToolbar.hide()
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                    coroutineScope.launch {
+                                        val success = currentSessionState?.undoManager?.redo() ?: false
+                                        if (success) {
+                                            triggerAutosave()
+                                            Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                     addLokitLog("lok::Document::postWindow(event=REDO)")
                                 },
-                                onClose = { showBottomBar = false }
+                                onClose = { showBottomBar = false },
+                                canUndo = canUndo,
+                                canRedo = canRedo
                             )
                         } else {
                         val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
@@ -2622,6 +2757,13 @@ fun InkyModule(
                                             when (activeInkySubpage) {
                                                 "underline_color" -> activeInkySubpage = "underline_options"
                                                 "create_new_style", "style_options" -> activeInkySubpage = "paragraph_styles"
+                                                "actions_to_undo", "actions_to_redo" -> {
+                                                    activeInkySubpage = previousInkySubpage
+                                                    previousInkySubpage = ""
+                                                    if (activeInkySubpage.isEmpty()) {
+                                                        bottomBarDeck = "ribbon"
+                                                    }
+                                                }
                                                 else -> {
                                                     activeInkySubpage = ""
                                                     openedFromExternalHub = false
@@ -2656,6 +2798,8 @@ fun InkyModule(
                                             "create_new_style" -> "Create New Style"
                                             "style_options" -> "Options for $selectedStyleNameForOptions"
                                             "change_capitalization" -> "Change Capitalization"
+                                            "actions_to_undo" -> "Actions to Undo"
+                                            "actions_to_redo" -> "Actions to Redo"
                                             else -> ""
                                         },
                                         style = MaterialTheme.typography.titleMedium,
@@ -2701,28 +2845,58 @@ fun InkyModule(
                                     }
 
                                     // Persistent undo/redo/close
-                                    IconButton(onClick = {
-                                        customTextToolbar.hide()
-                                        triggerAutosave()
-                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                    }) {
+                                    LongClickIconButton(
+                                        enabled = canUndo,
+                                        onClick = {
+                                            customTextToolbar.hide()
+                                            coroutineScope.launch {
+                                                val success = currentSessionState?.undoManager?.undo() ?: false
+                                                if (success) {
+                                                    triggerAutosave()
+                                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                        },
+                                        onLongClick = {
+                                            customTextToolbar.hide()
+                                            previousInkySubpage = activeInkySubpage
+                                            activeInkySubpage = "actions_to_undo"
+                                        }
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Undo,
                                             contentDescription = "Undo",
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
-                                    IconButton(onClick = {
-                                        customTextToolbar.hide()
-                                        triggerAutosave()
-                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::postWindow(event=REDO)")
-                                    }) {
+                                    LongClickIconButton(
+                                        enabled = canRedo,
+                                        onClick = {
+                                            customTextToolbar.hide()
+                                            coroutineScope.launch {
+                                                val success = currentSessionState?.undoManager?.redo() ?: false
+                                                if (success) {
+                                                    triggerAutosave()
+                                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            addLokitLog("lok::Document::postWindow(event=REDO)")
+                                        },
+                                        onLongClick = {
+                                            customTextToolbar.hide()
+                                            previousInkySubpage = activeInkySubpage
+                                            activeInkySubpage = "actions_to_redo"
+                                        }
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Redo,
                                             contentDescription = "Redo",
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
                                     IconButton(onClick = {
@@ -2795,28 +2969,58 @@ fun InkyModule(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    IconButton(onClick = {
-                                        customTextToolbar.hide()
-                                        triggerAutosave()
-                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                    }) {
+                                    LongClickIconButton(
+                                        enabled = canUndo,
+                                        onClick = {
+                                            customTextToolbar.hide()
+                                            coroutineScope.launch {
+                                                val success = currentSessionState?.undoManager?.undo() ?: false
+                                                if (success) {
+                                                    triggerAutosave()
+                                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                        },
+                                        onLongClick = {
+                                            customTextToolbar.hide()
+                                            previousInkySubpage = activeInkySubpage
+                                            activeInkySubpage = "actions_to_undo"
+                                        }
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Undo,
                                             contentDescription = "Undo",
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
-                                    IconButton(onClick = {
-                                        customTextToolbar.hide()
-                                        triggerAutosave()
-                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::postWindow(event=REDO)")
-                                    }) {
+                                    LongClickIconButton(
+                                        enabled = canRedo,
+                                        onClick = {
+                                            customTextToolbar.hide()
+                                            coroutineScope.launch {
+                                                val success = currentSessionState?.undoManager?.redo() ?: false
+                                                if (success) {
+                                                    triggerAutosave()
+                                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                            addLokitLog("lok::Document::postWindow(event=REDO)")
+                                        },
+                                        onLongClick = {
+                                            customTextToolbar.hide()
+                                            previousInkySubpage = activeInkySubpage
+                                            activeInkySubpage = "actions_to_redo"
+                                        }
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Rounded.Redo,
                                             contentDescription = "Redo",
-                                            tint = MaterialTheme.colorScheme.primary
+                                            tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
                                     IconButton(onClick = {
@@ -2893,6 +3097,32 @@ fun InkyModule(
                                             activeInkySubpage = "paragraph_styles"
                                         }
                                         "change_capitalization" -> ChangeCapitalizationSubpage(context)
+                                        "actions_to_undo" -> {
+                                            val undoHistory = currentSessionState?.undoManager?.historyManager?.undoHistory?.collectAsState()?.value ?: emptyList()
+                                            com.example.ui.components.ActionsToUndoSubpage(
+                                                undoHistory = undoHistory,
+                                                onSelectEntry = { entry ->
+                                                    coroutineScope.launch {
+                                                        currentSessionState?.undoManager?.undoTo(entry)
+                                                        triggerAutosave()
+                                                        Toast.makeText(context, "Actions undone", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            )
+                                        }
+                                        "actions_to_redo" -> {
+                                            val redoHistory = currentSessionState?.undoManager?.historyManager?.redoHistory?.collectAsState()?.value ?: emptyList()
+                                            com.example.ui.components.ActionsToRedoSubpage(
+                                                redoHistory = redoHistory,
+                                                onSelectEntry = { entry ->
+                                                    coroutineScope.launch {
+                                                        currentSessionState?.undoManager?.redoTo(entry)
+                                                        triggerAutosave()
+                                                        Toast.makeText(context, "Actions redone", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             } else {
@@ -4449,3 +4679,28 @@ fun OpenDocumentDialog(
         }
     }
 }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun LongClickIconButton(
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(48.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = if (enabled) onLongClick else null,
+                enabled = enabled
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        content()
+    }
+}
+

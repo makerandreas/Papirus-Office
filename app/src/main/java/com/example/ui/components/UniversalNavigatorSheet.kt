@@ -42,7 +42,9 @@ fun NavigatorSheetContent(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canUndo: Boolean = true,
+    canRedo: Boolean = true
 ) {
     val context = LocalContext.current
     val navState by navEngine.state.collectAsState()
@@ -86,18 +88,18 @@ fun NavigatorSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (isEditMode) {
-                    IconButton(onClick = onUndo) {
+                    IconButton(onClick = onUndo, enabled = canUndo) {
                         Icon(
                             imageVector = Icons.Rounded.Undo,
                             contentDescription = stringResource(R.string.options_done),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
-                    IconButton(onClick = onRedo) {
+                    IconButton(onClick = onRedo, enabled = canRedo) {
                         Icon(
                             imageVector = Icons.Rounded.Redo,
                             contentDescription = stringResource(R.string.options_done),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
                 }
@@ -817,7 +819,9 @@ fun NavigateBySheetContent(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canUndo: Boolean = true,
+    canRedo: Boolean = true
 ) {
     val navState by navEngine.state.collectAsState()
 
@@ -881,18 +885,18 @@ fun NavigateBySheetContent(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (isEditMode) {
-                    IconButton(onClick = onUndo) {
+                    IconButton(onClick = onUndo, enabled = canUndo) {
                         Icon(
                             imageVector = Icons.Rounded.Undo,
                             contentDescription = stringResource(R.string.options_done),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
-                    IconButton(onClick = onRedo) {
+                    IconButton(onClick = onRedo, enabled = canRedo) {
                         Icon(
                             imageVector = Icons.Rounded.Redo,
                             contentDescription = stringResource(R.string.options_done),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
                 }

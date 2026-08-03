@@ -1,6 +1,7 @@
 package com.makerandreas.papirusoffice.data
 
 import com.makerandreas.papirusoffice.data.navigation.NavigationEngine
+import com.makerandreas.papirusoffice.data.undo.UndoManager
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +14,7 @@ class DocumentSession(
     var dirty: Boolean = false,
     var protected: Boolean = false,
     var readOnly: Boolean = false,
-    val undoManager: UndoManager = UndoManager(),
+    val undoManager: UndoManager = UndoManager(sessionIdProvider = { id.toString() }),
     val parserReport: ParserReport = ParserReport(),
     val navigationEngine: NavigationEngine = NavigationEngine(document)
 )
