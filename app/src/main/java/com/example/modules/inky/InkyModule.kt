@@ -1320,252 +1320,688 @@ fun InkyModule(
                 }
         ) {
         Column(modifier = Modifier.fillMaxSize().imePadding()) {
-            
-            // --- HEADER TOP APP BAR ---
-            // Hidden temporarily if bottom bar is opened or scrolling hides it
+                 // --- HEADER TOP APP BAR ---
             AnimatedVisibility(
-                visible = !showBottomBar && isControlsVisible,
+                visible = !showBottomBar,
                 enter = expandVertically(),
-                exit = shrinkVertically(),
-                modifier = Modifier.pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                customTextToolbar.hide()
-                            }
-                        }
-                    }
-                }
+                exit = shrinkVertically()
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                if (!isEditMode) {
-                    // --- VIEWER MODE APP BAR ---
+                if (showFindReplace) {
+                    com.example.ui.components.FindAndReplaceBar(
+                        isTablet = false,
+                        onFind = { query ->
+                            searchQuery = query
+                            val text = docBodyText.text
+                            if (query.isNotEmpty() && text.contains(query, ignoreCase = true)) {
+                                val index = text.indexOf(query, ignoreCase = true)
+                                docBodyText = docBodyText.copy(
+                                    selection = androidx.compose.ui.text.TextRange(index, index + query.length)
+                                )
+                                Toast.makeText(context, "Found match at character $index", Toast.LENGTH_SHORT).show()
+                            } else if (query.isNotEmpty()) {
+                                Toast.makeText(context, "No match found", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onReplace = { find, replace ->
+                            val text = docBodyText.text
+                            if (find.isNotEmpty() && text.contains(find, ignoreCase = true)) {
+                                val updatedText = text.replace(find, replace, ignoreCase = true)
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = updatedText,
+                                    selection = androidx.compose.ui.text.TextRange(0)
+                                )
+                                isSaved = false
+                                Toast.makeText(context, "Replaced successfully", Toast.LENGTH_SHORT).show()
+                            } else if (find.isNotEmpty()) {
+                                Toast.makeText(context, "Nothing to replace", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onClose = {
+                            showFindReplace = false
+                        }
+                    )
+                } else {
                     TopAppBar(
                         title = {
-                            Text(
-                                text = docTitle,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            if (!isEditMode) {
+                                Text(
+                                    text = docTitle,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         },
                         navigationIcon = {
-                            IconButton(onClick = { handleClose() }) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
+                            if (!isEditMode) {
+                                IconButton(onClick = { handleClose() }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
+                                }
+                            } else {
+                                IconButton(onClick = { 
+                                    isEditMode = false 
+                                    Toast.makeText(context, "Switched to Viewer Mode", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Viewer")
+                                }
                             }
                         },
                         actions = {
+                            // 1. Upload to Google Drive
                             IconButton(onClick = {
                                 Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
                                 addLokitLog("Upload to Drive triggered")
                             }) {
                                 Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
                             }
-                            IconButton(onClick = { 
-                                isWebView = !isWebView
-                                Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
-                                addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
+
+                            // 2. Find in Page
+                            IconButton(onClick = {
+                                showFindReplace = !showFindReplace
                             }) {
-                                Icon(
-                                    imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                    contentDescription = "Document View Mode"
-                                )
+                                Icon(Icons.Rounded.Search, contentDescription = "Find in Page")
                             }
+
+                            if (isEditMode) {
+                                // 3. Mobile view (Edit Mode only)
+                                IconButton(onClick = {
+                                    isWebView = !isWebView
+                                    Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Icon(
+                                        imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
+                                        contentDescription = "Document View Mode"
+                                    )
+                                }
+
+                                // 4. Undo (Edit Mode only)
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            currentSessionState?.undoManager?.undo()
+                                            triggerAutosave()
+                                        }
+                                    },
+                                    enabled = canUndo
+                                ) {
+                                    Icon(Icons.Rounded.Undo, contentDescription = "Undo")
+                                }
+                            }
+
+                            // 5. More Options (both modes, different menu items)
                             Box {
-                                IconButton(onClick = { showMoreMenu = true }) {
+                                var showMoreMenuInAppBar by remember { mutableStateOf(false) }
+                                IconButton(onClick = { showMoreMenuInAppBar = true }) {
                                     Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
                                 }
                                 DropdownMenu(
-                                    expanded = showMoreMenu,
-                                    onDismissRequest = { showMoreMenu = false }
+                                    expanded = showMoreMenuInAppBar,
+                                    onDismissRequest = { showMoreMenuInAppBar = false }
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Export to PDF") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
-                                            addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Save as...") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showSaveAsDialog = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            isDarkDocument = !isDarkDocument
-                                        },
-                                        leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Simulate Save Error") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            performSave(true)
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
-                                    )
-                                     DropdownMenuItem(
-                                         text = { Text("Open Navigation Bar") },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             showBottomBar = true
-                                             bottomBarDeck = "navigator"
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
-                                     )
-                                     DropdownMenuItem(
-                                         text = { Text(stringResource(R.string.menu_reload)) },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             if (!isSaved) {
-                                                 showReloadConfirmationDialog = true
-                                             } else {
-                                                 triggerReload()
-                                             }
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = "Reload Document") }
-                                     )
-                                     DropdownMenuItem(
-                                         text = { Text(stringResource(R.string.menu_close)) },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             handleClose()
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Close Document") }
-                                     )
-                                     DropdownMenuItem(
-                                         text = { Text("Share Document") },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             showUniversalEmailSheet = true
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
-                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("Clipboard Framework") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showUniversalClipboardSheet = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = "Clipboard Framework") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("XML Importing") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showUniversalXmlImportSheet = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Code, contentDescription = "XML Importing") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Simple ODF") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showUniversalOdfSheet = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.FolderZip, contentDescription = "Simple ODF") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Save") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            handleSaveCommand()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Simulate Save Error") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            performSave(true)
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Export to PDF") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Exporting ODF to PDF...", Toast.LENGTH_SHORT).show()
-                                            addLokitLog("lok::Document::saveAs(\"output.pdf\", \"pdf\")")
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            isDarkDocument = !isDarkDocument
-                                        },
-                                        leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Read it Aloud") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
-                                    )
-                                     DropdownMenuItem(
-                                         text = { Text("Open Navigator Bar") },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             showBottomBar = true
-                                             bottomBarDeck = "navigator"
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
-                                     )
-                                     DropdownMenuItem(
-                                         text = { Text(stringResource(R.string.menu_reload)) },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             if (!isSaved) {
-                                                 showReloadConfirmationDialog = true
-                                             } else {
-                                                 triggerReload()
-                                             }
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = "Reload Document") }
-                                     )
-                                     DropdownMenuItem(
-                                         text = { Text(stringResource(R.string.menu_close)) },
-                                         onClick = {
-                                             showMoreMenu = false
-                                             handleClose()
-                                         },
-                                         leadingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Close Document") }
-                                     )
-                                 }
-                             }
+                                    if (!isEditMode) {
+                                        // Viewer Mode Items: Share as PDF, Save as, Switch to Dark Mode, Open navigation bar, Read aloud, Print
+                                        DropdownMenuItem(
+                                            text = { Text("Share as PDF") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                Toast.makeText(context, "Exporting and sharing as PDF...", Toast.LENGTH_SHORT).show()
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "Share as PDF") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Save as...") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showSaveAsDialog = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                isDarkDocument = !isDarkDocument
+                                            },
+                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Open navigation bar") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showBottomBar = true
+                                                bottomBarDeck = "navigator"
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = "Open navigation bar") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Read aloud") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Print") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showUniversalPrintSheet = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                        )
+                                    } else {
+                                        // Edit Mode Items: Share, Switch to Dark Mode, Read aloud, Open Navigation Bar, Print
+                                        DropdownMenuItem(
+                                            text = { Text("Share") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showUniversalEmailSheet = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                isDarkDocument = !isDarkDocument
+                                            },
+                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Read aloud") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Open Navigation Bar") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showBottomBar = true
+                                                bottomBarDeck = "navigator"
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = "Open Navigation Bar") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Print") },
+                                            onClick = {
+                                                showMoreMenuInAppBar = false
+                                                showUniversalPrintSheet = true
+                                            },
+                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
 
-                             DropdownMenu(
-                                 expanded = showToolbarPagesMenu,
-                                 onDismissRequest = { showToolbarPagesMenu = false }
-                             ) {
-                                 val pages = listOf("home", "insert", "layout", "view", "review")
-                                 pages.forEach { page ->
-                                     DropdownMenuItem(
-                                         text = { Text(page.replaceFirstChar { it.uppercase() }) },
-                                         onClick = {
-                                             activeToolbarType = page
-                                             showToolbarPagesMenu = false
-                                         }
-                                     )
-                                 }
-                             }
+            // --- Status Bar Atas (ONLY visible in Edit Mode) ---
+            if (isEditMode) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tonalElevation = 1.dp,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = docTitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = if (isSaved) "Saved" else "Modified",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
 
+            // --- MAIN DOCUMENT WORKSPACE CANVAS ---
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(docBgColor),
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .horizontalScroll(horizScrollState)
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Document Paper Sheet
+                    Surface(
+                        modifier = Modifier
+                            .width((340 * zoomScale).dp)
+                            .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                            .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                            .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                        color = pageBgColor,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding((20 * zoomScale).dp)
+                        ) {
+                            androidx.compose.foundation.text.BasicTextField(
+                                value = docBodyText,
+                                onValueChange = { newValue ->
+                                    docBodyText = newValue
+                                    triggerAutosave()
+                                },
+                                enabled = isEditMode,
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    color = textPrimaryColor,
+                                    fontSize = (activeFontSize * zoomScale).sp,
+                                    fontFamily = when (activeFontFamily.lowercase()) {
+                                        "serif", "times new roman" -> FontFamily.Serif
+                                        "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
+                                        "monospace", "courier" -> FontFamily.Monospace
+                                        else -> FontFamily.Default
+                                    },
+                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                    textDecoration = buildList {
+                                        if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
+                                        if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                    }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
+                                    textAlign = textAlignment
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .defaultMinSize(minHeight = (440 * zoomScale).dp)
+                                    .focusRequester(focusRequester)
+                                    .onGloballyPositioned { bodyTextFieldCoordinates = it }
+                                    .testTag("doc_body_editor")
+                            )
+                        }
+                    }
+                }
+            }
 
-                            // 2. Insert Tab Character
+            // --- Status Bar Bawah (ONLY visible in Edit Mode) ---
+            if (isEditMode) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tonalElevation = 2.dp,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // 1. Page Counter (Left)
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    targetPageText = currentDocPage.toString()
+                                    showGoToPageDialog = true
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Rounded.Description,
+                                contentDescription = "Pages",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Page $currentDocPage of $totalDocPages",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // 2. Words and Character Counter (Middle)
+                        Text(
+                            text = "$wordCount words, ${docBodyText.text.length} chars",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+
+                        // 3. Zoom Control (Right)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    zoomScale = (zoomScale - 0.1f).coerceAtLeast(0.25f)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Remove,
+                                    contentDescription = "Zoom Out",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = "${(zoomScale * 100).toInt()}%",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable {
+                                        zoomScale = 1.0f
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                            IconButton(
+                                onClick = {
+                                    zoomScale = (zoomScale + 0.1f).coerceAtMost(4.0f)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Add,
+                                    contentDescription = "Zoom In",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- BOTTOM TOOLBAR HUB (Quick Action Bar, ONLY visible in Edit Mode) ---
+            AnimatedVisibility(
+                visible = isEditMode && !showBottomBar,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    tonalElevation = 4.dp,
+                    border = BorderStroke(1.dp, borderStrokeColor)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // --- Main scrollable area ---
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. Font style (Dropdown style with text & chevron)
+                            Row(
+                                modifier = Modifier
+                                    .width(100.dp)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .border(1.dp, borderStrokeColor.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        showBottomBar = true
+                                        activeInkySubpage = "font_style"
+                                        openedFromExternalHub = true
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = activeFontFamily,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = "Select Font Style",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // 2. Font size (Dropdown style with number & chevron)
+                            Row(
+                                modifier = Modifier
+                                    .width(72.dp)
+                                    .height(36.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    .border(1.dp, borderStrokeColor.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                    .clickable {
+                                        showFontSizeDialog = true
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = activeFontSize.toString(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                                    contentDescription = "Select Font Size",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // 3. Bold
+                            IconButton(
+                                onClick = {
+                                    isBold = !isBold
+                                    triggerAutosave()
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (isBold) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                )
+                            ) {
+                                Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
+                            }
+
+                            // 4. Italic
+                            IconButton(
+                                onClick = {
+                                    isItalic = !isItalic
+                                    triggerAutosave()
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (isItalic) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                )
+                            ) {
+                                Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
+                            }
+
+                            // 5. Underline with Tap and Hold
+                            LongClickIconButton(
+                                onClick = {
+                                    isUnderline = !isUnderline
+                                    triggerAutosave()
+                                },
+                                onLongClick = {
+                                    showBottomBar = true
+                                    activeInkySubpage = "underline_options"
+                                    openedFromExternalHub = true
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.FormatUnderlined,
+                                    contentDescription = "Underline",
+                                    tint = if (isUnderline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // 6. Strikethrough
+                            IconButton(
+                                onClick = {
+                                    isStrikethrough = !isStrikethrough
+                                    triggerAutosave()
+                                },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = if (isStrikethrough) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                                )
+                            ) {
+                                Icon(Icons.Rounded.FormatStrikethrough, contentDescription = "Strikethrough")
+                            }
+
+                            // 7. Highlight color
+                            IconButton(onClick = {
+                                showBottomBar = true
+                                activeInkySubpage = "highlight_color"
+                                openedFromExternalHub = true
+                            }) {
+                                Icon(
+                                    Icons.Rounded.BorderColor,
+                                    contentDescription = "Highlight Color",
+                                    tint = if (highlightColor != Color.Transparent) highlightColor else MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // 8. Font color
+                            IconButton(onClick = {
+                                showBottomBar = true
+                                activeInkySubpage = "font_color"
+                                openedFromExternalHub = true
+                            }) {
+                                Icon(
+                                    Icons.Rounded.FormatColorText,
+                                    contentDescription = "Font Color",
+                                    tint = fontColor
+                                )
+                            }
+
+                            // 9. Create bulleted list
+                            IconButton(onClick = {
+                                showBottomBar = true
+                                activeInkySubpage = "bulleted_list"
+                                openedFromExternalHub = true
+                            }) {
+                                Icon(Icons.Rounded.FormatListBulleted, contentDescription = "Bulleted List")
+                            }
+
+                            // 10. Create numbered list
+                            IconButton(onClick = {
+                                showBottomBar = true
+                                activeInkySubpage = "numbered_list"
+                                openedFromExternalHub = true
+                            }) {
+                                Icon(Icons.Rounded.FormatListNumbered, contentDescription = "Numbered List")
+                            }
+
+                            // 11. Increase indent
+                            IconButton(onClick = {
+                                val currentText = docBodyText.text
+                                val selection = docBodyText.selection
+                                val start = selection.start
+                                val end = selection.end
+                                val newText = currentText.substring(0, start) + "    " + currentText.substring(end)
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = newText,
+                                    selection = androidx.compose.ui.text.TextRange(start + 4)
+                                )
+                                triggerAutosave()
+                            }) {
+                                Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
+                            }
+
+                            // 12. Decrease indent
+                            IconButton(onClick = {
+                                val currentText = docBodyText.text
+                                val selection = docBodyText.selection
+                                val start = selection.start
+                                val end = selection.end
+                                if (start >= 4 && currentText.substring(start - 4, start) == "    ") {
+                                    val newText = currentText.substring(0, start - 4) + currentText.substring(end)
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = newText,
+                                        selection = androidx.compose.ui.text.TextRange(start - 4)
+                                    )
+                                    triggerAutosave()
+                                } else {
+                                    Toast.makeText(context, "Cannot decrease indent further", Toast.LENGTH_SHORT).show()
+                                }
+                            }) {
+                                Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
+                            }
+
+                            // 13. Add image
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Add image selected", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = "Add Image")
+                            }
+
+                            // 14. Add table
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Add table selected", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Rounded.GridOn, contentDescription = "Add Table")
+                            }
+
+                            // 15. Add link
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Add link selected", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Rounded.Link, contentDescription = "Add Link")
+                            }
+
+                            // 16. Add comment
+                            IconButton(onClick = {
+                                Toast.makeText(context, "Add comment selected", Toast.LENGTH_SHORT).show()
+                            }) {
+                                Icon(Icons.Rounded.Comment, contentDescription = "Add Comment")
+                            }
+                        }
+
+                        // --- Vertical Divider ---
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(32.dp)
+                                .background(borderStrokeColor.copy(alpha = 0.5f))
+                        )
+
+                        // --- Persistent Trailing Actions ---
+                        Row(
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            // a. Insert Tab
                             IconButton(
                                 onClick = {
                                     val currentText = docBodyText.text
@@ -1573,60 +2009,46 @@ fun InkyModule(
                                     val start = selection.start
                                     val end = selection.end
                                     val newText = currentText.substring(0, start) + "\t" + currentText.substring(end)
-                                    val newSelection = androidx.compose.ui.text.TextRange(start + 1)
                                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(
                                         text = newText,
-                                        selection = newSelection
+                                        selection = androidx.compose.ui.text.TextRange(start + 1)
                                     )
                                     triggerAutosave()
                                 }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.KeyboardTab,
-                                    contentDescription = "Insert Tab",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                                Icon(Icons.Rounded.KeyboardTab, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
                             }
-                            // 3. Show Keyboard
+
+                            // b. Toggle Keyboard
                             IconButton(
                                 onClick = {
                                     if (isKeyboardVisible) {
                                         keyboardController?.hide()
                                     } else {
-                                        focusRequester.requestFocus()
+                                        try {
+                                            focusRequester.requestFocus()
+                                        } catch (e: Exception) {}
                                         keyboardController?.show()
                                     }
                                 }
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Keyboard,
-                                    contentDescription = "Show Keyboard",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                                Icon(Icons.Rounded.Keyboard, contentDescription = "Toggle Keyboard", tint = MaterialTheme.colorScheme.primary)
                             }
-                            // 4. Open Standard Bottom Sheet (Simplified Ribbon Deck)
+
+                            // c. Open Standard Bottom Sheet
                             IconButton(
                                 onClick = {
-                                    val wasVisible = isKeyboardVisible
-                                    coroutineScope.launch {
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                        delay(100)
-                                        wasKeyboardOpenBeforeBottomSheet = wasVisible
-                                        showBottomBar = true
-                                        bottomBarDeck = "ribbon"
-                                    }
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    showBottomBar = true
+                                    bottomBarDeck = "ribbon"
                                 },
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.ViewAgenda,
-                                    contentDescription = "Open Standard Bottom Sheet",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
+                                Icon(Icons.Rounded.ViewAgenda, contentDescription = "Open Bottom Sheet", tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             }
                         }
-                    )
+                    }
                 }
             }
         }
@@ -3094,7 +3516,34 @@ fun InkyModule(
             }
         )
     }
-}
+
+    // --- FLOATING ACTION BUTTON FOR VIEWER MODE ---
+    if (!isEditMode) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            FloatingActionButton(
+                onClick = {
+                    isEditMode = true
+                    showBottomBar = false
+                    Toast.makeText(context, "Edit Mode Active", Toast.LENGTH_SHORT).show()
+                },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .size(56.dp)
+                    .testTag("fab_open_edit_mode")
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Edit,
+                    contentDescription = "Open Edit Mode"
+                )
+            }
+        }
+    }
 }
 }
 
