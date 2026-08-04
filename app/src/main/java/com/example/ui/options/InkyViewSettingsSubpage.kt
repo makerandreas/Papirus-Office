@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.R
 import com.makerandreas.papirusoffice.data.*
 import kotlinx.coroutines.launch
 
@@ -77,14 +79,14 @@ fun InkyViewSettingsSubpage(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Enable Double Tap to Fold",
+                                    text = stringResource(R.string.inky_view_enable_double_tap_fold),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Double tap any heading to collapse or expand all content under it",
+                                    text = stringResource(R.string.inky_view_enable_double_tap_fold_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                                 )
@@ -126,14 +128,14 @@ fun InkyViewSettingsSubpage(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Include Sub-levels",
+                                    text = stringResource(R.string.inky_view_include_sublevels),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = textColor
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Also fold lower-level subheadings nested under the clicked heading",
+                                    text = stringResource(R.string.inky_view_include_sublevels_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = subtitleColor
                                 )
@@ -157,7 +159,7 @@ fun InkyViewSettingsSubpage(
                 // --- MAIN SUBPAGE: Inky Options - View ---
                 Column(modifier = modifier.fillMaxWidth()) {
                     // Group 1: Guides
-                    InkySubCategoryHeader(title = "Guides")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_guides))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -165,7 +167,7 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         InkySwitchRow(
-                            title = "Helplines while Moving",
+                            title = stringResource(R.string.inky_view_helplines),
                             checked = viewOptions.helplinesWhileMoving,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateHelplinesWhileMoving(isChecked) }
@@ -177,7 +179,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 2: Display
-                    InkySubCategoryHeader(title = "Display")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_display))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -185,7 +187,7 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         InkySwitchRow(
-                            title = "Images and Objects",
+                            title = stringResource(R.string.inky_view_images),
                             checked = viewOptions.showImages,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowImages(isChecked) }
@@ -197,7 +199,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Tables",
+                            title = stringResource(R.string.inky_view_tables),
                             checked = viewOptions.showTables,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowTables(isChecked) }
@@ -209,7 +211,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Drawing and Controls",
+                            title = stringResource(R.string.inky_view_drawing),
                             checked = viewOptions.showDrawingControls,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowDrawingControls(isChecked) }
@@ -221,7 +223,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Comments",
+                            title = stringResource(R.string.inky_view_comments),
                             checked = viewOptions.showComments,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowComments(isChecked) }
@@ -233,7 +235,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Resolved Comments",
+                            title = stringResource(R.string.inky_view_resolved_comments),
                             checked = viewOptions.showResolvedComments,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowResolvedComments(isChecked) }
@@ -245,7 +247,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 3: Display Fields
-                    InkySubCategoryHeader(title = "Display Fields")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_display_fields))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -253,7 +255,7 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         InkySwitchRow(
-                            title = "Hidden text",
+                            title = stringResource(R.string.inky_view_hidden_text),
                             checked = viewOptions.showHiddenText,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowHiddenText(isChecked) }
@@ -265,7 +267,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Hidden paragraphs",
+                            title = stringResource(R.string.inky_view_hidden_paragraphs),
                             checked = viewOptions.showHiddenParagraphs,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateShowHiddenParagraphs(isChecked) }
@@ -277,7 +279,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 4: Track Changes
-                    InkySubCategoryHeader(title = "Track Changes")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_track_changes))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -285,7 +287,7 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         InkySwitchRow(
-                            title = "Tracked Deletions in Margin",
+                            title = stringResource(R.string.inky_view_tracked_deletions),
                             checked = viewOptions.trackedDeletionsInMargin,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateTrackedDeletionsMargin(isChecked) }
@@ -297,7 +299,7 @@ fun InkyViewSettingsSubpage(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                         )
                         InkySwitchRow(
-                            title = "Tooltips on Tracked Changes",
+                            title = stringResource(R.string.inky_view_tooltips),
                             checked = viewOptions.tooltipsOnTrackedChanges,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateTooltipsTrackedChanges(isChecked) }
@@ -309,7 +311,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 5: Outline Folding
-                    InkySubCategoryHeader(title = "Outline Folding")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_outline_folding))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -326,14 +328,14 @@ fun InkyViewSettingsSubpage(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Double Tap to Fold Outline",
+                                    text = stringResource(R.string.inky_view_double_tap_fold),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "Configure outline section folding behavior",
+                                    text = stringResource(R.string.inky_view_double_tap_fold_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -349,7 +351,7 @@ fun InkyViewSettingsSubpage(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Icon(
                                     imageVector = Icons.Rounded.ChevronRight,
-                                    contentDescription = "Open Double Tap to Fold Options",
+                                    contentDescription = stringResource(R.string.inky_view_open_fold_options),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -359,7 +361,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 6: View
-                    InkySubCategoryHeader(title = "View")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_view_group))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -367,7 +369,7 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                     ) {
                         InkySwitchRow(
-                            title = "Enable Smooth Scrolling",
+                            title = stringResource(R.string.inky_view_smooth_scrolling),
                             checked = viewOptions.enableSmoothScrolling,
                             onCheckedChange = { isChecked ->
                                 coroutineScope.launch { preferencesRepository.updateEnableSmoothScrolling(isChecked) }
@@ -379,7 +381,7 @@ fun InkyViewSettingsSubpage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Group 7: Zoom
-                    InkySubCategoryHeader(title = "Zoom")
+                    InkySubCategoryHeader(title = stringResource(R.string.inky_view_zoom))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -387,14 +389,14 @@ fun InkyViewSettingsSubpage(
                             .background(MaterialTheme.colorScheme.surfaceContainerLow)
                             .padding(16.dp)
                     ) {
-                        Text("Zoom Options", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.inky_view_zoom_options), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val selectedZoomLabel = when (viewOptions.zoomMode) {
-                            ZoomMode.LAST -> "Use last document setting"
-                            ZoomMode.FIT_WIDTH -> "Fit width"
-                            ZoomMode.HUNDRED -> "100%"
-                            ZoomMode.CUSTOM -> "Custom (${viewOptions.customZoomPercent}%)"
+                            ZoomMode.LAST -> stringResource(R.string.inky_view_zoom_last)
+                            ZoomMode.FIT_WIDTH -> stringResource(R.string.inky_view_zoom_fit)
+                            ZoomMode.HUNDRED -> stringResource(R.string.inky_view_zoom_hundred)
+                            ZoomMode.CUSTOM -> stringResource(R.string.inky_view_zoom_custom, viewOptions.customZoomPercent)
                         }
 
                         ExposedDropdownMenuBox(
@@ -417,28 +419,28 @@ fun InkyViewSettingsSubpage(
                                 onDismissRequest = { zoomDropdownExpanded = false }
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Use last document setting") },
+                                    text = { Text(stringResource(R.string.inky_view_zoom_last)) },
                                     onClick = {
                                         zoomDropdownExpanded = false
                                         coroutineScope.launch { preferencesRepository.updateZoomMode(ZoomMode.LAST) }
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Fit width") },
+                                    text = { Text(stringResource(R.string.inky_view_zoom_fit)) },
                                     onClick = {
                                         zoomDropdownExpanded = false
                                         coroutineScope.launch { preferencesRepository.updateZoomMode(ZoomMode.FIT_WIDTH) }
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("100%") },
+                                    text = { Text(stringResource(R.string.inky_view_zoom_hundred)) },
                                     onClick = {
                                         zoomDropdownExpanded = false
                                         coroutineScope.launch { preferencesRepository.updateZoomMode(ZoomMode.HUNDRED) }
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Custom") },
+                                    text = { Text(stringResource(R.string.inky_view_zoom_custom_label)) },
                                     onClick = {
                                         zoomDropdownExpanded = false
                                         coroutineScope.launch { preferencesRepository.updateZoomMode(ZoomMode.CUSTOM) }
@@ -457,10 +459,10 @@ fun InkyViewSettingsSubpage(
     if (showCustomZoomDialog) {
         AlertDialog(
             onDismissRequest = { showCustomZoomDialog = false },
-            title = { Text("Custom Zoom Scaling") },
+            title = { Text(stringResource(R.string.inky_view_custom_zoom_title)) },
             text = {
                 Column {
-                    Text("Enter custom zoom scale percentage (25% - 400%):", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.inky_view_custom_zoom_prompt), style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = customZoomInput,
@@ -469,7 +471,7 @@ fun InkyViewSettingsSubpage(
                                 customZoomInput = input
                             }
                         },
-                        label = { Text("Zoom Percentage") },
+                        label = { Text(stringResource(R.string.inky_view_custom_zoom_input_label)) },
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -488,17 +490,17 @@ fun InkyViewSettingsSubpage(
                             }
                             showCustomZoomDialog = false
                         } else {
-                            Toast.makeText(context, "Please enter a value between 25 and 400", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.inky_view_custom_zoom_invalid), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.testTag("btn_save_custom_zoom")
                 ) {
-                    Text("OK")
+                    Text(stringResource(R.string.btn_ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCustomZoomDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )

@@ -538,9 +538,36 @@ fun InkyModule(
     var openedFromExternalHub by remember { mutableStateOf(false) }
 
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
+    var showReloadConfirmationDialog by remember { mutableStateOf(false) }
     var pendingActionAfterSave by remember { mutableStateOf<(() -> Unit)?>(null) }
     var showCreateFromTemplateDialog by remember { mutableStateOf(false) }
     var showOpenDocumentDialog by remember { mutableStateOf(false) }
+
+    val triggerReload = {
+        val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+        if (currentSession != null) {
+            isLoadingDocument = true
+            isParsingDoc = true
+            coroutineScope.launch {
+                val parseResult = com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
+                if (parseResult != null) {
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                    lastTextRecordedValue = parseResult.text
+                    docxImages = parseResult.extractedImages
+                    docxExtents = parseResult.imageExtents
+                    isSaved = true
+                    Toast.makeText(context, context.getString(R.string.toast_reload_success), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to reload document", Toast.LENGTH_SHORT).show()
+                }
+                isLoadingDocument = false
+                isParsingDoc = false
+            }
+        } else {
+            Toast.makeText(context, "No active session to reload", Toast.LENGTH_SHORT).show()
+        }
+        Unit
+    }
 
     // Save & Loading states
     var isSaving by remember { mutableStateOf(false) }
@@ -878,6 +905,11 @@ fun InkyModule(
 
     val handleClose = {
         val closeAction = {
+            val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+            if (currentSession != null) {
+                com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.close(currentSession)
+            }
+            com.example.MainActivity.openedFilePath = null
             onFormatAction("Back to start center")
         }
         if (!isSaved) {
@@ -1382,80 +1414,43 @@ fun InkyModule(
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("Open Navigation Bar") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showBottomBar = true
-                                            bottomBarDeck = "navigator"
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Print") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            Toast.makeText(context, "Printing document...", Toast.LENGTH_SHORT).show()
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
-                                    )
-                                }
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
-                        )
-                    )
-                } else {
-                    // --- EDIT MODE APP BAR (Headline & Subtitle removed) ---
-                    TopAppBar(
-                        title = { /* Headline & Subtitle removed in Edit Mode as required */ },
-                        navigationIcon = {
-                            IconButton(onClick = { isEditMode = false }) {
-                                Icon(Icons.Default.Check, contentDescription = "Exit Edit Mode", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        },
-                        actions = {
-                            IconButton(onClick = {
-                                Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
-                                addLokitLog("Upload to Drive triggered")
-                            }) {
-                                Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
-                            }
-                            IconButton(onClick = { showFindReplace = !showFindReplace }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Find and Replace")
-                            }
-                            IconButton(onClick = { 
-                                isWebView = !isWebView
-                                Toast.makeText(context, if (isWebView) "Mobile View" else "Normal View", Toast.LENGTH_SHORT).show()
-                                addLokitLog("View Mode changed -> lok::Document::paintTileList() refreshed")
-                            }) {
-                                Icon(
-                                    imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                    contentDescription = "Document View Mode"
-                                )
-                            }
-                            IconButton(onClick = { 
-                                handleSaveCommand()
-                            }) {
-                                Icon(Icons.Rounded.Save, contentDescription = "Save")
-                            }
-                            Box {
-                                IconButton(onClick = { showMoreMenu = true }) {
-                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
-                                }
-                                DropdownMenu(
-                                    expanded = showMoreMenu,
-                                    onDismissRequest = { showMoreMenu = false }
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("Share") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showUniversalEmailSheet = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
-                                    )
+                                     DropdownMenuItem(
+                                         text = { Text("Open Navigation Bar") },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             showBottomBar = true
+                                             bottomBarDeck = "navigator"
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
+                                     )
+                                     DropdownMenuItem(
+                                         text = { Text(stringResource(R.string.menu_reload)) },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             if (!isSaved) {
+                                                 showReloadConfirmationDialog = true
+                                             } else {
+                                                 triggerReload()
+                                             }
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = "Reload Document") }
+                                     )
+                                     DropdownMenuItem(
+                                         text = { Text(stringResource(R.string.menu_close)) },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             handleClose()
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Close Document") }
+                                     )
+                                     DropdownMenuItem(
+                                         text = { Text("Share Document") },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             showUniversalEmailSheet = true
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
+                                     )
                                     DropdownMenuItem(
                                         text = { Text("Clipboard Framework") },
                                         onClick = {
@@ -1521,1055 +1516,54 @@ fun InkyModule(
                                         },
                                         leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read Aloud") }
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text("Open Navigator Bar") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showBottomBar = true
-                                            bottomBarDeck = "navigator"
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Print") },
-                                        onClick = {
-                                            showMoreMenu = false
-                                            showUniversalPrintSheet = true
-                                        },
-                                        leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
-                                    )
-                                }
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(4.dp)
-                        )
-                    )
+                                     DropdownMenuItem(
+                                         text = { Text("Open Navigator Bar") },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             showBottomBar = true
+                                             bottomBarDeck = "navigator"
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Explore, contentDescription = "Navigator") }
+                                     )
+                                     DropdownMenuItem(
+                                         text = { Text(stringResource(R.string.menu_reload)) },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             if (!isSaved) {
+                                                 showReloadConfirmationDialog = true
+                                             } else {
+                                                 triggerReload()
+                                             }
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = "Reload Document") }
+                                     )
+                                     DropdownMenuItem(
+                                         text = { Text(stringResource(R.string.menu_close)) },
+                                         onClick = {
+                                             showMoreMenu = false
+                                             handleClose()
+                                         },
+                                         leadingIcon = { Icon(Icons.Rounded.Close, contentDescription = "Close Document") }
+                                     )
+                                 }
+                             }
 
-                    // --- STATUS BAR BARU DI BAWAH APP BAR (Edit Mode Only) ---
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = docTitle,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
+                             DropdownMenu(
+                                 expanded = showToolbarPagesMenu,
+                                 onDismissRequest = { showToolbarPagesMenu = false }
+                             ) {
+                                 val pages = listOf("home", "insert", "layout", "view", "review")
+                                 pages.forEach { page ->
+                                     DropdownMenuItem(
+                                         text = { Text(page.replaceFirstChar { it.uppercase() }) },
+                                         onClick = {
+                                             activeToolbarType = page
+                                             showToolbarPagesMenu = false
+                                         }
+                                     )
+                                 }
+                             }
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (isSaving) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(12.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.status_saving),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                } else if (saveFailed) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.ErrorOutline,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.status_save_failed),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                } else if (isSaved) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.CheckCircle,
-                                        contentDescription = null,
-                                        tint = Color(0xFF10B981),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.status_saved),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF10B981)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Edit,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.status_unsaved),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.secondary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            }
-
-            // --- FIREBASE CLOUD SYNC & AUTH BAR ---
-            CloudSyncBar(
-                currentDocumentTitle = docTitle,
-                currentDocumentContent = docBodyText.text,
-                moduleType = "WRITER",
-                onLoadDocumentFromCloud = { cloudDoc ->
-                    docTitle = cloudDoc.title
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(cloudDoc.content)
-                    isNewDocument = false
-                    isSaved = true
-                    Toast.makeText(context, "Loaded cloud document: ${cloudDoc.title}", Toast.LENGTH_SHORT).show()
-                }
-            )
-
-            // --- FIND AND REPLACE OVERLAY BAR ---
-            AnimatedVisibility(visible = showFindReplace) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                placeholder = { Text("Search text...") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { searchQuery = "" }) {
-                                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                        }
-                                    }
-                                }
-                            )
-                            if (isEditMode) {
-                                OutlinedTextField(
-                                    value = replaceQuery,
-                                    onValueChange = { replaceQuery = it },
-                                    placeholder = { Text("Replace with...") },
-                                    modifier = Modifier.weight(1f),
-                                    singleLine = true
-                                )
-                            }
-                            IconButton(onClick = { showFindReplace = false }) {
-                                Icon(Icons.Default.Close, contentDescription = "Close")
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = {
-                                Toast.makeText(context, "Searching: $searchQuery", Toast.LENGTH_SHORT).show()
-                            }) {
-                                Text("Find")
-                            }
-                            if (isEditMode) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Button(onClick = {
-                                    triggerAutosave()
-                                    Toast.makeText(context, "Replacing '$searchQuery' -> '$replaceQuery'", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Text("Replace All")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // --- MAIN DOCUMENT AREA & VIEWPORT ---
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            ) {
-                val currentDensity = androidx.compose.ui.platform.LocalDensity.current
-                val customDensity = remember(currentDensity) {
-                    androidx.compose.ui.unit.Density(
-                        density = currentDensity.density,
-                        fontScale = 1.0f
-                    )
-                }
-                androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.ui.platform.LocalDensity provides customDensity
-                ) {
-                    // Interactive document container
-                    Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .onGloballyPositioned { viewportCoordinates = it }
-                        .verticalScroll(scrollState)
-                        .background(docBgColor)
-                        .padding(if (isWebView) 0.dp else 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    
-                    if (!isWebView) {
-                        // --- A4 PORTRAIT VIEWPORT ---
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(horizScrollState),
-                            contentAlignment = if (zoomScale > 1f) Alignment.CenterStart else Alignment.Center
-                        ) {
-                            if (!isEditMode) {
-                                // --- VIEWER MODE: SEPARATE ELEGANT A4 PAGES (WYSIWYG) ---
-                                val displayDoc = remember(currentSessionState, docBodyText.text, textAlignment) {
-                                    currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
-                                        body = com.makerandreas.papirusoffice.data.DocumentBody(
-                                            elements = listOf(
-                                                com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement(
-                                                    com.makerandreas.papirusoffice.data.OfficeParagraph(
-                                                        text = docBodyText.text,
-                                                        alignment = when (textAlignment) {
-                                                            TextAlign.Center -> "Center"
-                                                            TextAlign.Right -> "Right"
-                                                            TextAlign.Justify -> "Justify"
-                                                            else -> "Left"
-                                                        }
-                                                    )
-                                                )
-                                            )
-                                        )
-                                    )
-                                }
-
-                                LayoutDrivenDocumentRenderer(
-                                    document = displayDoc,
-                                    zoomScale = zoomScale,
-                                    isEditMode = false,
-                                    cursor = layoutCursor,
-                                    onCursorChange = { layoutCursor = it },
-                                    outlineEngine = outlineEngine,
-                                    enableOutlineFolding = viewOptions.enableOutlineFolding,
-                                    showImages = viewOptions.showImages,
-                                    showTables = viewOptions.showTables
-                                )
-
-                                if (docxImages.isNotEmpty()) {
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.padding(vertical = 8.dp)
-                                    ) {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text(
-                                            text = "--- EMBEDDED IMAGES ---",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textAccentColor
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        docxImages.forEach { (imageName, imageFile) ->
-                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                com.example.ui.components.DocxEmbeddedImage(
-                                                    imageFile = imageFile,
-                                                    extentCx = extent.first,
-                                                    extentCy = extent.second
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                // --- EDITOR MODE: SEPARATE ELEGANT A4 PAGES (WYSIWYG MATCHING VIEWER) ---
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    pagesList.forEachIndexed { index, pageText ->
-                                        Box(
-                                            modifier = Modifier
-                                                .width((320 * zoomScale).dp)
-                                                .height((452 * zoomScale).dp)
-                                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                                .background(pageBgColor)
-                                                .padding(24.dp)
-                                        ) {
-                                            if (index == 0) {
-                                                androidx.compose.foundation.text.BasicTextField(
-                                                    value = docBodyText,
-                                                    onValueChange = {
-                                                        if (it.text != docBodyText.text) {
-                                                            customTextToolbar.hide()
-                                                        }
-                                                        docBodyText = it
-                                                        isSaved = false
-                                                        triggerAutosave()
-                                                        addLokitLog("LOK_CALLBACK_INVALIDATE_TILES -> edit")
-                                                    },
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                                        .focusRequester(focusRequester)
-                                                        .bringIntoViewResponder(noOpBringIntoViewResponder),
-                                                    onTextLayout = { bodyTextLayoutResult = it },
-                                                    readOnly = false,
-                                                    textStyle = androidx.compose.ui.text.TextStyle(
-                                                        fontSize = (activeFontSize * zoomScale).sp,
-                                                        lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
-                                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                        textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                        fontFamily = when (activeFontFamily) {
-                                                            "Liberation Serif" -> FontFamily.Serif
-                                                            "Calibri" -> FontFamily.SansSerif
-                                                            "Arial" -> FontFamily.SansSerif
-                                                            "Roboto" -> FontFamily.SansSerif
-                                                            else -> FontFamily.Default
-                                                        },
-                                                        color = textPrimaryColor,
-                                                        textAlign = textAlignment
-                                                    ),
-                                                    decorationBox = { innerTextField ->
-                                                        innerTextField()
-                                                    }
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = pageText,
-                                                    fontSize = (activeFontSize * zoomScale).sp,
-                                                    lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
-                                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                    textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                                    fontFamily = when (activeFontFamily) {
-                                                        "Liberation Serif" -> FontFamily.Serif
-                                                        "Calibri" -> FontFamily.SansSerif
-                                                        "Arial" -> FontFamily.SansSerif
-                                                        "Roboto" -> FontFamily.SansSerif
-                                                        else -> FontFamily.Default
-                                                    },
-                                                    color = textPrimaryColor,
-                                                    textAlign = textAlignment,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            }
-                                        }
-                                    }
-                                    if (docxImages.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text(
-                                            text = "--- EMBEDDED IMAGES ---",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textAccentColor,
-                                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        docxImages.forEach { (imageName, imageFile) ->
-                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                com.example.ui.components.DocxEmbeddedImage(
-                                                    imageFile = imageFile,
-                                                    extentCx = extent.first,
-                                                    extentCy = extent.second
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // --- MOBILE/WEB VIEWPORT (Full Bleed) ---
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 8.dp)
-                                .border(1.dp, borderStrokeColor, RoundedCornerShape(12.dp))
-                                .onGloballyPositioned { pageBoxCoordinates = it }
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            val canceled = event.changes.any { it.isConsumed }
-                                            if (!canceled) {
-                                                if (event.changes.size >= 2) {
-                                                    val zoomChange = event.calculateZoom()
-                                                    if (zoomChange != 1f) {
-                                                        val newScale = zoomScale * zoomChange
-                                                        zoomScale = newScale.coerceIn(0.5f, 2.0f)
-                                                    }
-                                                    event.changes.forEach { change ->
-                                                        if (change.positionChanged()) {
-                                                            change.consume()
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                            colors = CardDefaults.cardColors(containerColor = pageBgColor),
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp)
-                            ) {
-                                Text(
-                                    text = "WEB / MOBILE VIEW MODE",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = textAccentColor,
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    androidx.compose.foundation.text.BasicTextField(
-                                        value = docBodyText,
-                                        onValueChange = {
-                                            docBodyText = it
-                                            isSaved = false
-                                            triggerAutosave()
-                                            addLokitLog("LOK_CALLBACK_INVALIDATE_TILES (Web mode edit)")
-                                            addLokitLog("lok::Document::renderTile() -> Web bounds")
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = 350.dp)
-                                            .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                            .focusRequester(focusRequester),
-                                        onTextLayout = { bodyTextLayoutResult = it },
-                                        readOnly = !isEditMode,
-                                        textStyle = androidx.compose.ui.text.TextStyle(
-                                            fontSize = (activeFontSize * zoomScale).sp,
-                                            lineHeight = (activeFontSize * zoomScale * lineSpacingFactor).sp,
-                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                            textDecoration = if (isUnderline) TextDecoration.Underline else TextDecoration.None,
-                                            fontFamily = when (activeFontFamily) {
-                                                "Liberation Serif" -> FontFamily.Serif
-                                                "Calibri" -> FontFamily.SansSerif
-                                                "Arial" -> FontFamily.SansSerif
-                                                "Roboto" -> FontFamily.SansSerif
-                                                else -> FontFamily.Default
-                                            },
-                                            color = textPrimaryColor,
-                                            textAlign = textAlignment
-                                        ),
-                                        decorationBox = { innerTextField ->
-                                            if (docBodyText.text.isEmpty()) {
-                                                Text(
-                                                    text = "Mulai mengetik di tampilan seluler ini...",
-                                                    color = Color.Gray.copy(alpha = 0.7f),
-                                                    fontSize = (activeFontSize * zoomScale).sp,
-                                                    fontFamily = FontFamily.SansSerif
-                                                )
-                                            }
-                                            innerTextField()
-                                        }
-                                    )
-
-                                    if (docxImages.isNotEmpty()) {
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Text(
-                                            text = "--- EMBEDDED IMAGES ---",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = textAccentColor,
-                                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        docxImages.forEach { (imageName, imageFile) ->
-                                            val extent = docxExtents[imageName] ?: docxExtents["default"] ?: Pair(1905000L, 1428750L)
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(vertical = 4.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                com.example.ui.components.DocxEmbeddedImage(
-                                                    imageFile = imageFile,
-                                                    extentCx = extent.first,
-                                                    extentCy = extent.second
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                }
-
-                // --- FLOATING GEMINI COPILOT FAB ---
-                if (!showBottomBar) {
-                    FloatingActionButton(
-                        onClick = { showAiAssistant = true },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = if (!isEditMode) 90.dp else 24.dp, end = 24.dp)
-                            .testTag("fab_gemini_copilot"),
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "Gemini Copilot")
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Gemini Copilot", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // --- FLOATING ACTION BUTTON (Viewer Mode Only) ---
-                if (!isEditMode && !showBottomBar) {
-                    ExtendedFloatingActionButton(
-                        onClick = { 
-                            isEditMode = true
-                        },
-                        icon = { Icon(Icons.Default.Edit, contentDescription = "Edit") },
-                        text = { Text("Edit Document") },
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(24.dp)
-                            .testTag("fab_edit_document"),
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-
-            // --- FOOTER STATS & STATUS BAR (Edit Mode Only as required) ---
-            if (isEditMode) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp)),
-                    shape = RoundedCornerShape(0.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                        customTextToolbar.hide()
-                                    }
-                                }
-                            }
-                        }
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Page $currentDocPage of $totalDocPages",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clickable {
-                                    targetPageText = currentDocPage.toString()
-                                    showGoToPageDialog = true
-                                }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                                .testTag("btn_page_indicator")
-                        )
-
-                        Text(
-                            text = "$wordCount words",
-                            fontSize = 11.sp,
-                            color = Color.Gray,
-                            modifier = Modifier.testTag("text_word_count")
-                        )
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    customTextToolbar.hide()
-                                    if (zoomScale > 0.5f) zoomScale -= 0.1f
-                                },
-                                modifier = Modifier.size(24.dp).testTag("btn_zoom_out")
-                            ) {
-                                Icon(androidx.compose.material.icons.Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
-                            }
-                            Text(
-                                text = "Zoom: ${(zoomScale * 100).toInt()}%",
-                                fontSize = 11.sp,
-                                color = Color.Gray,
-                                modifier = Modifier
-                                    .clickable {
-                                        customTextToolbar.hide()
-                                        zoomScale = 1.0f
-                                    }
-                                    .padding(horizontal = 2.dp, vertical = 2.dp)
-                                    .testTag("text_zoom_percent")
-                            )
-                            IconButton(
-                                onClick = {
-                                    customTextToolbar.hide()
-                                    if (zoomScale < 2.0f) zoomScale += 0.1f
-                                },
-                                modifier = Modifier.size(24.dp).testTag("btn_zoom_in")
-                            ) {
-                                Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // --- BOTTOM TOOLBAR HUB (Edit Mode Only) ---
-            // Contains horizontal scrollable tools, togglable Standard/Formatting options
-            AnimatedVisibility(
-                visible = isEditMode && !showBottomBar,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-                modifier = Modifier.pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.changes.any { it.pressed && !it.previousPressed }) {
-                                customTextToolbar.hide()
-                            }
-                        }
-                    }
-                }
-            ) {
-                Surface(
-                    tonalElevation = 6.dp,
-                    color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-
-                        // Left Side: Horizontal Scrollable Toolbar Area (1 toolbar at a time)
-                        LazyRow(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (activeToolbarType == "Standard") {
-                                // --- STANDARD TOOLBAR ---
-                                
-                                // 1. Font Style (Drop-down sepanjang ±3 ikon)
-                                item {
-                                    Row(
-                                        modifier = Modifier
-                                            .width(120.dp)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                            .clickable {
-                                                bottomBarDeck = "font_family"
-                                                showBottomBar = true
-                                            }
-                                            .padding(horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = activeFontFamily,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = "Font Style",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                // 2. Font Size (Drop-down sepanjang ±2 ikon)
-                                item {
-                                    Row(
-                                        modifier = Modifier
-                                            .width(76.dp)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                            .clickable { showFontSizeDialog = true }
-                                            .padding(horizontal = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = "$activeFontSize pt",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = "Font Size",
-                                            modifier = Modifier.size(16.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-
-                                // 3. Bold
-                                item {
-                                    IconButton(
-                                        onClick = { isBold = !isBold; triggerAutosave() },
-                                        colors = if (isBold) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                    ) {
-                                        Icon(Icons.Rounded.FormatBold, contentDescription = "Bold", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 4. Italic
-                                item {
-                                    IconButton(
-                                        onClick = { isItalic = !isItalic; triggerAutosave() },
-                                        colors = if (isItalic) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                    ) {
-                                        Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 5. Underline
-                                item {
-                                    Row(
-                                        modifier = Modifier
-                                            .width(72.dp)
-                                            .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(
-                                                if (isUnderline) MaterialTheme.colorScheme.secondaryContainer
-                                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                            )
-                                            .border(
-                                                1.dp,
-                                                if (isUnderline) MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
-                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                                RoundedCornerShape(8.dp)
-                                            ),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clickable {
-                                                    isUnderline = !isUnderline
-                                                    triggerAutosave()
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.FormatUnderlined,
-                                                contentDescription = "Underline",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .width(28.dp)
-                                                .fillMaxHeight()
-                                                .clickable {
-                                                    bottomBarDeck = "underline_options"
-                                                    openedFromExternalHub = true
-                                                    showBottomBar = true
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.KeyboardArrowDown,
-                                                contentDescription = "Underline Options",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // 6. Strikethrough
-                                item {
-                                    IconButton(
-                                        onClick = { isStrikethrough = !isStrikethrough; triggerAutosave() },
-                                        colors = if (isStrikethrough) IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer) else IconButtonDefaults.iconButtonColors()
-                                    ) {
-                                        Icon(Icons.Rounded.StrikethroughS, contentDescription = "Strikethrough", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 7. Text Highlight Color
-                                item {
-                                    IconButton(onClick = {
-                                        showBottomBar = true
-                                        bottomBarDeck = "highlight_color"
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.BorderColor,
-                                            contentDescription = "Highlight Color",
-                                            tint = if (highlightColor == Color.Transparent) Color.Gray else highlightColor
-                                        )
-                                    }
-                                }
-
-                                // 8. Font Color
-                                item {
-                                    IconButton(onClick = {
-                                        showBottomBar = true
-                                        bottomBarDeck = "font_color"
-                                    }) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.FormatColorText,
-                                            contentDescription = "Font Color",
-                                            tint = fontColor
-                                        )
-                                    }
-                                }
-
-                                // 9. Insert Bulleted Lists
-                                item {
-                                    IconButton(onClick = {
-                                        val sel = docBodyText.selection
-                                        val currentText = docBodyText.text
-                                        val start = sel.start
-                                        val end = sel.end
-                                        val newText = currentText.substring(0, start) + "• " + currentText.substring(end)
-                                        docBodyText = docBodyText.copy(
-                                            text = newText,
-                                            selection = androidx.compose.ui.text.TextRange(start + 2)
-                                        )
-                                        addLokitLog("lok::Document::insertBulletedList() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.FormatListBulleted, contentDescription = "Insert Bulleted List", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 10. Insert Numbered Lists
-                                item {
-                                    IconButton(onClick = {
-                                        val sel = docBodyText.selection
-                                        val currentText = docBodyText.text
-                                        val start = sel.start
-                                        val end = sel.end
-                                        val newText = currentText.substring(0, start) + "1. " + currentText.substring(end)
-                                        docBodyText = docBodyText.copy(
-                                            text = newText,
-                                            selection = androidx.compose.ui.text.TextRange(start + 3)
-                                        )
-                                        addLokitLog("lok::Document::insertNumberedList() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.FormatListNumbered, contentDescription = "Insert Numbered List", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 11. Increase Indent
-                                item {
-                                    IconButton(onClick = {
-                                        val sel = docBodyText.selection
-                                        val currentText = docBodyText.text
-                                        val start = sel.start
-                                        val end = sel.end
-                                        val newText = currentText.substring(0, start) + "\t" + currentText.substring(end)
-                                        docBodyText = docBodyText.copy(
-                                            text = newText,
-                                            selection = androidx.compose.ui.text.TextRange(start + 1)
-                                        )
-                                        addLokitLog("lok::Document::increaseIndent() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 12. Decrease Indent
-                                item {
-                                    IconButton(onClick = {
-                                        addLokitLog("lok::Document::decreaseIndent() -> SUCCESS")
-                                        Toast.makeText(context, "Decrease Indent", Toast.LENGTH_SHORT).show()
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 13. Change Text Direction
-                                item {
-                                    IconButton(onClick = {
-                                        textAlignment = if (textAlignment == TextAlign.Left) TextAlign.Right else TextAlign.Left
-                                        addLokitLog("lok::Document::setTextDirection() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.FormatTextdirectionLToR, contentDescription = "Change text direction", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 14. Insert Pictures
-                                item {
-                                    IconButton(onClick = {
-                                        Toast.makeText(context, "Menyisipkan Gambar...", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::insertImage() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.Image, contentDescription = "Insert Picture", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 15. Insert Tables
-                                item {
-                                    IconButton(onClick = {
-                                        Toast.makeText(context, "Menyisipkan Tabel...", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::insertTable() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.GridOn, contentDescription = "Insert Table", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 16. Insert Links
-                                item {
-                                    IconButton(onClick = {
-                                        Toast.makeText(context, "Menyisipkan Tautan...", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::insertLink() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.Link, contentDescription = "Insert Link", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-
-                                // 17. Add Comment
-                                item {
-                                    IconButton(onClick = {
-                                        Toast.makeText(context, "Menambahkan Komentar...", Toast.LENGTH_SHORT).show()
-                                        addLokitLog("lok::Document::addComment() -> SUCCESS")
-                                        triggerAutosave()
-                                    }) {
-                                        Icon(Icons.Rounded.Comment, contentDescription = "Add Comment", tint = MaterialTheme.colorScheme.primary)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Vertical Full-height Divider separating horizontal tools from persistent triggers
-                        Spacer(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .fillMaxHeight(0.7f)
-                                .background(borderStrokeColor)
-                                .padding(horizontal = 4.dp)
-                        )
-
-                        // Right Side: 4 Persistent Icons (Material Symbols Rounded)
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(1.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val availableToolbarPages = listOf("Standard")
-
-                            // 1. Switch Toolbar (Dynamic based on page count)
-                            if (availableToolbarPages.size > 1) {
-                                Box {
-                                    IconButton(
-                                        onClick = {
-                                            if (availableToolbarPages.size == 2) {
-                                                activeToolbarType = if (activeToolbarType == "Standard") "Formatting" else "Standard"
-                                            } else {
-                                                showToolbarPagesMenu = true
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Cached,
-                                            contentDescription = "Switch Toolbar",
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                    if (availableToolbarPages.size >= 3) {
-                                        DropdownMenu(
-                                            expanded = showToolbarPagesMenu,
-                                            onDismissRequest = { showToolbarPagesMenu = false }
-                                        ) {
-                                            availableToolbarPages.forEach { page ->
-                                                DropdownMenuItem(
-                                                    text = { Text(page) },
-                                                    onClick = {
-                                                        activeToolbarType = page
-                                                        showToolbarPagesMenu = false
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
 
                             // 2. Insert Tab Character
                             IconButton(
@@ -2632,7 +1626,7 @@ fun InkyModule(
                                 )
                             }
                         }
-                    }
+                    )
                 }
             }
         }
@@ -2642,7 +1636,7 @@ fun InkyModule(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = showBottomBar,
                 enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
                 exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut()
@@ -2845,59 +1839,61 @@ fun InkyModule(
                                     }
 
                                     // Persistent undo/redo/close
-                                    LongClickIconButton(
-                                        enabled = canUndo,
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch {
-                                                val success = currentSessionState?.undoManager?.undo() ?: false
-                                                if (success) {
-                                                    triggerAutosave()
-                                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                    if (activeInkySubpage != "actions_to_undo" && activeInkySubpage != "actions_to_redo") {
+                                        LongClickIconButton(
+                                            enabled = canUndo,
+                                            onClick = {
+                                                customTextToolbar.hide()
+                                                coroutineScope.launch {
+                                                    val success = currentSessionState?.undoManager?.undo() ?: false
+                                                    if (success) {
+                                                        triggerAutosave()
+                                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
+                                                addLokitLog("lok::Document::postWindow(event=UNDO)")
+                                            },
+                                            onLongClick = {
+                                                customTextToolbar.hide()
+                                                previousInkySubpage = activeInkySubpage
+                                                activeInkySubpage = "actions_to_undo"
                                             }
-                                            addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                        },
-                                        onLongClick = {
-                                            customTextToolbar.hide()
-                                            previousInkySubpage = activeInkySubpage
-                                            activeInkySubpage = "actions_to_undo"
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Undo,
+                                                contentDescription = "Undo",
+                                                tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
                                         }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Undo,
-                                            contentDescription = "Undo",
-                                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                        )
-                                    }
-                                    LongClickIconButton(
-                                        enabled = canRedo,
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch {
-                                                val success = currentSessionState?.undoManager?.redo() ?: false
-                                                if (success) {
-                                                    triggerAutosave()
-                                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                        LongClickIconButton(
+                                            enabled = canRedo,
+                                            onClick = {
+                                                customTextToolbar.hide()
+                                                coroutineScope.launch {
+                                                    val success = currentSessionState?.undoManager?.redo() ?: false
+                                                    if (success) {
+                                                        triggerAutosave()
+                                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
+                                                addLokitLog("lok::Document::postWindow(event=REDO)")
+                                            },
+                                            onLongClick = {
+                                                customTextToolbar.hide()
+                                                previousInkySubpage = activeInkySubpage
+                                                activeInkySubpage = "actions_to_redo"
                                             }
-                                            addLokitLog("lok::Document::postWindow(event=REDO)")
-                                        },
-                                        onLongClick = {
-                                            customTextToolbar.hide()
-                                            previousInkySubpage = activeInkySubpage
-                                            activeInkySubpage = "actions_to_redo"
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Redo,
+                                                contentDescription = "Redo",
+                                                tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            )
                                         }
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Redo,
-                                            contentDescription = "Redo",
-                                            tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                        )
                                     }
                                     IconButton(onClick = {
                                         customTextToolbar.hide()
@@ -3152,6 +2148,14 @@ fun InkyModule(
                                                      showBottomBar = false
                                                      showSaveAsDialog = true
                                                  },
+                                                 onReloadDocument = {
+                                                     showBottomBar = false
+                                                     if (!isSaved) {
+                                                         showReloadConfirmationDialog = true
+                                                     } else {
+                                                         triggerReload()
+                                                     }
+                                                 },
                                                  onDocumentProperties = {
                                                      coroutineScope.launch {
                                                          val currentPath = com.example.MainActivity.openedFilePath ?: "templates/inky/Normal.ott"
@@ -3313,6 +2317,40 @@ fun InkyModule(
                 showPasteSpecialDialog = false
                 triggerAutosave()
                 Toast.makeText(context, "Menempelkan sebagai $format", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    if (showReloadConfirmationDialog) {
+        AlertDialog(
+            onDismissRequest = { showReloadConfirmationDialog = false },
+            title = {
+                Text(stringResource(R.string.confirm_reload_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    stringResource(R.string.confirm_reload_msg),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showReloadConfirmationDialog = false
+                        triggerReload()
+                    },
+                    modifier = Modifier.testTag("btn_confirm_reload")
+                ) {
+                    Text(stringResource(R.string.btn_yes), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showReloadConfirmationDialog = false },
+                    modifier = Modifier.testTag("btn_cancel_reload")
+                ) {
+                    Text(stringResource(R.string.btn_no))
+                }
             }
         )
     }
@@ -3512,7 +2550,7 @@ fun InkyModule(
     if (showGoToPageDialog) {
         AlertDialog(
             onDismissRequest = { showGoToPageDialog = false },
-            title = { Text("Go to...", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.goto_page_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     OutlinedTextField(
@@ -3522,7 +2560,7 @@ fun InkyModule(
                                 targetPageText = input
                             }
                         },
-                        placeholder = { Text("Type page number here (max. $totalDocPages)") },
+                        placeholder = { Text(stringResource(R.string.goto_page_placeholder, totalDocPages)) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
@@ -3535,7 +2573,7 @@ fun InkyModule(
                                     documentNavigator.goToPage(p)
                                     showGoToPageDialog = false
                                 } else {
-                                    Toast.makeText(context, "Invalid page number. Must be between 1 and $totalDocPages", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.goto_page_invalid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         ),
@@ -3551,12 +2589,12 @@ fun InkyModule(
                             documentNavigator.goToPage(p)
                             showGoToPageDialog = false
                         } else {
-                            Toast.makeText(context, "Please enter a valid page number (1-$totalDocPages)", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.goto_page_valid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.testTag("btn_confirm_go_to_page")
                 ) {
-                    Text("Go to", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.goto_page_confirm_btn), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -4058,6 +3096,7 @@ fun InkyModule(
     }
 }
 }
+}
 
 // ==========================================
 // File Subpage & Components
@@ -4071,6 +3110,7 @@ private fun FileSubpage(
     onCloseDocument: () -> Unit,
     onSaveDocument: () -> Unit,
     onSaveAsDocument: () -> Unit,
+    onReloadDocument: () -> Unit = {},
     onDocumentProperties: () -> Unit = {},
     onPrintDocument: () -> Unit = {},
     onShareDocument: () -> Unit = {}
@@ -4087,7 +3127,7 @@ private fun FileSubpage(
             icon = Icons.Rounded.Refresh,
             title = "Reload document"
         ) {
-            Toast.makeText(context, "Reloading document...", Toast.LENGTH_SHORT).show()
+            onReloadDocument()
         }
 
         Spacer(modifier = Modifier.height(16.dp))

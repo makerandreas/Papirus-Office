@@ -1,21 +1,33 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Papirus Office ProGuard / R8 Rules
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve stack trace line numbers for crash logging
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Preserve JNI Native Method Names and Classes
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep Papirus Office Engine & Domain Models
+-keep class com.makerandreas.papirusoffice.** { *; }
+-keep class com.example.** { *; }
+
+# Keep LibreOffice UNO / Java SDK Stubs
+-keep class com.sun.star.** { *; }
+
+# Moshi / Retrofit / JSON Serialization rules
+-keepattributes *Annotation*
+-keepclassmembers class * {
+    @com.squareup.moshi.Json *;
+}
+
+# Room Database rules
+-keep class * extends androidx.room.RoomDatabase
+-dontwarn androidx.room.paging.**
+
+# Retain Compose runtime annotations
+-keepclassmembers class * {
+    @androidx.compose.runtime.Composable *;
+}
+

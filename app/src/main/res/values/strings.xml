@@ -239,4 +239,75 @@
     <string name="actionsToRedoGroupHeader">Actions to Redo: %1$d</string>
     <string name="noActionsToUndo">No actions to undo</string>
     <string name="noActionsToRedo">No actions to redo</string>
+
+    <!-- Go to Page Popup -->
+    <string name="goto_page_title">Go to...</string>
+    <string name="goto_page_placeholder">Type page number here (max. %1$d)</string>
+    <string name="goto_page_invalid_range_toast">Invalid page number. Must be between 1 and %1$d</string>
+    <string name="goto_page_valid_range_toast">Please enter a valid page number (1-%1$d)</string>
+    <string name="goto_page_confirm_btn">Go to</string>
+
+    <!-- Inky View Settings Options -->
+    <string name="inky_view_enable_double_tap_fold">Enable Double Tap to Fold</string>
+    <string name="inky_view_enable_double_tap_fold_desc">Double tap any heading to collapse or expand all content under it</string>
+    <string name="inky_view_include_sublevels">Include Sub-levels</string>
+    <string name="inky_view_include_sublevels_desc">Also fold lower-level subheadings nested under the clicked heading</string>
+    
+    <string name="inky_view_guides">Guides</string>
+    <string name="inky_view_helplines">Helplines while Moving</string>
+    
+    <string name="inky_view_display">Display</string>
+    <string name="inky_view_images">Images and Objects</string>
+    <string name="inky_view_tables">Tables</string>
+    <string name="inky_view_drawing">Drawing and Controls</string>
+    <string name="inky_view_comments">Comments</string>
+    <string name="inky_view_resolved_comments">Resolved Comments</string>
+    
+    <string name="inky_view_display_fields">Display Fields</string>
+    <string name="inky_view_hidden_text">Hidden text</string>
+    <string name="inky_view_hidden_paragraphs">Hidden paragraphs</string>
+    
+    <string name="inky_view_track_changes">Track Changes</string>
+    <string name="inky_view_tracked_deletions">Tracked Deletions in Margin</string>
+    <string name="inky_view_tooltips">Tooltips on Tracked Changes</string>
+    
+    <string name="inky_view_outline_folding">Outline Folding</string>
+    <string name="inky_view_double_tap_fold">Double Tap to Fold Outline</string>
+    <string name="inky_view_double_tap_fold_desc">Configure outline section folding behavior</string>
+    <string name="inky_view_open_fold_options">Open Double Tap to Fold Options</string>
+    
+    <string name="inky_view_view_group">View</string>
+    <string name="inky_view_smooth_scrolling">Enable Smooth Scrolling</string>
+    
+    <string name="inky_view_zoom">Zoom</string>
+    <string name="inky_view_zoom_options">Zoom Options</string>
+    <string name="inky_view_zoom_last">Use last document setting</string>
+    <string name="inky_view_zoom_fit">Fit width</string>
+    <string name="inky_view_zoom_hundred">100%</string>
+    <string name="inky_view_zoom_custom">Custom (%1$d%%)</string>
+    <string name="inky_view_zoom_custom_label">Custom</string>
+    
+    <string name="inky_view_custom_zoom_title">Custom Zoom Scaling</string>
+    <string name="inky_view_custom_zoom_prompt">Enter custom zoom scale percentage (25%% - 400%%):</string>
+    <string name="inky_view_custom_zoom_input_label">Zoom Percentage</string>
+    <string name="inky_view_custom_zoom_invalid">Please enter a value between 25 and 400</string>
+
+    <!-- Help Popup Inky View Settings -->
+    <string name="inky_view_header_title">Inky: View</string>
+    <string name="help_inky_view_fold_title">Help: Double Tap to Fold Outline</string>
+    <string name="help_inky_view_fold_body">Double-tap any heading in the document to instantly collapse or expand all content underneath it, including text, images, tables, and frames. Enabling \'Include sub-levels\' will also collapse lower-level subheadings.</string>
+    <string name="help_inky_view_options_title">Help: Inky View Options</string>
+    <string name="help_inky_view_options_body">This page allows you to control how document elements (images, tables, drawings, comments, hidden text, and helplines) and zoom levels are displayed in the Inky Writer editor.</string>
+    <string name="help_inky_generic_title">Help: %1$s</string>
+    <string name="help_inky_generic_body">Configurations changed in \'%1$s\' take effect immediately without requiring an application restart.</string>
+
+    <!-- Reload & Close Document Actions -->
+    <string name="menu_reload">Reload Document</string>
+    <string name="menu_close">Close Document</string>
+    <string name="confirm_reload_title">Cancel all changes?</string>
+    <string name="confirm_reload_msg">Do you want to discard all your unsaved modifications and reload the document from storage?</string>
+    <string name="btn_reload">Reload</string>
+    <string name="toast_reload_success">Document reloaded successfully</string>
+    <string name="btn_yes">Yes</string>
+    <string name="btn_no">No</string>
 </resources>

@@ -249,12 +249,12 @@ fun PapirusOfficeOptionsScreen(
 
                     // Headline Title (No Subtitle)
                     val headerTitle = when {
-                        activeSubSubpage == "auto_recovery" -> "Save Auto Recovery Options"
-                        activeSubSubpage == "backup_copies" -> "Always Create Backup Copy"
-                        activeSubSubpage == "double_tap_fold" -> "Double Tap to Fold Outline"
-                        activeSubpage?.id == "inky_view" -> "Inky: View"
+                        activeSubSubpage == "auto_recovery" -> stringResource(R.string.save_auto_recovery_title)
+                        activeSubSubpage == "backup_copies" -> stringResource(R.string.always_create_backup_copy)
+                        activeSubSubpage == "double_tap_fold" -> stringResource(R.string.inky_view_double_tap_fold)
+                        activeSubpage?.id == "inky_view" -> stringResource(R.string.inky_view_header_title)
                         activeSubpage != null -> activeSubpage!!.title
-                        else -> "Papirus Office Options"
+                        else -> stringResource(R.string.options_title)
                     }
 
                     Text(
@@ -477,12 +477,12 @@ fun PapirusOfficeOptionsScreen(
             activeSubpage?.id == "inky_view" -> {
                 when (activeSubSubpage) {
                     "double_tap_fold" -> Pair(
-                        "Help: Double Tap to Fold Outline",
-                        "Double-tap any heading in the document to instantly collapse or expand all content underneath it, including text, images, tables, and frames. Enabling 'Include sub-levels' will also collapse lower-level subheadings."
+                        stringResource(R.string.help_inky_view_fold_title),
+                        stringResource(R.string.help_inky_view_fold_body)
                     )
                     else -> Pair(
-                        "Help: Inky View Options",
-                        "This page allows you to control how document elements (images, tables, drawings, comments, hidden text, and helplines) and zoom levels are displayed in the Inky Writer editor."
+                        stringResource(R.string.help_inky_view_options_title),
+                        stringResource(R.string.help_inky_view_options_body)
                     )
                 }
             }
@@ -503,8 +503,8 @@ fun PapirusOfficeOptionsScreen(
                 }
             }
             activeSubpage != null -> Pair(
-                "Help: ${activeSubpage!!.title}",
-                "Configurations changed in '${activeSubpage!!.title}' take effect immediately without requiring an application restart."
+                stringResource(R.string.help_inky_generic_title, activeSubpage!!.title),
+                stringResource(R.string.help_inky_generic_body, activeSubpage!!.title)
             )
             else -> Pair(
                 stringResource(R.string.help_dialog_main_title),
@@ -524,7 +524,7 @@ fun PapirusOfficeOptionsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showHelpDialog = false }) {
-                    Text("OK")
+                    Text(stringResource(R.string.btn_ok))
                 }
             }
         )
