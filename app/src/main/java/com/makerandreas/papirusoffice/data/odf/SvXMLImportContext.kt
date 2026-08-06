@@ -19,7 +19,17 @@ open class SvXMLImportContext(
     open fun onEndElement(token: OdfXmlToken) {}
 
     open fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
-        return SvXMLImportContext(importFilter, token)
+        return when (token) {
+            OdfXmlToken.XML_DOCUMENT, OdfXmlToken.XML_DOCUMENT_CONTENT, OdfXmlToken.XML_OFFICE -> OdfDocumentContentContext(importFilter, token)
+            OdfXmlToken.XML_BODY -> OdfBodyContext(importFilter, token)
+            OdfXmlToken.XML_TEXT, OdfXmlToken.XML_SPREADSHEET, OdfXmlToken.XML_PRESENTATION -> OdfTextBodyContext(importFilter, token)
+            OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
+            OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token)
+            OdfXmlToken.XML_AUTOMATIC_STYLES, OdfXmlToken.XML_STYLES -> OdfStylesContainerContext(importFilter, token)
+            else -> SvXMLImportContext(importFilter, token)
+        }
     }
 }
 

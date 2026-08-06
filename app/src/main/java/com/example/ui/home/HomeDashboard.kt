@@ -526,6 +526,10 @@ fun HomeDashboard(
             mutableStateOf(RecentFilesTracker.getRecents(context))
         }
 
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            recentFiles = RecentFilesTracker.getRecents(context)
+        }
+
         val filteredFiles = remember(recentFiles, searchQuery, selectedFilter) {
             val searched = if (searchQuery.trim().isEmpty()) {
                 recentFiles

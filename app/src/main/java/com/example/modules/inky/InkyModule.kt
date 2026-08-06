@@ -283,6 +283,7 @@ fun InkyModule(
     }
 
     var lastTextRecordedValue by remember { mutableStateOf("") }
+    var initialLoadedText by remember { mutableStateOf("") }
 
     LaunchedEffect(docBodyText.text, docTitle, currentSessionState?.document) {
         val activeDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -322,9 +323,11 @@ fun InkyModule(
                         } else {
                             docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                             lastTextRecordedValue = parseResult.text
+                            initialLoadedText = parseResult.text
                             docxImages = parseResult.extractedImages
                             docxExtents = parseResult.imageExtents
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
+                            RecentFilesTracker.addFile(context, f.absolutePath, "Inky")
                             updateActiveSession(f, parseResult.parsedDocument)
                         }
                     }
@@ -348,6 +351,7 @@ fun InkyModule(
                     isLoadingDocument = false
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                     lastTextRecordedValue = parseResult.text
+                    initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
                     updateInkyMetadata("templates/inky/Normal.ott", "Document.odt", parseResult.text)
@@ -544,27 +548,34 @@ fun InkyModule(
     var showOpenDocumentDialog by remember { mutableStateOf(false) }
 
     val triggerReload = {
-        val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
-        if (currentSession != null) {
-            isLoadingDocument = true
-            isParsingDoc = true
-            coroutineScope.launch {
-                val parseResult = com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
-                if (parseResult != null) {
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                    lastTextRecordedValue = parseResult.text
-                    docxImages = parseResult.extractedImages
-                    docxExtents = parseResult.imageExtents
-                    isSaved = true
-                    Toast.makeText(context, context.getString(R.string.toast_reload_success), Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Failed to reload document", Toast.LENGTH_SHORT).show()
+        isLoadingDocument = true
+        isParsingDoc = true
+        coroutineScope.launch {
+            val path = com.example.MainActivity.openedFilePath
+            var reloadedText = initialLoadedText
+            if (path != null) {
+                try {
+                    val file = java.io.File(path)
+                    if (file.exists()) {
+                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                        val parseResult = parser.parseDocument(file)
+                        reloadedText = parseResult.text
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                isLoadingDocument = false
-                isParsingDoc = false
             }
-        } else {
-            Toast.makeText(context, "No active session to reload", Toast.LENGTH_SHORT).show()
+            val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+            if (currentSession != null) {
+                com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
+            }
+            docBodyText = androidx.compose.ui.text.input.TextFieldValue(reloadedText)
+            lastTextRecordedValue = reloadedText
+            initialLoadedText = reloadedText
+            isSaved = true
+            Toast.makeText(context, context.getString(R.string.toast_reload_success), Toast.LENGTH_SHORT).show()
+            isLoadingDocument = false
+            isParsingDoc = false
         }
         Unit
     }
@@ -606,6 +617,10 @@ fun InkyModule(
                     if (actualSuccess) {
                         isSaved = true
                         saveFailed = false
+                        initialLoadedText = docBodyText.text
+                        if (path != null) {
+                            RecentFilesTracker.addFile(context, path, "Inky")
+                        }
                         Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
                     } else {
                         saveFailed = true
@@ -650,8 +665,10 @@ fun InkyModule(
                     if (actualSuccess) {
                         isSaved = true
                         saveFailed = false
+                        initialLoadedText = docBodyText.text
                         if (path != null) {
                             updateInkyMetadata(path, docTitle, docBodyText.text)
+                            RecentFilesTracker.addFile(context, path, "Inky")
                         }
                         Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
                         onSuccess?.invoke()
@@ -730,6 +747,19 @@ fun InkyModule(
                     docTitle = savedName
                     isSaved = true
                     isNewDocument = false
+                    initialLoadedText = docBodyText.text
+                    
+                    val localSavedFile = java.io.File(context.filesDir, savedName)
+                    try {
+                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                        parser.saveDocument(localSavedFile, docBodyText.text)
+                        com.example.MainActivity.openedFilePath = localSavedFile.absolutePath
+                        com.example.MainActivity.openedFileType = "Inky"
+                        RecentFilesTracker.addFile(context, localSavedFile.absolutePath, "Inky")
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    
                     updateInkyMetadata(it.toString(), savedName, docBodyText.text)
                     Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
                     pendingActionAfterSave?.invoke()
@@ -868,6 +898,7 @@ fun InkyModule(
                     }
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                     lastTextRecordedValue = parseResult.text
+                    initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
 
@@ -1023,8 +1054,6 @@ fun InkyModule(
             } else {
                 showBottomBar = false
             }
-        } else if (isEditMode) {
-            isEditMode = false
         } else {
             handleClose()
         }
@@ -1061,22 +1090,6 @@ fun InkyModule(
     // Helper functions
     fun triggerAutosave() {
         isSaved = false
-        coroutineScope.launch {
-            delay(1500)
-            val path = com.example.MainActivity.openedFilePath
-            if (path != null) {
-                try {
-                    val file = java.io.File(path)
-                    val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                    val success = parser.saveDocument(file, docBodyText.text)
-                    if (success) {
-                        isSaved = true
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
     }
 
     LaunchedEffect(currentSessionState) {
@@ -1374,17 +1387,11 @@ fun InkyModule(
                             }
                         },
                         navigationIcon = {
-                            if (!isEditMode) {
-                                IconButton(onClick = { handleClose() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
-                                }
-                            } else {
-                                IconButton(onClick = { 
-                                    isEditMode = false 
-                                    Toast.makeText(context, "Switched to Viewer Mode", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to Viewer")
-                                }
+                            IconButton(
+                                onClick = { handleClose() },
+                                modifier = Modifier.testTag("btn_top_app_bar_back")
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
                             }
                         },
                         actions = {
@@ -1605,6 +1612,9 @@ fun InkyModule(
                             androidx.compose.foundation.text.BasicTextField(
                                 value = docBodyText,
                                 onValueChange = { newValue ->
+                                    if (newValue.text != docBodyText.text) {
+                                        isSaved = false
+                                    }
                                     docBodyText = newValue
                                     triggerAutosave()
                                 },
@@ -2833,6 +2843,8 @@ fun InkyModule(
                     val parseResult = docxParser.parseDocument(file)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                        lastTextRecordedValue = parseResult.text
+                        initialLoadedText = parseResult.text
                         docxImages = parseResult.extractedImages
                         docxExtents = parseResult.imageExtents
                         isSaved = true

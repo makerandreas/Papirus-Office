@@ -1051,6 +1051,7 @@ class OfficeDocumentParser(private val context: Context) {
             }
 
             tempFile.copyTo(outputFile, overwrite = true)
+            cacheRepository.saveCachedDocument(outputFile, text)
             true
         } catch (e: Exception) {
             DocumentParsingLogger.logError(
