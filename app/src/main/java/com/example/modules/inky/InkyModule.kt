@@ -557,8 +557,10 @@ fun InkyModule(
                 try {
                     val file = java.io.File(path)
                     if (file.exists()) {
+                        val cacheRepo = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
+                        cacheRepo.invalidateCache(file)
                         val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                        val parseResult = parser.parseDocument(file)
+                        val parseResult = parser.parseDocument(file, bypassCache = true)
                         reloadedText = parseResult.text
                     }
                 } catch (e: Exception) {

@@ -23,12 +23,12 @@ class DocxDocumentParser(private val context: Context) {
 
     val parsingProgress: androidx.lifecycle.LiveData<ParsingProgress> get() = officeParser.parsingProgress
 
-    suspend fun parseDocument(file: File): DocxParseResult = withContext(Dispatchers.IO) {
+    suspend fun parseDocument(file: File, bypassCache: Boolean = false): DocxParseResult = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext DocxParseResult("")
 
         val fileName = file.name.lowercase()
         if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm") || isZipFile(file)) {
-            val parsedDoc = officeParser.parseDocument(file)
+            val parsedDoc = officeParser.parseDocument(file, bypassCache)
             return@withContext DocxParseResult(
                 text = parsedDoc.plainText,
                 extractedImages = parsedDoc.extractedImages,
@@ -400,10 +400,20 @@ class DocxDocumentParser(private val context: Context) {
                             if (entryName == "[Content_Types].xml") foundContentTypes = true
                             if (entryName == "_rels/.rels") foundRels = true
 
-                            val newEntry = java.util.zip.ZipEntry(entryName)
-                            zout.putNextEntry(newEntry)
-                            
-                            if (entryName == targetEntry) {
+                            if (entryName == "mimetype") {
+                                foundMime = true
+                                val mimeStr = if (isOds) "application/vnd.oasis.opendocument.spreadsheet"
+                                              else if (isOdp) "application/vnd.oasis.opendocument.presentation"
+                                              else "application/vnd.oasis.opendocument.text"
+                                val mimeBytes = mimeStr.toByteArray(Charsets.UTF_8)
+                                val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
+                                    method = java.util.zip.ZipEntry.STORED
+                                    size = mimeBytes.size.toLong()
+                                    crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                }
+                                zout.putNextEntry(mimeEntry)
+                                zout.write(mimeBytes)
+                            } else if (entryName == targetEntry) {
                                 foundTarget = true
                                 val updatedXmlBytes = if (isDocx) {
                                     generateDocxXml(text)
@@ -412,6 +422,8 @@ class DocxDocumentParser(private val context: Context) {
                                 }
                                 zout.write(updatedXmlBytes)
                             } else {
+                                val newEntry = java.util.zip.ZipEntry(entryName)
+                                zout.putNextEntry(newEntry)
                                 zin.copyTo(zout)
                             }
                             
@@ -461,6 +473,7 @@ class DocxDocumentParser(private val context: Context) {
             
             // Copy tempFile back to file
             tempFile.copyTo(file, overwrite = true)
+            com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context).saveCachedDocument(file, text)
             true
         } catch (e: Exception) {
             e.printStackTrace()

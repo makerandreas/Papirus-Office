@@ -20,9 +20,13 @@ object DocumentLifecycleManager {
             // Clear Undo and Redo manager
             session.undoManager.clear()
 
-            // Read and parse document
+            // Invalidate cache first so reload reads fresh data from disk!
+            val cacheRepo = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
+            cacheRepo.invalidateCache(fileObj)
+
+            // Read and parse document bypassing cache
             val parser = DocxDocumentParser(context)
-            val parseResult = parser.parseDocument(fileObj)
+            val parseResult = parser.parseDocument(fileObj, bypassCache = true)
 
             val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: session.document
             session.document = officeDoc

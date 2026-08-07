@@ -327,38 +327,36 @@ class OfficeDocumentParser(private val context: Context) {
      * Parses the ODT, ODS, DOCX, or XLSX file into structured OfficeParsedDocument model
      * mapping paragraphs, headings, list items, tables, and images.
      */
-    suspend fun parseDocument(file: File): OfficeParsedDocument = withContext(Dispatchers.IO) {
-        // Fast path: Check Room cache first
-        val cached = cacheRepository.getCachedDocument(file)
-        if (cached != null) {
-            val statusMsg = try {
-                context.getString(com.example.R.string.loading_status_cached)
-            } catch (e: Exception) {
-                "Loading document from local cache..."
-            }
-            _parsingProgress.postValue(ParsingProgress(100, statusMsg))
+    suspend fun parseDocument(file: File, bypassCache: Boolean = false): OfficeParsedDocument = withContext(Dispatchers.IO) {
+        // Fast path: Check Room cache first unless bypassed
+        if (!bypassCache) {
+            val cached = cacheRepository.getCachedDocument(file)
+            if (cached != null && cached.plainText.isNotBlank()) {
+                val statusMsg = try {
+                    context.getString(com.example.R.string.loading_status_cached)
+                } catch (e: Exception) {
+                    "Loading document from local cache..."
+                }
+                _parsingProgress.postValue(ParsingProgress(100, statusMsg))
 
-            val cachedElements = if (cached.plainText.isNotBlank()) {
-                cached.plainText.split("\n\n").map { block ->
+                val cachedElements = cached.plainText.split("\n\n").map { block ->
                     OfficeDocumentElement.Paragraph(text = block)
                 }
-            } else {
-                emptyList()
+                return@withContext OfficeParsedDocument(
+                    elements = cachedElements,
+                    rawXml = "",
+                    plainText = cached.plainText,
+                    extractedImages = emptyMap(),
+                    isOdt = cached.format == "ODT",
+                    isDocx = cached.format == "DOCX",
+                    isOds = cached.format == "ODS",
+                    isXlsx = cached.format == "XLSX",
+                    isOdp = cached.format == "ODP",
+                    isPptx = cached.format == "PPTX",
+                    isParsingFailed = cached.isParsingFailed,
+                    failureReason = cached.failureReason
+                )
             }
-            return@withContext OfficeParsedDocument(
-                elements = cachedElements,
-                rawXml = "",
-                plainText = cached.plainText,
-                extractedImages = emptyMap(),
-                isOdt = cached.format == "ODT",
-                isDocx = cached.format == "DOCX",
-                isOds = cached.format == "ODS",
-                isXlsx = cached.format == "XLSX",
-                isOdp = cached.format == "ODP",
-                isPptx = cached.format == "PPTX",
-                isParsingFailed = cached.isParsingFailed,
-                failureReason = cached.failureReason
-            )
         }
 
         _parsingProgress.postValue(ParsingProgress(10, context.getString(com.example.R.string.loading_status_initial)))
@@ -810,13 +808,23 @@ class OfficeDocumentParser(private val context: Context) {
                             if (entryName == "META-INF/manifest.xml") foundManifest = true
                             if (entryName == "styles.xml") foundStyles = true
 
-                            val newEntry = java.util.zip.ZipEntry(entryName)
-                            zout.putNextEntry(newEntry)
-
-                            if (entryName == "content.xml") {
+                            if (entryName == "mimetype") {
+                                val mimeBytes = "application/vnd.oasis.opendocument.spreadsheet".toByteArray(Charsets.UTF_8)
+                                val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
+                                    method = java.util.zip.ZipEntry.STORED
+                                    size = mimeBytes.size.toLong()
+                                    crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                }
+                                zout.putNextEntry(mimeEntry)
+                                zout.write(mimeBytes)
+                            } else if (entryName == "content.xml") {
                                 foundContent = true
+                                val contentEntry = java.util.zip.ZipEntry("content.xml")
+                                zout.putNextEntry(contentEntry)
                                 zout.write(contentXmlBytes)
                             } else {
+                                val newEntry = java.util.zip.ZipEntry(entryName)
+                                zout.putNextEntry(newEntry)
                                 zin.copyTo(zout)
                             }
 
@@ -1013,13 +1021,23 @@ class OfficeDocumentParser(private val context: Context) {
                             if (entryName == "META-INF/manifest.xml") foundManifest = true
                             if (entryName == "styles.xml") foundStyles = true
 
-                            val newEntry = java.util.zip.ZipEntry(entryName)
-                            zout.putNextEntry(newEntry)
-
-                            if (entryName == "content.xml") {
+                            if (entryName == "mimetype") {
+                                val mimeBytes = "application/vnd.oasis.opendocument.text".toByteArray(Charsets.UTF_8)
+                                val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
+                                    method = java.util.zip.ZipEntry.STORED
+                                    size = mimeBytes.size.toLong()
+                                    crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                }
+                                zout.putNextEntry(mimeEntry)
+                                zout.write(mimeBytes)
+                            } else if (entryName == "content.xml") {
                                 foundContent = true
+                                val contentEntry = java.util.zip.ZipEntry("content.xml")
+                                zout.putNextEntry(contentEntry)
                                 zout.write(contentXmlBytes)
                             } else {
+                                val newEntry = java.util.zip.ZipEntry(entryName)
+                                zout.putNextEntry(newEntry)
                                 zin.copyTo(zout)
                             }
 
@@ -1590,9 +1608,14 @@ class OfficeDocumentParser(private val context: Context) {
 
             if (!outputFile.exists() || outputFile.length() == 0L) {
                 java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
-                    val mimeEntry = java.util.zip.ZipEntry("mimetype")
+                    val mimeBytes = "application/vnd.oasis.opendocument.presentation".toByteArray(Charsets.UTF_8)
+                    val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
+                        method = java.util.zip.ZipEntry.STORED
+                        size = mimeBytes.size.toLong()
+                        crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                    }
                     zout.putNextEntry(mimeEntry)
-                    zout.write("application/vnd.oasis.opendocument.presentation".toByteArray(Charsets.UTF_8))
+                    zout.write(mimeBytes)
                     zout.closeEntry()
 
                     val manifestEntry = java.util.zip.ZipEntry("META-INF/manifest.xml")
@@ -1613,13 +1636,23 @@ class OfficeDocumentParser(private val context: Context) {
 
                         while (entry != null) {
                             val entryName = entry.name
-                            val newEntry = java.util.zip.ZipEntry(entryName)
-                            zout.putNextEntry(newEntry)
-
-                            if (entryName == "content.xml") {
+                            if (entryName == "mimetype") {
+                                val mimeBytes = "application/vnd.oasis.opendocument.presentation".toByteArray(Charsets.UTF_8)
+                                val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
+                                    method = java.util.zip.ZipEntry.STORED
+                                    size = mimeBytes.size.toLong()
+                                    crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                }
+                                zout.putNextEntry(mimeEntry)
+                                zout.write(mimeBytes)
+                            } else if (entryName == "content.xml") {
                                 foundContent = true
+                                val contentEntry = java.util.zip.ZipEntry("content.xml")
+                                zout.putNextEntry(contentEntry)
                                 zout.write(contentXmlBytes)
                             } else {
+                                val newEntry = java.util.zip.ZipEntry(entryName)
+                                zout.putNextEntry(newEntry)
                                 zin.copyTo(zout)
                             }
 
