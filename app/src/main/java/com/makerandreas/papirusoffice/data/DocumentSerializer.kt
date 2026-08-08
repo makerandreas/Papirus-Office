@@ -1,18 +1,31 @@
 package com.makerandreas.papirusoffice.data
 
 import android.content.Context
+import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 class DocumentSerializer(private val context: Context) {
     private val officeParser = OfficeDocumentParser(context)
+    private val odtWriter = OdtDocumentWriter()
     
     suspend fun serializeToFormat(
         document: OfficeDocument, 
         format: String, 
         outputFile: File
     ): Boolean = withContext(Dispatchers.IO) {
+        if (format.equals("ODT", ignoreCase = true)) {
+            return@withContext try {
+                val bytes = odtWriter.write(document)
+                outputFile.writeBytes(bytes)
+                true
+            } catch (e: Exception) {
+                PapirusLogger.e("DocumentSerializer", "Failed to write ODT document", e)
+                false
+            }
+        }
+
         val parsedElements = document.body.elements.mapNotNull { element ->
             when (element) {
                 is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> OfficeDocumentElement.Paragraph(text = element.paragraph.text)
@@ -48,10 +61,7 @@ class DocumentSerializer(private val context: Context) {
         )
         
         return@withContext when (format.uppercase()) {
-            "ODT" -> officeParser.saveOdtDocument(outputFile, parsedDoc)
             "DOCX" -> {
-                // For DOCX we can use the old raw generator for now or bridge it
-                // Actually DocxDocumentParser had the logic. Let's keep it here.
                 val parser = DocxDocumentParser(context)
                 parser.saveDocument(outputFile, parsedDoc.plainText)
             }

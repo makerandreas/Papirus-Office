@@ -17,7 +17,7 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
-    fun testInsertText() {
+    fun testInsertText() = kotlinx.coroutines.runBlocking {
         val doc = createInitialDocument()
         val engine = EditingEngine(document = doc)
         engine.cursor = DocumentCursor(0, 0, 0, 6) // cursor after 'Hello '
@@ -30,7 +30,7 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
-    fun testDeleteBackward() {
+    fun testDeleteBackward() = kotlinx.coroutines.runBlocking {
         val doc = createInitialDocument()
         val engine = EditingEngine(document = doc)
         engine.cursor = DocumentCursor(0, 0, 0, 5) // cursor after 'Hello'
@@ -43,7 +43,7 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
-    fun testUndoRedoInsert() {
+    fun testUndoRedoInsert() = kotlinx.coroutines.runBlocking {
         val doc = createInitialDocument()
         val engine = EditingEngine(document = doc)
         engine.cursor = DocumentCursor(0, 0, 0, 11) // end of "Hello World"
@@ -65,7 +65,7 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
-    fun testSplitAndMergeParagraphs() {
+    fun testSplitAndMergeParagraphs() = kotlinx.coroutines.runBlocking {
         val doc = createInitialDocument()
         val engine = EditingEngine(document = doc)
         engine.cursor = DocumentCursor(0, 0, 0, 6) // Hello [cursor] World
@@ -166,7 +166,7 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
-    fun testDocumentTransactions() {
+    fun testDocumentTransactions() = kotlinx.coroutines.runBlocking {
         val doc = createInitialDocument()
         val engine = EditingEngine(document = doc)
         engine.cursor = DocumentCursor(0, 0, 0, 11)
@@ -224,5 +224,113 @@ class DocumentEnginesUnitTest {
         val prev = reminderManager.previousReminder(1, 15)
         assertNotNull(prev)
         assertEquals(10, prev?.offset)
+    }
+
+    @Test
+    fun testOdtRoundTripEmptyDocument() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Empty Doc"),
+            body = DocumentBody(elements = emptyList())
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        assertTrue(bytes.isNotEmpty())
+
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip empty doc failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripSingleCharacter() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Char Doc"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "A")))
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip single character failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripHello() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Hello Doc"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "Hello!")))
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip Hello failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripMultipleParagraphs() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Multi Para"),
+            body = DocumentBody(elements = listOf(
+                OfficeParagraph(text = "Paragraph 1"),
+                OfficeParagraph(text = "Paragraph 2"),
+                OfficeParagraph(text = "Paragraph 3")
+            ))
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip multiple paragraphs failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripHeadingAndParagraph() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Heading Doc"),
+            body = DocumentBody(elements = listOf(
+                OfficeHeading(text = "Main Chapter", level = 1),
+                OfficeParagraph(text = "Introductory text in main chapter."),
+                OfficeHeading(text = "Sub Section", level = 2),
+                OfficeParagraph(text = "Nested text in sub section.")
+            ))
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip heading & paragraph failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripTable() {
+        val table = OfficeTable(
+            rows = listOf(
+                OfficeTableRow(cells = listOf(OfficeTableCell("Header 1"), OfficeTableCell("Header 2"))),
+                OfficeTableRow(cells = listOf(OfficeTableCell("Value 1"), OfficeTableCell("Value 2")))
+            ),
+            numColumns = 2
+        )
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Table Doc"),
+            body = DocumentBody(elements = listOf(table))
+        )
+        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip table failed: ${result.differences}", result.isSuccess)
     }
 }
