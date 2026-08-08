@@ -20,8 +20,8 @@ class DocumentCacheRepository(context: Context) {
 
         val cache = cacheDao.getCacheByPath(file.absolutePath) ?: return@withContext null
 
-        // Cache validation: check if file size or last modified timestamp changed externally, or if cached plain text is blank
-        if (cache.lastModified != file.lastModified() || cache.fileSize != file.length() || cache.plainText.isBlank()) {
+        // Cache validation: check if file size or last modified timestamp changed externally, or if parsing previously failed
+        if (cache.lastModified != file.lastModified() || cache.fileSize != file.length() || cache.isParsingFailed) {
             cacheDao.deleteCacheByPath(file.absolutePath)
             return@withContext null
         }

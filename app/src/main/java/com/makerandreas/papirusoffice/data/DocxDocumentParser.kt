@@ -281,6 +281,50 @@ class DocxDocumentParser(private val context: Context) {
         )
     }
 
+    suspend fun saveDocument(file: File, document: com.makerandreas.papirusoffice.data.OfficeDocument): Boolean = withContext(Dispatchers.IO) {
+        val parsedElements = document.body.elements.mapNotNull { element ->
+            when (element) {
+                is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> OfficeDocumentElement.Paragraph(text = element.paragraph.text)
+                is com.makerandreas.papirusoffice.data.OfficeParagraph -> OfficeDocumentElement.Paragraph(text = element.text)
+                is com.makerandreas.papirusoffice.data.OfficeHeading -> OfficeDocumentElement.Heading(text = element.text, level = element.level)
+                is com.makerandreas.papirusoffice.data.OfficeListItem -> OfficeDocumentElement.ListItem(text = element.text, bullet = element.bullet)
+                is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement -> OfficeDocumentElement.Table(rows = element.table.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.table.numColumns)
+                is com.makerandreas.papirusoffice.data.OfficeTable -> OfficeDocumentElement.Table(rows = element.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.numColumns)
+                else -> null
+            }
+        }
+        
+        val parsedDoc = OfficeParsedDocument(
+            elements = parsedElements,
+            rawXml = "",
+            plainText = parsedElements.joinToString("\n\n") { 
+                when (it) {
+                    is OfficeDocumentElement.Paragraph -> it.text
+                    is OfficeDocumentElement.Heading -> it.text
+                    is OfficeDocumentElement.ListItem -> it.text
+                    is OfficeDocumentElement.Table -> it.rows.joinToString("\n") { row -> row.cells.joinToString("\t") { cell -> cell.text } }
+                    else -> ""
+                }
+            },
+            extractedImages = emptyMap(),
+            isOdt = file.name.endsWith(".odt", ignoreCase = true),
+            isDocx = file.name.endsWith(".docx", ignoreCase = true) || file.name.endsWith(".docm", ignoreCase = true),
+            isOds = file.name.endsWith(".ods", ignoreCase = true),
+            isXlsx = file.name.endsWith(".xlsx", ignoreCase = true) || file.name.endsWith(".xlsm", ignoreCase = true),
+            isOdp = file.name.endsWith(".odp", ignoreCase = true),
+            isPptx = file.name.endsWith(".pptx", ignoreCase = true) || file.name.endsWith(".pptm", ignoreCase = true),
+            isParsingFailed = false
+        )
+        val fileName = file.name.lowercase()
+        if (parsedDoc.isXlsx) return@withContext officeParser.saveXlsxDocument(file, parsedDoc)
+        if (parsedDoc.isOds) return@withContext officeParser.saveOdsDocument(file, parsedDoc)
+        if (parsedDoc.isOdp) return@withContext officeParser.saveOdpDocument(file, parsedDoc)
+        if (parsedDoc.isOdt) return@withContext officeParser.saveOdtDocument(file, parsedDoc)
+        if (parsedDoc.isPptx) return@withContext officeParser.savePptxDocument(file, parsedDoc)
+        
+        return@withContext saveDocument(file, parsedDoc.plainText)
+    }
+
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
         val fileName = file.name.lowercase()
         val isXlsx = fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm")

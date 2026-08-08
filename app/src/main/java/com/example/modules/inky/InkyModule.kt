@@ -292,6 +292,30 @@ fun InkyModule(
         navEngine.updateDocument(activeDoc)
     }
 
+    LaunchedEffect(currentSessionState?.document) {
+        val sessionDoc = currentSessionState?.document
+        if (sessionDoc != null) {
+            val textFromDoc = sessionDoc.body.elements.mapNotNull {
+                when (it) {
+                    is com.makerandreas.papirusoffice.data.OfficeParagraph -> it.text
+                    is com.makerandreas.papirusoffice.data.OfficeHeading -> it.text
+                    is com.makerandreas.papirusoffice.data.OfficeListItem -> it.text
+                    is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> it.paragraph.text
+                    else -> null
+                }
+            }.joinToString("\n\n")
+
+            if (textFromDoc.isNotBlank() && textFromDoc != docBodyText.text) {
+                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                    text = textFromDoc,
+                    selection = androidx.compose.ui.text.TextRange(textFromDoc.length)
+                )
+                lastTextRecordedValue = textFromDoc
+                initialLoadedText = textFromDoc
+            }
+        }
+    }
+
     val navEngineState by navEngine.state.collectAsState()
 
     var isLoadingDocument by remember { mutableStateOf(false) }
@@ -551,25 +575,28 @@ fun InkyModule(
         isLoadingDocument = true
         isParsingDoc = true
         coroutineScope.launch {
-            val path = com.example.MainActivity.openedFilePath
             var reloadedText = initialLoadedText
-            if (path != null) {
-                try {
-                    val file = java.io.File(path)
-                    if (file.exists()) {
-                        val cacheRepo = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
-                        cacheRepo.invalidateCache(file)
-                        val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                        val parseResult = parser.parseDocument(file, bypassCache = true)
-                        reloadedText = parseResult.text
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
             val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
             if (currentSession != null) {
-                com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
+                val result = com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
+                if (result != null) {
+                    reloadedText = result.text
+                }
+            } else {
+                // Fallback if no active session
+                val path = com.example.MainActivity.openedFilePath
+                if (path != null) {
+                    try {
+                        val file = java.io.File(path)
+                        if (file.exists()) {
+                            val cacheRepo = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
+                            cacheRepo.invalidateCache(file)
+                            val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                            val parseResult = parser.parseDocument(file, bypassCache = true)
+                            reloadedText = parseResult.text
+                        }
+                    } catch (e: Exception) {}
+                }
             }
             docBodyText = androidx.compose.ui.text.input.TextFieldValue(reloadedText)
             lastTextRecordedValue = reloadedText
@@ -608,7 +635,26 @@ fun InkyModule(
                         try {
                             val file = java.io.File(path)
                             val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                            actualSuccess = parser.saveDocument(file, docBodyText.text)
+                            
+                            val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+                            val documentToSave = if (currentSession != null) {
+                                val updatedElements = docBodyText.text.split("\n\n").map { block ->
+                                    com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                                }
+                                val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                                currentSession.document = updatedDoc
+                                updatedDoc
+                            } else {
+                                com.makerandreas.papirusoffice.data.OfficeDocument(
+                                    metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
+                                    body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
+                                        com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                                    })
+                                )
+                            }
+                            
+                            val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                            actualSuccess = serializer.serializeToFormat(documentToSave, if (file.name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT", file)
                         } catch (e: Exception) {
                             e.printStackTrace()
                             actualSuccess = false
@@ -656,7 +702,26 @@ fun InkyModule(
                         try {
                             val file = java.io.File(path)
                             val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                            actualSuccess = parser.saveDocument(file, docBodyText.text)
+                            
+                            val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+                            val documentToSave = if (currentSession != null) {
+                                val updatedElements = docBodyText.text.split("\n\n").map { block ->
+                                    com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                                }
+                                val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                                currentSession.document = updatedDoc
+                                updatedDoc
+                            } else {
+                                com.makerandreas.papirusoffice.data.OfficeDocument(
+                                    metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
+                                    body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
+                                        com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                                    })
+                                )
+                            }
+                            
+                            val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                            actualSuccess = serializer.serializeToFormat(documentToSave, if (file.name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT", file)
                         } catch (e: Exception) {
                             e.printStackTrace()
                             actualSuccess = false
@@ -689,6 +754,23 @@ fun InkyModule(
         uri?.let {
             coroutineScope.launch {
                 var actualSuccess = true
+                val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+                val documentToSave = if (currentSession != null) {
+                    val updatedElements = docBodyText.text.split("\n\n").map { block ->
+                        com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                    }
+                    val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                    currentSession.document = updatedDoc
+                    updatedDoc
+                } else {
+                    com.makerandreas.papirusoffice.data.OfficeDocument(
+                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
+                        body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
+                            com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                        })
+                    )
+                }
+                
                 try {
                     val isDocx = currentSaveDefaultFilename.endsWith(".docx", ignoreCase = true)
                     val extension = if (isDocx) ".docx" else ".odt"
@@ -696,7 +778,8 @@ fun InkyModule(
                     if (tempFile.exists()) tempFile.delete()
                     
                     val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                    val success = parser.saveDocument(tempFile, docBodyText.text)
+                    val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                    val success = serializer.serializeToFormat(documentToSave, if (tempFile.name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT", tempFile)
                     if (success && tempFile.exists()) {
                         context.contentResolver.openOutputStream(it)?.use { outputStream ->
                             tempFile.inputStream().copyTo(outputStream)
@@ -751,10 +834,30 @@ fun InkyModule(
                     isNewDocument = false
                     initialLoadedText = docBodyText.text
                     
-                    val localSavedFile = java.io.File(context.filesDir, savedName)
+                    val localSavedFile = java.io.File(context.cacheDir, savedName)
                     try {
                         val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
-                        parser.saveDocument(localSavedFile, docBodyText.text)
+                        
+                        // Synchronize UI text into OfficeDocument elements before saving
+                        val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+                        val documentToSave = if (currentSession != null) {
+                            val updatedElements = docBodyText.text.split("\n\n").map { block ->
+                                com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                            }
+                            val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                            currentSession.document = updatedDoc
+                            updatedDoc
+                        } else {
+                            com.makerandreas.papirusoffice.data.OfficeDocument(
+                                metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
+                                body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
+                                    com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
+                                })
+                            )
+                        }
+                        
+                        val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                        serializer.serializeToFormat(documentToSave, if (localSavedFile.name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT", localSavedFile)
                         com.example.MainActivity.openedFilePath = localSavedFile.absolutePath
                         com.example.MainActivity.openedFileType = "Inky"
                         RecentFilesTracker.addFile(context, localSavedFile.absolutePath, "Inky")
@@ -945,7 +1048,9 @@ fun InkyModule(
             com.example.MainActivity.openedFilePath = null
             onFormatAction("Back to start center")
         }
-        if (!isSaved) {
+        val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
+        val isDirty = !isSaved || (currentSession?.dirty == true)
+        if (isDirty) {
             pendingActionAfterSave = closeAction
             showUnsavedChangesDialog = true
         } else {

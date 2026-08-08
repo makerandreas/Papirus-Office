@@ -331,7 +331,7 @@ class OfficeDocumentParser(private val context: Context) {
         // Fast path: Check Room cache first unless bypassed
         if (!bypassCache) {
             val cached = cacheRepository.getCachedDocument(file)
-            if (cached != null && cached.plainText.isNotBlank()) {
+            if (cached != null && !cached.isParsingFailed) {
                 val statusMsg = try {
                     context.getString(com.example.R.string.loading_status_cached)
                 } catch (e: Exception) {
@@ -339,8 +339,12 @@ class OfficeDocumentParser(private val context: Context) {
                 }
                 _parsingProgress.postValue(ParsingProgress(100, statusMsg))
 
-                val cachedElements = cached.plainText.split("\n\n").map { block ->
-                    OfficeDocumentElement.Paragraph(text = block)
+                val cachedElements = if (cached.plainText.isNotEmpty()) {
+                    cached.plainText.split("\n\n").map { block ->
+                        OfficeDocumentElement.Paragraph(text = block)
+                    }
+                } else {
+                    emptyList()
                 }
                 return@withContext OfficeParsedDocument(
                     elements = cachedElements,
