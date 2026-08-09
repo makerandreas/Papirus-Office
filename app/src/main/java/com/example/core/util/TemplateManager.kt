@@ -18,25 +18,37 @@ object TemplateManager {
     private const val TAG = "TemplateManager"
 
     /**
-     * Extracts the empty default Inky template file (templates/inky/Normal.ott) from app assets.
+     * Extracts the empty default Inky template file (templates/styles/Default.ott) from app assets.
      * This OTT file serves as the base structure whenever a new Inky document is created.
      */
-    fun getInkyNormalTemplateFile(context: Context): File? {
+    fun getInkyNormalTemplateFile(context: Context): File? = extractAssetTemplate(context, "templates/styles/Default.ott", "Default.ott")
+
+    /**
+     * Extracts the empty default Calc template file (templates/wizard/styles/default.ots) from app assets.
+     */
+    fun getCalcDefaultTemplateFile(context: Context): File? = extractAssetTemplate(context, "templates/wizard/styles/default.ots", "default.ots")
+
+    /**
+     * Extracts the empty default Slidia template file (templates/slidia/Default.otp) from app assets.
+     */
+    fun getSlidiaDefaultTemplateFile(context: Context): File? = extractAssetTemplate(context, "templates/slidia/Default.otp", "Default.otp")
+
+    private fun extractAssetTemplate(context: Context, assetPath: String, targetFileName: String): File? {
         return try {
-            val templateDir = File(context.cacheDir, "templates/inky")
+            val templateDir = File(context.cacheDir, "templates")
             if (!templateDir.exists()) {
                 templateDir.mkdirs()
             }
-            val targetFile = File(templateDir, "Normal.ott")
-            context.assets.open("templates/inky/Normal.ott").use { input ->
+            val targetFile = File(templateDir, targetFileName)
+            context.assets.open(assetPath).use { input ->
                 FileOutputStream(targetFile).use { output ->
                     input.copyTo(output)
                 }
             }
-            Log.d(TAG, "Successfully extracted Inky Normal.ott template to: ${targetFile.absolutePath}")
+            Log.d(TAG, "Successfully extracted $assetPath template to: ${targetFile.absolutePath}")
             targetFile
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to extract Normal.ott template from assets", e)
+            Log.e(TAG, "Failed to extract $assetPath template from assets", e)
             null
         }
     }
@@ -50,6 +62,26 @@ object TemplateManager {
 
     // A curated, robust list of LibreOffice templates of standard ODF formats acting as the primary source
     val curatedTemplates = listOf(
+        // Official Pre-loaded LibreOffice Asset Templates
+        TemplateItem(
+            name = "Official LibreOffice Writer Blank",
+            type = "ODT",
+            url = "asset://templates/styles/Default.ott",
+            description = "Standard official LibreOffice Writer template (.ott) configured for documents, essays, and letters."
+        ),
+        TemplateItem(
+            name = "Official LibreOffice Calc Blank",
+            type = "ODS",
+            url = "asset://templates/wizard/styles/default.ots",
+            description = "Standard official LibreOffice Calc template (.ots) configured for tabular sheets, calculations, and financial budgets."
+        ),
+        TemplateItem(
+            name = "Official LibreOffice Slidia Presentation",
+            type = "ODP",
+            url = "asset://templates/slidia/Default.otp",
+            description = "Standard official LibreOffice Impress presentation template (.otp) configured for slides, graphics, and pitch decks."
+        ),
+
         // ODT Templates
         TemplateItem(
             name = "Resume (Modern Layout)",
@@ -205,6 +237,20 @@ object TemplateManager {
             val safeName = template.name.replace("[^a-zA-Z0-9_.-]".toRegex(), "_")
             val fileName = "$safeName.$fileExtension"
             val destinationFile = File(templatesDir, fileName)
+
+            if (template.url.startsWith("asset://")) {
+                val assetPath = template.url.removePrefix("asset://")
+                context.assets.open(assetPath).use { input ->
+                    FileOutputStream(destinationFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    onProgress(1.0f)
+                }
+                Log.d(TAG, "Extracted local asset template from $assetPath to ${destinationFile.absolutePath}")
+                return@withContext destinationFile
+            }
 
             Log.d(TAG, "Downloading template from ${template.url} to ${destinationFile.absolutePath}")
 

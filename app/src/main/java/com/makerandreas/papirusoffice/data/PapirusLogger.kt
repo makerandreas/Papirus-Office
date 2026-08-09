@@ -54,21 +54,25 @@ object PapirusLogger {
 
         // Logcat Sink
         val fullTag = "$TAG_PREFIX:$tag"
-        when (level) {
-            LogLevel.DEBUG -> Log.d(fullTag, message, throwable)
-            LogLevel.INFO -> Log.i(fullTag, message, throwable)
-            LogLevel.WARN -> Log.w(fullTag, message, throwable)
-            LogLevel.ERROR -> Log.e(fullTag, message, throwable)
+        try {
+            when (level) {
+                LogLevel.DEBUG -> Log.d(fullTag, message, throwable)
+                LogLevel.INFO -> Log.i(fullTag, message, throwable)
+                LogLevel.WARN -> Log.w(fullTag, message, throwable)
+                LogLevel.ERROR -> Log.e(fullTag, message, throwable)
+            }
+        } catch (e: Throwable) {
+            println("[$fullTag] $message")
         }
 
         // File Sink
         logFile?.let { file ->
             try {
-                val logLine = "[$timestamp] [${level.name}] [$tag] $message" +
-                        (throwable?.let { "\n" + Log.getStackTraceString(it) } ?: "") + "\n"
+                val stackTrace = throwable?.let { "\n" + it.stackTraceToString() } ?: ""
+                val logLine = "[$timestamp] [${level.name}] [$tag] $message" + stackTrace + "\n"
                 file.appendText(logLine)
             } catch (e: Exception) {
-                Log.e("PapirusLogger", "Failed to append log to runtime.log", e)
+                // Ignore file write errors in unit test environment
             }
         }
     }

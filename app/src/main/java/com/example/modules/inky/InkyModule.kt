@@ -378,7 +378,7 @@ fun InkyModule(
                     initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
-                    updateInkyMetadata("templates/inky/Normal.ott", "Document.odt", parseResult.text)
+                    updateInkyMetadata("templates/styles/Default.ott", "Document.odt", parseResult.text)
 
                     // Set active session for the default loaded template
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -2697,7 +2697,7 @@ fun InkyModule(
                                                  },
                                                  onDocumentProperties = {
                                                      coroutineScope.launch {
-                                                         val currentPath = com.example.MainActivity.openedFilePath ?: "templates/inky/Normal.ott"
+                                                         val currentPath = com.example.MainActivity.openedFilePath ?: "templates/styles/Default.ott"
                                                          var meta = inkyMetadataRepo.getMetadata(currentPath)
                                                          if (meta == null) {
                                                              updateInkyMetadata(currentPath, docTitle, docBodyText.text)

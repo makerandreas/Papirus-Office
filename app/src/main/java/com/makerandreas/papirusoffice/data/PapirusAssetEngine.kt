@@ -170,4 +170,19 @@ object PapirusAssetEngine {
         initialize(context)
         return File(context.filesDir, "papirus_assets/hyphenation")
     }
+
+    fun getShareDirectory(context: Context): File {
+        initialize(context)
+        return File(context.filesDir, "papirus_assets/share")
+    }
+
+    fun getRegistryDirectory(context: Context): File {
+        initialize(context)
+        return File(context.filesDir, "papirus_assets/share/registry")
+    }
+
+    fun getColibreIconsZip(context: Context): File {
+        initialize(context)
+        return File(context.filesDir, "papirus_assets/share/config/images_colibre.zip")
+    }
 }
