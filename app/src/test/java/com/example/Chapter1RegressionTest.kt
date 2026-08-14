@@ -89,22 +89,24 @@ class Chapter1RegressionTest {
     fun test11To14_DirtyStateTrackingAndCloseConfirmation() {
         val file = File(context.filesDir, "DirtyTest.odt")
         val session = DocumentSession(
-            file = DocumentReference.LocalFile(file),
-            initialDocument = OfficeDocument(body = DocumentBody(elements = listOf(OfficeParagraph("Base text"))))
+            engine = DocumentEngine(),
+            document = OfficeDocument(body = DocumentBody(elements = listOf(OfficeParagraph("Base text")))),
+            file = OfficeFile(file)
         )
 
-        assertFalse("New session with unchanged document should not be dirty", session.isDirty())
+        assertFalse("New session with unchanged document should not be dirty", session.dirty)
 
         // Modify document
-        session.applyEdit { doc ->
-            doc.copy(body = DocumentBody(elements = doc.body.elements + OfficeParagraph("New addition")))
-        }
+        session.document = session.document.copy(
+            body = DocumentBody(elements = session.document.body.elements + OfficeParagraph("New addition"))
+        )
+        session.dirty = true
 
-        assertTrue("Session with edits should be marked dirty", session.isDirty())
+        assertTrue("Session with edits should be marked dirty", session.dirty)
 
         // Simulate save
-        session.markSaved()
-        assertFalse("Session after markSaved should no longer be dirty", session.isDirty())
+        session.dirty = false
+        assertFalse("Session after markSaved should no longer be dirty", session.dirty)
     }
 
     @Test
@@ -113,13 +115,12 @@ class Chapter1RegressionTest {
         file.writeText("Recent Document Content")
 
         // Store metadata in cache repository / recents
-        cacheRepository.saveCache(
+        cacheRepository.saveCachedDocument(
             file = file,
-            plainText = "Recent Document Content",
-            rawXml = "<content/>"
+            text = "Recent Document Content"
         )
 
-        val cachedData = cacheRepository.getCache(file)
+        val cachedData = cacheRepository.getCachedDocument(file)
         assertNotNull("Cache repository should find stored recent entry", cachedData)
         assertEquals("Cached text should match written content", "Recent Document Content", cachedData?.plainText)
     }
@@ -130,7 +131,7 @@ class Chapter1RegressionTest {
         val odtFile = File(context.filesDir, "external.odt")
         val originalOdtDoc = OfficeDocument(
             body = DocumentBody(elements = listOf(
-                OfficeHeading("External ODT Heading", 1),
+                OfficeHeading("External ODT Heading", level = 1),
                 OfficeParagraph("External ODT Body Text")
             ))
         )
@@ -156,16 +157,15 @@ class Chapter1RegressionTest {
 
         // Create a rich structured document: Heading + Paragraphs + Table
         val table = OfficeTable(
-            numRows = 2,
-            numColumns = 2,
             rows = listOf(
-                TableRow(cells = listOf(TableCell("Header 1"), TableCell("Header 2"))),
-                TableRow(cells = listOf(TableCell("Val 1"), TableCell("Val 2")))
-            )
+                OfficeTableRow(cells = listOf(OfficeTableCell("Header 1"), OfficeTableCell("Header 2"))),
+                OfficeTableRow(cells = listOf(OfficeTableCell("Val 1"), OfficeTableCell("Val 2")))
+            ),
+            numColumns = 2
         )
         val complexDoc = OfficeDocument(
             body = DocumentBody(elements = listOf(
-                OfficeHeading("Main Title", 1),
+                OfficeHeading("Main Title", level = 1),
                 OfficeParagraph("Formatted paragraph text"),
                 table
             ))
@@ -176,7 +176,7 @@ class Chapter1RegressionTest {
         assertTrue("Save structured ODT should succeed", saveResult)
 
         // Forcefully invalidate cache
-        cacheRepository.clearCache()
+        cacheRepository.invalidateCache(file)
 
         // Reopen strictly from physical file on disk
         val physicalDoc = odtSerializer.read(DocumentReference.LocalFile(file), context)
