@@ -1,12 +1,14 @@
 package com.example
 
 import com.makerandreas.papirusoffice.data.*
+import com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator
+import com.makerandreas.papirusoffice.data.writer.OdtDocumentParser
+import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -14,9 +16,8 @@ class DocumentEnginesUnitTest {
 
     private fun createInitialDocument(): OfficeDocument {
         val paragraph = OfficeParagraph(text = "Hello World", styleName = "Normal")
-        val elements = listOf(OfficeDocElement.ParagraphElement(paragraph))
         return OfficeDocument(
-            body = DocumentBody(elements = elements),
+            body = DocumentBody(elements = listOf(paragraph)),
             metadata = DocumentMetadata(author = "Andreas", title = "My Book")
         )
     }
@@ -29,8 +30,8 @@ class DocumentEnginesUnitTest {
         
         engine.insertText("Beautiful ")
         
-        val updatedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello Beautiful World", updatedPara.paragraph.text)
+        val updatedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello Beautiful World", updatedPara.text)
         assertEquals(16, engine.cursor.offset)
     }
 
@@ -42,8 +43,8 @@ class DocumentEnginesUnitTest {
         
         engine.deleteBackward()
         
-        val updatedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hell World", updatedPara.paragraph.text)
+        val updatedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hell World", updatedPara.text)
         assertEquals(4, engine.cursor.offset)
     }
 
@@ -55,18 +56,18 @@ class DocumentEnginesUnitTest {
         
         engine.insertText("!")
         
-        var updatedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World!", updatedPara.paragraph.text)
+        var updatedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World!", updatedPara.text)
         
         // Undo
         engine.undo()
-        updatedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World", updatedPara.paragraph.text)
+        updatedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World", updatedPara.text)
         
         // Redo
         engine.redo()
-        updatedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World!", updatedPara.paragraph.text)
+        updatedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World!", updatedPara.text)
     }
 
     @Test
@@ -78,18 +79,18 @@ class DocumentEnginesUnitTest {
         engine.splitParagraph()
         
         assertEquals(2, engine.document.body.elements.size)
-        val para1 = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        val para2 = engine.document.body.elements[1] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello ", para1.paragraph.text)
-        assertEquals("World", para2.paragraph.text)
+        val para1 = engine.document.body.elements[0].extractParagraph()!!
+        val para2 = engine.document.body.elements[1].extractParagraph()!!
+        assertEquals("Hello ", para1.text)
+        assertEquals("World", para2.text)
         assertEquals(1, engine.cursor.paragraphIndex)
         assertEquals(0, engine.cursor.offset)
         
         // Now merge them back
         engine.mergeParagraphs(0, 1)
         assertEquals(1, engine.document.body.elements.size)
-        val mergedPara = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World", mergedPara.paragraph.text)
+        val mergedPara = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World", mergedPara.text)
         assertEquals(6, engine.cursor.offset)
     }
 
@@ -157,12 +158,11 @@ class DocumentEnginesUnitTest {
         
         // Test Replace All
         val replacedDoc = DocumentServices.replaceAll(doc, "World", "Everyone")
-        val replacedPara = replacedDoc.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello Everyone", replacedPara.paragraph.text)
+        val replacedPara = replacedDoc.body.elements[0].extractParagraph()!!
+        assertEquals("Hello Everyone", replacedPara.text)
         
         // Test Spell Check (simulated)
         val spellIssues = DocumentServices.runSpellCheck(doc)
-        // 'Hello' and 'World' are in our dictionary, so no issues expected
         assertEquals(0, spellIssues.size)
         
         // Test AutoCorrect
@@ -182,13 +182,13 @@ class DocumentEnginesUnitTest {
         engine.insertText("!")
         engine.commitTransaction()
         
-        var para = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World!!", para.paragraph.text)
+        var para = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World!!", para.text)
         
         // A single undo should rollback both inserts because they are part of the same transaction
         engine.undo()
-        para = engine.document.body.elements[0] as OfficeDocElement.ParagraphElement
-        assertEquals("Hello World", para.paragraph.text)
+        para = engine.document.body.elements[0].extractParagraph()!!
+        assertEquals("Hello World", para.text)
     }
 
     @Test
@@ -196,10 +196,7 @@ class DocumentEnginesUnitTest {
         val heading = OfficeParagraph(text = "Intro", styleName = "Heading 1")
         val p1 = OfficeParagraph(text = "Nested text under heading", styleName = "Normal")
         val doc = OfficeDocument(
-            body = DocumentBody(elements = listOf(
-                OfficeDocElement.ParagraphElement(heading),
-                OfficeDocElement.ParagraphElement(p1)
-            ))
+            body = DocumentBody(elements = listOf(heading, p1))
         )
         val outlineEngine = OutlineEngineImpl()
         outlineEngine.buildOutline(doc)
@@ -237,14 +234,14 @@ class DocumentEnginesUnitTest {
             metadata = DocumentMetadata(title = "Empty Doc"),
             body = DocumentBody(elements = emptyList())
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         assertTrue(bytes.isNotEmpty())
 
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip empty doc failed: ${result.differences}", result.isSuccess)
     }
 
@@ -254,12 +251,12 @@ class DocumentEnginesUnitTest {
             metadata = DocumentMetadata(title = "Char Doc"),
             body = DocumentBody(elements = listOf(OfficeParagraph(text = "A")))
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip single character failed: ${result.differences}", result.isSuccess)
     }
 
@@ -269,12 +266,12 @@ class DocumentEnginesUnitTest {
             metadata = DocumentMetadata(title = "Hello Doc"),
             body = DocumentBody(elements = listOf(OfficeParagraph(text = "Hello!")))
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip Hello failed: ${result.differences}", result.isSuccess)
     }
 
@@ -288,12 +285,12 @@ class DocumentEnginesUnitTest {
                 OfficeParagraph(text = "Paragraph 3")
             ))
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip multiple paragraphs failed: ${result.differences}", result.isSuccess)
     }
 
@@ -302,18 +299,18 @@ class DocumentEnginesUnitTest {
         val doc = OfficeDocument(
             metadata = DocumentMetadata(title = "Heading Doc"),
             body = DocumentBody(elements = listOf(
-                OfficeHeading(text = "Main Chapter", level = 1),
-                OfficeParagraph(text = "Introductory text in main chapter."),
-                OfficeHeading(text = "Sub Section", level = 2),
-                OfficeParagraph(text = "Nested text in sub section.")
+                OfficeHeading(text = "Main Chapter", level = 1, styleName = "Heading_1"),
+                OfficeParagraph(text = "Introductory text in main chapter.", styleName = "Standard"),
+                OfficeHeading(text = "Sub Section", level = 2, styleName = "Heading_2"),
+                OfficeParagraph(text = "Nested text in sub section.", styleName = "Standard")
             ))
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip heading & paragraph failed: ${result.differences}", result.isSuccess)
     }
 
@@ -330,12 +327,200 @@ class DocumentEnginesUnitTest {
             metadata = DocumentMetadata(title = "Table Doc"),
             body = DocumentBody(elements = listOf(table))
         )
-        val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
-        val parser = com.makerandreas.papirusoffice.data.writer.OdtDocumentParser()
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
 
         val bytes = writer.write(doc)
         val restored = parser.parse(bytes)
-        val result = com.makerandreas.papirusoffice.data.util.OfficeDocumentComparator.compare(doc, restored)
+        val result = OfficeDocumentComparator.compare(doc, restored)
         assertTrue("RoundTrip table failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripBoldText() {
+        val run1 = OfficeTextRun(text = "Hello ")
+        val run2 = OfficeTextRun(text = "World", isBold = true)
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Bold Doc"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "Hello World", runs = listOf(run1, run2))))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip bold text failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripItalicText() {
+        val run1 = OfficeTextRun(text = "Papirus ")
+        val run2 = OfficeTextRun(text = "Office", isItalic = true)
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Italic Doc"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "Papirus Office", runs = listOf(run1, run2))))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip italic text failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripUnderlineText() {
+        val run = OfficeTextRun(text = "Underlined Text", isUnderline = true)
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Underline Doc"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "Underlined Text", runs = listOf(run))))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip underline text failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripParagraphStyle() {
+        val p = OfficeParagraph(text = "Custom Styled Paragraph", styleName = "Body_20_Text")
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Style Doc"),
+            body = DocumentBody(elements = listOf(p))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip paragraph style failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripAuthor() {
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Author Doc", author = "Andreas Maker"),
+            body = DocumentBody(elements = listOf(OfficeParagraph(text = "Document with metadata author.")))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip author metadata failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testOdtRoundTripMixedRuns() {
+        val run1 = OfficeTextRun(text = "Plain ")
+        val run2 = OfficeTextRun(text = "Bold ", isBold = true)
+        val run3 = OfficeTextRun(text = "Italic ", isItalic = true)
+        val run4 = OfficeTextRun(text = "Underline", isUnderline = true)
+        val doc = OfficeDocument(
+            metadata = DocumentMetadata(title = "Mixed Runs Doc"),
+            body = DocumentBody(elements = listOf(
+                OfficeParagraph(text = "Plain Bold Italic Underline", runs = listOf(run1, run2, run3, run4))
+            ))
+        )
+        val writer = OdtDocumentWriter()
+        val parser = OdtDocumentParser()
+
+        val bytes = writer.write(doc)
+        val restored = parser.parse(bytes)
+        val result = OfficeDocumentComparator.compare(doc, restored)
+        assertTrue("RoundTrip mixed runs failed: ${result.differences}", result.isSuccess)
+    }
+
+    @Test
+    fun testDefaultOttDiagnostic() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val assetPath = "templates/styles/Default.ott"
+        val inputStream = context.assets.open(assetPath)
+        assertNotNull("Asset $assetPath should not be null", inputStream)
+
+        val bytes = inputStream.use { it.readBytes() }
+        assertTrue("Asset $assetPath should not be empty", bytes.isNotEmpty())
+
+        var isZip = false
+        var hasMimetype = false
+        var hasManifest = false
+        var hasContentXml = false
+        var hasStylesXml = false
+        var hasSettingsXml = false
+        var hasMetaXml = false
+
+        try {
+            java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zip ->
+                isZip = true
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    when (entry.name) {
+                        "mimetype" -> hasMimetype = true
+                        "META-INF/manifest.xml" -> hasManifest = true
+                        "content.xml" -> hasContentXml = true
+                        "styles.xml" -> hasStylesXml = true
+                        "settings.xml" -> hasSettingsXml = true
+                        "meta.xml" -> hasMetaXml = true
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            isZip = false
+        }
+
+        println("=== DIAGNOSTIC TEST: Default.ott ===")
+        println("ZIP: ${if (isZip) "PASS" else "FAIL"}")
+        println("mimetype: ${if (hasMimetype) "PASS" else "FAIL"}")
+        println("manifest.xml: ${if (hasManifest) "PASS" else "FAIL"}")
+        println("content.xml: ${if (hasContentXml) "PASS" else "FAIL (expected for empty template styles)"}")
+        println("styles.xml: ${if (hasStylesXml) "PASS" else "FAIL"}")
+        println("settings.xml: ${if (hasSettingsXml) "PASS" else "FAIL (optional)"}")
+        println("meta.xml: ${if (hasMetaXml) "PASS" else "FAIL"}")
+        println("====================================")
+
+        assertTrue("Should be a valid ZIP file", isZip)
+        assertTrue("Should have mimetype entry", hasMimetype)
+        assertTrue("Should have manifest.xml entry", hasManifest)
+        assertTrue("Should have styles.xml entry", hasStylesXml)
+        assertTrue("Should have meta.xml entry", hasMetaXml)
+    }
+
+    @Test
+    fun testDefaultOttToNewDocumentAndSaveOdtRoundTrip() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val assetPath = "templates/styles/Default.ott"
+        val bytes = context.assets.open(assetPath).use { it.readBytes() }
+        
+        // 1. Load OTT template into OfficeDocument
+        val parser = OdtDocumentParser()
+        val templateDoc = parser.parse(bytes)
+        assertNotNull("Template OfficeDocument should not be null", templateDoc)
+
+        // 2. Modify OfficeDocument (Insert "Hello!")
+        val newElements = templateDoc.body.elements.toMutableList()
+        newElements.add(OfficeParagraph(text = "Hello!"))
+        newElements.add(OfficeHeading(text = "Template Section", level = 1))
+        val modifiedDoc = templateDoc.copy(body = DocumentBody(elements = newElements))
+
+        // 3. Save as ODT bytes via OdtDocumentWriter
+        val writer = OdtDocumentWriter()
+        val odtBytes = writer.write(modifiedDoc)
+        assertTrue("Saved ODT bytes should not be empty", odtBytes.isNotEmpty())
+
+        // 4. Parse saved ODT bytes
+        val restoredDoc = parser.parse(odtBytes)
+
+        // 5. Compare structure
+        val result = OfficeDocumentComparator.compare(modifiedDoc, restoredDoc)
+        assertTrue("Default.ott -> Edit -> ODT Roundtrip failed: ${result.differences}", result.isSuccess)
     }
 }

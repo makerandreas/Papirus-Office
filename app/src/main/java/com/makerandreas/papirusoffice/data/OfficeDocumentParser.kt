@@ -257,7 +257,10 @@ class OfficeDocumentParser(private val context: Context) {
         if (!file.exists()) return@withContext ""
         val isOdf = file.name.endsWith(".odt", ignoreCase = true) ||
                 file.name.endsWith(".ods", ignoreCase = true) ||
-                file.name.endsWith(".odp", ignoreCase = true)
+                file.name.endsWith(".odp", ignoreCase = true) ||
+                file.name.endsWith(".ott", ignoreCase = true) ||
+                file.name.endsWith(".ots", ignoreCase = true) ||
+                file.name.endsWith(".otp", ignoreCase = true)
         val isXlsx = file.name.endsWith(".xlsx", ignoreCase = true) ||
                 file.name.endsWith(".xlsm", ignoreCase = true)
         val isPptx = file.name.endsWith(".pptx", ignoreCase = true) ||
@@ -320,6 +323,53 @@ class OfficeDocumentParser(private val context: Context) {
                 cause = e
             )
         }
+
+        if (isOdf) {
+            val nameLower = file.name.lowercase()
+            val fallbackXml = when {
+                nameLower.endsWith(".odt") || nameLower.endsWith(".ott") -> """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:draw:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2">
+                      <office:automatic-styles>
+                        <style:style style:name="P1" style:family="paragraph" style:parent-style-name="Standard"/>
+                      </office:automatic-styles>
+                      <office:body>
+                        <office:text>
+                          <text:p text:style-name="P1"/>
+                        </office:text>
+                      </office:body>
+                    </office:document-content>
+                """.trimIndent()
+                nameLower.endsWith(".ods") || nameLower.endsWith(".ots") -> """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+                      <office:body>
+                        <office:spreadsheet>
+                          <table:table table:name="Sheet1">
+                            <table:table-row>
+                              <table:table-cell office:value-type="string">
+                                <text:p/>
+                              </table:table-cell>
+                            </table:table-row>
+                          </table:table>
+                        </office:spreadsheet>
+                      </office:body>
+                    </office:document-content>
+                """.trimIndent()
+                else -> """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:draw:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2">
+                      <office:body>
+                        <office:presentation>
+                          <draw:page draw:name="Slide 1"/>
+                        </office:presentation>
+                      </office:body>
+                    </office:document-content>
+                """.trimIndent()
+            }
+            return@withContext fallbackXml
+        }
+
         return@withContext ""
     }
 
@@ -365,9 +415,9 @@ class OfficeDocumentParser(private val context: Context) {
 
         _parsingProgress.postValue(ParsingProgress(10, context.getString(com.example.R.string.loading_status_initial)))
 
-        val isOdt = file.name.endsWith(".odt", ignoreCase = true)
-        val isOds = file.name.endsWith(".ods", ignoreCase = true)
-        val isOdp = file.name.endsWith(".odp", ignoreCase = true)
+        val isOdt = file.name.endsWith(".odt", ignoreCase = true) || file.name.endsWith(".ott", ignoreCase = true)
+        val isOds = file.name.endsWith(".ods", ignoreCase = true) || file.name.endsWith(".ots", ignoreCase = true)
+        val isOdp = file.name.endsWith(".odp", ignoreCase = true) || file.name.endsWith(".otp", ignoreCase = true)
         val isDocx = file.name.endsWith(".docx", ignoreCase = true) || file.name.endsWith(".doc", ignoreCase = true)
         val isXlsx = file.name.endsWith(".xlsx", ignoreCase = true) || file.name.endsWith(".xlsm", ignoreCase = true)
         val isPptx = file.name.endsWith(".pptx", ignoreCase = true) || file.name.endsWith(".pptm", ignoreCase = true)

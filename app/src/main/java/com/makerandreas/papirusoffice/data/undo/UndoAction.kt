@@ -6,6 +6,8 @@ import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OfficeImage
 import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.OfficeTable
+import com.makerandreas.papirusoffice.data.extractParagraph
+import com.makerandreas.papirusoffice.data.replaceParagraph
 
 /**
  * Phase 1: UndoAction Interface
@@ -42,8 +44,8 @@ class InsertTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val startIndex = offset
             val endIndex = offset + insertedText.length
@@ -52,7 +54,7 @@ class InsertTextAction(
             } else {
                 text.removeSuffix(insertedText)
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -61,15 +63,15 @@ class InsertTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val newText = if (offset in 0..text.length) {
                 text.substring(0, offset) + insertedText + text.substring(offset)
             } else {
                 text + insertedText
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -91,15 +93,15 @@ class DeleteTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val newText = if (offset in 0..text.length) {
                 text.substring(0, offset) + deletedText + text.substring(offset)
             } else {
                 text + deletedText
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -108,8 +110,8 @@ class DeleteTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val startIndex = offset
             val endIndex = offset + deletedText.length
@@ -118,7 +120,7 @@ class DeleteTextAction(
             } else {
                 text
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -141,11 +143,11 @@ class ReplaceTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val replaced = text.replaceRange(offset, (offset + newText.length).coerceAtMost(text.length), oldText)
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = replaced))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = replaced))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -154,11 +156,11 @@ class ReplaceTextAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val text = oldPara.text
             val replaced = text.replaceRange(offset, (offset + oldText.length).coerceAtMost(text.length), newText)
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = replaced))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = replaced))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -180,8 +182,9 @@ class ParagraphStyleAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(element.paragraph.copy(styleName = oldStyleName))
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(styleName = oldStyleName))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -190,8 +193,9 @@ class ParagraphStyleAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(element.paragraph.copy(styleName = newStyleName))
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(styleName = newStyleName))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -214,12 +218,12 @@ class CharacterStyleAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val updatedRuns = oldPara.runs.mapIndexed { idx, run ->
                 if (idx == runIndex) run.copy(styleName = oldStyleName) else run
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(runs = updatedRuns))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(runs = updatedRuns))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -228,12 +232,12 @@ class CharacterStyleAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val updatedRuns = oldPara.runs.mapIndexed { idx, run ->
                 if (idx == runIndex) run.copy(styleName = newStyleName) else run
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(runs = updatedRuns))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(runs = updatedRuns))
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -369,10 +373,11 @@ class SplitParagraphAction(
         if (paragraphIndex in elements.indices && paragraphIndex + 1 in elements.indices) {
             val leftElement = elements[paragraphIndex]
             val rightElement = elements[paragraphIndex + 1]
-            if (leftElement is OfficeDocElement.ParagraphElement &&
-                rightElement is OfficeDocElement.ParagraphElement) {
-                val joinedText = leftElement.paragraph.text + rightElement.paragraph.text
-                elements[paragraphIndex] = OfficeDocElement.ParagraphElement(leftElement.paragraph.copy(text = joinedText))
+            val leftPara = leftElement.extractParagraph()
+            val rightPara = rightElement.extractParagraph()
+            if (leftPara != null && rightPara != null) {
+                val joinedText = leftPara.text + rightPara.text
+                elements[paragraphIndex] = leftElement.replaceParagraph(leftPara.copy(text = joinedText))
                 elements.removeAt(paragraphIndex + 1)
                 updateDocument(doc.copy(body = DocumentBody(elements)))
             }
@@ -383,10 +388,15 @@ class SplitParagraphAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = leftText))
-            elements.add(paragraphIndex + 1, OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName)))
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = leftText))
+            val newRight = if (element is OfficeDocElement.ParagraphElement) {
+                OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName))
+            } else {
+                OfficeParagraph(text = rightText, styleName = oldPara.styleName)
+            }
+            elements.add(paragraphIndex + 1, newRight)
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -409,9 +419,15 @@ class MergeParagraphAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val targetElem = elements.getOrNull(targetIdx)
-        if (targetElem is OfficeDocElement.ParagraphElement) {
-            elements[targetIdx] = OfficeDocElement.ParagraphElement(targetElem.paragraph.copy(text = targetText))
-            elements.add(sourceIdx, OfficeDocElement.ParagraphElement(OfficeParagraph(text = sourceText)))
+        val targetPara = targetElem?.extractParagraph()
+        if (targetPara != null) {
+            elements[targetIdx] = targetElem.replaceParagraph(targetPara.copy(text = targetText))
+            val newSource = if (targetElem is OfficeDocElement.ParagraphElement) {
+                OfficeDocElement.ParagraphElement(OfficeParagraph(text = sourceText))
+            } else {
+                OfficeParagraph(text = sourceText)
+            }
+            elements.add(sourceIdx, newSource)
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
     }
@@ -420,8 +436,9 @@ class MergeParagraphAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val targetElem = elements.getOrNull(targetIdx)
-        if (targetElem is OfficeDocElement.ParagraphElement) {
-            elements[targetIdx] = OfficeDocElement.ParagraphElement(targetElem.paragraph.copy(text = targetText + sourceText))
+        val targetPara = targetElem?.extractParagraph()
+        if (targetPara != null) {
+            elements[targetIdx] = targetElem.replaceParagraph(targetPara.copy(text = targetText + sourceText))
             elements.removeAt(sourceIdx)
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
@@ -448,3 +465,4 @@ class CompoundUndoAction(
         }
     }
 }
+

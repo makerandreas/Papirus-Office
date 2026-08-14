@@ -94,8 +94,9 @@ class EditingEngine(
         if (cursor.offset > 0) {
             val pIdx = cursor.paragraphIndex
             val element = document.body.elements.getOrNull(pIdx)
-            if (element is OfficeDocElement.ParagraphElement) {
-                val text = element.paragraph.text
+            val paragraph = element?.extractParagraph()
+            if (paragraph != null) {
+                val text = paragraph.text
                 val charToDelete = text[cursor.offset - 1].toString()
                 val action = com.makerandreas.papirusoffice.data.undo.DeleteTextAction(
                     paragraphIndex = pIdx,
@@ -116,8 +117,9 @@ class EditingEngine(
     suspend fun splitParagraph() {
         val pIdx = cursor.paragraphIndex
         val element = document.body.elements.getOrNull(pIdx)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val originalText = element.paragraph.text
+        val paragraph = element?.extractParagraph()
+        if (paragraph != null) {
+            val originalText = paragraph.text
             val leftText = originalText.substring(0, cursor.offset)
             val rightText = originalText.substring(cursor.offset)
 
@@ -137,9 +139,11 @@ class EditingEngine(
     suspend fun mergeParagraphs(targetIdx: Int, sourceIdx: Int) {
         val targetElem = document.body.elements.getOrNull(targetIdx)
         val sourceElem = document.body.elements.getOrNull(sourceIdx)
-        if (targetElem is OfficeDocElement.ParagraphElement && sourceElem is OfficeDocElement.ParagraphElement) {
-            val targetText = targetElem.paragraph.text
-            val sourceText = sourceElem.paragraph.text
+        val targetPara = targetElem?.extractParagraph()
+        val sourcePara = sourceElem?.extractParagraph()
+        if (targetPara != null && sourcePara != null) {
+            val targetText = targetPara.text
+            val sourceText = sourcePara.text
 
             val action = com.makerandreas.papirusoffice.data.undo.MergeParagraphAction(
                 targetIdx = targetIdx,
@@ -214,15 +218,15 @@ class InsertTextCommand(val paragraphIndex: Int, val offset: Int, val textToInse
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val originalText = oldPara.text
             val newText = if (offset in 0..originalText.length) {
                 originalText.substring(0, offset) + textToInsert + originalText.substring(offset)
             } else {
                 originalText + textToInsert
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -230,8 +234,8 @@ class InsertTextCommand(val paragraphIndex: Int, val offset: Int, val textToInse
     override fun undo(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val originalText = oldPara.text
             val startIndex = offset
             val endIndex = offset + textToInsert.length
@@ -240,7 +244,7 @@ class InsertTextCommand(val paragraphIndex: Int, val offset: Int, val textToInse
             } else {
                 originalText.removeSuffix(textToInsert)
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -250,8 +254,8 @@ class DeleteTextCommand(val paragraphIndex: Int, val offset: Int, val deletedTex
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val originalText = oldPara.text
             val startIndex = offset
             val endIndex = offset + deletedText.length
@@ -260,7 +264,7 @@ class DeleteTextCommand(val paragraphIndex: Int, val offset: Int, val deletedTex
             } else {
                 originalText
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -268,15 +272,15 @@ class DeleteTextCommand(val paragraphIndex: Int, val offset: Int, val deletedTex
     override fun undo(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
             val originalText = oldPara.text
             val newText = if (offset in 0..originalText.length) {
                 originalText.substring(0, offset) + deletedText + originalText.substring(offset)
             } else {
                 originalText + deletedText
             }
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = newText))
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = newText))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -286,10 +290,15 @@ class SplitParagraphCommand(val paragraphIndex: Int, val leftText: String, val r
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            val oldPara = element.paragraph
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(oldPara.copy(text = leftText))
-            elements.add(paragraphIndex + 1, OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName)))
+        val oldPara = element?.extractParagraph()
+        if (oldPara != null) {
+            elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = leftText))
+            val newRight = if (element is OfficeDocElement.ParagraphElement) {
+                OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName))
+            } else {
+                OfficeParagraph(text = rightText, styleName = oldPara.styleName)
+            }
+            elements.add(paragraphIndex + 1, newRight)
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -448,7 +457,7 @@ object CaretNavigation {
         if (cursor.paragraphIndex > 0) {
             val prevIdx = cursor.paragraphIndex - 1
             val prevElem = document.body.elements.getOrNull(prevIdx)
-            val len = if (prevElem is OfficeDocElement.ParagraphElement) prevElem.paragraph.text.length else 0
+            val len = prevElem?.extractParagraph()?.text?.length ?: 0
             return DocumentCursor(prevIdx, prevIdx, 0, len)
         }
         return cursor
@@ -456,7 +465,7 @@ object CaretNavigation {
 
     fun moveRight(document: OfficeDocument, cursor: DocumentCursor): DocumentCursor {
         val elem = document.body.elements.getOrNull(cursor.paragraphIndex)
-        val textLength = if (elem is OfficeDocElement.ParagraphElement) elem.paragraph.text.length else 0
+        val textLength = elem?.extractParagraph()?.text?.length ?: 0
         if (cursor.offset < textLength) {
             return cursor.copy(offset = cursor.offset + 1)
         }
@@ -471,7 +480,7 @@ object CaretNavigation {
         if (cursor.paragraphIndex > 0) {
             val prevIdx = cursor.paragraphIndex - 1
             val prevElem = document.body.elements.getOrNull(prevIdx)
-            val textLength = if (prevElem is OfficeDocElement.ParagraphElement) prevElem.paragraph.text.length else 0
+            val textLength = prevElem?.extractParagraph()?.text?.length ?: 0
             return DocumentCursor(prevIdx, prevIdx, 0, cursor.offset.coerceAtMost(textLength))
         }
         return cursor
@@ -481,7 +490,7 @@ object CaretNavigation {
         if (cursor.paragraphIndex < document.body.elements.size - 1) {
             val nextIdx = cursor.paragraphIndex + 1
             val nextElem = document.body.elements.getOrNull(nextIdx)
-            val textLength = if (nextElem is OfficeDocElement.ParagraphElement) nextElem.paragraph.text.length else 0
+            val textLength = nextElem?.extractParagraph()?.text?.length ?: 0
             return DocumentCursor(nextIdx, nextIdx, 0, cursor.offset.coerceAtMost(textLength))
         }
         return cursor
@@ -489,8 +498,9 @@ object CaretNavigation {
 
     fun moveWordLeft(document: OfficeDocument, cursor: DocumentCursor): DocumentCursor {
         val elem = document.body.elements.getOrNull(cursor.paragraphIndex)
-        if (elem is OfficeDocElement.ParagraphElement) {
-            val text = elem.paragraph.text
+        val paragraph = elem?.extractParagraph()
+        if (paragraph != null) {
+            val text = paragraph.text
             if (cursor.offset == 0) return moveLeft(document, cursor)
 
             var i = cursor.offset - 1
@@ -504,8 +514,9 @@ object CaretNavigation {
 
     fun moveWordRight(document: OfficeDocument, cursor: DocumentCursor): DocumentCursor {
         val elem = document.body.elements.getOrNull(cursor.paragraphIndex)
-        if (elem is OfficeDocElement.ParagraphElement) {
-            val text = elem.paragraph.text
+        val paragraph = elem?.extractParagraph()
+        if (paragraph != null) {
+            val text = paragraph.text
             val len = text.length
             if (cursor.offset == len) return moveRight(document, cursor)
 
@@ -523,7 +534,7 @@ object CaretNavigation {
 
     fun end(document: OfficeDocument, cursor: DocumentCursor): DocumentCursor {
         val elem = document.body.elements.getOrNull(cursor.paragraphIndex)
-        val len = if (elem is OfficeDocElement.ParagraphElement) elem.paragraph.text.length else 0
+        val len = elem?.extractParagraph()?.text?.length ?: 0
         return cursor.copy(offset = len)
     }
 }
@@ -632,8 +643,9 @@ object DocumentServices {
         val results = mutableListOf<SearchResult>()
         if (query.isEmpty()) return results
         document.body.elements.forEachIndexed { elemIdx, element ->
-            if (element is OfficeDocElement.ParagraphElement) {
-                val text = element.paragraph.text
+            val p = element.extractParagraph()
+            if (p != null) {
+                val text = p.text
                 var index = text.indexOf(query, ignoreCase = true)
                 while (index != -1) {
                     results.add(SearchResult(elemIdx, index, query.length, text.substring(index, index + query.length)))
@@ -647,10 +659,11 @@ object DocumentServices {
     fun replaceAll(document: OfficeDocument, query: String, replacement: String): OfficeDocument {
         if (query.isEmpty()) return document
         val updatedElements = document.body.elements.map { element ->
-            if (element is OfficeDocElement.ParagraphElement) {
-                val text = element.paragraph.text
+            val p = element.extractParagraph()
+            if (p != null) {
+                val text = p.text
                 val newText = text.replace(query, replacement, ignoreCase = true)
-                OfficeDocElement.ParagraphElement(element.paragraph.copy(text = newText))
+                element.replaceParagraph(p.copy(text = newText))
             } else {
                 element
             }
@@ -661,8 +674,8 @@ object DocumentServices {
     fun generateTableOfContents(document: OfficeDocument): List<TOCEntry> {
         val toc = mutableListOf<TOCEntry>()
         document.body.elements.forEachIndexed { index, element ->
-            if (element is OfficeDocElement.ParagraphElement) {
-                val p = element.paragraph
+            val p = element.extractParagraph()
+            if (p != null) {
                 if (p.styleName?.contains("Heading", ignoreCase = true) == true) {
                     val level = when {
                         p.styleName.contains("Heading 1", ignoreCase = true) -> 1
@@ -681,8 +694,9 @@ object DocumentServices {
         val dictionary = setOf("the", "and", "document", "papirus", "office", "editor", "engine", "paragraph", "table", "image", "layout", "hello", "world")
         val issues = mutableListOf<SpellIssue>()
         document.body.elements.forEachIndexed { elemIdx, element ->
-            if (element is OfficeDocElement.ParagraphElement) {
-                val words = element.paragraph.text.split(Regex("[\\s,.:;!?()]+"))
+            val p = element.extractParagraph()
+            if (p != null) {
+                val words = p.text.split(Regex("[\\s,.:;!?()]+"))
                 var offset = 0
                 for (word in words) {
                     if (word.isNotBlank() && word.all { it.isLetter() }) {

@@ -115,8 +115,8 @@ class OdtDocumentWriter : DocumentFormatWriter {
             }
             is OfficeHeading -> {
                 val level = if (element.level > 0) element.level else 1
-                val styleName = "Heading_$level"
-                sb.append("      <text:h text:outline-level=\"$level\" style:style-name=\"$styleName\">")
+                val styleName = if (!element.styleName.isNullOrEmpty()) element.styleName else "Heading_$level"
+                sb.append("      <text:h text:outline-level=\"$level\" style:style-name=\"${escapeXml(styleName)}\">")
                 writeRunsOrText(sb, element.text, element.runs)
                 sb.append("</text:h>\n")
             }
@@ -170,12 +170,16 @@ class OdtDocumentWriter : DocumentFormatWriter {
     private fun writeRunsOrText(sb: StringBuilder, plainText: String, runs: List<OfficeTextRun>) {
         if (runs.isNotEmpty()) {
             for (run in runs) {
-                val hasStyle = run.isBold || run.isItalic || run.isUnderline
+                val styleName = run.styleName ?: run.characterStyle
+                val hasStyle = run.isBold || run.isItalic || run.isUnderline || !styleName.isNullOrEmpty()
                 if (hasStyle) {
-                    sb.append("<text:span>")
+                    val styleAttr = if (!styleName.isNullOrEmpty()) " style:style-name=\"${escapeXml(styleName)}\"" else ""
+                    sb.append("<text:span$styleAttr>")
                     if (run.isBold) sb.append("<b>")
                     if (run.isItalic) sb.append("<i>")
+                    if (run.isUnderline) sb.append("<u>")
                     sb.append(escapeXml(run.text))
+                    if (run.isUnderline) sb.append("</u>")
                     if (run.isItalic) sb.append("</i>")
                     if (run.isBold) sb.append("</b>")
                     sb.append("</text:span>")

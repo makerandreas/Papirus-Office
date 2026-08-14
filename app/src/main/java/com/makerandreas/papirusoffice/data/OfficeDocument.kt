@@ -18,6 +18,20 @@ data class OfficeDocument(
     val footnote: DocumentFootnote = DocumentFootnote()
 )
 
+fun OfficeDocument.toPlainText(): String {
+    return body.elements.joinToString("\n\n") { element ->
+        when (element) {
+            is OfficeParagraph -> element.text
+            is OfficeDocElement.ParagraphElement -> element.paragraph.text
+            is OfficeHeading -> element.text
+            is OfficeListItem -> "${element.bullet} ${element.text}"
+            is OfficeTable -> element.rows.joinToString("\n") { row -> row.cells.joinToString("\t") { cell -> cell.text } }
+            is OfficeDocElement.TableElement -> element.table.rows.joinToString("\n") { row -> row.cells.joinToString("\t") { cell -> cell.text } }
+            else -> ""
+        }
+    }
+}
+
 // ==========================================
 // LAYER 2: Body as sequence of OfficeElements
 // ==========================================
@@ -37,6 +51,21 @@ sealed class OfficeDocElement : OfficeElement {
     data class BookmarkElement(val bookmark: OfficeBookmark) : OfficeDocElement()
     data class HyperlinkElement(val hyperlink: OfficeHyperlink) : OfficeDocElement()
     data class FieldElement(val field: OfficeField) : OfficeDocElement()
+}
+
+fun OfficeElement.extractParagraph(): OfficeParagraph? {
+    return when (this) {
+        is OfficeParagraph -> this
+        is OfficeDocElement.ParagraphElement -> this.paragraph
+        else -> null
+    }
+}
+
+fun OfficeElement.replaceParagraph(newPara: OfficeParagraph): OfficeElement {
+    return when (this) {
+        is OfficeDocElement.ParagraphElement -> OfficeDocElement.ParagraphElement(newPara)
+        else -> newPara
+    }
 }
 
 // ==========================================

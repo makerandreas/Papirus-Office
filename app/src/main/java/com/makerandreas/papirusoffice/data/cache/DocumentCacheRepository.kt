@@ -128,11 +128,11 @@ class DocumentCacheRepository(context: Context) {
         val name = file.name.lowercase()
         return when {
             name.endsWith(".docx") || name.endsWith(".docm") -> "DOCX"
-            name.endsWith(".odt") -> "ODT"
-            name.endsWith(".ods") -> "ODS"
+            name.endsWith(".odt") || name.endsWith(".ott") -> "ODT"
+            name.endsWith(".ods") || name.endsWith(".ots") -> "ODS"
             name.endsWith(".xlsx") || name.endsWith(".xlsm") -> "XLSX"
             name.endsWith(".pptx") -> "PPTX"
-            name.endsWith(".odp") -> "ODP"
+            name.endsWith(".odp") || name.endsWith(".otp") -> "ODP"
             else -> "UNKNOWN"
         }
     }

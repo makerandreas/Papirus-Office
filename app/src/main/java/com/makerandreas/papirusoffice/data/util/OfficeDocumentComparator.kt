@@ -12,12 +12,15 @@ object OfficeDocumentComparator {
     fun compare(original: OfficeDocument, restored: OfficeDocument): RoundTripResult {
         val differences = mutableListOf<String>()
 
-        // 1. Compare Metadata Title
+        // 1. Compare Metadata
         if (original.metadata.title.isNotEmpty() && original.metadata.title != restored.metadata.title) {
             differences.add("Metadata Title mismatch: expected '${original.metadata.title}', got '${restored.metadata.title}'")
         }
+        if (original.metadata.author.isNotEmpty() && original.metadata.author != restored.metadata.author && original.metadata.author != restored.metadata.creator) {
+            differences.add("Metadata Author mismatch: expected '${original.metadata.author}', got '${restored.metadata.author}'")
+        }
 
-        // Helper to extract clean list of elements from body
+        // 2. Helper to extract clean list of elements from body
         val origElements = flattenElements(original.body.elements)
         val restElements = flattenElements(restored.body.elements)
 
@@ -33,6 +36,10 @@ object OfficeDocumentComparator {
                         if (orig.text != rest.text) {
                             differences.add("Paragraph[$i] text mismatch: expected '${orig.text}', got '${rest.text}'")
                         }
+                        if (!orig.styleName.isNullOrEmpty() && orig.styleName != rest.styleName) {
+                            differences.add("Paragraph[$i] styleName mismatch: expected '${orig.styleName}', got '${rest.styleName}'")
+                        }
+                        compareRuns("Paragraph[$i]", orig.runs, rest.runs, differences)
                     }
                     orig is OfficeHeading && rest is OfficeHeading -> {
                         if (orig.text != rest.text) {
@@ -41,11 +48,16 @@ object OfficeDocumentComparator {
                         if (orig.level != rest.level) {
                             differences.add("Heading[$i] level mismatch: expected level ${orig.level}, got ${rest.level}")
                         }
+                        if (!orig.styleName.isNullOrEmpty() && orig.styleName != rest.styleName) {
+                            differences.add("Heading[$i] styleName mismatch: expected '${orig.styleName}', got '${rest.styleName}'")
+                        }
+                        compareRuns("Heading[$i]", orig.runs, rest.runs, differences)
                     }
                     orig is OfficeListItem && rest is OfficeListItem -> {
                         if (orig.text != rest.text) {
                             differences.add("ListItem[$i] text mismatch: expected '${orig.text}', got '${rest.text}'")
                         }
+                        compareRuns("ListItem[$i]", orig.runs, rest.runs, differences)
                     }
                     orig is OfficeTable && rest is OfficeTable -> {
                         if (orig.rows.size != rest.rows.size) {
@@ -75,6 +87,45 @@ object OfficeDocumentComparator {
 
         val isSuccess = differences.isEmpty()
         return RoundTripResult(isSuccess, differences)
+    }
+
+    private fun compareRuns(
+        label: String,
+        origRuns: List<OfficeTextRun>,
+        restRuns: List<OfficeTextRun>,
+        differences: MutableList<String>
+    ) {
+        if (origRuns.isEmpty()) return
+        if (restRuns.isEmpty()) {
+            differences.add("$label runs mismatch: expected ${origRuns.size} runs, got 0 runs")
+            return
+        }
+
+        val cleanOrig = origRuns.filter { it.text.isNotEmpty() }
+        val cleanRest = restRuns.filter { it.text.isNotEmpty() }
+
+        if (cleanOrig.size != cleanRest.size) {
+            differences.add("$label run count mismatch: expected ${cleanOrig.size}, got ${cleanRest.size}")
+            return
+        }
+
+        for (j in cleanOrig.indices) {
+            val rOrig = cleanOrig[j]
+            val rRest = cleanRest[j]
+
+            if (rOrig.text != rRest.text) {
+                differences.add("$label run[$j] text mismatch: expected '${rOrig.text}', got '${rRest.text}'")
+            }
+            if (rOrig.isBold != rRest.isBold) {
+                differences.add("$label run[$j] isBold mismatch: expected ${rOrig.isBold}, got ${rRest.isBold}")
+            }
+            if (rOrig.isItalic != rRest.isItalic) {
+                differences.add("$label run[$j] isItalic mismatch: expected ${rOrig.isItalic}, got ${rRest.isItalic}")
+            }
+            if (rOrig.isUnderline != rRest.isUnderline) {
+                differences.add("$label run[$j] isUnderline mismatch: expected ${rOrig.isUnderline}, got ${rRest.isUnderline}")
+            }
+        }
     }
 
     private fun flattenElements(elements: List<OfficeElement>): List<OfficeElement> {

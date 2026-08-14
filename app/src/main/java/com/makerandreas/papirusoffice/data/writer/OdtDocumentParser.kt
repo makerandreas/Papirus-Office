@@ -1,6 +1,5 @@
 package com.makerandreas.papirusoffice.data.writer
 
-import android.util.Xml
 import com.makerandreas.papirusoffice.data.*
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
@@ -14,15 +13,16 @@ class OdtDocumentParser {
         PapirusLogger.d("ODT", "READ_START")
         var contentXmlBytes: ByteArray? = null
         var metaXmlBytes: ByteArray? = null
+        var stylesXmlBytes: ByteArray? = null
 
         try {
             ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
                 var entry = zip.nextEntry
                 while (entry != null) {
-                    if (entry.name == "content.xml") {
-                        contentXmlBytes = zip.readBytes()
-                    } else if (entry.name == "meta.xml") {
-                        metaXmlBytes = zip.readBytes()
+                    when (entry.name) {
+                        "content.xml" -> contentXmlBytes = zip.readBytes()
+                        "meta.xml" -> metaXmlBytes = zip.readBytes()
+                        "styles.xml" -> stylesXmlBytes = zip.readBytes()
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
@@ -35,20 +35,21 @@ class OdtDocumentParser {
         }
 
         if (contentXmlBytes == null) {
-            PapirusLogger.e("ODT", "READ_FAILED entry=content.xml", Exception("content.xml missing from zip"))
-            return OfficeDocument()
+            PapirusLogger.d("ODT", "content.xml missing from zip (template mode), creating default document structure")
+        } else {
+            PapirusLogger.d("ODT", "CONTENT_XML_READ")
         }
 
-        PapirusLogger.d("ODT", "CONTENT_XML_READ")
-
-        val title = if (metaXmlBytes != null) parseTitleFromMetaXml(metaXmlBytes!!) else ""
-        val elements = parseContentXml(contentXmlBytes!!)
+        val metadata = if (metaXmlBytes != null) parseMetaXml(metaXmlBytes!!) else DocumentMetadata()
+        val styles = if (stylesXmlBytes != null) parseStylesXml(stylesXmlBytes!!) else DocumentStyles()
+        val elements = if (contentXmlBytes != null) parseContentXml(contentXmlBytes!!) else listOf(OfficeParagraph(""))
 
         PapirusLogger.d("ODT", "BODY_ELEMENTS=${elements.size}")
         PapirusLogger.d("ODT", "READ_SUCCESS")
 
         return OfficeDocument(
-            metadata = DocumentMetadata(title = title),
+            metadata = metadata,
+            styles = styles,
             body = DocumentBody(elements = elements)
         )
     }
@@ -57,33 +58,36 @@ class OdtDocumentParser {
         return parse(file.readBytes())
     }
 
-    private fun parseTitleFromMetaXml(metaXmlBytes: ByteArray): String {
+    private fun parseMetaXml(metaXmlBytes: ByteArray): DocumentMetadata {
+        var title = ""
+        var author = ""
         try {
             val factory = XmlPullParserFactory.newInstance()
-            factory.isNamespaceAware = false
+            factory.isNamespaceAware = true
             val parser = factory.newPullParser()
             parser.setInput(ByteArrayInputStream(metaXmlBytes), "UTF-8")
 
             var eventType = parser.eventType
-            var inTitle = false
+            var currentTarget = ""
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
-                        if (name == "dc:title" || name == "title") {
-                            inTitle = true
+                        if (name == "title" || name == "creator" || name == "initial-creator") {
+                            currentTarget = name
                         }
                     }
                     XmlPullParser.TEXT -> {
-                        if (inTitle && !parser.text.isNullOrBlank()) {
-                            return parser.text.trim()
+                        val text = parser.text?.trim() ?: ""
+                        if (text.isNotEmpty()) {
+                            when (currentTarget) {
+                                "title" -> title = text
+                                "creator", "initial-creator" -> author = text
+                            }
                         }
                     }
                     XmlPullParser.END_TAG -> {
-                        val name = parser.name ?: ""
-                        if (name == "dc:title" || name == "title") {
-                            inTitle = false
-                        }
+                        currentTarget = ""
                     }
                 }
                 eventType = parser.next()
@@ -91,96 +95,178 @@ class OdtDocumentParser {
         } catch (e: Exception) {
             // Ignore meta parse errors
         }
-        return ""
+        return DocumentMetadata(title = title, author = author, creator = author)
+    }
+
+    private fun parseStylesXml(stylesXmlBytes: ByteArray): DocumentStyles {
+        val paragraphStyles = mutableMapOf<String, ParagraphStyle>()
+        val characterStyles = mutableMapOf<String, CharacterStyle>()
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val parser = factory.newPullParser()
+            parser.setInput(ByteArrayInputStream(stylesXmlBytes), "UTF-8")
+
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    val name = parser.name ?: ""
+                    if (name == "style") {
+                        val styleName = getAttr(parser, "name") ?: getAttr(parser, "style-name")
+                        val family = getAttr(parser, "family")
+                        if (!styleName.isNullOrEmpty()) {
+                            if (family == "paragraph") {
+                                paragraphStyles[styleName] = ParagraphStyle(name = styleName)
+                            } else if (family == "text") {
+                                characterStyles[styleName] = CharacterStyle(name = styleName)
+                            }
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (e: Exception) {
+            // Ignore style parse errors
+        }
+        return DocumentStyles(paragraphStyles = paragraphStyles, characterStyles = characterStyles)
     }
 
     private fun parseContentXml(contentXmlBytes: ByteArray): List<OfficeElement> {
         val elements = mutableListOf<OfficeElement>()
         try {
             val factory = XmlPullParserFactory.newInstance()
-            factory.isNamespaceAware = false
+            factory.isNamespaceAware = true
             val parser = factory.newPullParser()
             parser.setInput(ByteArrayInputStream(contentXmlBytes), "UTF-8")
 
             var eventType = parser.eventType
             val currentText = StringBuilder()
+            val currentRuns = mutableListOf<OfficeTextRun>()
+
             var headingLevel = 1
+            var headingStyleName: String? = null
+            var paragraphStyleName: String? = null
+
             var inParagraph = false
             var inHeading = false
             var inTable = false
             var inListItem = false
+
+            var boldDepth = 0
+            var italicDepth = 0
+            var underlineDepth = 0
+            var spanStyleName: String? = null
+
             val currentTableRows = mutableListOf<OfficeTableRow>()
             val currentRowCells = mutableListOf<OfficeTableCell>()
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
-                        val tag = parser.name ?: ""
-                        when {
-                            tag == "text:p" || tag == "p" -> {
+                        val name = parser.name ?: ""
+                        when (name) {
+                            "p" -> {
                                 inParagraph = true
                                 currentText.clear()
+                                currentRuns.clear()
+                                paragraphStyleName = getAttr(parser, "style-name")
                             }
-                            tag == "text:h" || tag == "h" -> {
+                            "h" -> {
                                 inHeading = true
                                 currentText.clear()
-                                val levelAttr = parser.getAttributeValue(null, "text:outline-level")
-                                    ?: parser.getAttributeValue(null, "outline-level")
+                                currentRuns.clear()
+                                headingStyleName = getAttr(parser, "style-name")
+                                val levelAttr = getAttr(parser, "outline-level")
                                 headingLevel = levelAttr?.toIntOrNull() ?: 1
                             }
-                            tag == "text:list-item" || tag == "list-item" -> {
+                            "list-item" -> {
                                 inListItem = true
                             }
-                            tag == "table:table" || tag == "table" -> {
+                            "table" -> {
                                 inTable = true
                                 currentTableRows.clear()
                             }
-                            tag == "table:table-row" || tag == "table-row" -> {
+                            "table-row" -> {
                                 currentRowCells.clear()
                             }
-                            tag == "table:table-cell" || tag == "table-cell" -> {
+                            "table-cell" -> {
                                 currentText.clear()
+                                currentRuns.clear()
                             }
+                            "span" -> {
+                                spanStyleName = getAttr(parser, "style-name")
+                            }
+                            "b" -> boldDepth++
+                            "i" -> italicDepth++
+                            "u" -> underlineDepth++
                         }
                     }
                     XmlPullParser.TEXT -> {
-                        currentText.append(parser.text ?: "")
+                        val text = parser.text ?: ""
+                        if (text.isNotEmpty() && (inParagraph || inHeading || inListItem)) {
+                            currentText.append(text)
+                            val isB = boldDepth > 0
+                            val isI = italicDepth > 0
+                            val isU = underlineDepth > 0
+                            currentRuns.add(
+                                OfficeTextRun(
+                                    text = text,
+                                    styleName = spanStyleName,
+                                    characterStyle = spanStyleName,
+                                    isBold = isB,
+                                    isItalic = isI,
+                                    isUnderline = isU
+                                )
+                            )
+                        }
                     }
                     XmlPullParser.END_TAG -> {
-                        val tag = parser.name ?: ""
-                        when {
-                            tag == "text:p" || tag == "p" -> {
+                        val name = parser.name ?: ""
+                        when (name) {
+                            "span" -> spanStyleName = null
+                            "b" -> if (boldDepth > 0) boldDepth--
+                            "i" -> if (italicDepth > 0) italicDepth--
+                            "u" -> if (underlineDepth > 0) underlineDepth--
+                            "p" -> {
                                 val text = currentText.toString()
+                                val runs = ArrayList(currentRuns)
                                 if (inHeading) {
-                                    // heading end tag will handle
+                                    // inside heading, handled by h end tag
                                 } else if (inTable) {
-                                    // cell end tag will handle
+                                    // cell end tag will handle or cell paragraph
                                 } else if (inListItem) {
-                                    elements.add(OfficeListItem(text = text))
+                                    elements.add(OfficeListItem(text = text, runs = runs))
                                 } else {
-                                    elements.add(OfficeParagraph(text = text))
+                                    elements.add(OfficeParagraph(text = text, styleName = paragraphStyleName, runs = runs))
                                 }
                                 inParagraph = false
                             }
-                            tag == "text:h" || tag == "h" -> {
+                            "h" -> {
                                 val text = currentText.toString()
-                                elements.add(OfficeHeading(text = text, level = headingLevel))
+                                val runs = ArrayList(currentRuns)
+                                elements.add(OfficeHeading(text = text, level = headingLevel, styleName = headingStyleName, runs = runs))
                                 inHeading = false
                             }
-                            tag == "text:list-item" || tag == "list-item" -> {
+                            "list-item" -> {
                                 inListItem = false
                             }
-                            tag == "table:table-cell" || tag == "table-cell" -> {
+                            "table-cell" -> {
                                 val cellText = currentText.toString()
-                                currentRowCells.add(OfficeTableCell(text = cellText))
+                                val runs = ArrayList(currentRuns)
+                                val cellParagraphs = if (runs.isNotEmpty()) {
+                                    listOf(OfficeParagraph(text = cellText, runs = runs))
+                                } else {
+                                    emptyList()
+                                }
+                                currentRowCells.add(OfficeTableCell(text = cellText, paragraphs = cellParagraphs))
                             }
-                            tag == "table:table-row" || tag == "table-row" -> {
+                            "table-row" -> {
                                 if (currentRowCells.isNotEmpty()) {
                                     currentTableRows.add(OfficeTableRow(cells = ArrayList(currentRowCells)))
                                     currentRowCells.clear()
                                 }
                             }
-                            tag == "table:table" || tag == "table" -> {
+                            "table" -> {
                                 if (currentTableRows.isNotEmpty()) {
                                     val maxCols = currentTableRows.maxOfOrNull { it.cells.size } ?: 0
                                     elements.add(OfficeTable(rows = ArrayList(currentTableRows), numColumns = maxCols))
@@ -197,5 +283,15 @@ class OdtDocumentParser {
             PapirusLogger.e("ODT", "parseContentXml error: ${e.message}", e)
         }
         return elements
+    }
+
+    private fun getAttr(parser: XmlPullParser, localName: String): String? {
+        for (i in 0 until parser.attributeCount) {
+            val name = parser.getAttributeName(i) ?: ""
+            if (name == localName || name.endsWith(":$localName")) {
+                return parser.getAttributeValue(i)
+            }
+        }
+        return null
     }
 }

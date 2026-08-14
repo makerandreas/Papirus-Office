@@ -27,7 +27,7 @@ class DocxDocumentParser(private val context: Context) {
         if (!file.exists()) return@withContext DocxParseResult("")
 
         val fileName = file.name.lowercase()
-        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || fileName.endsWith(".ods") || fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm") || isZipFile(file)) {
+        if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || fileName.endsWith(".ott") || fileName.endsWith(".ods") || fileName.endsWith(".ots") || fileName.endsWith(".odp") || fileName.endsWith(".otp") || fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm") || isZipFile(file)) {
             val parsedDoc = officeParser.parseDocument(file, bypassCache)
             return@withContext DocxParseResult(
                 text = parsedDoc.plainText,
