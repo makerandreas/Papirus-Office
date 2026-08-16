@@ -21,12 +21,14 @@ class OdtDocumentWriter : DocumentFormatWriter {
             val baos = ByteArrayOutputStream()
 
             ZipOutputStream(baos).use { zout ->
-                // 1. mimetype (MUST be first entry and uncompressed STORED per ODF specification Part 3)
+                // 1. mimetype (MUST be first entry, uncompressed STORED, zero extra field per ODF specification Part 2 / Part 3)
                 val mimeBytes = "application/vnd.oasis.opendocument.text".toByteArray(Charsets.UTF_8)
                 val mimeEntry = ZipEntry("mimetype").apply {
                     method = ZipEntry.STORED
                     size = mimeBytes.size.toLong()
+                    compressedSize = mimeBytes.size.toLong()
                     crc = CRC32().apply { update(mimeBytes) }.value
+                    extra = ByteArray(0)
                 }
                 zout.putNextEntry(mimeEntry)
                 zout.write(mimeBytes)
@@ -272,7 +274,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
             <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
-              <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+              <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.text"/>
               <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
               <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
               <manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>

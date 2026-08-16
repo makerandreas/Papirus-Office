@@ -843,7 +843,9 @@ class OfficeDocumentParser(private val context: Context) {
                     val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
                         method = java.util.zip.ZipEntry.STORED
                         size = mimeBytes.size.toLong()
+                        compressedSize = mimeBytes.size.toLong()
                         crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                        extra = ByteArray(0)
                     }
                     zout.putNextEntry(mimeEntry)
                     zout.write(mimeBytes)
@@ -892,7 +894,9 @@ class OfficeDocumentParser(private val context: Context) {
                                 val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
                                     method = java.util.zip.ZipEntry.STORED
                                     size = mimeBytes.size.toLong()
+                                    compressedSize = mimeBytes.size.toLong()
                                     crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                    extra = ByteArray(0)
                                 }
                                 zout.putNextEntry(mimeEntry)
                                 zout.write(mimeBytes)
@@ -1089,7 +1093,9 @@ class OfficeDocumentParser(private val context: Context) {
                     val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
                         method = java.util.zip.ZipEntry.STORED
                         size = mimeBytes.size.toLong()
+                        compressedSize = mimeBytes.size.toLong()
                         crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                        extra = ByteArray(0)
                     }
                     zout.putNextEntry(mimeEntry)
                     zout.write(mimeBytes)
@@ -1138,7 +1144,9 @@ class OfficeDocumentParser(private val context: Context) {
                                 val mimeEntry = java.util.zip.ZipEntry("mimetype").apply {
                                     method = java.util.zip.ZipEntry.STORED
                                     size = mimeBytes.size.toLong()
+                                    compressedSize = mimeBytes.size.toLong()
                                     crc = java.util.zip.CRC32().apply { update(mimeBytes) }.value
+                                    extra = ByteArray(0)
                                 }
                                 zout.putNextEntry(mimeEntry)
                                 zout.write(mimeBytes)

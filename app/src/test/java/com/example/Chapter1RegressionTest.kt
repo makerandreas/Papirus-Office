@@ -198,38 +198,53 @@ class Chapter1RegressionTest {
         odtSerializer.write(doc, DocumentReference.LocalFile(file), context)
 
         var hasMimetype = false
+        var isMimetypeFirst = false
         var isMimetypeUncompressed = false
+        var mimetypeExtraLength = -1
         var hasManifest = false
         var hasContentXml = false
         var hasStylesXml = false
         var hasMetaXml = false
+        var manifestContent = ""
+        var entryIndex = 0
 
         java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
+                if (entryIndex == 0 && entry.name == "mimetype") {
+                    isMimetypeFirst = true
+                }
                 when (entry.name) {
                     "mimetype" -> {
                         hasMimetype = true
+                        mimetypeExtraLength = entry.extra?.size ?: 0
                         if (entry.method == java.util.zip.ZipEntry.STORED) {
                             isMimetypeUncompressed = true
                         }
                     }
-                    "META-INF/manifest.xml" -> hasManifest = true
+                    "META-INF/manifest.xml" -> {
+                        hasManifest = true
+                        manifestContent = String(zip.readBytes(), Charsets.UTF_8)
+                    }
                     "content.xml" -> hasContentXml = true
                     "styles.xml" -> hasStylesXml = true
                     "meta.xml" -> hasMetaXml = true
                 }
                 zip.closeEntry()
+                entryIndex++
                 entry = zip.nextEntry
             }
         }
 
         assertTrue("Package must contain mimetype", hasMimetype)
-        assertTrue("mimetype must be uncompressed STORED entry per ODF spec", isMimetypeUncompressed)
+        assertTrue("mimetype must be the first entry in ZIP package (ODF Spec 3.3)", isMimetypeFirst)
+        assertTrue("mimetype must be uncompressed STORED entry per ODF spec (ODF Spec 3.3)", isMimetypeUncompressed)
+        assertEquals("mimetype must have no extra field (ODF Spec 3.3)", 0, mimetypeExtraLength)
         assertTrue("Package must contain META-INF/manifest.xml", hasManifest)
         assertTrue("Package must contain content.xml", hasContentXml)
         assertTrue("Package must contain styles.xml", hasStylesXml)
         assertTrue("Package must contain meta.xml", hasMetaXml)
+        assertTrue("Manifest must declare root file-entry with manifest:version (ODF Spec 4.16.14.1)", manifestContent.contains("manifest:full-path=\"/\" manifest:version=\"1.2\"") || manifestContent.contains("manifest:full-path=\"/\""))
     }
 
     @Test
