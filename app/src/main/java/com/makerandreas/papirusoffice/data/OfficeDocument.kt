@@ -5,6 +5,15 @@ import java.io.File
 // ==========================================
 // LAYER 1: OfficeDocument (Root Document Model)
 // ==========================================
+data class OdtPackageData(
+    val entries: Map<String, ByteArray> = emptyMap(),
+    val originalContentXml: String? = null,
+    val originalStylesXml: String? = null,
+    val originalManifestXml: String? = null,
+    val originalMetaXml: String? = null,
+    val originalSettingsXml: String? = null
+)
+
 data class OfficeDocument(
     val metadata: DocumentMetadata = DocumentMetadata(),
     val styles: DocumentStyles = DocumentStyles(),
@@ -15,7 +24,8 @@ data class OfficeDocument(
     val parserReport: ParserReport = ParserReport(),
     val header: DocumentHeader = DocumentHeader(),
     val footer: DocumentFooter = DocumentFooter(),
-    val footnote: DocumentFootnote = DocumentFootnote()
+    val footnote: DocumentFootnote = DocumentFootnote(),
+    val odtPackageData: OdtPackageData? = null
 )
 
 fun OfficeDocument.toPlainText(): String {
@@ -192,8 +202,11 @@ data class ParagraphStyle(
     val fontSizeSp: Float = 12f,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
+    val isUnderline: Boolean = false,
     val colorHex: String? = null,
-    val alignment: String = "Left"
+    val alignment: String = "Left",
+    val fontFamily: String? = null,
+    val parentStyleName: String? = null
 )
 
 data class CharacterStyle(
@@ -201,7 +214,10 @@ data class CharacterStyle(
     val fontSizeSp: Float = 12f,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
-    val colorHex: String? = null
+    val isUnderline: Boolean = false,
+    val colorHex: String? = null,
+    val fontFamily: String? = null,
+    val parentStyleName: String? = null
 )
 
 // ==========================================
@@ -378,7 +394,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
 
     return OfficeDocument(
         metadata = metadata,
-        body = DocumentBody(elements = docElements)
+        body = DocumentBody(elements = docElements),
+        odtPackageData = this.odtPackageData
     )
 }
 

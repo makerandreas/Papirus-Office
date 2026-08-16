@@ -231,4 +231,110 @@ class Chapter1RegressionTest {
         assertTrue("Package must contain styles.xml", hasStylesXml)
         assertTrue("Package must contain meta.xml", hasMetaXml)
     }
+
+    @Test
+    fun test31To35_ExternalOdtRoundTripPackagePreservation() = runBlocking {
+        // Create an external ODT mock with rich styles.xml and an extra file (Pictures/sample.png)
+        val customStylesXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+              <office:styles>
+                <style:style style:name="Custom_LibreOffice_Style" style:family="paragraph">
+                  <style:text-properties fo:font-size="16pt" fo:font-weight="bold" fo:color="#FF0000"/>
+                </style:style>
+              </office:styles>
+            </office:document-styles>
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+
+        val customContentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2">
+              <office:body>
+                <office:text>
+                  <text:p text:style-name="Custom_LibreOffice_Style">Hello External LibreOffice Document!</text:p>
+                </office:text>
+              </office:body>
+            </office:document-content>
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+
+        val customManifestXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+              <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+              <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+              <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
+              <manifest:file-entry manifest:full-path="Pictures/sample.png" manifest:media-type="image/png"/>
+            </manifest:manifest>
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+
+        val samplePngBytes = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
+
+        val initialOdtFile = File(context.filesDir, "ExternalDoc.odt")
+        java.util.zip.ZipOutputStream(initialOdtFile.outputStream()).use { zout ->
+            val mime = "application/vnd.oasis.opendocument.text".toByteArray()
+            val entry = java.util.zip.ZipEntry("mimetype").apply {
+                method = java.util.zip.ZipEntry.STORED
+                size = mime.size.toLong()
+                crc = java.util.zip.CRC32().apply { update(mime) }.value
+            }
+            zout.putNextEntry(entry)
+            zout.write(mime)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("content.xml"))
+            zout.write(customContentXml)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("styles.xml"))
+            zout.write(customStylesXml)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("META-INF/manifest.xml"))
+            zout.write(customManifestXml)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("Pictures/sample.png"))
+            zout.write(samplePngBytes)
+            zout.closeEntry()
+        }
+
+        // 1. Parse external ODT into OfficeDocument
+        val parser = OdtDocumentParser()
+        val parsedDoc = parser.parse(initialOdtFile)
+
+        assertNotNull("Package data must be captured", parsedDoc.odtPackageData)
+        assertTrue("Original package entries should be captured", parsedDoc.odtPackageData!!.entries.containsKey("Pictures/sample.png"))
+        assertTrue("Custom styles should be parsed", parsedDoc.styles.paragraphStyles.containsKey("Custom_LibreOffice_Style"))
+        assertEquals("Font weight parsed as bold", true, parsedDoc.styles.paragraphStyles["Custom_LibreOffice_Style"]?.isBold)
+
+        // 2. Edit document in Papirus (modify text)
+        val updatedElements = listOf(
+            OfficeParagraph(text = "Hello External LibreOffice Document! (Edited by Papirus)", styleName = "Custom_LibreOffice_Style")
+        )
+        val editedDoc = parsedDoc.copy(body = DocumentBody(elements = updatedElements))
+
+        // 3. Save ODT back to disk
+        val savedOdtFile = File(context.filesDir, "ExternalDoc_Saved.odt")
+        val saveResult = odtSerializer.write(editedDoc, DocumentReference.LocalFile(savedOdtFile), context)
+        assertTrue("Save must succeed", saveResult)
+
+        // 4. Verify preserved files in output package
+        val preservedEntries = mutableMapOf<String, ByteArray>()
+        java.util.zip.ZipInputStream(savedOdtFile.inputStream()).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                preservedEntries[entry.name] = zip.readBytes()
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+
+        assertTrue("Pictures/sample.png must be preserved byte-for-byte in round-trip", preservedEntries.containsKey("Pictures/sample.png"))
+        assertArrayEquals("Pictures/sample.png bytes match", samplePngBytes, preservedEntries["Pictures/sample.png"])
+        assertEquals("styles.xml must be preserved exactly from original document", String(customStylesXml), String(preservedEntries["styles.xml"] ?: ByteArray(0)))
+
+        // 5. Reopen saved file and verify content + structure
+        val reopened = odtSerializer.read(DocumentReference.LocalFile(savedOdtFile), context)
+        assertTrue("Reopened text reflects edits", reopened.toPlainText().contains("(Edited by Papirus)"))
+    }
 }

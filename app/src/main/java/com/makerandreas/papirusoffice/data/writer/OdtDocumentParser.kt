@@ -11,28 +11,29 @@ class OdtDocumentParser {
 
     fun parse(bytes: ByteArray): OfficeDocument {
         PapirusLogger.d("ODT", "READ_START")
-        var contentXmlBytes: ByteArray? = null
-        var metaXmlBytes: ByteArray? = null
-        var stylesXmlBytes: ByteArray? = null
+        val packageEntries = mutableMapOf<String, ByteArray>()
 
         try {
             ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
                 var entry = zip.nextEntry
                 while (entry != null) {
-                    when (entry.name) {
-                        "content.xml" -> contentXmlBytes = zip.readBytes()
-                        "meta.xml" -> metaXmlBytes = zip.readBytes()
-                        "styles.xml" -> stylesXmlBytes = zip.readBytes()
-                    }
+                    val entryBytes = zip.readBytes()
+                    packageEntries[entry.name] = entryBytes
                     zip.closeEntry()
                     entry = zip.nextEntry
                 }
             }
-            PapirusLogger.d("ODT", "PACKAGE_OPENED")
+            PapirusLogger.d("ODT", "PACKAGE_OPENED entries=${packageEntries.size}")
         } catch (e: Exception) {
             PapirusLogger.e("ODT", "READ_FAILED entry=package", e)
             return OfficeDocument()
         }
+
+        val contentXmlBytes = packageEntries["content.xml"]
+        val metaXmlBytes = packageEntries["meta.xml"]
+        val stylesXmlBytes = packageEntries["styles.xml"]
+        val manifestXmlBytes = packageEntries["META-INF/manifest.xml"]
+        val settingsXmlBytes = packageEntries["settings.xml"]
 
         if (contentXmlBytes == null) {
             PapirusLogger.d("ODT", "content.xml missing from zip (template mode), creating default document structure")
@@ -40,17 +41,47 @@ class OdtDocumentParser {
             PapirusLogger.d("ODT", "CONTENT_XML_READ")
         }
 
-        val metadata = if (metaXmlBytes != null) parseMetaXml(metaXmlBytes!!) else DocumentMetadata()
-        val styles = if (stylesXmlBytes != null) parseStylesXml(stylesXmlBytes!!) else DocumentStyles()
-        val elements = if (contentXmlBytes != null) parseContentXml(contentXmlBytes!!) else listOf(OfficeParagraph(""))
+        val metadata = if (metaXmlBytes != null) parseMetaXml(metaXmlBytes) else DocumentMetadata()
+
+        // Styles from styles.xml (document styles)
+        val docStyles = if (stylesXmlBytes != null) parseStylesXml(stylesXmlBytes) else DocumentStyles()
+
+        // Parse automatic styles and elements from content.xml
+        val (automaticStyles, elements) = if (contentXmlBytes != null) {
+            parseContentXml(contentXmlBytes, docStyles)
+        } else {
+            Pair(DocumentStyles(), listOf(OfficeParagraph("")))
+        }
+
+        // Merge styles: document styles + automatic styles
+        val mergedParagraphStyles = docStyles.paragraphStyles.toMutableMap().apply {
+            putAll(automaticStyles.paragraphStyles)
+        }
+        val mergedCharacterStyles = docStyles.characterStyles.toMutableMap().apply {
+            putAll(automaticStyles.characterStyles)
+        }
+        val mergedStyles = DocumentStyles(
+            paragraphStyles = mergedParagraphStyles,
+            characterStyles = mergedCharacterStyles
+        )
+
+        val packageData = OdtPackageData(
+            entries = packageEntries,
+            originalContentXml = contentXmlBytes?.toString(Charsets.UTF_8),
+            originalStylesXml = stylesXmlBytes?.toString(Charsets.UTF_8),
+            originalManifestXml = manifestXmlBytes?.toString(Charsets.UTF_8),
+            originalMetaXml = metaXmlBytes?.toString(Charsets.UTF_8),
+            originalSettingsXml = settingsXmlBytes?.toString(Charsets.UTF_8)
+        )
 
         PapirusLogger.d("ODT", "BODY_ELEMENTS=${elements.size}")
         PapirusLogger.d("ODT", "READ_SUCCESS")
 
         return OfficeDocument(
             metadata = metadata,
-            styles = styles,
-            body = DocumentBody(elements = elements)
+            styles = mergedStyles,
+            body = DocumentBody(elements = elements),
+            odtPackageData = packageData
         )
     }
 
@@ -72,9 +103,9 @@ class OdtDocumentParser {
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
-                        val name = parser.name ?: ""
-                        if (name == "title" || name == "creator" || name == "initial-creator") {
-                            currentTarget = name
+                        val localName = getLocalName(parser)
+                        if (localName == "title" || localName == "creator" || localName == "initial-creator") {
+                            currentTarget = localName
                         }
                     }
                     XmlPullParser.TEXT -> {
@@ -99,39 +130,143 @@ class OdtDocumentParser {
     }
 
     private fun parseStylesXml(stylesXmlBytes: ByteArray): DocumentStyles {
+        return parseStylesFromStream(stylesXmlBytes)
+    }
+
+    private fun parseStylesFromStream(xmlBytes: ByteArray): DocumentStyles {
         val paragraphStyles = mutableMapOf<String, ParagraphStyle>()
         val characterStyles = mutableMapOf<String, CharacterStyle>()
+
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
             val parser = factory.newPullParser()
-            parser.setInput(ByteArrayInputStream(stylesXmlBytes), "UTF-8")
+            parser.setInput(ByteArrayInputStream(xmlBytes), "UTF-8")
 
             var eventType = parser.eventType
+            var currentStyleName: String? = null
+            var currentFamily: String? = null
+            var currentParentStyle: String? = null
+
+            var currentIsBold = false
+            var currentIsItalic = false
+            var currentIsUnderline = false
+            var currentFontSizeSp = 12f
+            var currentColorHex: String? = null
+            var currentFontFamily: String? = null
+            var currentAlignment = "Left"
+
             while (eventType != XmlPullParser.END_DOCUMENT) {
-                if (eventType == XmlPullParser.START_TAG) {
-                    val name = parser.name ?: ""
-                    if (name == "style") {
-                        val styleName = getAttr(parser, "name") ?: getAttr(parser, "style-name")
-                        val family = getAttr(parser, "family")
-                        if (!styleName.isNullOrEmpty()) {
-                            if (family == "paragraph") {
-                                paragraphStyles[styleName] = ParagraphStyle(name = styleName)
-                            } else if (family == "text") {
-                                characterStyles[styleName] = CharacterStyle(name = styleName)
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        val localName = getLocalName(parser)
+                        when (localName) {
+                            "style", "default-style" -> {
+                                currentStyleName = getAttr(parser, "name") ?: getAttr(parser, "style-name") ?: if (localName == "default-style") "Default" else null
+                                currentFamily = getAttr(parser, "family")
+                                currentParentStyle = getAttr(parser, "parent-style-name")
+
+                                currentIsBold = false
+                                currentIsItalic = false
+                                currentIsUnderline = false
+                                currentFontSizeSp = 12f
+                                currentColorHex = null
+                                currentFontFamily = null
+                                currentAlignment = "Left"
                             }
+                            "text-properties" -> {
+                                val fontWeight = getAttr(parser, "font-weight") ?: getAttr(parser, "font-weight-asian") ?: getAttr(parser, "font-weight-complex")
+                                if (fontWeight.equals("bold", ignoreCase = true) || fontWeight.equals("700", ignoreCase = true) || fontWeight.equals("800", ignoreCase = true) || fontWeight.equals("900", ignoreCase = true)) {
+                                    currentIsBold = true
+                                }
+                                val fontStyle = getAttr(parser, "font-style") ?: getAttr(parser, "font-style-asian") ?: getAttr(parser, "font-style-complex")
+                                if (fontStyle.equals("italic", ignoreCase = true) || fontStyle.equals("oblique", ignoreCase = true)) {
+                                    currentIsItalic = true
+                                }
+                                val underline = getAttr(parser, "text-underline-style") ?: getAttr(parser, "text-underline-type")
+                                if (!underline.isNullOrEmpty() && !underline.equals("none", ignoreCase = true)) {
+                                    currentIsUnderline = true
+                                }
+                                val sizeAttr = getAttr(parser, "font-size") ?: getAttr(parser, "font-size-asian")
+                                if (!sizeAttr.isNullOrEmpty()) {
+                                    val numeric = sizeAttr.filter { it.isDigit() || it == '.' }.toFloatOrNull()
+                                    if (numeric != null && numeric > 0f) {
+                                        currentFontSizeSp = numeric
+                                    }
+                                }
+                                currentColorHex = getAttr(parser, "color")
+                                currentFontFamily = getAttr(parser, "font-name") ?: getAttr(parser, "font-family")
+                            }
+                            "paragraph-properties" -> {
+                                val align = getAttr(parser, "text-align")
+                                if (!align.isNullOrEmpty()) {
+                                    currentAlignment = when (align.lowercase()) {
+                                        "center" -> "Center"
+                                        "right", "end" -> "Right"
+                                        "justify" -> "Justify"
+                                        else -> "Left"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        val localName = getLocalName(parser)
+                        if (localName == "style" || localName == "default-style") {
+                            val name = currentStyleName
+                            if (!name.isNullOrEmpty()) {
+                                if (currentFamily == "paragraph" || currentFamily == null) {
+                                    paragraphStyles[name] = ParagraphStyle(
+                                        name = name,
+                                        fontSizeSp = currentFontSizeSp,
+                                        isBold = currentIsBold,
+                                        isItalic = currentIsItalic,
+                                        isUnderline = currentIsUnderline,
+                                        colorHex = currentColorHex,
+                                        alignment = currentAlignment,
+                                        fontFamily = currentFontFamily,
+                                        parentStyleName = currentParentStyle
+                                    )
+                                }
+                                if (currentFamily == "text" || currentFamily == null) {
+                                    characterStyles[name] = CharacterStyle(
+                                        name = name,
+                                        fontSizeSp = currentFontSizeSp,
+                                        isBold = currentIsBold,
+                                        isItalic = currentIsItalic,
+                                        isUnderline = currentIsUnderline,
+                                        colorHex = currentColorHex,
+                                        fontFamily = currentFontFamily,
+                                        parentStyleName = currentParentStyle
+                                    )
+                                }
+                            }
+                            currentStyleName = null
                         }
                     }
                 }
                 eventType = parser.next()
             }
         } catch (e: Exception) {
-            // Ignore style parse errors
+            PapirusLogger.e("ODT", "parseStylesFromStream error: ${e.message}", e)
         }
+
         return DocumentStyles(paragraphStyles = paragraphStyles, characterStyles = characterStyles)
     }
 
-    private fun parseContentXml(contentXmlBytes: ByteArray): List<OfficeElement> {
+    private fun parseContentXml(
+        contentXmlBytes: ByteArray,
+        existingStyles: DocumentStyles
+    ): Pair<DocumentStyles, List<OfficeElement>> {
+        val automaticStyles = parseStylesFromStream(contentXmlBytes)
+
+        val mergedParagraphStyles = existingStyles.paragraphStyles.toMutableMap().apply {
+            putAll(automaticStyles.paragraphStyles)
+        }
+        val mergedCharacterStyles = existingStyles.characterStyles.toMutableMap().apply {
+            putAll(automaticStyles.characterStyles)
+        }
+
         val elements = mutableListOf<OfficeElement>()
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -147,6 +282,7 @@ class OdtDocumentParser {
             var headingStyleName: String? = null
             var paragraphStyleName: String? = null
 
+            var inBody = false
             var inParagraph = false
             var inHeading = false
             var inTable = false
@@ -163,15 +299,16 @@ class OdtDocumentParser {
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
-                        val name = parser.name ?: ""
-                        when (name) {
-                            "p" -> {
+                        val localName = getLocalName(parser)
+                        when (localName) {
+                            "body" -> inBody = true
+                            "p" -> if (inBody) {
                                 inParagraph = true
                                 currentText.clear()
                                 currentRuns.clear()
                                 paragraphStyleName = getAttr(parser, "style-name")
                             }
-                            "h" -> {
+                            "h" -> if (inBody) {
                                 inHeading = true
                                 currentText.clear()
                                 currentRuns.clear()
@@ -179,39 +316,74 @@ class OdtDocumentParser {
                                 val levelAttr = getAttr(parser, "outline-level")
                                 headingLevel = levelAttr?.toIntOrNull() ?: 1
                             }
-                            "list-item" -> {
+                            "list-item" -> if (inBody) {
                                 inListItem = true
                             }
-                            "table" -> {
+                            "table" -> if (inBody) {
                                 inTable = true
                                 currentTableRows.clear()
                             }
-                            "table-row" -> {
+                            "table-row" -> if (inBody) {
                                 currentRowCells.clear()
                             }
-                            "table-cell" -> {
+                            "table-cell" -> if (inBody) {
                                 currentText.clear()
                                 currentRuns.clear()
                             }
-                            "span" -> {
+                            "span" -> if (inBody) {
                                 spanStyleName = getAttr(parser, "style-name")
+                            }
+                            "s" -> if (inBody && (inParagraph || inHeading || inListItem)) {
+                                val countAttr = getAttr(parser, "c")
+                                val count = countAttr?.toIntOrNull() ?: 1
+                                repeat(count) { currentText.append(" ") }
+                            }
+                            "tab" -> if (inBody && (inParagraph || inHeading || inListItem)) {
+                                currentText.append("\t")
+                            }
+                            "line-break" -> if (inBody && (inParagraph || inHeading || inListItem)) {
+                                currentText.append("\n")
                             }
                             "b" -> boldDepth++
                             "i" -> italicDepth++
                             "u" -> underlineDepth++
+                            "image" -> if (inBody) {
+                                val href = getAttr(parser, "href")
+                                if (!href.isNullOrEmpty()) {
+                                    elements.add(OfficeImage(imagePath = href))
+                                }
+                            }
                         }
                     }
                     XmlPullParser.TEXT -> {
                         val text = parser.text ?: ""
-                        if (text.isNotEmpty() && (inParagraph || inHeading || inListItem)) {
+                        if (inBody && text.isNotEmpty() && (inParagraph || inHeading || inListItem)) {
                             currentText.append(text)
-                            val isB = boldDepth > 0
-                            val isI = italicDepth > 0
-                            val isU = underlineDepth > 0
+
+                            // Resolve formatting from style name and inline tags
+                            val matchingCharStyle = spanStyleName?.let { mergedCharacterStyles[it] }
+                            val matchingParaStyle = if (inHeading) headingStyleName?.let { mergedParagraphStyles[it] } else paragraphStyleName?.let { mergedParagraphStyles[it] }
+
+                            val isB = boldDepth > 0 ||
+                                    matchingCharStyle?.isBold == true ||
+                                    matchingParaStyle?.isBold == true ||
+                                    spanStyleName?.contains("Bold", ignoreCase = true) == true ||
+                                    inHeading
+
+                            val isI = italicDepth > 0 ||
+                                    matchingCharStyle?.isItalic == true ||
+                                    matchingParaStyle?.isItalic == true ||
+                                    spanStyleName?.contains("Italic", ignoreCase = true) == true
+
+                            val isU = underlineDepth > 0 ||
+                                    matchingCharStyle?.isUnderline == true ||
+                                    matchingParaStyle?.isUnderline == true ||
+                                    spanStyleName?.contains("Underline", ignoreCase = true) == true
+
                             currentRuns.add(
                                 OfficeTextRun(
                                     text = text,
-                                    styleName = spanStyleName,
+                                    styleName = spanStyleName ?: (if (inHeading) headingStyleName else paragraphStyleName),
                                     characterStyle = spanStyleName,
                                     isBold = isB,
                                     isItalic = isI,
@@ -221,19 +393,20 @@ class OdtDocumentParser {
                         }
                     }
                     XmlPullParser.END_TAG -> {
-                        val name = parser.name ?: ""
-                        when (name) {
+                        val localName = getLocalName(parser)
+                        when (localName) {
+                            "body" -> inBody = false
                             "span" -> spanStyleName = null
                             "b" -> if (boldDepth > 0) boldDepth--
                             "i" -> if (italicDepth > 0) italicDepth--
                             "u" -> if (underlineDepth > 0) underlineDepth--
-                            "p" -> {
+                            "p" -> if (inBody) {
                                 val text = currentText.toString()
                                 val runs = ArrayList(currentRuns)
                                 if (inHeading) {
                                     // inside heading, handled by h end tag
                                 } else if (inTable) {
-                                    // cell end tag will handle or cell paragraph
+                                    // inside table cell, handled by table-cell
                                 } else if (inListItem) {
                                     elements.add(OfficeListItem(text = text, runs = runs))
                                 } else {
@@ -241,16 +414,16 @@ class OdtDocumentParser {
                                 }
                                 inParagraph = false
                             }
-                            "h" -> {
+                            "h" -> if (inBody) {
                                 val text = currentText.toString()
                                 val runs = ArrayList(currentRuns)
                                 elements.add(OfficeHeading(text = text, level = headingLevel, styleName = headingStyleName, runs = runs))
                                 inHeading = false
                             }
-                            "list-item" -> {
+                            "list-item" -> if (inBody) {
                                 inListItem = false
                             }
-                            "table-cell" -> {
+                            "table-cell" -> if (inBody) {
                                 val cellText = currentText.toString()
                                 val runs = ArrayList(currentRuns)
                                 val cellParagraphs = if (runs.isNotEmpty()) {
@@ -260,13 +433,13 @@ class OdtDocumentParser {
                                 }
                                 currentRowCells.add(OfficeTableCell(text = cellText, paragraphs = cellParagraphs))
                             }
-                            "table-row" -> {
+                            "table-row" -> if (inBody) {
                                 if (currentRowCells.isNotEmpty()) {
                                     currentTableRows.add(OfficeTableRow(cells = ArrayList(currentRowCells)))
                                     currentRowCells.clear()
                                 }
                             }
-                            "table" -> {
+                            "table" -> if (inBody) {
                                 if (currentTableRows.isNotEmpty()) {
                                     val maxCols = currentTableRows.maxOfOrNull { it.cells.size } ?: 0
                                     elements.add(OfficeTable(rows = ArrayList(currentTableRows), numColumns = maxCols))
@@ -282,13 +455,20 @@ class OdtDocumentParser {
         } catch (e: Exception) {
             PapirusLogger.e("ODT", "parseContentXml error: ${e.message}", e)
         }
-        return elements
+
+        return Pair(automaticStyles, elements)
+    }
+
+    private fun getLocalName(parser: XmlPullParser): String {
+        val name = parser.name ?: return ""
+        return if (name.contains(":")) name.substringAfter(":") else name
     }
 
     private fun getAttr(parser: XmlPullParser, localName: String): String? {
         for (i in 0 until parser.attributeCount) {
-            val name = parser.getAttributeName(i) ?: ""
-            if (name == localName || name.endsWith(":$localName")) {
+            val attrName = parser.getAttributeName(i) ?: ""
+            val attrLocal = if (attrName.contains(":")) attrName.substringAfter(":") else attrName
+            if (attrLocal.equals(localName, ignoreCase = true)) {
                 return parser.getAttributeValue(i)
             }
         }

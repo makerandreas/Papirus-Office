@@ -481,9 +481,34 @@ class OfficeDocumentParser(private val context: Context) {
                 isOdp = detectedOdp
             )
             if (!parsedDoc.isParsingFailed) {
+                var finalParsedDoc = parsedDoc
+                if (isOdt) {
+                    try {
+                        val packageEntries = mutableMapOf<String, ByteArray>()
+                        java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
+                            var entry = zip.nextEntry
+                            while (entry != null) {
+                                packageEntries[entry.name] = zip.readBytes()
+                                zip.closeEntry()
+                                entry = zip.nextEntry
+                            }
+                        }
+                        val packageData = OdtPackageData(
+                            entries = packageEntries,
+                            originalContentXml = packageEntries["content.xml"]?.toString(Charsets.UTF_8),
+                            originalStylesXml = packageEntries["styles.xml"]?.toString(Charsets.UTF_8),
+                            originalManifestXml = packageEntries["META-INF/manifest.xml"]?.toString(Charsets.UTF_8),
+                            originalMetaXml = packageEntries["meta.xml"]?.toString(Charsets.UTF_8),
+                            originalSettingsXml = packageEntries["settings.xml"]?.toString(Charsets.UTF_8)
+                        )
+                        finalParsedDoc = parsedDoc.copy(odtPackageData = packageData)
+                    } catch (e: Exception) {
+                        // Keep parsedDoc if package entry read fails
+                    }
+                }
                 _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
-                cacheRepository.saveCachedDocument(file, parsedDoc)
-                return@withContext parsedDoc
+                cacheRepository.saveCachedDocument(file, finalParsedDoc)
+                return@withContext finalParsedDoc
             }
         }
 
@@ -1007,11 +1032,44 @@ class OfficeDocumentParser(private val context: Context) {
      * 'mimetype', 'META-INF/manifest.xml', 'styles.xml', and 'meta.xml'.
      */
     suspend fun saveOdtDocument(outputFile: File, document: OfficeParsedDocument): Boolean = withContext(Dispatchers.IO) {
-        return@withContext saveOdtDocumentInternal(outputFile, document.plainText, document.elements)
+        return@withContext try {
+            val officeDoc = document.toOfficeDocument()
+            val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+            val odtBytes = writer.write(officeDoc)
+            outputFile.writeBytes(odtBytes)
+            true
+        } catch (e: Exception) {
+            saveOdtDocumentInternal(outputFile, document.plainText, document.elements)
+        }
     }
 
     suspend fun saveOdtDocument(outputFile: File, text: String): Boolean = withContext(Dispatchers.IO) {
-        return@withContext saveOdtDocumentInternal(outputFile, text, emptyList())
+        return@withContext try {
+            val packageEntries = if (outputFile.exists() && outputFile.length() > 0L) {
+                val map = mutableMapOf<String, ByteArray>()
+                java.util.zip.ZipInputStream(outputFile.inputStream()).use { zip ->
+                    var entry = zip.nextEntry
+                    while (entry != null) {
+                        map[entry.name] = zip.readBytes()
+                        zip.closeEntry()
+                        entry = zip.nextEntry
+                    }
+                }
+                map
+            } else emptyMap()
+
+            val packageData = if (packageEntries.isNotEmpty()) OdtPackageData(entries = packageEntries) else null
+            val officeDoc = OfficeDocument(
+                body = DocumentBody(elements = listOf(OfficeParagraph(text = text))),
+                odtPackageData = packageData
+            )
+            val writer = com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter()
+            val odtBytes = writer.write(officeDoc)
+            outputFile.writeBytes(odtBytes)
+            true
+        } catch (e: Exception) {
+            saveOdtDocumentInternal(outputFile, text, emptyList())
+        }
     }
 
     private suspend fun saveOdtDocumentInternal(
