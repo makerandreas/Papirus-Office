@@ -638,10 +638,14 @@ fun InkyModule(
                             
                             val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
                             val documentToSave = if (currentSession != null) {
+                                val isTextDirty = (currentSession.dirty) || (docBodyText.text != initialLoadedText)
                                 val updatedElements = docBodyText.text.split("\n\n").map { block ->
                                     com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
                                 }
-                                val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                                val updatedDoc = currentSession.document.copy(
+                                    body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements),
+                                    isModified = isTextDirty
+                                )
                                 currentSession.document = updatedDoc
                                 updatedDoc
                             } else {
@@ -649,7 +653,8 @@ fun InkyModule(
                                     metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
                                     body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
                                         com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
-                                    })
+                                    }),
+                                    isModified = true
                                 )
                             }
                             
@@ -705,10 +710,14 @@ fun InkyModule(
                             
                             val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
                             val documentToSave = if (currentSession != null) {
+                                val isTextDirty = (currentSession.dirty) || (docBodyText.text != initialLoadedText)
                                 val updatedElements = docBodyText.text.split("\n\n").map { block ->
                                     com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
                                 }
-                                val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                                val updatedDoc = currentSession.document.copy(
+                                    body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements),
+                                    isModified = isTextDirty
+                                )
                                 currentSession.document = updatedDoc
                                 updatedDoc
                             } else {
@@ -716,7 +725,8 @@ fun InkyModule(
                                     metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
                                     body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
                                         com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
-                                    })
+                                    }),
+                                    isModified = true
                                 )
                             }
                             
@@ -756,10 +766,14 @@ fun InkyModule(
                 var actualSuccess = true
                 val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
                 val documentToSave = if (currentSession != null) {
+                    val isTextDirty = (currentSession.dirty) || (docBodyText.text != initialLoadedText)
                     val updatedElements = docBodyText.text.split("\n\n").map { block ->
                         com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
                     }
-                    val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                    val updatedDoc = currentSession.document.copy(
+                        body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements),
+                        isModified = isTextDirty
+                    )
                     currentSession.document = updatedDoc
                     updatedDoc
                 } else {
@@ -767,7 +781,8 @@ fun InkyModule(
                         metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
                         body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
                             com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
-                        })
+                        }),
+                        isModified = true
                     )
                 }
                 
@@ -841,10 +856,14 @@ fun InkyModule(
                         // Synchronize UI text into OfficeDocument elements before saving
                         val currentSession = com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.value
                         val documentToSave = if (currentSession != null) {
+                            val isTextDirty = (currentSession.dirty) || (docBodyText.text != initialLoadedText)
                             val updatedElements = docBodyText.text.split("\n\n").map { block ->
                                 com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
                             }
-                            val updatedDoc = currentSession.document.copy(body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements))
+                            val updatedDoc = currentSession.document.copy(
+                                body = com.makerandreas.papirusoffice.data.DocumentBody(elements = updatedElements),
+                                isModified = isTextDirty
+                            )
                             currentSession.document = updatedDoc
                             updatedDoc
                         } else {
@@ -852,7 +871,8 @@ fun InkyModule(
                                 metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle),
                                 body = com.makerandreas.papirusoffice.data.DocumentBody(elements = docBodyText.text.split("\n\n").map { block ->
                                     com.makerandreas.papirusoffice.data.OfficeParagraph(text = block)
-                                })
+                                }),
+                                isModified = true
                             )
                         }
                         

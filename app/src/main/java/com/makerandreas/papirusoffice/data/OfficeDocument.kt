@@ -25,7 +25,8 @@ data class OfficeDocument(
     val header: DocumentHeader = DocumentHeader(),
     val footer: DocumentFooter = DocumentFooter(),
     val footnote: DocumentFootnote = DocumentFootnote(),
-    val odtPackageData: OdtPackageData? = null
+    val odtPackageData: OdtPackageData? = null,
+    val isModified: Boolean = false
 )
 
 fun OfficeDocument.toPlainText(): String {

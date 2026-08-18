@@ -43,7 +43,7 @@ class Chapter1RegressionTest {
             OfficeHeading(text = "Chapter 1 Title", level = 1),
             OfficeParagraph(text = "Hello! Welcome to Papirus Office Engine.")
         )
-        val sessionDoc = templateDoc.copy(body = DocumentBody(elements = elements))
+        val sessionDoc = templateDoc.copy(body = DocumentBody(elements = elements), isModified = true)
 
         // Step 03: Save as ODT file
         val file = File(context.filesDir, "Chapter1_Test.odt")
@@ -326,7 +326,7 @@ class Chapter1RegressionTest {
         val updatedElements = listOf(
             OfficeParagraph(text = "Hello External LibreOffice Document! (Edited by Papirus)", styleName = "Custom_LibreOffice_Style")
         )
-        val editedDoc = parsedDoc.copy(body = DocumentBody(elements = updatedElements))
+        val editedDoc = parsedDoc.copy(body = DocumentBody(elements = updatedElements), isModified = true)
 
         // 3. Save ODT back to disk
         val savedOdtFile = File(context.filesDir, "ExternalDoc_Saved.odt")
@@ -351,5 +351,133 @@ class Chapter1RegressionTest {
         // 5. Reopen saved file and verify content + structure
         val reopened = odtSerializer.read(DocumentReference.LocalFile(savedOdtFile), context)
         assertTrue("Reopened text reflects edits", reopened.toPlainText().contains("(Edited by Papirus)"))
+    }
+
+    @Test
+    fun test31_UnmodifiedDocumentExactContentXmlLosslessRoundTrip() = runBlocking {
+        val initialOdtFile = File(context.filesDir, "Lossless_Original.odt")
+        val mime = "application/vnd.oasis.opendocument.text".toByteArray(Charsets.UTF_8)
+        val complexContentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
+              <office:automatic-styles>
+                <style:style style:name="P7" style:family="paragraph" style:parent-style-name="Standard">
+                  <style:text-properties fo:color="#ff0000" fo:font-size="18pt" fo:font-weight="bold"/>
+                </style:style>
+                <style:style style:name="T3" style:family="text">
+                  <style:text-properties fo:font-style="italic" style:text-underline-style="solid"/>
+                </style:style>
+                <style:style style:name="grip1" style:family="graphic"/>
+                <style:style style:name="MP1" style:family="paragraph"/>
+              </office:automatic-styles>
+              <office:body>
+                <office:text>
+                  <text:p text:style-name="P7">Complex Unmodified Title <text:span text:style-name="T3">with custom styling</text:span></text:p>
+                </office:text>
+              </office:body>
+            </office:document-content>
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+
+        val stylesXml = "<office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"/>".toByteArray(Charsets.UTF_8)
+        val manifestXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
+              <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.text"/>
+              <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
+            </manifest:manifest>
+        """.trimIndent().toByteArray(Charsets.UTF_8)
+
+        java.util.zip.ZipOutputStream(initialOdtFile.outputStream()).use { zout ->
+            val entry = java.util.zip.ZipEntry("mimetype").apply {
+                method = java.util.zip.ZipEntry.STORED
+                size = mime.size.toLong()
+                compressedSize = mime.size.toLong()
+                crc = java.util.zip.CRC32().apply { update(mime) }.value
+                extra = ByteArray(0)
+            }
+            zout.putNextEntry(entry)
+            zout.write(mime)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("content.xml"))
+            zout.write(complexContentXml)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("styles.xml"))
+            zout.write(stylesXml)
+            zout.closeEntry()
+
+            zout.putNextEntry(java.util.zip.ZipEntry("META-INF/manifest.xml"))
+            zout.write(manifestXml)
+            zout.closeEntry()
+        }
+
+        // 1. Parse into OfficeDocument without modifying (isModified == false)
+        val parser = OdtDocumentParser()
+        val doc = parser.parse(initialOdtFile)
+        assertFalse("Parsed document is not modified initially", doc.isModified)
+        assertNotNull("Package data must capture original content.xml", doc.odtPackageData?.originalContentXml)
+
+        // 2. Open -> Save (Lossless path)
+        val savedFile = File(context.filesDir, "Lossless_Saved.odt")
+        val saveSuccess = odtSerializer.write(doc, DocumentReference.LocalFile(savedFile), context)
+        assertTrue("Save must succeed", saveSuccess)
+
+        // 3. Extract content.xml from savedFile and verify 100% byte-for-byte exact preservation
+        var outputContentXml: ByteArray? = null
+        java.util.zip.ZipInputStream(savedFile.inputStream()).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name == "content.xml") {
+                    outputContentXml = zip.readBytes()
+                    break
+                }
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+
+        assertNotNull("Saved package must contain content.xml", outputContentXml)
+        assertArrayEquals("content.xml must be preserved lossless byte-for-byte on unmodified Open -> Save", complexContentXml, outputContentXml)
+    }
+
+    @Test
+    fun test32_RichFormattingRoundTripWithStylesAndFormattingVerification() = runBlocking {
+        // Create document with bold, italic, underline runs and table
+        val doc = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeHeading(text = "Report Overview", level = 1),
+                    OfficeParagraph(
+                        text = "Formatted Section",
+                        styleName = "Standard",
+                        runs = listOf(
+                            OfficeTextRun(text = "Bold Text ", isBold = true),
+                            OfficeTextRun(text = "Italic Text ", isItalic = true),
+                            OfficeTextRun(text = "Underlined Text", isUnderline = true)
+                        )
+                    ),
+                    OfficeTable(
+                        numColumns = 2,
+                        rows = listOf(
+                            OfficeTableRow(listOf(OfficeTableCell("Header 1"), OfficeTableCell("Header 2"))),
+                            OfficeTableRow(listOf(OfficeTableCell("Value A"), OfficeTableCell("Value B")))
+                        )
+                    )
+                )
+            ),
+            isModified = true
+        )
+
+        val file = File(context.filesDir, "RichFormatTest.odt")
+        val saveResult = odtSerializer.write(doc, DocumentReference.LocalFile(file), context)
+        assertTrue("Save rich format doc must succeed", saveResult)
+
+        val reopened = odtSerializer.read(DocumentReference.LocalFile(file), context)
+        val plainText = reopened.toPlainText()
+
+        assertTrue("Should contain heading", plainText.contains("Report Overview"))
+        assertTrue("Should contain bold text", plainText.contains("Bold Text"))
+        assertTrue("Should contain table content", plainText.contains("Header 1") && plainText.contains("Value B"))
     }
 }

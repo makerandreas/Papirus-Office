@@ -14,10 +14,20 @@ class OdtDocumentWriter : DocumentFormatWriter {
         PapirusLogger.d("ODT", "BODY_ELEMENTS=${elements.size}")
 
         try {
-            val contentXmlBytes = buildContentXml(document)
-            PapirusLogger.d("ODT", "CONTENT_XML_BUILT")
-
             val packageData = document.odtPackageData
+            val useOriginalContentXml = !document.isModified &&
+                (packageData?.entries?.containsKey("content.xml") == true || packageData?.originalContentXml != null)
+
+            val contentXmlBytes = if (useOriginalContentXml) {
+                PapirusLogger.d("ODT", "CONTENT_XML_PRESERVED_EXACT_ORIGINAL")
+                packageData?.entries?.get("content.xml")
+                    ?: packageData?.originalContentXml?.toByteArray(Charsets.UTF_8)
+                    ?: buildContentXml(document)
+            } else {
+                PapirusLogger.d("ODT", "CONTENT_XML_GENERATED_STRUCTURED")
+                buildContentXml(document)
+            }
+            PapirusLogger.d("ODT", "CONTENT_XML_READY")
             val baos = ByteArrayOutputStream()
 
             ZipOutputStream(baos).use { zout ->
