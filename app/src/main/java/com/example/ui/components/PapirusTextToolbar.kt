@@ -48,6 +48,7 @@ class PapirusTextToolbar : TextToolbar {
     var onCut: (() -> Unit)? = null
     var onPaste: (() -> Unit)? = null
     var onSelectAll: (() -> Unit)? = null
+    var onDelete: (() -> Unit)? = null
 
     override val status: TextToolbarStatus
         get() = statusState
@@ -85,6 +86,11 @@ class PapirusTextToolbar : TextToolbar {
         selectedText: String = "",
         hasClipboardContent: Boolean = true,
         isBottomBarShowing: Boolean = false,
+        onDeleteClick: (() -> Unit)? = null,
+        onCutClick: (() -> Unit)? = null,
+        onCopyClick: (() -> Unit)? = null,
+        onPasteClick: (() -> Unit)? = null,
+        onSelectAllClick: (() -> Unit)? = null,
         onCharacterStyleClick: () -> Unit = {},
         onCharacterOptionsClick: () -> Unit = {},
         onParagraphStyleClick: () -> Unit = {},
@@ -183,25 +189,22 @@ class PapirusTextToolbar : TextToolbar {
                                 ) {
                                     if (isEditMode) {
                                         // Editor Mode Compact
-                                        if (hasSelection && onCut != null) {
+                                        if (hasSelection && (onCutClick != null || onCut != null)) {
                                             FctIconButton(Icons.Default.ContentCut, stringResource(R.string.fct_cut)) {
-                                                val action = onCut
                                                 hide()
-                                                action?.invoke()
+                                                if (onCutClick != null) onCutClick() else onCut?.invoke()
                                             }
                                         }
-                                        if (hasSelection && onCopy != null) {
+                                        if (hasSelection && (onCopyClick != null || onCopy != null)) {
                                             FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
-                                                val action = onCopy
                                                 hide()
-                                                action?.invoke()
+                                                if (onCopyClick != null) onCopyClick() else onCopy?.invoke()
                                             }
                                         }
-                                        if (hasClipboardContent && onPaste != null) {
+                                        if (hasClipboardContent && (onPasteClick != null || onPaste != null)) {
                                             FctIconButton(Icons.Default.ContentPaste, stringResource(R.string.fct_paste)) {
-                                                val action = onPaste
                                                 hide()
-                                                action?.invoke()
+                                                if (onPasteClick != null) onPasteClick() else onPaste?.invoke()
                                             }
                                         }
                                         if (hasSelection) {
@@ -210,16 +213,20 @@ class PapirusTextToolbar : TextToolbar {
                                                 color = MaterialTheme.colorScheme.outlineVariant
                                             )
                                             FctIconButton(Icons.Default.Delete, "Delete") {
-                                                val action = onCut
                                                 hide()
-                                                action?.invoke()
+                                                if (onDeleteClick != null) {
+                                                    onDeleteClick()
+                                                } else if (onDelete != null) {
+                                                    onDelete?.invoke()
+                                                } else {
+                                                    onCut?.invoke()
+                                                }
                                             }
                                         }
-                                        if (onSelectAll != null) {
+                                        if (onSelectAllClick != null || onSelectAll != null) {
                                             FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
-                                                val action = onSelectAll
                                                 hide()
-                                                action?.invoke()
+                                                if (onSelectAllClick != null) onSelectAllClick() else onSelectAll?.invoke()
                                             }
                                         }
                                         FctIconButton(Icons.Default.AutoAwesome, "AI options") {
@@ -230,18 +237,16 @@ class PapirusTextToolbar : TextToolbar {
                                         }
                                     } else {
                                         // Viewer Mode Compact
-                                        if (hasSelection && onCopy != null) {
+                                        if (hasSelection && (onCopyClick != null || onCopy != null)) {
                                             FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
-                                                val action = onCopy
                                                 hide()
-                                                action?.invoke()
+                                                if (onCopyClick != null) onCopyClick() else onCopy?.invoke()
                                             }
                                         }
-                                        if (onSelectAll != null) {
+                                        if (onSelectAllClick != null || onSelectAll != null) {
                                             FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
-                                                val action = onSelectAll
                                                 hide()
-                                                action?.invoke()
+                                                if (onSelectAllClick != null) onSelectAllClick() else onSelectAll?.invoke()
                                             }
                                         }
                                     }

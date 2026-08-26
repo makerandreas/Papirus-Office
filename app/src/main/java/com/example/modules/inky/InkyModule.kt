@@ -147,6 +147,7 @@ fun InkyModule(
 
     // --- Inky Core States ---
     var isEditMode by remember { mutableStateOf(false) } // False = Viewer Mode, True = Edit Mode
+    var editorMode by remember { mutableStateOf(if (isEditMode) com.example.modules.inky.state.EditorMode.EDIT else com.example.modules.inky.state.EditorMode.VIEW) }
     var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
@@ -1158,35 +1159,124 @@ fun InkyModule(
         }
     }
 
-    BackHandler {
-        if (customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown) {
-            customTextToolbar.hide()
-            if (isKeyboardVisible) {
-                keyboardController?.hide()
-            }
-        } else if (showBottomBar) {
-            if (activeInkySubpage.isNotEmpty()) {
-                if (openedFromExternalHub) {
-                    showBottomBar = false
-                    openedFromExternalHub = false
-                    bottomBarDeck = "ribbon"
-                } else {
-                    // sequential back
-                    when (activeInkySubpage) {
-                        "underline_color" -> activeInkySubpage = "underline_options"
-                        "create_new_style", "style_options" -> activeInkySubpage = "paragraph_styles"
-                        else -> activeInkySubpage = ""
-                    }
+    val inkyEditingEngine = remember { com.makerandreas.papirusoffice.data.writer.EditingEngine() }
+    val inkyClipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+
+    val enterEditMode = {
+        isEditMode = true
+        editorMode = com.example.modules.inky.state.EditorMode.EDIT
+        com.makerandreas.papirusoffice.data.PapirusLogger.d("BACK", "mode=EDIT (entered)")
+    }
+
+    val exitEditMode = {
+        isEditMode = false
+        editorMode = com.example.modules.inky.state.EditorMode.VIEW
+        focusManager.clearFocus()
+        customTextToolbar.hide()
+        keyboardController?.hide()
+        if (!docBodyText.selection.collapsed) {
+            docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
+        }
+        com.makerandreas.papirusoffice.data.PapirusLogger.d("BACK", "mode=VIEW (exited)")
+    }
+
+    val handleBack: () -> Unit = {
+        com.makerandreas.papirusoffice.data.PapirusLogger.d("BACK", "handleBack: mode=$editorMode, fct=${customTextToolbar.status}, bottomBar=$showBottomBar, keyboard=$isKeyboardVisible")
+        when {
+            customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown -> {
+                customTextToolbar.hide()
+                if (isKeyboardVisible) {
+                    keyboardController?.hide()
                 }
-            } else {
-                showBottomBar = false
             }
-        } else {
-            handleClose()
+            showBottomBar -> {
+                if (activeInkySubpage.isNotEmpty()) {
+                    if (openedFromExternalHub) {
+                        showBottomBar = false
+                        openedFromExternalHub = false
+                        bottomBarDeck = "ribbon"
+                    } else {
+                        // sequential back
+                        when (activeInkySubpage) {
+                            "underline_color" -> activeInkySubpage = "underline_options"
+                            "create_new_style", "style_options" -> activeInkySubpage = "paragraph_styles"
+                            else -> activeInkySubpage = ""
+                        }
+                    }
+                } else {
+                    showBottomBar = false
+                }
+            }
+            isKeyboardVisible -> {
+                keyboardController?.hide()
+                focusManager.clearFocus()
+            }
+            isEditMode || editorMode == com.example.modules.inky.state.EditorMode.EDIT -> {
+                exitEditMode()
+            }
+            else -> {
+                handleClose()
+            }
         }
     }
 
+    val handleFctDelete: () -> Unit = {
+        val selection = docBodyText.selection
+        if (!selection.collapsed) {
+            val start = kotlin.math.min(selection.start, selection.end)
+            val end = kotlin.math.max(selection.start, selection.end)
+            val selRange = com.makerandreas.papirusoffice.data.writer.SelectionRange(start, end)
+            val fullText = docBodyText.text
+
+            com.makerandreas.papirusoffice.data.PapirusLogger.d("UNDO", "DeleteSelectionCommand")
+            inkyEditingEngine.deleteSelection(
+                selection = selRange,
+                fullText = fullText,
+                onApply = { appliedText, newSel ->
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                        text = appliedText,
+                        selection = androidx.compose.ui.text.TextRange(newSel.min, newSel.max)
+                    )
+                    lastTextRecordedValue = appliedText
+                    isSaved = false
+                }
+            )
+        }
+    }
+
+    val handleFctCut: () -> Unit = {
+        val selection = docBodyText.selection
+        if (!selection.collapsed) {
+            val start = kotlin.math.min(selection.start, selection.end)
+            val end = kotlin.math.max(selection.start, selection.end)
+            val selectedStr = docBodyText.text.substring(start, end)
+            inkyClipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedStr))
+            com.makerandreas.papirusoffice.data.PapirusLogger.d("UNDO", "CutSelectionCommand")
+            handleFctDelete()
+        }
+    }
+
+    val handleFctCopy: () -> Unit = {
+        val selection = docBodyText.selection
+        if (!selection.collapsed) {
+            val start = kotlin.math.min(selection.start, selection.end)
+            val end = kotlin.math.max(selection.start, selection.end)
+            val selectedStr = docBodyText.text.substring(start, end)
+            inkyClipboardManager.setText(androidx.compose.ui.text.AnnotatedString(selectedStr))
+            com.makerandreas.papirusoffice.data.PapirusLogger.d("CLIPBOARD", "Copied text")
+        }
+    }
+
+    val handleFctSelectAll: () -> Unit = {
+        docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0, docBodyText.text.length))
+    }
+
+    BackHandler {
+        handleBack()
+    }
+
     LaunchedEffect(isEditMode) {
+        editorMode = if (isEditMode) com.example.modules.inky.state.EditorMode.EDIT else com.example.modules.inky.state.EditorMode.VIEW
         if (!isEditMode) {
             customTextToolbar.hide()
             focusManager.clearFocus()
@@ -1515,10 +1605,10 @@ fun InkyModule(
                         },
                         navigationIcon = {
                             IconButton(
-                                onClick = { handleClose() },
+                                onClick = { handleBack() },
                                 modifier = Modifier.testTag("btn_top_app_bar_back")
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Start Center")
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = if (isEditMode) "Exit Edit Mode" else "Start Center")
                             }
                         },
                         actions = {
@@ -3012,6 +3102,10 @@ fun InkyModule(
         selectedText = selectedTextSnippet,
         hasClipboardContent = fctHasClipboardContent,
         isBottomBarShowing = showBottomBar,
+        onDeleteClick = handleFctDelete,
+        onCutClick = handleFctCut,
+        onCopyClick = handleFctCopy,
+        onSelectAllClick = handleFctSelectAll,
         onCharacterStyleClick = {
             showBottomBar = true
             activeInkySubpage = "font_style"
