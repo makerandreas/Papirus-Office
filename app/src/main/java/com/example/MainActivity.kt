@@ -199,9 +199,19 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
     }
 
-    // Dynamic theme preference state
+    // Dynamic theme and theme mode preference state
     var dynamicColorEnabled by remember {
         mutableStateOf(com.example.ui.theme.ThemeSettings.isDynamicColorEnabled(context))
+    }
+    var themeMode by remember {
+        mutableStateOf(com.example.ui.theme.ThemeSettings.getThemeMode(context))
+    }
+
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = when (themeMode) {
+        "DARK" -> true
+        "LIGHT" -> false
+        else -> isSystemDark
     }
 
     // Adaptive formatting toolbar / ribbon bar states
@@ -228,6 +238,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     }
 
     PapirusTheme(
+        darkTheme = isDark,
         workspace = currentWorkspace,
         dynamicColor = dynamicColorEnabled
     ) {
@@ -352,7 +363,10 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                                 currentWorkspace = workspaceName
                             },
                             dynamicColorEnabled = dynamicColorEnabled,
-                            onDynamicColorChange = { dynamicColorEnabled = it }
+                            onDynamicColorChange = {
+                                dynamicColorEnabled = it
+                                themeMode = com.example.ui.theme.ThemeSettings.getThemeMode(context)
+                            }
                         )
                         "create_new_document" -> NewDocumentScreen(
                             onBack = { currentWorkspace = "home" },

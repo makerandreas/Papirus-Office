@@ -690,6 +690,9 @@ private fun DynamicColorSettingCard(
     var isDynamicEnabled by remember {
         mutableStateOf(ThemeSettings.isDynamicColorEnabled(context))
     }
+    var themeMode by remember {
+        mutableStateOf(ThemeSettings.getThemeMode(context))
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -704,6 +707,35 @@ private fun DynamicColorSettingCard(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Theme Mode",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val modes = listOf("SYSTEM" to "System", "LIGHT" to "Light", "DARK" to "Dark")
+                modes.forEachIndexed { index, (key, label) ->
+                    SegmentedButton(
+                        selected = themeMode == key,
+                        onClick = {
+                            themeMode = key
+                            ThemeSettings.setThemeMode(context, key)
+                            onDynamicColorChange?.invoke(isDynamicEnabled)
+                            Toast.makeText(context, "Theme set to $label", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

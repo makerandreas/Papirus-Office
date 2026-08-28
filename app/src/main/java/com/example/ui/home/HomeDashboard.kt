@@ -7,6 +7,7 @@ import android.widget.Toast
 import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.stringResource
 import com.example.R
 import com.makerandreas.papirusoffice.data.PapirusConfigManager
@@ -212,6 +214,9 @@ fun HomeDashboard(
     var searchQuery by remember { mutableStateOf("") }
     var isSearchActive by remember { mutableStateOf(false) }
 
+    // Drawer state for hamburger menu bar
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
     // Auto-close search bar when switching subpages (Recents, Files, Google Drive)
     LaunchedEffect(pagerState.currentPage) {
         isSearchActive = false
@@ -219,10 +224,7 @@ fun HomeDashboard(
     }
 
     // Dialog & Options states
-    var showMoreMenu by remember { mutableStateOf(false) }
     var showOptionsDialog by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    var showNewDocDialog by remember { mutableStateOf(false) }
-    var showFabMenu by remember { mutableStateOf(false) }
     var showUniversalPrintSheet by remember { mutableStateOf(false) }
     var showUniversalEmailSheet by remember { mutableStateOf(false) }
     var showUniversalClipboardSheet by remember { mutableStateOf(false) }
@@ -239,208 +241,325 @@ fun HomeDashboard(
         }
     }
 
-    Scaffold(
-        topBar = {
-            Column {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Papirus Office",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 24.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
-                    },
-                    actions = {
-                        if (activeTab != "Files") {
-                            IconButton(
-                                onClick = { isSearchActive = !isSearchActive },
-                                modifier = Modifier.testTag("btn_top_search")
-                            ) {
-                                Icon(
-                                    imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                                    contentDescription = "Search"
-                                )
-                            }
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.width(320.dp),
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                drawerTonalElevation = 2.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 24.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(12.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Description,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
                         }
-                        Box {
-                            IconButton(
-                                onClick = { showMoreMenu = true },
-                                modifier = Modifier.testTag("btn_top_more")
-                            ) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
-                            }
-                            DropdownMenu(
-                                expanded = showMoreMenu,
-                                onDismissRequest = { showMoreMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = null) },
-                                    text = { Text("Printing & SDK Examples") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showUniversalPrintSheet = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) },
-                                    text = { Text("Emailing & SDK Examples") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showUniversalEmailSheet = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                                    text = { Text("Clipboard & SDK Examples") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showUniversalClipboardSheet = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.Code, contentDescription = null) },
-                                    text = { Text("XML Importing & SDK Examples") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showUniversalXmlImportSheet = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.FolderZip, contentDescription = null) },
-                                    text = { Text("Simple ODF & Package Examples") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showUniversalOdfSheet = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
-                                    text = { Text("Crash Log") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        onNavigateToModule("crash_logs")
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                                    text = { Text("Papirus Office Options") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        showOptionsDialog = true
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-                                    text = { Text("About") },
-                                    onClick = {
-                                        showMoreMenu = false
-                                        onNavigateToModule("about")
-                                    }
-                                )
-                            }
+                        Column {
+                            Text(
+                                text = "Papirus Office",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Productivity Suite",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp)
-                    )
-                )
+                    }
+                }
 
-                AnimatedVisibility(visible = isSearchActive) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .testTag("search_field"),
-                        placeholder = { Text(stringResource(R.string.search_placeholder)) },
-                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
-                                }
-                            }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "FEATURES & TOOLS",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.Print, contentDescription = null) },
+                        label = { Text("Printing & SDK Examples") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showUniversalPrintSheet = true
                         },
-                        singleLine = true,
-                        shape = RoundedCornerShape(28.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.Email, contentDescription = null) },
+                        label = { Text("Emailing & SDK Examples") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showUniversalEmailSheet = true
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
+                        label = { Text("Clipboard & SDK Examples") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showUniversalClipboardSheet = true
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.Code, contentDescription = null) },
+                        label = { Text("XML Importing & SDK Examples") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showUniversalXmlImportSheet = true
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.FolderZip, contentDescription = null) },
+                        label = { Text("Simple ODF & Package Examples") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showUniversalOdfSheet = true
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp))
+
+                    Text(
+                        text = "APPLICATION",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
+                        label = { Text("Crash Log") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            onNavigateToModule("crash_logs")
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
+                        label = { Text("Papirus Office Options") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            showOptionsDialog = true
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
+                        label = { Text("About") },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            onNavigateToModule("about")
+                        },
+                        modifier = Modifier.padding(vertical = 2.dp)
                     )
                 }
             }
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background,
-                modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
-            ) {
-                NavigationBarItem(
-                    selected = pagerState.currentPage == 0,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
-                    },
-                    icon = { Icon(Icons.Rounded.History, contentDescription = "Recents tab") },
-                    label = { Text("Recents") }
-                )
-                NavigationBarItem(
-                    selected = pagerState.currentPage == 1,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                    },
-                    icon = { Icon(Icons.Rounded.Folder, contentDescription = "Files tab") },
-                    label = { Text("Files") }
-                )
-                NavigationBarItem(
-                    selected = pagerState.currentPage == 2,
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                    },
-                    icon = { Icon(Icons.Rounded.Cloud, contentDescription = "Google Drive tab") },
-                    label = { Text("Google Drive") }
-                )
-            }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onNavigateToModule("create_new_document") },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("main_fab")
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = stringResource(R.string.create_new_document)
-                )
-            }
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            androidx.compose.foundation.pager.HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { page ->
-                when (page) {
-                    0 -> RecentsSubPage(
-                        searchQuery = searchQuery,
-                        onNavigateToModule = onNavigateToModule
+    ) {
+        Scaffold(
+            topBar = {
+                Column {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                text = "Papirus Office",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 22.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        if (drawerState.isClosed) drawerState.open() else drawerState.close()
+                                    }
+                                },
+                                modifier = Modifier.testTag("btn_top_menu")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Menu,
+                                    contentDescription = "Main Menu"
+                                )
+                            }
+                        },
+                        actions = {
+                            if (activeTab != "Files") {
+                                IconButton(
+                                    onClick = { isSearchActive = !isSearchActive },
+                                    modifier = Modifier.testTag("btn_top_search")
+                                ) {
+                                    Icon(
+                                        imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
+                                        contentDescription = "Search"
+                                    )
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
                     )
-                    1 -> FilesSubPage(
-                        onNavigateToModule = onNavigateToModule
+
+                    AnimatedVisibility(visible = isSearchActive) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .testTag("search_field"),
+                            placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(28.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                    }
+                }
+            },
+            bottomBar = {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+                ) {
+                    NavigationBarItem(
+                        selected = pagerState.currentPage == 0,
+                        onClick = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        },
+                        icon = { Icon(Icons.Rounded.AccessTime, contentDescription = "Recents tab") },
+                        label = { Text("Recents") }
                     )
-                    2 -> GoogleDriveSubPage()
+                    NavigationBarItem(
+                        selected = pagerState.currentPage == 1,
+                        onClick = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                        },
+                        icon = { Icon(Icons.Rounded.Folder, contentDescription = "Files tab") },
+                        label = { Text("Files") }
+                    )
+                    NavigationBarItem(
+                        selected = pagerState.currentPage == 2,
+                        onClick = {
+                            coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                        },
+                        icon = {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_google_drive),
+                                contentDescription = "Google Drive tab",
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = { Text("Google Drive") }
+                    )
+                }
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { onNavigateToModule("create_new_document") },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 3.dp,
+                        pressedElevation = 6.dp
+                    ),
+                    modifier = Modifier.testTag("main_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = stringResource(R.string.create_new_document),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize()
+                ) { page ->
+                    when (page) {
+                        0 -> RecentsSubPage(
+                            searchQuery = searchQuery,
+                            onNavigateToModule = onNavigateToModule
+                        )
+                        1 -> FilesSubPage(
+                            onNavigateToModule = onNavigateToModule
+                        )
+                        2 -> GoogleDriveSubPage()
+                    }
                 }
             }
         }
@@ -610,14 +729,46 @@ fun HomeDashboard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items(filterOptions) { (filterKey, stringResId) ->
+                    val isSelected = selectedFilter == filterKey
                     FilterChip(
-                        selected = selectedFilter == filterKey,
+                        selected = isSelected,
                         onClick = { selectedFilter = filterKey },
-                        label = { Text(stringResource(stringResId), style = MaterialTheme.typography.labelMedium) },
+                        leadingIcon = if (isSelected) {
+                            {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        } else null,
+                        label = {
+                            Text(
+                                text = stringResource(stringResId),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 14.sp
+                            )
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        elevation = if (isSelected) FilterChipDefaults.filterChipElevation(elevation = 1.dp) else null,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            containerColor = Color.Transparent,
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            iconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer
                         ),
+                        border = if (isSelected) {
+                            null
+                        } else {
+                            FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = false,
+                                borderColor = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        },
                         modifier = Modifier.testTag("filter_chip_${filterKey.lowercase().replace(" ", "_")}")
                     )
                 }
@@ -634,65 +785,34 @@ fun HomeDashboard(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth(0.85f)
+                        modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(160.dp)
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                            Color.Transparent
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(90.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.secondaryContainer,
-                                        shape = RoundedCornerShape(24.dp)
-                                    )
-                                    .align(Alignment.Center)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.tertiaryContainer,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .offset(x = 18.dp, y = (-18).dp)
-                            )
-                            Icon(
-                                imageVector = Icons.Rounded.FindInPage,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(44.dp)
-                            )
-                        }
+                        RecentsEmptyStateRosetteBadge(
+                            color = MaterialTheme.colorScheme.primary,
+                            iconColor = MaterialTheme.colorScheme.onPrimary,
+                            size = 165.dp
+                        )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(26.dp))
                         
                         Text(
                             text = "No Recent Documents",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 22.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "Any document you open from your device directory or create using the plus button will be listed here instantly for quick, offline access.",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "All documents you have ever opened and\nsaved will appear here.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.sp,
+                            lineHeight = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 20.sp
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -857,6 +977,56 @@ fun HomeDashboard(
             }
         }
     }
+
+@Composable
+fun RecentsEmptyStateRosetteBadge(
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    iconColor: Color = MaterialTheme.colorScheme.onPrimary,
+    size: androidx.compose.ui.unit.Dp = 165.dp
+) {
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
+            val numPetals = 12
+            val centerRadius = this.size.minDimension * 0.36f
+            val petalRadius = this.size.minDimension * 0.175f
+            val orbitRadius = this.size.minDimension * 0.325f
+
+            // Draw center circle
+            drawCircle(
+                color = color,
+                radius = centerRadius,
+                center = center
+            )
+
+            // Draw 12 overlapping smooth petal lobes
+            for (i in 0 until numPetals) {
+                val angle = (i * (2 * Math.PI / numPetals)).toFloat()
+                val petalCenter = Offset(
+                    center.x + orbitRadius * kotlin.math.cos(angle),
+                    center.y + orbitRadius * kotlin.math.sin(angle)
+                )
+                drawCircle(
+                    color = color,
+                    radius = petalRadius,
+                    center = petalCenter
+                )
+            }
+        }
+
+        // Crisp document icon inside (64dp)
+        Icon(
+            imageVector = Icons.Rounded.Description,
+            contentDescription = null,
+            tint = iconColor,
+            modifier = Modifier.size(64.dp)
+        )
+    }
+}
 
 // ==========================================
 // FILES SUB-PAGE (DYNAMIC FILES EXPLORER)
