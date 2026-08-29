@@ -15,10 +15,10 @@ val BrightAmber = Color(0xFFF59E0B)      // High-contrast accent amber
 val LightSlate = Color(0xFF94A3B8)       // Light slate gray for secondary labels
 val MintAccent = Color(0xFF14B8A6)        // Mint tertiary for dark
 
-// Brand Static Colors (Material 3 Expressive Accents)
-val BrandBase = Color(0xFFA4C639)        // Base Papirus Green
-val BrandInky = Color(0xFF4285F4)        // Inky Blue
-val BrandCellina = Color(0xFF34A853)     // Cellina Green
-val BrandSlidia = Color(0xFFEA4335)      // Slidia Red
-val BrandPagella = Color(0xFFFBBC05)     // Pagella Yellow
+// Brand & Module Default Accent Colors (Default accents for Android 11 and below / non-Material You)
+val BrandBase = Color(0xFF2563EB)        // Papirus Base Blue (#2563EB)
+val BrandInky = Color(0xFF0F9D58)        // Inky Green (#0F9D58)
+val BrandCellina = Color(0xFF16A3B7)     // Cellina Cyan/Teal (#16A3B7)
+val BrandSlidia = Color(0xFFF59E0B)      // Slidia Amber/Orange (#F59E0B)
+val BrandPagella = Color(0xFFD93025)     // Pagella Red (#D93025)
 

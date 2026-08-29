@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.core.util.TemplateManager
+import com.example.ui.theme.*
 
 /**
  * Checks if the device has an active internet connection.
@@ -242,13 +243,13 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     Box(
                         modifier = Modifier
                             .size(52.dp)
-                            .background(Color(0xFFEFF6FF), RoundedCornerShape(12.dp)),
+                            .background(BrandInky.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Description,
                             contentDescription = null,
-                            tint = Color(0xFF2563EB),
+                            tint = BrandInky,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -297,13 +298,13 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     Box(
                         modifier = Modifier
                             .size(52.dp)
-                            .background(Color(0xFFECFDF5), RoundedCornerShape(12.dp)),
+                            .background(BrandCellina.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.GridView,
                             contentDescription = null,
-                            tint = Color(0xFF10B981),
+                            tint = BrandCellina,
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -352,13 +353,13 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     Box(
                         modifier = Modifier
                             .size(52.dp)
-                            .background(Color(0xFFFFFBEB), RoundedCornerShape(12.dp)),
+                            .background(BrandSlidia.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Slideshow,
                             contentDescription = null,
-                            tint = Color(0xFFD97706),
+                            tint = BrandSlidia,
                             modifier = Modifier.size(28.dp)
                         )
                     }

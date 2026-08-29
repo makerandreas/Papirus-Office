@@ -53,68 +53,68 @@ object ThemeSettings {
 }
 
 // ==========================================
-// Base Color Schemes (M3 Purple Palette)
+// Base Color Schemes (Papirus Base: #2563EB)
 // ==========================================
 private val BaseLightColorScheme = lightColorScheme(
-    primary = Color(0xFF6750A4),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFEADDFF),
-    onPrimaryContainer = Color(0xFF21005D),
-    secondary = Color(0xFF625B71),
+    primary = BrandBase,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFDBEAFE),
+    onPrimaryContainer = Color(0xFF001B3F),
+    secondary = Color(0xFF565E71),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE8DEF8),
-    onSecondaryContainer = Color(0xFF4A4459),
-    tertiary = Color(0xFF7D5260),
+    secondaryContainer = Color(0xFFDAE2F9),
+    onSecondaryContainer = Color(0xFF131C2B),
+    tertiary = Color(0xFF705574),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFFD8E4),
-    onTertiaryContainer = Color(0xFF31111D),
+    tertiaryContainer = Color(0xFFFAD7FD),
+    onTertiaryContainer = Color(0xFF28132E),
     background = Color(0xFFFEF7FF),
     surface = Color(0xFFFEF7FF),
-    surfaceContainer = Color(0xFFF3EDF7),
-    onBackground = Color(0xFF1D1B20),
-    onSurface = Color(0xFF1D1B20),
-    surfaceVariant = Color(0xFFE7E0EC),
-    onSurfaceVariant = Color(0xFF49454F),
-    outline = Color(0xFF79747E),
-    outlineVariant = Color(0xFFCAC4D0)
+    surfaceContainer = Color(0xFFF1F5F9),
+    onBackground = Color(0xFF191C20),
+    onSurface = Color(0xFF191C20),
+    surfaceVariant = Color(0xFFE0E2EC),
+    onSurfaceVariant = Color(0xFF44474E),
+    outline = Color(0xFF74777F),
+    outlineVariant = Color(0xFFC4C6D0)
 )
 
 private val BaseDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFD0BCFF),
-    onPrimary = Color(0xFF381E72),
-    primaryContainer = Color(0xFF4F378B),
-    onPrimaryContainer = Color(0xFFEADDFF),
-    secondary = Color(0xFFCCC2DC),
-    onSecondary = Color(0xFF332D41),
-    secondaryContainer = Color(0xFF4A4458),
-    onSecondaryContainer = Color(0xFFE8DEF8),
-    tertiary = Color(0xFFEFB8C8),
-    onTertiary = Color(0xFF492532),
-    tertiaryContainer = Color(0xFF633B48),
-    onTertiaryContainer = Color(0xFFFFD8E4),
-    background = Color(0xFF141218),
-    surface = Color(0xFF141218),
-    surfaceContainer = Color(0xFF211F26),
-    onBackground = Color(0xFFE6E0E9),
-    onSurface = Color(0xFFE6E0E9),
-    surfaceVariant = Color(0xFF49454F),
-    onSurfaceVariant = Color(0xFFCAC4D0),
-    outline = Color(0xFF938F99),
-    outlineVariant = Color(0xFF49454F)
+    primary = Color(0xFFADC6FF),
+    onPrimary = Color(0xFF002E69),
+    primaryContainer = Color(0xFF004494),
+    onPrimaryContainer = Color(0xFFDBEAFE),
+    secondary = Color(0xFFBEC6DC),
+    onSecondary = Color(0xFF283041),
+    secondaryContainer = Color(0xFF3E4759),
+    onSecondaryContainer = Color(0xFFDAE2F9),
+    tertiary = Color(0xFFDDBCE0),
+    onTertiary = Color(0xFF3F2844),
+    tertiaryContainer = Color(0xFF573E5C),
+    onTertiaryContainer = Color(0xFFFAD7FD),
+    background = Color(0xFF111318),
+    surface = Color(0xFF111318),
+    surfaceContainer = Color(0xFF1D2024),
+    onBackground = Color(0xFFE2E2E9),
+    onSurface = Color(0xFFE2E2E9),
+    surfaceVariant = Color(0xFF44474E),
+    onSurfaceVariant = Color(0xFFC4C6D0),
+    outline = Color(0xFF8E9099),
+    outlineVariant = Color(0xFF44474E)
 )
 
 // ==========================================
-// Inky Color Schemes (BrandInky: #4285F4)
+// Inky Color Schemes (BrandInky: #0F9D58)
 // ==========================================
 private val InkyLightColorScheme = lightColorScheme(
     primary = BrandInky,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCE6FF),
-    onPrimaryContainer = Color(0xFF001549),
-    secondary = Color(0xFF585F72),
+    primaryContainer = Color(0xFFCEF4DC),
+    onPrimaryContainer = Color(0xFF00210E),
+    secondary = Color(0xFF506352),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFDCE2F9),
-    onSecondaryContainer = Color(0xFF151B2C),
+    secondaryContainer = Color(0xFFD3E8D3),
+    onSecondaryContainer = Color(0xFF0E1F12),
     background = Color(0xFFF8FAFC),
     surface = Color.White,
     onBackground = Color(0xFF0F172A),
@@ -126,13 +126,13 @@ private val InkyLightColorScheme = lightColorScheme(
 
 private val InkyDarkColorScheme = darkColorScheme(
     primary = BrandInky,
-    onPrimary = Color(0xFF00216C),
-    primaryContainer = Color(0xFF003CA4),
-    onPrimaryContainer = Color(0xFFDCE6FF),
-    secondary = Color(0xFFC0C6DD),
-    onSecondary = Color(0xFF272F42),
-    secondaryContainer = Color(0xFF3E465A),
-    onSecondaryContainer = Color(0xFFDCE2F9),
+    onPrimary = Color(0xFF003918),
+    primaryContainer = Color(0xFF005226),
+    onPrimaryContainer = Color(0xFFCEF4DC),
+    secondary = Color(0xFFB7CCB8),
+    onSecondary = Color(0xFF233426),
+    secondaryContainer = Color(0xFF394B3B),
+    onSecondaryContainer = Color(0xFFD3E8D3),
     background = Color(0xFF020617),
     surface = Color(0xFF0F172A),
     onBackground = Color(0xFFF8FAFC),
@@ -143,17 +143,17 @@ private val InkyDarkColorScheme = darkColorScheme(
 )
 
 // ==========================================
-// Cellina Color Schemes (BrandCellina: #34A853)
+// Cellina Color Schemes (BrandCellina: #16A3B7)
 // ==========================================
 private val CellinaLightColorScheme = lightColorScheme(
     primary = BrandCellina,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFC1F1C8),
-    onPrimaryContainer = Color(0xFF002209),
-    secondary = Color(0xFF516351),
+    primaryContainer = Color(0xFFC6F2F8),
+    onPrimaryContainer = Color(0xFF002025),
+    secondary = Color(0xFF4A6267),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFD4E9D2),
-    onSecondaryContainer = Color(0xFF0F1F11),
+    secondaryContainer = Color(0xFFCCE8ED),
+    onSecondaryContainer = Color(0xFF051F23),
     background = Color(0xFFF8FAFC),
     surface = Color.White,
     onBackground = Color(0xFF0F172A),
@@ -165,13 +165,13 @@ private val CellinaLightColorScheme = lightColorScheme(
 
 private val CellinaDarkColorScheme = darkColorScheme(
     primary = BrandCellina,
-    onPrimary = Color(0xFF003914),
-    primaryContainer = Color(0xFF005322),
-    onPrimaryContainer = Color(0xFFC1F1C8),
-    secondary = Color(0xFFB8CCB7),
-    onSecondary = Color(0xFF243425),
-    secondaryContainer = Color(0xFF3A4B3A),
-    onSecondaryContainer = Color(0xFFD4E9D2),
+    onPrimary = Color(0xFF00363E),
+    primaryContainer = Color(0xFF004F5B),
+    onPrimaryContainer = Color(0xFFC6F2F8),
+    secondary = Color(0xFFB0CCD1),
+    onSecondary = Color(0xFF1C3438),
+    secondaryContainer = Color(0xFF324B4F),
+    onSecondaryContainer = Color(0xFFCCE8ED),
     background = Color(0xFF020617),
     surface = Color(0xFF0F172A),
     onBackground = Color(0xFFF8FAFC),
@@ -182,10 +182,49 @@ private val CellinaDarkColorScheme = darkColorScheme(
 )
 
 // ==========================================
-// Slidia Color Schemes (BrandSlidia: #EA4335)
+// Slidia Color Schemes (BrandSlidia: #F59E0B)
 // ==========================================
 private val SlidiaLightColorScheme = lightColorScheme(
     primary = BrandSlidia,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFFE0A8),
+    onPrimaryContainer = Color(0xFF2B1700),
+    secondary = Color(0xFF6F5B40),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFBE0BD),
+    onSecondaryContainer = Color(0xFF271904),
+    background = Color(0xFFF8FAFC),
+    surface = Color.White,
+    onBackground = Color(0xFF0F172A),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFE2E8F0),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1)
+)
+
+private val SlidiaDarkColorScheme = darkColorScheme(
+    primary = BrandSlidia,
+    onPrimary = Color(0xFF452800),
+    primaryContainer = Color(0xFF673E00),
+    onPrimaryContainer = Color(0xFFFFE0A8),
+    secondary = Color(0xFFDEC2A2),
+    onSecondary = Color(0xFF3E2D16),
+    secondaryContainer = Color(0xFF56432A),
+    onSecondaryContainer = Color(0xFFFBE0BD),
+    background = Color(0xFF020617),
+    surface = Color(0xFF0F172A),
+    onBackground = Color(0xFFF8FAFC),
+    onSurface = Color(0xFFF8FAFC),
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0xFF334155)
+)
+
+// ==========================================
+// Pagella Color Schemes (BrandPagella: #D93025)
+// ==========================================
+private val PagellaLightColorScheme = lightColorScheme(
+    primary = BrandPagella,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFFFDAD5),
     onPrimaryContainer = Color(0xFF410002),
@@ -202,54 +241,15 @@ private val SlidiaLightColorScheme = lightColorScheme(
     outline = Color(0xFFCBD5E1)
 )
 
-private val SlidiaDarkColorScheme = darkColorScheme(
-    primary = BrandSlidia,
-    onPrimary = Color(0xFF680003),
+private val PagellaDarkColorScheme = darkColorScheme(
+    primary = BrandPagella,
+    onPrimary = Color(0xFF680005),
     primaryContainer = Color(0xFF93000A),
     onPrimaryContainer = Color(0xFFFFDAD5),
     secondary = Color(0xFFE7BDB7),
     onSecondary = Color(0xFF442926),
     secondaryContainer = Color(0xFF5D3F3C),
     onSecondaryContainer = Color(0xFFFFDAD5),
-    background = Color(0xFF020617),
-    surface = Color(0xFF0F172A),
-    onBackground = Color(0xFFF8FAFC),
-    onSurface = Color(0xFFF8FAFC),
-    surfaceVariant = Color(0xFF1E293B),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    outline = Color(0xFF334155)
-)
-
-// ==========================================
-// Pagella Color Schemes (BrandPagella: #FBBC05)
-// ==========================================
-private val PagellaLightColorScheme = lightColorScheme(
-    primary = BrandPagella,
-    onPrimary = Color(0xFF211B00), // high contrast dark slate on light yellow
-    primaryContainer = Color(0xFFFFF1BD),
-    onPrimaryContainer = Color(0xFF241A00),
-    secondary = Color(0xFF6A5D3F),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF3E1BB),
-    onSecondaryContainer = Color(0xFF231B04),
-    background = Color(0xFFF8FAFC),
-    surface = Color.White,
-    onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFE2E8F0),
-    onSurfaceVariant = Color(0xFF475569),
-    outline = Color(0xFFCBD5E1)
-)
-
-private val PagellaDarkColorScheme = darkColorScheme(
-    primary = BrandPagella,
-    onPrimary = Color(0xFF423200),
-    primaryContainer = Color(0xFF5E4900),
-    onPrimaryContainer = Color(0xFFFFF1BD),
-    secondary = Color(0xFFD6C5A0),
-    onSecondary = Color(0xFF3B2F15),
-    secondaryContainer = Color(0xFF524529),
-    onSecondaryContainer = Color(0xFFF3E1BB),
     background = Color(0xFF020617),
     surface = Color(0xFF0F172A),
     onBackground = Color(0xFFF8FAFC),

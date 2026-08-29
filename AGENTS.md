@@ -11,3 +11,12 @@ All document format specifications, standards, and schema definitions placed in 
 
 ## Test Fixtures (`/tests`)
 Files in `/tests` (e.g., `.odt`, `.docx`) are reference test files for regression testing and compatibility verification across LibreOffice, Microsoft Word, and Papirus Office.
+
+## Color Scheme & Module Accent Conventions
+Default static accent colors for Android 11 and below (devices without dynamic color / Material You support):
+- **Papirus (Base)**: `#2563EB` (Primary Suite Blue)
+- **Inky**: `#0F9D58` (Word Processing Green)
+- **Cellina**: `#16A3B7` (Spreadsheets Cyan/Teal)
+- **Slidia**: `#F59E0B` (Presentations Amber/Orange)
+- **Pagella**: `#D93025` (PDF Viewer Red)
+

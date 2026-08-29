@@ -20,7 +20,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.ui.theme.*
 import com.makerandreas.papirusoffice.data.PapirusConfigManager
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -256,22 +259,20 @@ fun HomeDashboard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
-                                .background(
-                                    MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(12.dp)
-                                ),
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.Description,
-                                contentDescription = null,
+                                painter = painterResource(id = R.drawable.ic_papirus_foreground),
+                                contentDescription = "Papirus Office App Icon",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                         Column {
@@ -860,10 +861,10 @@ fun HomeDashboard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 val (iconColor, bgIconColor, charSymbol) = when (file.fileType) {
-                                    "Inky" -> Triple(Color(0xFF2563EB), Color(0xFFEFF6FF), "W")
-                                    "Cellina" -> Triple(Color(0xFF10B981), Color(0xFFECFDF5), "S")
-                                    "Slidia" -> Triple(Color(0xFFD97706), Color(0xFFFFFBEB), "P")
-                                    "Pagella" -> Triple(Color(0xFFE11D48), Color(0xFFFFF1F2), "D")
+                                    "Inky" -> Triple(BrandInky, BrandInky.copy(alpha = 0.12f), "W")
+                                    "Cellina" -> Triple(BrandCellina, BrandCellina.copy(alpha = 0.12f), "S")
+                                    "Slidia" -> Triple(BrandSlidia, BrandSlidia.copy(alpha = 0.12f), "P")
+                                    "Pagella" -> Triple(BrandPagella, BrandPagella.copy(alpha = 0.12f), "D")
                                     else -> Triple(Color.Gray, Color.LightGray, "F")
                                 }
 

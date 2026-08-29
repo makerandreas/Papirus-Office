@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -365,7 +366,7 @@ fun AboutIllustrationSection() {
             )
         }
 
-        // Centered elegant illustration representing office software on Android mobile device
+        // Centered official Papirus app icon floating smoothly
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -375,7 +376,7 @@ fun AboutIllustrationSection() {
             // Glow background effect
             Box(
                 modifier = Modifier
-                    .size(90.dp)
+                    .size(96.dp)
                     .background(
                         brush = Brush.radialGradient(
                             colors = listOf(
@@ -387,83 +388,20 @@ fun AboutIllustrationSection() {
                     )
             )
 
-            // 1. Android Smartphone Frame
+            // Themed Papirus Foreground App Icon
             Box(
                 modifier = Modifier
-                    .size(width = 54.dp, height = 86.dp)
-                    .border(2.5.dp, MaterialTheme.colorScheme.onSurface, RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                    .padding(3.dp),
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
-                // Smartphone Screen
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                    MaterialTheme.colorScheme.surface
-                                )
-                            ),
-                            shape = RoundedCornerShape(9.dp)
-                        )
-                ) {
-                    // Speaker ear piece at top
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 2.dp)
-                            .size(width = 12.dp, height = 2.dp)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), RoundedCornerShape(1.dp))
-                    )
-                }
-            }
-
-            // 2. Overlapping Elegant Office Document / Sheet
-            Box(
-                modifier = Modifier
-                    .size(width = 44.dp, height = 54.dp)
-                    .offset(x = 12.dp, y = 8.dp)
-                    .rotate(8f)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
-                    .border(1.5.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
-                    .padding(6.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Inside the document: draw document lines/grid representing sheets/texts
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Title placeholder line
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.7f)
-                            .height(3.5.dp)
-                            .background(MaterialTheme.colorScheme.onPrimary, RoundedCornerShape(1.dp))
-                    )
-                    // Detail lines
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp)
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f), RoundedCornerShape(1.dp))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .height(2.dp)
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f), RoundedCornerShape(1.dp))
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(0.5f)
-                            .height(2.dp)
-                            .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.6f), RoundedCornerShape(1.dp))
-                    )
-                }
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_papirus_foreground),
+                    contentDescription = "Papirus Office App Icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(54.dp)
+                )
             }
         }
     }

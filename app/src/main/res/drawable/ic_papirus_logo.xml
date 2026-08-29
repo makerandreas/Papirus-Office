@@ -1,10 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
+    android:width="1024dp"
+    android:height="1024dp"
     android:viewportWidth="1024"
     android:viewportHeight="1024">
 
-    <!-- Blue Document Base -->
+    <!-- Canvas Background -->
+    <path
+        android:fillColor="#FEF7FF"
+        android:pathData="M0,0h1024v1024h-1024z" />
+
+    <!-- Document Base (Blue Accent) -->
     <path
         android:fillColor="#2563EB"
         android:pathData="M372,745.333C359.167,745.333 348.181,740.764 339.042,731.625C329.903,722.486 325.333,711.5 325.333,698.667V325.333C325.333,312.5 329.903,301.514 339.042,292.375C348.181,283.236 359.167,278.667 372,278.667H539.417C545.639,278.667 551.569,279.833 557.208,282.167C562.847,284.5 567.806,287.806 572.083,292.083L685.25,405.25C689.528,409.528 692.833,414.486 695.167,420.125C697.5,425.764 698.667,431.694 698.667,437.917V698.667C698.667,711.5 694.097,722.486 684.958,731.625C675.819,740.764 664.833,745.333 652,745.333H372ZM535.333,418.667C535.333,425.278 537.569,430.819 542.042,435.292C546.514,439.764 552.056,442 558.667,442H652L535.333,325.333V418.667Z" />
