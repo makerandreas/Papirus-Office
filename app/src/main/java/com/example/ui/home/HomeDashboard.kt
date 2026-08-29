@@ -531,11 +531,14 @@ fun HomeDashboard(
                         defaultElevation = 3.dp,
                         pressedElevation = 6.dp
                     ),
-                    modifier = Modifier.testTag("main_fab")
+                    modifier = Modifier
+                        .size(56.dp)
+                        .testTag("main_fab")
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Add,
+                        painter = painterResource(id = R.drawable.ic_fab_new_document),
                         contentDescription = stringResource(R.string.create_new_document),
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -662,10 +665,10 @@ fun HomeDashboard(
             } else {
                 searched.filter {
                     val fileTypeToMatch = when (selectedFilter) {
-                        "Inky Document" -> "Inky"
-                        "Cellina Spreadsheet" -> "Cellina"
-                        "Slidia Presentation" -> "Slidia"
-                        "Pagella PDF Document" -> "Pagella"
+                        "Inky Documents" -> "Inky"
+                        "Cellina Spreadsheets" -> "Cellina"
+                        "Slidia Presentations" -> "Slidia"
+                        "Pagella PDF" -> "Pagella"
                         else -> ""
                     }
                     it.fileType == fileTypeToMatch
@@ -716,10 +719,10 @@ fun HomeDashboard(
             // Filter Chips under the app bar
             val filterOptions = listOf(
                 "All" to R.string.filter_all,
-                "Inky Document" to R.string.filter_inky,
-                "Cellina Spreadsheet" to R.string.filter_cellina,
-                "Slidia Presentation" to R.string.filter_slidia,
-                "Pagella PDF Document" to R.string.filter_pagella
+                "Inky Documents" to R.string.filter_inky,
+                "Cellina Spreadsheets" to R.string.filter_cellina,
+                "Slidia Presentations" to R.string.filter_slidia,
+                "Pagella PDF" to R.string.filter_pagella
             )
 
             LazyRow(
@@ -788,31 +791,30 @@ fun HomeDashboard(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
-                        RecentsEmptyStateRosetteBadge(
-                            color = MaterialTheme.colorScheme.primary,
-                            iconColor = MaterialTheme.colorScheme.onPrimary,
-                            size = 165.dp
+                        RecentsEmptyStateIllustration(
+                            modifier = Modifier.size(140.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(26.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
                         
                         Text(
-                            text = "No Recent Documents",
-                            style = MaterialTheme.typography.titleLarge,
+                            text = stringResource(R.string.no_recent_documents_title),
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 22.sp,
+                            fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "All documents you have ever opened and\nsaved will appear here.",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = stringResource(R.string.no_recent_documents_desc),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
                             fontSize = 12.sp,
-                            lineHeight = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -980,53 +982,14 @@ fun HomeDashboard(
     }
 
 @Composable
-fun RecentsEmptyStateRosetteBadge(
-    modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
-    iconColor: Color = MaterialTheme.colorScheme.onPrimary,
-    size: androidx.compose.ui.unit.Dp = 165.dp
+fun RecentsEmptyStateIllustration(
+    modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.size(size),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val center = Offset(this.size.width / 2f, this.size.height / 2f)
-            val numPetals = 12
-            val centerRadius = this.size.minDimension * 0.36f
-            val petalRadius = this.size.minDimension * 0.175f
-            val orbitRadius = this.size.minDimension * 0.325f
-
-            // Draw center circle
-            drawCircle(
-                color = color,
-                radius = centerRadius,
-                center = center
-            )
-
-            // Draw 12 overlapping smooth petal lobes
-            for (i in 0 until numPetals) {
-                val angle = (i * (2 * Math.PI / numPetals)).toFloat()
-                val petalCenter = Offset(
-                    center.x + orbitRadius * kotlin.math.cos(angle),
-                    center.y + orbitRadius * kotlin.math.sin(angle)
-                )
-                drawCircle(
-                    color = color,
-                    radius = petalRadius,
-                    center = petalCenter
-                )
-            }
-        }
-
-        // Crisp document icon inside (64dp)
-        Icon(
-            imageVector = Icons.Rounded.Description,
-            contentDescription = null,
-            tint = iconColor,
-            modifier = Modifier.size(64.dp)
-        )
-    }
+    Image(
+        painter = painterResource(id = R.drawable.ic_recents_empty_illustration),
+        contentDescription = null,
+        modifier = modifier
+    )
 }
 
 // ==========================================
