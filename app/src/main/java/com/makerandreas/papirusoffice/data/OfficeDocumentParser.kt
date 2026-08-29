@@ -24,6 +24,14 @@ sealed class SchemaValidationResult {
     data class Invalid(val reason: String, val warnings: List<String> = emptyList()) : SchemaValidationResult()
 }
 
+data class DocxStyleMeta(
+    val styleId: String,
+    val name: String,
+    val outlineLvl: Int?,
+    val isHeading: Boolean,
+    val headingLevel: Int
+)
+
 /**
  * Modern document parser for ODT and DOCX files.
  * Uses standard Java ZIP and XML libraries to extract 'content.xml' (ODT) or 'word/document.xml' (DOCX)
@@ -31,6 +39,85 @@ sealed class SchemaValidationResult {
  * Logs malformed XML structures or unsupported tags into crash.log via DocumentParsingLogger.
  */
 class OfficeDocumentParser(private val context: Context) {
+
+    private fun extractDocxStyles(file: File): Map<String, DocxStyleMeta> {
+        val stylesMap = mutableMapOf<String, DocxStyleMeta>()
+        if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return stylesMap
+        try {
+            var stylesXmlContent: String? = null
+            java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "word/styles.xml") {
+                        stylesXmlContent = zip.readBytes().toString(Charsets.UTF_8)
+                        break
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+
+            if (stylesXmlContent != null) {
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = false
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(stylesXmlContent.toByteArray(Charsets.UTF_8)), "UTF-8")
+
+                var eventType = parser.eventType
+                var currentStyleId: String? = null
+                var currentStyleName: String? = null
+                var currentOutlineLvl: Int? = null
+
+                while (eventType != XmlPullParser.END_DOCUMENT) {
+                    val tagName = parser.name?.lowercase() ?: ""
+                    when (eventType) {
+                        XmlPullParser.START_TAG -> {
+                            if (tagName == "w:style" || tagName == "style") {
+                                currentStyleId = parser.getAttributeValue(null, "w:styleId") ?: parser.getAttributeValue(null, "styleId")
+                                currentStyleName = null
+                                currentOutlineLvl = null
+                            } else if (tagName == "w:name" || tagName == "name") {
+                                currentStyleName = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                            } else if (tagName == "w:outlinelvl" || tagName == "outlinelvl") {
+                                val lvlStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                currentOutlineLvl = lvlStr?.toIntOrNull()
+                            }
+                        }
+                        XmlPullParser.END_TAG -> {
+                            if ((tagName == "w:style" || tagName == "style") && currentStyleId != null) {
+                                val sName = currentStyleName ?: currentStyleId
+                                val isHeading = sName.contains("heading", ignoreCase = true) ||
+                                        sName.contains("judul", ignoreCase = true) ||
+                                        sName.contains("title", ignoreCase = true) ||
+                                        currentStyleId.matches(Regex("(?i)para[1-9]")) ||
+                                        currentStyleId.matches(Regex("(?i)heading[1-9]")) ||
+                                        currentOutlineLvl != null
+
+                                val level = when {
+                                    currentOutlineLvl != null -> currentOutlineLvl + 1
+                                    Regex("\\d+").find(sName) != null -> Regex("\\d+").find(sName)!!.value.toInt()
+                                    Regex("\\d+").find(currentStyleId) != null -> Regex("\\d+").find(currentStyleId)!!.value.toInt()
+                                    sName.contains("title", ignoreCase = true) -> 1
+                                    else -> 1
+                                }
+                                stylesMap[currentStyleId.lowercase()] = DocxStyleMeta(
+                                    styleId = currentStyleId,
+                                    name = sName,
+                                    outlineLvl = currentOutlineLvl,
+                                    isHeading = isHeading,
+                                    headingLevel = level.coerceIn(1, 6)
+                                )
+                            }
+                        }
+                    }
+                    eventType = parser.next()
+                }
+            }
+        } catch (e: Exception) {
+            // Graceful fallback
+        }
+        return stylesMap
+    }
 
     private val cacheRepository = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
     private val imageExtractor = DocxImageExtractor(context)
@@ -514,6 +601,7 @@ class OfficeDocumentParser(private val context: Context) {
 
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
+        val docxStylesMap = if (isDocx) extractDocxStyles(file) else emptyMap()
 
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -550,7 +638,8 @@ class OfficeDocumentParser(private val context: Context) {
                 "office:value", "office:value-type", "table:number-columns-repeated", "table:number-rows-repeated",
                 "worksheet", "sheetdata", "row", "c", "v", "f", "t", "is", "r", "inlinestr", "dimension", "cols", "col",
                 "sheetviews", "sheetview", "selection", "pagemargins", "[content_types].xml", "_rels/.rels",
-                "w:document", "w:body", "w:pPr", "w:rPr", "w:b", "w:i", "w:u", "style:style", "meta-inf/manifest.xml", "styles.xml"
+                "w:document", "w:body", "w:pPr", "w:rPr", "w:b", "w:i", "w:u", "style:style", "meta-inf/manifest.xml", "styles.xml",
+                "w:lastrenderedpagebreak", "w:sectpr", "text:soft-page-break"
             )
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
@@ -600,8 +689,48 @@ class OfficeDocumentParser(private val context: Context) {
                             // Paragraphs
                             nameLower == "text:p" || nameLower == "w:p" || nameLower == "p" || nameLower == "a:p" -> {
                                 inParagraph = true
+                                inHeading = false
+                                headingLevel = 1
                                 currentText.clear()
                                 currentRuns.clear()
+                            }
+
+                            // DOCX / Word Style & Outline Level detection
+                            nameLower == "w:pstyle" || nameLower == "pstyle" -> {
+                                val styleVal = parser.getAttributeValue(null, "w:val")
+                                    ?: parser.getAttributeValue(null, "val") ?: ""
+                                val meta = docxStylesMap[styleVal.lowercase()]
+                                if (meta != null && meta.isHeading) {
+                                    inHeading = true
+                                    headingLevel = meta.headingLevel
+                                } else {
+                                    val isHeadingStyle = styleVal.contains("Heading", ignoreCase = true) ||
+                                            styleVal.contains("Judul", ignoreCase = true) ||
+                                            styleVal.contains("Title", ignoreCase = true) ||
+                                            styleVal.matches(Regex("(?i)^para[1-9]$")) ||
+                                            styleVal.matches(Regex("^[1-6]$"))
+                                    if (isHeadingStyle) {
+                                        inHeading = true
+                                        val levelDigit = Regex("\\d+").find(styleVal)?.value?.toIntOrNull()
+                                        headingLevel = levelDigit ?: 1
+                                    }
+                                }
+                            }
+                            nameLower == "w:outlinelvl" || nameLower == "outlinelvl" -> {
+                                val lvlVal = parser.getAttributeValue(null, "w:val")
+                                    ?: parser.getAttributeValue(null, "val")
+                                val parsedLvl = lvlVal?.toIntOrNull()
+                                if (parsedLvl != null) {
+                                    inHeading = true
+                                    headingLevel = parsedLvl + 1
+                                }
+                            }
+
+                            // Page breaks
+                            nameLower == "w:lastrenderedpagebreak" || nameLower == "lastrenderedpagebreak" ||
+                            nameLower == "text:soft-page-break" || nameLower == "soft-page-break" -> {
+                                elements.add(OfficeDocumentElement.PageBreak)
+                                plainTextBuilder.append("\n\n--- Page Break ---\n\n")
                             }
 
                             // Text formatting
@@ -644,7 +773,14 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.append("\t")
                             }
                             nameLower == "text:line-break" || nameLower == "w:br" || nameLower == "w:cr" -> {
-                                currentText.append("\n")
+                                val brType = parser.getAttributeValue(null, "type")
+                                    ?: parser.getAttributeValue(null, "w:type")
+                                if (brType?.equals("page", ignoreCase = true) == true) {
+                                    elements.add(OfficeDocumentElement.PageBreak)
+                                    plainTextBuilder.append("\n\n--- Page Break ---\n\n")
+                                } else {
+                                    currentText.append("\n")
+                                }
                             }
 
                             // Images
@@ -697,19 +833,31 @@ class OfficeDocumentParser(private val context: Context) {
                                 inParagraph = false
                                 val paraText = currentText.toString().trim()
                                 if (paraText.isNotEmpty()) {
-                                    val paragraphObj = OfficeDocumentElement.Paragraph(
-                                        text = paraText,
-                                        runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
-                                            TextRun(paraText, isBold, isItalic, isUnderline)
+                                    if (inHeading && !inTable) {
+                                        elements.add(
+                                            OfficeDocumentElement.Heading(
+                                                text = paraText,
+                                                level = headingLevel,
+                                                styleName = "Heading $headingLevel"
+                                            )
                                         )
-                                    )
-                                    if (inTable) {
-                                        currentCellParagraphs.add(paragraphObj)
-                                    } else {
-                                        elements.add(paragraphObj)
                                         plainTextBuilder.append(paraText).append("\n\n")
+                                    } else {
+                                        val paragraphObj = OfficeDocumentElement.Paragraph(
+                                            text = paraText,
+                                            runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
+                                                TextRun(paraText, isBold, isItalic, isUnderline)
+                                            )
+                                        )
+                                        if (inTable) {
+                                            currentCellParagraphs.add(paragraphObj)
+                                        } else {
+                                            elements.add(paragraphObj)
+                                            plainTextBuilder.append(paraText).append("\n\n")
+                                        }
                                     }
                                 }
+                                inHeading = false
                                 currentText.clear()
                                 currentRuns.clear()
                                 isBold = false
@@ -1255,6 +1403,9 @@ class OfficeDocumentParser(private val context: Context) {
                         sb.append("      <draw:frame draw:name=\"Image1\">\n")
                         sb.append("        <draw:image xlink:href=\"${escapeXml(element.imagePath)}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>\n")
                         sb.append("      </draw:frame>\n")
+                    }
+                    is OfficeDocumentElement.PageBreak -> {
+                        sb.append("      <text:p text:style-name=\"PageBreak\"/>\n")
                     }
                 }
             }

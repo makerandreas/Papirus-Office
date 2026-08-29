@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -641,7 +643,7 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Rounded.FormatIndentIncrease, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Extract Labeled Strings")
                     }

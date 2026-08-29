@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -126,7 +127,7 @@ fun FilesSubPage(
             title = "Documents",
             path = "/storage/emulated/0/Documents",
             description = "Default document drafts and sheets",
-            icon = Icons.Rounded.Article
+            icon = Icons.AutoMirrored.Rounded.Article
         ) {
             val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments")
             openDocumentLauncher.launch(uri)

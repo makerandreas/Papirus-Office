@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -677,7 +679,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                         },
                         modifier = Modifier.weight(1.0f)
                     ) {
-                        Icon(Icons.Rounded.CallSplit, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Rounded.CallSplit, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Copy Sentence")
                     }
@@ -695,7 +697,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                         modifier = Modifier.weight(1.0f),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
-                        Icon(Icons.Rounded.PlaylistAdd, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Paste Sentence")
                     }
@@ -763,7 +765,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                         modifier = Modifier.weight(1.0f),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                     ) {
-                        Icon(Icons.Rounded.DriveFileMove, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Rounded.DriveFileMove, contentDescription = null)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Paste Range")
                     }

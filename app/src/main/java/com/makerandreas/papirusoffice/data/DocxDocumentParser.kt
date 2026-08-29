@@ -464,6 +464,8 @@ class DocxDocumentParser(private val context: Context) {
                                 } else {
                                     generateOdtXml(text)
                                 }
+                                val newEntry = java.util.zip.ZipEntry(targetEntry)
+                                zout.putNextEntry(newEntry)
                                 zout.write(updatedXmlBytes)
                             } else {
                                 val newEntry = java.util.zip.ZipEntry(entryName)

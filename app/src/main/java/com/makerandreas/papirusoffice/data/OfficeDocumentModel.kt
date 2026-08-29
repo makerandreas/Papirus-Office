@@ -36,6 +36,8 @@ sealed class OfficeDocumentElement {
         val widthDp: Float = 0f,
         val heightDp: Float = 0f
     ) : OfficeDocumentElement()
+
+    data object PageBreak : OfficeDocumentElement()
 }
 
 data class TableRow(

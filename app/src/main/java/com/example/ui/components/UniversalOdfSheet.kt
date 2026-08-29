@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -174,7 +176,7 @@ fun UniversalOdfSheet(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
                         text = { Text("Concatenate", maxLines = 1) },
-                        icon = { Icon(Icons.Rounded.LibraryBooks, contentDescription = null) }
+                        icon = { Icon(Icons.AutoMirrored.Rounded.LibraryBooks, contentDescription = null) }
                     )
                     Tab(
                         selected = selectedTab == 4,
@@ -709,7 +711,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Rounded.CompareArrows, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Rounded.CompareArrows, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Run Slide Relocation (0 -> END)")
                 }
@@ -728,7 +730,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                 ) {
-                    Icon(Icons.Rounded.MergeType, contentDescription = null)
+                    Icon(Icons.AutoMirrored.Rounded.MergeType, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Merge doc2.odt into doc1.odt")
                 }
@@ -892,7 +894,7 @@ private fun HelpAndOptimizationTab() {
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(

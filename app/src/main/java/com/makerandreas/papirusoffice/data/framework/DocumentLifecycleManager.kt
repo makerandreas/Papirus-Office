@@ -107,8 +107,16 @@ object DocumentLifecycleManager {
 
     fun registerRecentDocument(context: Context, session: DocumentSession) {
         val path = session.file?.uri ?: session.file?.file?.absolutePath ?: return
-        val name = session.file?.displayName ?: session.file?.file?.name ?: "Document.odt"
-        val fileType = if (name.endsWith(".docx", ignoreCase = true)) "DOCX" else "Inky"
+        val fileObj = session.file?.file ?: java.io.File(path)
+        if (!fileObj.exists()) return
+        val name = session.file?.displayName ?: fileObj.name
+        val lowerName = name.lowercase()
+        val fileType = when {
+            lowerName.endsWith(".ods") || lowerName.endsWith(".ots") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".csv") -> "Cellina"
+            lowerName.endsWith(".odp") || lowerName.endsWith(".otp") || lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> "Slidia"
+            lowerName.endsWith(".pdf") -> "Pagella"
+            else -> "Inky"
+        }
         RecentFilesTracker.addFile(context, path, fileType)
     }
 }

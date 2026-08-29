@@ -1,5 +1,6 @@
 package com.example.modules.inky
 import android.util.Log
+import kotlin.math.roundToInt
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -379,7 +380,6 @@ fun InkyModule(
                     initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
                     docxExtents = parseResult.imageExtents
-                    updateInkyMetadata("templates/styles/Default.ott", "Document.odt", parseResult.text)
 
                     // Set active session for the default loaded template
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -459,13 +459,21 @@ fun InkyModule(
         }
     }
 
-    val currentDocPage = remember(wordsBeforeCursor, wordCount, totalDocPages) {
-        if (wordCount == 0 || totalDocPages <= 1) {
-            1
-        } else {
-            val ratio = wordsBeforeCursor.toFloat() / wordCount.toFloat()
-            val page = (ratio * totalDocPages).toInt() + 1
-            page.coerceIn(1, totalDocPages)
+    val currentDocPage by remember(totalDocPages, wordCount, isEditMode) {
+        derivedStateOf {
+            if (totalDocPages <= 1) {
+                1
+            } else if (scrollState.maxValue > 0) {
+                val scrollRatio = scrollState.value.toFloat() / scrollState.maxValue.toFloat()
+                val pageFromScroll = (scrollRatio * (totalDocPages - 1)).roundToInt() + 1
+                pageFromScroll.coerceIn(1, totalDocPages)
+            } else if (isEditMode && wordCount > 0) {
+                val ratio = wordsBeforeCursor.toFloat() / wordCount.toFloat()
+                val page = (ratio * totalDocPages).toInt() + 1
+                page.coerceIn(1, totalDocPages)
+            } else {
+                1
+            }
         }
     }
 
@@ -473,7 +481,8 @@ fun InkyModule(
         object : com.makerandreas.papirusoffice.data.DocumentNavigator {
             override fun goToPage(page: Int) {
                 coroutineScope.launch {
-                    val ratio = (page - 1).toFloat() / totalDocPages.coerceAtLeast(1).toFloat()
+                    val targetPage = page.coerceIn(1, totalDocPages)
+                    val ratio = if (totalDocPages > 1) (targetPage - 1).toFloat() / (totalDocPages - 1).toFloat() else 0f
                     val targetScroll = (ratio * scrollState.maxValue).toInt()
                     if (viewOptions.enableSmoothScrolling) {
                         scrollState.animateScrollTo(targetScroll)
@@ -490,7 +499,138 @@ fun InkyModule(
     LaunchedEffect(navEngineState.navTargetSignal) {
         val signal = navEngineState.navTargetSignal
         if (signal != null) {
-            documentNavigator.goToPage(signal.targetPageIndex)
+            val cleanTitle = signal.titleOrLabel.trim().removePrefix("\u200B").trim()
+            val fullDocText = docBodyText.text
+
+            var targetCharIndex: Int? = null
+
+            if (cleanTitle.isNotBlank()) {
+                var idx = fullDocText.indexOf(cleanTitle, ignoreCase = true)
+                if (idx < 0) {
+                    val normalizedDoc = fullDocText.replace("\u200B", "")
+                    val normalizedTitle = cleanTitle.replace("\u200B", "")
+                    val nIdx = normalizedDoc.indexOf(normalizedTitle, ignoreCase = true)
+                    if (nIdx >= 0) {
+                        idx = nIdx
+                    }
+                }
+                if (idx < 0) {
+                    val simplified = cleanTitle.replace("\\s+".toRegex(), " ")
+                    idx = fullDocText.indexOf(simplified, ignoreCase = true)
+                }
+                if (idx < 0 && cleanTitle.length > 8) {
+                    val prefix = cleanTitle.take(12)
+                    idx = fullDocText.indexOf(prefix, ignoreCase = true)
+                }
+                if (idx >= 0) {
+                    targetCharIndex = idx
+                }
+            }
+
+            // Fallback: search by elements in current session
+            if (targetCharIndex == null) {
+                val elements = currentSessionState?.document?.body?.elements ?: emptyList()
+                when (signal.targetType) {
+                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.HEADING -> {
+                        val headings = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeHeading>()
+                        val targetHeading = headings.getOrNull(signal.targetParagraphIndex - 1)
+                            ?: headings.find { it.text.contains(cleanTitle, ignoreCase = true) }
+                        if (targetHeading != null && targetHeading.text.isNotBlank()) {
+                            val hClean = targetHeading.text.trim().removePrefix("\u200B").trim()
+                            val idx = fullDocText.indexOf(hClean, ignoreCase = true)
+                            if (idx >= 0) targetCharIndex = idx
+                        }
+                    }
+                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.TABLE -> {
+                        val tables = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeTable>()
+                        val targetTable = tables.getOrNull(signal.targetElementIndex)
+                            ?: tables.getOrNull(signal.targetParagraphIndex - 1)
+                        val firstCell = targetTable?.rows?.firstOrNull()?.cells?.firstOrNull()?.text?.trim()
+                        if (!firstCell.isNullOrBlank()) {
+                            val idx = fullDocText.indexOf(firstCell, ignoreCase = true)
+                            if (idx >= 0) targetCharIndex = idx
+                        }
+                    }
+                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.BOOKMARK -> {
+                        val bookmarks = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeBookmark>()
+                        val bm = bookmarks.find { it.name.equals(cleanTitle, ignoreCase = true) }
+                        if (bm != null) {
+                            val idx = fullDocText.indexOf(bm.name, ignoreCase = true)
+                            if (idx >= 0) targetCharIndex = idx
+                        }
+                    }
+                    else -> {}
+                }
+            }
+
+            // Fallback: search by paragraph block or page fraction
+            if (targetCharIndex == null && fullDocText.isNotEmpty()) {
+                val blocks = fullDocText.split("\n\n")
+                if (signal.targetParagraphIndex > 0 && signal.targetParagraphIndex <= blocks.size) {
+                    var accumulated = 0
+                    for (i in 0 until (signal.targetParagraphIndex - 1)) {
+                        accumulated += blocks[i].length + 2
+                    }
+                    targetCharIndex = accumulated.coerceIn(0, fullDocText.length)
+                } else if (signal.targetPageIndex > 0 && totalDocPages > 0) {
+                    val ratio = (signal.targetPageIndex - 1).toFloat() / totalDocPages.toFloat()
+                    targetCharIndex = (ratio * fullDocText.length).toInt().coerceIn(0, fullDocText.length)
+                }
+            }
+
+            if (targetCharIndex != null && fullDocText.isNotEmpty()) {
+                val selLength = if (cleanTitle.isNotEmpty() && targetCharIndex + cleanTitle.length <= fullDocText.length) {
+                    cleanTitle.length
+                } else {
+                    0
+                }
+
+                // Move cursor and selection to target
+                docBodyText = docBodyText.copy(
+                    selection = androidx.compose.ui.text.TextRange(
+                        start = targetCharIndex,
+                        end = (targetCharIndex + selLength).coerceAtMost(fullDocText.length)
+                    )
+                )
+
+                // Scroll viewfinder
+                if (isEditMode) {
+                    if (scrollState.maxValue > 0) {
+                        val scrollRatio = targetCharIndex.toFloat() / fullDocText.length.toFloat()
+                        val targetScroll = (scrollRatio * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                        if (viewOptions.enableSmoothScrolling) {
+                            scrollState.animateScrollTo(targetScroll)
+                        } else {
+                            scrollState.scrollTo(targetScroll)
+                        }
+                    }
+                } else {
+                    // Multi-page Viewer Mode
+                    if (pagesList.isNotEmpty()) {
+                        var acc = 0
+                        var targetPageIdx = 0
+                        for ((pIdx, pText) in pagesList.withIndex()) {
+                            acc += pText.length
+                            if (targetCharIndex <= acc) {
+                                targetPageIdx = pIdx
+                                break
+                            }
+                        }
+                        val pageRatio = if (pagesList.size > 1) targetPageIdx.toFloat() / (pagesList.size - 1).toFloat() else 0f
+                        val pageScroll = (pageRatio * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
+                        if (viewOptions.enableSmoothScrolling) {
+                            scrollState.animateScrollTo(pageScroll)
+                        } else {
+                            scrollState.scrollTo(pageScroll)
+                        }
+                    } else if (signal.targetPageIndex > 0) {
+                        documentNavigator.goToPage(signal.targetPageIndex)
+                    }
+                }
+            } else if (signal.targetPageIndex > 0) {
+                documentNavigator.goToPage(signal.targetPageIndex)
+            }
+
             navEngine.clearNavSignal()
         }
     }
@@ -1549,7 +1689,7 @@ fun InkyModule(
                     }
                 }
         ) {
-        Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        Column(modifier = Modifier.fillMaxSize().then(if (!showBottomBar) Modifier.imePadding() else Modifier)) {
                  // --- HEADER TOP APP BAR ---
             AnimatedVisibility(
                 visible = !showBottomBar,
@@ -1811,56 +1951,131 @@ fun InkyModule(
                         .padding(vertical = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Document Paper Sheet
-                    Surface(
-                        modifier = Modifier
-                            .width((340 * zoomScale).dp)
-                            .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                            .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                            .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
-                        color = pageBgColor,
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding((20 * zoomScale).dp)
-                        ) {
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = docBodyText,
-                                onValueChange = { newValue ->
-                                    if (newValue.text != docBodyText.text) {
-                                        isSaved = false
-                                    }
-                                    docBodyText = newValue
-                                    triggerAutosave()
-                                },
-                                enabled = isEditMode,
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                    color = textPrimaryColor,
-                                    fontSize = (activeFontSize * zoomScale).sp,
-                                    fontFamily = when (activeFontFamily.lowercase()) {
-                                        "serif", "times new roman" -> FontFamily.Serif
-                                        "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
-                                        "monospace", "courier" -> FontFamily.Monospace
-                                        else -> FontFamily.Default
-                                    },
-                                    fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                    textDecoration = buildList {
-                                        if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
-                                        if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
-                                    }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
-                                    textAlign = textAlignment
-                                ),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                    if (!isEditMode) {
+                        // Multi-page Viewer Mode: Render distinct page paper sheets
+                        pagesList.forEachIndexed { pageIndex, pageContent ->
+                            Surface(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .defaultMinSize(minHeight = (440 * zoomScale).dp)
-                                    .focusRequester(focusRequester)
-                                    .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                    .testTag("doc_body_editor")
-                            )
+                                    .width((340 * zoomScale).dp)
+                                    .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                    .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                color = pageBgColor,
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding((20 * zoomScale).dp)
+                                ) {
+                                    // Header (if document has title)
+                                    if (docTitle.isNotBlank() && pagesList.size > 1) {
+                                        Text(
+                                            text = docTitle,
+                                            fontSize = (10 * zoomScale).sp,
+                                            color = Color.Gray,
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 0.5.dp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                    }
+
+                                    androidx.compose.foundation.text.selection.SelectionContainer {
+                                        Text(
+                                            text = pageContent,
+                                            color = textPrimaryColor,
+                                            fontSize = (activeFontSize * zoomScale).sp,
+                                            fontFamily = when (activeFontFamily.lowercase()) {
+                                                "serif", "times new roman" -> FontFamily.Serif
+                                                "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
+                                                "monospace", "courier" -> FontFamily.Monospace
+                                                else -> FontFamily.Default
+                                            },
+                                            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                            fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                            textDecoration = buildList {
+                                                if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
+                                                if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                            }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
+                                            textAlign = textAlignment,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .weight(1f, fill = false)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Footer with Page Number
+                                    if (pagesList.size > 1) {
+                                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 0.5.dp)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Page ${pageIndex + 1} of ${pagesList.size}",
+                                            fontSize = (10 * zoomScale).sp,
+                                            color = Color.Gray,
+                                            modifier = Modifier.align(Alignment.End)
+                                        )
+                                    }
+                                }
+                            }
+                            if (pageIndex < pagesList.size - 1) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                            }
+                        }
+                    } else {
+                        // Edit Mode: Document Paper Sheet
+                        Surface(
+                            modifier = Modifier
+                                .width((340 * zoomScale).dp)
+                                .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                            color = pageBgColor,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding((20 * zoomScale).dp)
+                            ) {
+                                androidx.compose.foundation.text.BasicTextField(
+                                    value = docBodyText,
+                                    onValueChange = { newValue ->
+                                        if (newValue.text != docBodyText.text) {
+                                            isSaved = false
+                                        }
+                                        docBodyText = newValue
+                                        triggerAutosave()
+                                    },
+                                    enabled = true,
+                                    readOnly = false,
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                        color = textPrimaryColor,
+                                        fontSize = (activeFontSize * zoomScale).sp,
+                                        fontFamily = when (activeFontFamily.lowercase()) {
+                                            "serif", "times new roman" -> FontFamily.Serif
+                                            "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
+                                            "monospace", "courier" -> FontFamily.Monospace
+                                            else -> FontFamily.Default
+                                        },
+                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                        textDecoration = buildList {
+                                            if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
+                                            if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                        }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
+                                        textAlign = textAlignment
+                                    ),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .defaultMinSize(minHeight = (440 * zoomScale).dp)
+                                        .focusRequester(focusRequester)
+                                        .onGloballyPositioned { bodyTextFieldCoordinates = it }
+                                        .testTag("doc_body_editor")
+                                )
+                            }
                         }
                     }
                 }

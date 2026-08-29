@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -172,7 +172,7 @@ fun NewDocumentScreen(
                         coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         isSearchActive = false
                     },
-                    icon = { Icon(Icons.Rounded.NoteAdd, contentDescription = "Create New Document Tab") },
+                    icon = { Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = "Create New Document Tab") },
                     label = { Text(stringResource(R.string.tab_create_new)) },
                     modifier = Modifier.testTag("tab_create_new")
                 )
@@ -588,7 +588,7 @@ fun CreateFromTemplateView(
                                 )
                         )
                         Icon(
-                            imageVector = Icons.Rounded.Article,
+                            imageVector = Icons.AutoMirrored.Rounded.Article,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(48.dp)

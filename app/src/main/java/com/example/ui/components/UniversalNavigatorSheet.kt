@@ -8,10 +8,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
-import androidx.compose.material.icons.automirrored.rounded.Notes
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -90,14 +88,14 @@ fun NavigatorSheetContent(
                 if (isEditMode) {
                     IconButton(onClick = onUndo, enabled = canUndo) {
                         Icon(
-                            imageVector = Icons.Rounded.Undo,
+                            imageVector = Icons.AutoMirrored.Rounded.Undo,
                             contentDescription = stringResource(R.string.options_done),
                             tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
                     IconButton(onClick = onRedo, enabled = canRedo) {
                         Icon(
-                            imageVector = Icons.Rounded.Redo,
+                            imageVector = Icons.AutoMirrored.Rounded.Redo,
                             contentDescription = stringResource(R.string.options_done),
                             tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
@@ -212,7 +210,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_headings),
                         icon = Icons.AutoMirrored.Rounded.FormatListBulleted,
-                        count = index.headings.size,
+                        count = countAllHeadings(index.headings),
                         isExpanded = expandedCategories["headings"] == true,
                         onToggleExpand = {
                             expandedCategories["headings"] = !(expandedCategories["headings"] ?: false)
@@ -397,7 +395,7 @@ fun NavigatorSheetContent(
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_comments),
-                        icon = Icons.Rounded.Comment,
+                        icon = Icons.AutoMirrored.Rounded.Comment,
                         count = index.comments.size,
                         isExpanded = expandedCategories["comments"] == true,
                         onToggleExpand = {
@@ -412,7 +410,7 @@ fun NavigatorSheetContent(
                         items(index.comments) { c ->
                             LeafItemRow(
                                 name = "${c.author}: ${c.content}",
-                                icon = Icons.Rounded.Comment,
+                                icon = Icons.AutoMirrored.Rounded.Comment,
                                 isSelected = navState.activeItemId == c.id,
                                 onClick = { navEngine.goToComment(c.id) }
                             )
@@ -689,7 +687,7 @@ fun NavigatorSheetContent(
                             items(index.comments) { c ->
                                 LeafItemRow(
                                     name = "${c.author}: ${c.content}",
-                                    icon = Icons.Rounded.Comment,
+                                    icon = Icons.AutoMirrored.Rounded.Comment,
                                     isSelected = navState.activeItemId == c.id,
                                     startPadding = 16.dp,
                                     onClick = { navEngine.goToComment(c.id) }
@@ -832,7 +830,7 @@ fun NavigateBySheetContent(
             NavigateBy.TABLE to (R.string.navigate_by_tables to Icons.Rounded.TableChart),
             NavigateBy.IMAGE to (R.string.navigate_by_images to Icons.Rounded.Image),
             NavigateBy.BOOKMARK to (R.string.navigate_by_bookmarks to Icons.Rounded.Bookmark),
-            NavigateBy.COMMENT to (R.string.navigate_by_comments to Icons.Rounded.Comment),
+            NavigateBy.COMMENT to (R.string.navigate_by_comments to Icons.AutoMirrored.Rounded.Comment),
             NavigateBy.SECTION to (R.string.navigate_by_sections to Icons.Rounded.ViewAgenda),
             NavigateBy.FRAME to (R.string.navigate_by_frames to Icons.Rounded.CropFree),
             NavigateBy.FIELD to (R.string.navigate_by_fields to Icons.Rounded.TextFields),
@@ -841,7 +839,7 @@ fun NavigateBySheetContent(
             NavigateBy.DRAWING to (R.string.navigate_by_drawing to Icons.Rounded.Category),
             NavigateBy.PAGE to (R.string.navigate_by_page to Icons.Rounded.Description),
             NavigateBy.REMINDER to (R.string.navigate_by_reminder to Icons.Rounded.Alarm),
-            NavigateBy.INDEX to (R.string.navigate_by_indexes to Icons.Rounded.Toc),
+            NavigateBy.INDEX to (R.string.navigate_by_indexes to Icons.AutoMirrored.Rounded.Toc),
             NavigateBy.SELECTION to (R.string.navigate_by_selection to Icons.Rounded.SelectAll),
             NavigateBy.RECENT to (R.string.navigate_by_recency to Icons.Rounded.History)
         )
@@ -887,14 +885,14 @@ fun NavigateBySheetContent(
                 if (isEditMode) {
                     IconButton(onClick = onUndo, enabled = canUndo) {
                         Icon(
-                            imageVector = Icons.Rounded.Undo,
+                            imageVector = Icons.AutoMirrored.Rounded.Undo,
                             contentDescription = stringResource(R.string.options_done),
                             tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
                     }
                     IconButton(onClick = onRedo, enabled = canRedo) {
                         Icon(
-                            imageVector = Icons.Rounded.Redo,
+                            imageVector = Icons.AutoMirrored.Rounded.Redo,
                             contentDescription = stringResource(R.string.options_done),
                             tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                         )
@@ -1007,6 +1005,16 @@ private fun CategoryHeaderRow(
     }
 }
 
+private fun countAllHeadings(list: List<HeadingNode>): Int {
+    var count = 0
+    fun recurse(node: HeadingNode) {
+        count++
+        node.children.forEach { recurse(it) }
+    }
+    list.forEach { recurse(it) }
+    return count
+}
+
 @Composable
 private fun HeadingTreeItem(
     node: HeadingNode,
@@ -1059,7 +1067,7 @@ private fun HeadingTreeItem(
                 )
 
                 Text(
-                    text = node.title,
+                    text = node.title.trim().removePrefix("\u200B").trim(),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1159,7 +1167,7 @@ private fun getNavigateByIcon(type: NavigateBy): ImageVector {
         NavigateBy.TABLE -> Icons.Rounded.TableChart
         NavigateBy.IMAGE -> Icons.Rounded.Image
         NavigateBy.BOOKMARK -> Icons.Rounded.Bookmark
-        NavigateBy.COMMENT -> Icons.Rounded.Comment
+        NavigateBy.COMMENT -> Icons.AutoMirrored.Rounded.Comment
         NavigateBy.SECTION -> Icons.Rounded.ViewAgenda
         NavigateBy.FRAME -> Icons.Rounded.CropFree
         NavigateBy.FIELD -> Icons.Rounded.TextFields
@@ -1168,7 +1176,7 @@ private fun getNavigateByIcon(type: NavigateBy): ImageVector {
         NavigateBy.DRAWING, NavigateBy.SHAPE -> Icons.Rounded.Category
         NavigateBy.PAGE -> Icons.Rounded.Description
         NavigateBy.REMINDER -> Icons.Rounded.Alarm
-        NavigateBy.INDEX -> Icons.Rounded.Toc
+        NavigateBy.INDEX -> Icons.AutoMirrored.Rounded.Toc
         NavigateBy.SELECTION -> Icons.Rounded.SelectAll
         NavigateBy.RECENT -> Icons.Rounded.History
     }

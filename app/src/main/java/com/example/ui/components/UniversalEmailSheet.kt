@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -157,7 +159,7 @@ fun UniversalEmailSheet(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
                         text = { Text("Email & Share") },
-                        icon = { Icon(Icons.Rounded.Send, contentDescription = null) }
+                        icon = { Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null) }
                     )
                     Tab(
                         selected = selectedTab == 1,
@@ -541,7 +543,7 @@ private fun EmailAndShareTab(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Rounded.Chat, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Rounded.Chat, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Direct Chat App")
                     }

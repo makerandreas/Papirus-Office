@@ -410,7 +410,7 @@ fun InkyViewSettingsSubpage(
                                 readOnly = true,
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = zoomDropdownExpanded) },
                                 modifier = Modifier
-                                    .menuAnchor()
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                     .fillMaxWidth()
                                     .testTag("dropdown_zoom_options")
                             )

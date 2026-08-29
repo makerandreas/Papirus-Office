@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -71,6 +72,17 @@ object RecentFilesTracker {
         val size: String
     )
 
+    fun normalizeModule(type: String, fileName: String): String {
+        val lowerName = fileName.lowercase()
+        return when {
+            type == "Inky" || type == "Cellina" || type == "Slidia" || type == "Pagella" -> type
+            lowerName.endsWith(".ods") || lowerName.endsWith(".ots") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".csv") -> "Cellina"
+            lowerName.endsWith(".odp") || lowerName.endsWith(".otp") || lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> "Slidia"
+            lowerName.endsWith(".pdf") -> "Pagella"
+            else -> "Inky"
+        }
+    }
+
     fun getRecents(context: Context): List<RecentFile> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonString = prefs.getString(KEY_RECENTS, "[]") ?: "[]"
@@ -82,7 +94,7 @@ object RecentFilesTracker {
                 val path = obj.getString("path")
                 val name = obj.getString("name")
                 val lastOpened = obj.getLong("lastOpened")
-                val fileType = obj.getString("fileType")
+                val fileType = normalizeModule(obj.getString("fileType"), name)
                 val size = obj.getString("size")
                 list.add(RecentFile(path, name, lastOpened, fileType, size))
             }
@@ -111,7 +123,7 @@ object RecentFilesTracker {
             path = path,
             name = file.name,
             lastOpened = System.currentTimeMillis(),
-            fileType = fileType,
+            fileType = normalizeModule(fileType, file.name),
             size = sizeStr
         ))
 
@@ -938,7 +950,7 @@ fun HomeDashboard(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            leadingIcon = { Icon(Icons.Rounded.MenuBook, contentDescription = null) },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null) },
                                             text = { Text(stringResource(R.string.menu_export_epub)) },
                                             onClick = {
                                                 showItemMenu = false

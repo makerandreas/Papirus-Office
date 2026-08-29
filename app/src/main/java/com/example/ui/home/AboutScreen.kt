@@ -160,7 +160,7 @@ fun AboutScreen(
                             value = BuildConfig.APP_VERSION_NAME,
                             icon = Icons.Rounded.PhoneAndroid
                         )
-                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         VersionRow(
                             label = stringResource(R.string.aboutEngineVersion),
                             value = BuildConfig.PAPIRUS_ENGINE_VERSION,

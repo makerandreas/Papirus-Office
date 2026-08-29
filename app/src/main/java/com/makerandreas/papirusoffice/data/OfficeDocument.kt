@@ -316,8 +316,9 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                 )
             }
             is OfficeDocumentElement.Heading -> {
-                OfficeParagraph(
+                OfficeHeading(
                     text = elem.text,
+                    level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
                     runs = listOf(OfficeTextRun(text = elem.text, isBold = true))
                 )
@@ -363,6 +364,9 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     widthDp = elem.widthDp,
                     heightDp = elem.heightDp
                 )
+            }
+            is OfficeDocumentElement.PageBreak -> {
+                OfficePageBreak
             }
         }
     }

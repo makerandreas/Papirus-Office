@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -117,7 +118,7 @@ fun PapirusOfficeOptionsScreen(
             OptionItem("lang_dict", "Installing language dictionaries", "Download or import offline language dictionaries", Icons.Rounded.Download),
             OptionItem("search_japanese", "Searching in Japanese", "Kanji, Kana, and Japanese search matching rules", Icons.Rounded.Translate),
             OptionItem("asian_layout", "Asian layout", "Typography, line breaking, and spacing for Asian scripts", Icons.Rounded.FormatSize),
-            OptionItem("ctl_layout", "Complex Text Layout", "Bidirectional text, Arabic, and Indic typography rules", Icons.Rounded.FormatAlignRight),
+            OptionItem("ctl_layout", "Complex Text Layout", "Bidirectional text, Arabic, and Indic typography rules", Icons.AutoMirrored.Rounded.FormatAlignRight),
             OptionItem("lang_tool_server", "Language tool server", "Grammar checker API server connection", Icons.Rounded.Dns),
             OptionItem("english_sentence", "English sentence checking", "Punctuation, spacing, and style checker rules", Icons.Rounded.CheckCircle)
         )
@@ -129,7 +130,7 @@ fun PapirusOfficeOptionsScreen(
         items = listOf(
             OptionItem("inky_general", "General", "Inky Writer editor preferences and default view mode", Icons.Rounded.EditNote),
             OptionItem("inky_view", "View", "Rulers, boundaries, non-printing characters, and zoom", Icons.Rounded.Preview),
-            OptionItem("inky_formatting", "Formatting Aids", "Tab stops, paragraph spacing indicators, and hidden text", Icons.Rounded.FormatAlignLeft),
+            OptionItem("inky_formatting", "Formatting Aids", "Tab stops, paragraph spacing indicators, and hidden text", Icons.AutoMirrored.Rounded.FormatAlignLeft),
             OptionItem("inky_grid", "Grid", "Snap to grid, page alignment grid spacing", Icons.Rounded.GridOn),
             OptionItem("inky_basic_fonts", "Basic Fonts", "Default fonts for Western, Asian, and CTL documents", Icons.Rounded.Title),
             OptionItem("inky_print", "Print", "Print hidden text, page background, and annotations", Icons.Rounded.Print),
@@ -151,7 +152,7 @@ fun PapirusOfficeOptionsScreen(
             OptionItem("cellina_view", "View", "Grid lines, formula bar, column/row headers", Icons.Rounded.GridView),
             OptionItem("cellina_calculate", "Calculate", "Iterative references, precision, and date baseline", Icons.Rounded.Calculate),
             OptionItem("cellina_formula", "Formula", "Formula syntax (Calc A1 / Excel A1), capitalization", Icons.Rounded.Functions),
-            OptionItem("cellina_sort_lists", "Sort Lists", "Custom sort lists (Days, Months, Custom series)", Icons.Rounded.Sort),
+            OptionItem("cellina_sort_lists", "Sort Lists", "Custom sort lists (Days, Months, Custom series)", Icons.AutoMirrored.Rounded.Sort),
             OptionItem("cellina_changes", "Changes", "Track sheet modifications and cell edit history", Icons.Rounded.Edit),
             OptionItem("cellina_compatibility", "Compatibility", "Key bindings and formula evaluation mode", Icons.Rounded.SwapHoriz),
             OptionItem("cellina_grid", "Grid", "Grid line color and snap options", Icons.Rounded.Grid4x4),
@@ -316,7 +317,7 @@ fun PapirusOfficeOptionsScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.options_help)) },
-                                    leadingIcon = { Icon(Icons.Rounded.HelpOutline, contentDescription = null) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null) },
                                     onClick = {
                                         showMoreMenu = false
                                         showHelpDialog = true
@@ -514,7 +515,7 @@ fun PapirusOfficeOptionsScreen(
 
         AlertDialog(
             onDismissRequest = { showHelpDialog = false },
-            icon = { Icon(Icons.Rounded.HelpOutline, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            icon = { Icon(Icons.AutoMirrored.Rounded.HelpOutline, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text(helpTitle) },
             text = {
                 Text(
