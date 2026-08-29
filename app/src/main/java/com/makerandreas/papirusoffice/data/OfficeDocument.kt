@@ -54,6 +54,7 @@ data class DocumentBody(
 
 // Legacy Compatibility wrapper mapping to OfficeDocElement
 @Deprecated("Use direct implementors of OfficeElement (e.g. OfficeParagraph, OfficeTable) for modern flows.")
+@Suppress("DEPRECATION")
 sealed class OfficeDocElement : OfficeElement {
     data class ParagraphElement(val paragraph: OfficeParagraph) : OfficeDocElement()
     data class TableElement(val table: OfficeTable) : OfficeDocElement()
@@ -64,6 +65,7 @@ sealed class OfficeDocElement : OfficeElement {
     data class FieldElement(val field: OfficeField) : OfficeDocElement()
 }
 
+@Suppress("DEPRECATION")
 fun OfficeElement.extractParagraph(): OfficeParagraph? {
     return when (this) {
         is OfficeParagraph -> this
@@ -72,6 +74,7 @@ fun OfficeElement.extractParagraph(): OfficeParagraph? {
     }
 }
 
+@Suppress("DEPRECATION")
 fun OfficeElement.replaceParagraph(newPara: OfficeParagraph): OfficeElement {
     return when (this) {
         is OfficeDocElement.ParagraphElement -> OfficeDocElement.ParagraphElement(newPara)
@@ -296,80 +299,69 @@ data class OfficeFile(
 // LAYER 8: Rich Adapter (OfficeParsedDocument -> OfficeDocument)
 // ==========================================
 fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
-    val docElements = this.elements.map { elem ->
+    val docElements: List<OfficeElement> = this.elements.map { elem ->
         when (elem) {
             is OfficeDocumentElement.Paragraph -> {
-                // Return as standard OfficeDocElement legacy wrapper to guarantee compatibility with existing screens
-                OfficeDocElement.ParagraphElement(
-                    OfficeParagraph(
-                        text = elem.text,
-                        styleName = elem.styleName,
-                        runs = elem.runs.map { run ->
-                            OfficeTextRun(
-                                text = run.text,
-                                isBold = run.isBold,
-                                isItalic = run.isItalic,
-                                isUnderline = run.isUnderline
-                            )
-                        }
-                    )
+                OfficeParagraph(
+                    text = elem.text,
+                    styleName = elem.styleName,
+                    runs = elem.runs.map { run ->
+                        OfficeTextRun(
+                            text = run.text,
+                            isBold = run.isBold,
+                            isItalic = run.isItalic,
+                            isUnderline = run.isUnderline
+                        )
+                    }
                 )
             }
             is OfficeDocumentElement.Heading -> {
-                OfficeDocElement.ParagraphElement(
-                    OfficeParagraph(
-                        text = elem.text,
-                        styleName = elem.styleName ?: "Heading ${elem.level}",
-                        runs = listOf(OfficeTextRun(text = elem.text, isBold = true))
-                    )
+                OfficeParagraph(
+                    text = elem.text,
+                    styleName = elem.styleName ?: "Heading ${elem.level}",
+                    runs = listOf(OfficeTextRun(text = elem.text, isBold = true))
                 )
             }
             is OfficeDocumentElement.ListItem -> {
-                OfficeDocElement.ParagraphElement(
-                    OfficeParagraph(
-                        text = elem.bullet + elem.text,
-                        runs = listOf(OfficeTextRun(text = elem.bullet + elem.text))
-                    )
+                OfficeParagraph(
+                    text = elem.bullet + elem.text,
+                    runs = listOf(OfficeTextRun(text = elem.bullet + elem.text))
                 )
             }
             is OfficeDocumentElement.Table -> {
-                OfficeDocElement.TableElement(
-                    OfficeTable(
-                        numColumns = elem.numColumns,
-                        rows = elem.rows.map { row ->
-                            OfficeTableRow(
-                                cells = row.cells.map { cell ->
-                                    OfficeTableCell(
-                                        text = cell.text,
-                                        paragraphs = cell.paragraphs.map { cellPara ->
-                                            OfficeParagraph(
-                                                text = cellPara.text,
-                                                styleName = cellPara.styleName,
-                                                runs = cellPara.runs.map { cellRun ->
-                                                    OfficeTextRun(
-                                                        text = cellRun.text,
-                                                        isBold = cellRun.isBold,
-                                                        isItalic = cellRun.isItalic,
-                                                        isUnderline = cellRun.isUnderline
-                                                    )
-                                                }
-                                            )
-                                        }
-                                    )
-                                }
-                            )
-                        }
-                    )
+                OfficeTable(
+                    numColumns = elem.numColumns,
+                    rows = elem.rows.map { row ->
+                        OfficeTableRow(
+                            cells = row.cells.map { cell ->
+                                OfficeTableCell(
+                                    text = cell.text,
+                                    paragraphs = cell.paragraphs.map { cellPara ->
+                                        OfficeParagraph(
+                                            text = cellPara.text,
+                                            styleName = cellPara.styleName,
+                                            runs = cellPara.runs.map { cellRun ->
+                                                OfficeTextRun(
+                                                    text = cellRun.text,
+                                                    isBold = cellRun.isBold,
+                                                    isItalic = cellRun.isItalic,
+                                                    isUnderline = cellRun.isUnderline
+                                                )
+                                            }
+                                        )
+                                    }
+                                )
+                            }
+                        )
+                    }
                 )
             }
             is OfficeDocumentElement.ImageElement -> {
-                OfficeDocElement.ImageElement(
-                    OfficeImage(
-                        imagePath = elem.imagePath,
-                        imageFile = elem.imageFile,
-                        widthDp = elem.widthDp,
-                        heightDp = elem.heightDp
-                    )
+                OfficeImage(
+                    imagePath = elem.imagePath,
+                    imageFile = elem.imageFile,
+                    widthDp = elem.widthDp,
+                    heightDp = elem.heightDp
                 )
             }
         }

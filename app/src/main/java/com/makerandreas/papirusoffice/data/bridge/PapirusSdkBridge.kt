@@ -82,17 +82,14 @@ class PapirusSdkBridge private constructor() {
      */
     fun performTextReplacement(searchString: String, replaceString: String): Boolean {
         val doc = _activeTextDocument.value ?: return false
-        if (doc is XReplaceable) {
-            return try {
-                // Background search & replace execution
-                Log.d(TAG, "Text replacement requested: '$searchString' -> '$replaceString'")
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "Text replacement failed: ${e.message}")
-                false
-            }
+        return try {
+            // Background search & replace execution
+            Log.d(TAG, "Text replacement requested for doc '${doc.url}': '$searchString' -> '$replaceString'")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Text replacement failed: ${e.message}")
+            false
         }
-        return false
     }
 
     /**

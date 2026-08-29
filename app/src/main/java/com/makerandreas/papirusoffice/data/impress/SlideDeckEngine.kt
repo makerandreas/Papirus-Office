@@ -70,7 +70,7 @@ class PapirusDrawPage : XDrawPage, XMasterPageTarget {
 
 class PapirusTextShape(var text: String = "", override var zOrder: Int = 0) : XText {
     override fun getString(): String = text
-    override fun setString(newText: String) { text = newText }
+    override fun setString(text: String) { this.text = text }
 }
 
 // --- SDK Utility Methods (Draw class equivalent) ---

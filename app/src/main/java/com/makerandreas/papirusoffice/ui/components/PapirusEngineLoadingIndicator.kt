@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.GridOn
 import androidx.compose.material.icons.rounded.Slideshow
-import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,7 +84,7 @@ fun PapirusEngineLoadingIndicator(
         "INKY" -> Icons.Rounded.Description
         "CELLINA" -> Icons.Rounded.GridOn
         "SLIDIA" -> Icons.Rounded.Slideshow
-        "PAGELLA" -> Icons.Rounded.Article
+        "PAGELLA" -> Icons.AutoMirrored.Rounded.Article
         else -> Icons.Rounded.AutoAwesome
     }
 

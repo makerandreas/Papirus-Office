@@ -28,7 +28,7 @@ abstract class PapirusDatabase : RoomDatabase() {
                     PapirusDatabase::class.java,
                     "papirus_office_db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

@@ -1,7 +1,6 @@
 package com.makerandreas.papirusoffice.data.undo
 
 import com.makerandreas.papirusoffice.data.DocumentBody
-import com.makerandreas.papirusoffice.data.OfficeDocElement
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OfficeImage
 import com.makerandreas.papirusoffice.data.OfficeParagraph
@@ -268,7 +267,7 @@ class InsertImageAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val safeIdx = insertIndex.coerceIn(0, elements.size)
-        elements.add(safeIdx, OfficeDocElement.ImageElement(image))
+        elements.add(safeIdx, image)
         updateDocument(doc.copy(body = DocumentBody(elements)))
     }
 }
@@ -298,7 +297,7 @@ class InsertTableAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val safeIdx = insertIndex.coerceIn(0, elements.size)
-        elements.add(safeIdx, OfficeDocElement.TableElement(table))
+        elements.add(safeIdx, table)
         updateDocument(doc.copy(body = DocumentBody(elements)))
     }
 }
@@ -318,7 +317,7 @@ class DeleteTableAction(
         val doc = getDocument()
         val elements = doc.body.elements.toMutableList()
         val safeIdx = tableIndex.coerceIn(0, elements.size)
-        elements.add(safeIdx, OfficeDocElement.TableElement(table))
+        elements.add(safeIdx, table)
         updateDocument(doc.copy(body = DocumentBody(elements)))
     }
 
@@ -391,11 +390,7 @@ class SplitParagraphAction(
         val oldPara = element?.extractParagraph()
         if (oldPara != null) {
             elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = leftText))
-            val newRight = if (element is OfficeDocElement.ParagraphElement) {
-                OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName))
-            } else {
-                OfficeParagraph(text = rightText, styleName = oldPara.styleName)
-            }
+            val newRight = OfficeParagraph(text = rightText, styleName = oldPara.styleName)
             elements.add(paragraphIndex + 1, newRight)
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }
@@ -422,11 +417,7 @@ class MergeParagraphAction(
         val targetPara = targetElem?.extractParagraph()
         if (targetPara != null) {
             elements[targetIdx] = targetElem.replaceParagraph(targetPara.copy(text = targetText))
-            val newSource = if (targetElem is OfficeDocElement.ParagraphElement) {
-                OfficeDocElement.ParagraphElement(OfficeParagraph(text = sourceText))
-            } else {
-                OfficeParagraph(text = sourceText)
-            }
+            val newSource = OfficeParagraph(text = sourceText)
             elements.add(sourceIdx, newSource)
             updateDocument(doc.copy(body = DocumentBody(elements)))
         }

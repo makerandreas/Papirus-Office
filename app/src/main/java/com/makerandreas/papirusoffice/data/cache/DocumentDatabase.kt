@@ -29,7 +29,7 @@ abstract class DocumentDatabase : RoomDatabase() {
                     DocumentDatabase::class.java,
                     "papirus_document_cache.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

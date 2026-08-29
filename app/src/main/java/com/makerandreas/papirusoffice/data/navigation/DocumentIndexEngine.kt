@@ -2,7 +2,6 @@ package com.makerandreas.papirusoffice.data.navigation
 
 import com.makerandreas.papirusoffice.data.OfficeBookmark
 import com.makerandreas.papirusoffice.data.OfficeComment
-import com.makerandreas.papirusoffice.data.OfficeDocElement
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OfficeElement
 import com.makerandreas.papirusoffice.data.OfficeField
@@ -393,32 +392,16 @@ class DocumentIndexEngine(
         doc.sections.forEach { section ->
             result.add(OfficeSection(name = section.name))
             section.elements.forEach { elem ->
-                result.add(unwrapDocElement(elem))
+                result.add(elem)
             }
         }
 
         // 2. Extract elements from main body
         doc.body.elements.forEach { elem ->
-            result.add(unwrapDocElement(elem))
+            result.add(elem)
         }
 
         return result
-    }
-
-    private fun unwrapDocElement(element: OfficeElement): OfficeElement {
-        return if (element is OfficeDocElement) {
-            when (element) {
-                is OfficeDocElement.ParagraphElement -> element.paragraph
-                is OfficeDocElement.TableElement -> element.table
-                is OfficeDocElement.ImageElement -> element.image
-                is OfficeDocElement.ShapeElement -> element.shape
-                is OfficeDocElement.BookmarkElement -> element.bookmark
-                is OfficeDocElement.HyperlinkElement -> element.hyperlink
-                is OfficeDocElement.FieldElement -> element.field
-            }
-        } else {
-            element
-        }
     }
 
     // UNO SUPPLIERS IMPLEMENTATIONS

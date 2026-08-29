@@ -96,8 +96,8 @@ class PapirusCellRange(
         return sheet.getCellByPosition(left + column, top + row)
     }
 
-    override fun getCellRangeByPosition(l: Int, t: Int, r: Int, b: Int): XCellRange {
-        return PapirusCellRange(sheet, left + l, top + t, left + r, top + b)
+    override fun getCellRangeByPosition(left: Int, top: Int, right: Int, bottom: Int): XCellRange {
+        return PapirusCellRange(sheet, this.left + left, this.top + top, this.left + right, this.top + bottom)
     }
 
     override fun getCellRangeByName(range: String): XCellRange {
@@ -399,7 +399,7 @@ class CellRangeAddress(val Sheet: Short, val StartColumn: Int, val StartRow: Int
 
 class PapirusSheetCellCursor(val sheet: PapirusSpreadsheet, var left: Int, var top: Int, var right: Int, var bottom: Int) : XSheetCellCursor, XUsedAreaCursor {
     override fun getCellByPosition(column: Int, row: Int): XCell = sheet.getCellByPosition(left + column, top + row)
-    override fun getCellRangeByPosition(l: Int, t: Int, r: Int, b: Int): XCellRange = sheet.getCellRangeByPosition(left + l, top + t, left + r, top + b)
+    override fun getCellRangeByPosition(left: Int, top: Int, right: Int, bottom: Int): XCellRange = sheet.getCellRangeByPosition(this.left + left, this.top + top, this.left + right, this.top + bottom)
     override fun getCellRangeByName(range: String): XCellRange = sheet.getCellRangeByName(range)
     
     override fun collapseToCurrentRegion() {}

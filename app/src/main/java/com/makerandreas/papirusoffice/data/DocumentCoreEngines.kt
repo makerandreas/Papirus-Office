@@ -293,11 +293,7 @@ class SplitParagraphCommand(val paragraphIndex: Int, val leftText: String, val r
         val oldPara = element?.extractParagraph()
         if (oldPara != null) {
             elements[paragraphIndex] = element.replaceParagraph(oldPara.copy(text = leftText))
-            val newRight = if (element is OfficeDocElement.ParagraphElement) {
-                OfficeDocElement.ParagraphElement(OfficeParagraph(text = rightText, styleName = oldPara.styleName))
-            } else {
-                OfficeParagraph(text = rightText, styleName = oldPara.styleName)
-            }
+            val newRight = OfficeParagraph(text = rightText, styleName = oldPara.styleName)
             elements.add(paragraphIndex + 1, newRight)
         }
         return document.copy(body = DocumentBody(elements))
@@ -308,9 +304,11 @@ class SplitParagraphCommand(val paragraphIndex: Int, val leftText: String, val r
         if (paragraphIndex in elements.indices && paragraphIndex + 1 in elements.indices) {
             val leftElement = elements[paragraphIndex]
             val rightElement = elements[paragraphIndex + 1]
-            if (leftElement is OfficeDocElement.ParagraphElement && rightElement is OfficeDocElement.ParagraphElement) {
-                val joinedText = leftElement.paragraph.text + rightElement.paragraph.text
-                elements[paragraphIndex] = OfficeDocElement.ParagraphElement(leftElement.paragraph.copy(text = joinedText))
+            val leftPara = leftElement.extractParagraph()
+            val rightPara = rightElement.extractParagraph()
+            if (leftPara != null && rightPara != null) {
+                val joinedText = leftPara.text + rightPara.text
+                elements[paragraphIndex] = leftElement.replaceParagraph(leftPara.copy(text = joinedText))
                 elements.removeAt(paragraphIndex + 1)
             }
         }
@@ -322,8 +320,9 @@ class MergeParagraphsCommand(val targetIdx: Int, val sourceIdx: Int, val targetT
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val targetElem = elements.getOrNull(targetIdx)
-        if (targetElem is OfficeDocElement.ParagraphElement) {
-            elements[targetIdx] = OfficeDocElement.ParagraphElement(targetElem.paragraph.copy(text = targetText + sourceText))
+        val targetPara = targetElem?.extractParagraph()
+        if (targetElem != null && targetPara != null) {
+            elements[targetIdx] = targetElem.replaceParagraph(targetPara.copy(text = targetText + sourceText))
             elements.removeAt(sourceIdx)
         }
         return document.copy(body = DocumentBody(elements))
@@ -332,9 +331,10 @@ class MergeParagraphsCommand(val targetIdx: Int, val sourceIdx: Int, val targetT
     override fun undo(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val targetElem = elements.getOrNull(targetIdx)
-        if (targetElem is OfficeDocElement.ParagraphElement) {
-            elements[targetIdx] = OfficeDocElement.ParagraphElement(targetElem.paragraph.copy(text = targetText))
-            elements.add(sourceIdx, OfficeDocElement.ParagraphElement(OfficeParagraph(text = sourceText)))
+        val targetPara = targetElem?.extractParagraph()
+        if (targetElem != null && targetPara != null) {
+            elements[targetIdx] = targetElem.replaceParagraph(targetPara.copy(text = targetText))
+            elements.add(sourceIdx, OfficeParagraph(text = sourceText))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -344,7 +344,7 @@ class InsertTableCommand(val insertIndex: Int, val table: OfficeTable) : Documen
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val safeIndex = insertIndex.coerceIn(0, elements.size)
-        elements.add(safeIndex, OfficeDocElement.TableElement(table))
+        elements.add(safeIndex, table)
         return document.copy(body = DocumentBody(elements))
     }
 
@@ -362,7 +362,7 @@ class InsertImageCommand(val insertIndex: Int, val image: OfficeImage) : Documen
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val safeIndex = insertIndex.coerceIn(0, elements.size)
-        elements.add(safeIndex, OfficeDocElement.ImageElement(image))
+        elements.add(safeIndex, image)
         return document.copy(body = DocumentBody(elements))
     }
 
@@ -380,8 +380,9 @@ class InsertBookmarkCommand(val paragraphIndex: Int, val bookmarkName: String) :
     override fun execute(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(element.paragraph.copy(bookmark = bookmarkName))
+        val para = element?.extractParagraph()
+        if (element != null && para != null) {
+            elements[paragraphIndex] = element.replaceParagraph(para.copy(bookmark = bookmarkName))
         }
         return document.copy(body = DocumentBody(elements))
     }
@@ -389,8 +390,9 @@ class InsertBookmarkCommand(val paragraphIndex: Int, val bookmarkName: String) :
     override fun undo(document: OfficeDocument): OfficeDocument {
         val elements = document.body.elements.toMutableList()
         val element = elements.getOrNull(paragraphIndex)
-        if (element is OfficeDocElement.ParagraphElement) {
-            elements[paragraphIndex] = OfficeDocElement.ParagraphElement(element.paragraph.copy(bookmark = null))
+        val para = element?.extractParagraph()
+        if (element != null && para != null) {
+            elements[paragraphIndex] = element.replaceParagraph(para.copy(bookmark = null))
         }
         return document.copy(body = DocumentBody(elements))
     }
