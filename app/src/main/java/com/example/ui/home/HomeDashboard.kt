@@ -260,161 +260,144 @@ fun HomeDashboard(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.width(320.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                drawerTonalElevation = 2.dp
+                drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
+                drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                drawerTonalElevation = 0.dp,
+                modifier = Modifier.width(360.dp)
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 24.dp)
+                        .fillMaxHeight()
+                        .padding(12.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    // Main Section Header
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .padding(horizontal = 16.dp, vertical = 18.dp),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_papirus_foreground),
-                                contentDescription = "Papirus Office App Icon",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "Papirus Office",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Productivity Suite",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        Text(
+                            text = "Papirus Office",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = 28.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                }
 
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        text = "FEATURES & TOOLS",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
+                    // Settings
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.Print, contentDescription = null) },
-                        label = { Text("Printing & SDK Examples") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            showUniversalPrintSheet = true
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
                         },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.Email, contentDescription = null) },
-                        label = { Text("Emailing & SDK Examples") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            showUniversalEmailSheet = true
+                        label = {
+                            Text(
+                                text = "Settings",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 20.sp,
+                                    letterSpacing = 0.1.sp
+                                )
+                            )
                         },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
-                        label = { Text("Clipboard & SDK Examples") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            showUniversalClipboardSheet = true
-                        },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.Code, contentDescription = null) },
-                        label = { Text("XML Importing & SDK Examples") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            showUniversalXmlImportSheet = true
-                        },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.FolderZip, contentDescription = null) },
-                        label = { Text("Simple ODF & Package Examples") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            showUniversalOdfSheet = true
-                        },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp))
-
-                    Text(
-                        text = "APPLICATION",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.BugReport, contentDescription = null) },
-                        label = { Text("Crash Log") },
-                        selected = false,
-                        onClick = {
-                            coroutineScope.launch { drawerState.close() }
-                            onNavigateToModule("crash_logs")
-                        },
-                        modifier = Modifier.padding(vertical = 2.dp)
-                    )
-
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                        label = { Text("Papirus Office Options") },
                         selected = false,
                         onClick = {
                             coroutineScope.launch { drawerState.close() }
                             showOptionsDialog = true
                         },
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedContainerColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(100.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .testTag("drawer_item_settings")
                     )
 
+                    // Crash Logs
                     NavigationDrawerItem(
-                        icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-                        label = { Text("About") },
+                        icon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.Comment,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = "Crash Logs",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 20.sp,
+                                    letterSpacing = 0.1.sp
+                                )
+                            )
+                        },
+                        selected = false,
+                        onClick = {
+                            coroutineScope.launch { drawerState.close() }
+                            onNavigateToModule("crash_logs")
+                        },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedContainerColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(100.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .testTag("drawer_item_crash_logs")
+                    )
+
+                    // About Papirus Office
+                    NavigationDrawerItem(
+                        icon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = {
+                            Text(
+                                text = "About Papirus Office",
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 20.sp,
+                                    letterSpacing = 0.1.sp
+                                )
+                            )
+                        },
                         selected = false,
                         onClick = {
                             coroutineScope.launch { drawerState.close() }
                             onNavigateToModule("about")
                         },
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedContainerColor = Color.Transparent,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        shape = RoundedCornerShape(100.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .testTag("drawer_item_about")
                     )
                 }
             }
