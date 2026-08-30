@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.widget.Toast
 import kotlinx.coroutines.launch
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -256,8 +257,16 @@ fun HomeDashboard(
         }
     }
 
+    // Close drawer on system back button press if open
+    BackHandler(enabled = drawerState.isOpen) {
+        coroutineScope.launch {
+            drawerState.close()
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = !isSearchActive,
         drawerContent = {
             ModalDrawerSheet(
                 drawerShape = RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp),
