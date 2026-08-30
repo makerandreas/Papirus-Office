@@ -327,8 +327,7 @@ fun AboutIllustrationSection() {
         ) {
             // Inky - Top
             OrbitingIcon(
-                icon = Icons.Rounded.Description,
-                color = BrandInky,
+                drawableRes = R.drawable.ic_inky_logo,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(y = (-18).dp)
@@ -337,8 +336,7 @@ fun AboutIllustrationSection() {
 
             // Cellina - Right
             OrbitingIcon(
-                icon = Icons.Rounded.GridView,
-                color = BrandCellina,
+                drawableRes = R.drawable.ic_cellina_logo,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .offset(x = 18.dp)
@@ -347,8 +345,7 @@ fun AboutIllustrationSection() {
 
             // Slidia - Bottom
             OrbitingIcon(
-                icon = Icons.Rounded.Slideshow,
-                color = BrandSlidia,
+                drawableRes = R.drawable.ic_slidia_logo,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = 18.dp)
@@ -357,8 +354,7 @@ fun AboutIllustrationSection() {
 
             // Pagella - Left
             OrbitingIcon(
-                icon = Icons.Rounded.PictureAsPdf,
-                color = BrandPagella,
+                drawableRes = R.drawable.ic_pagella_logo,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .offset(x = (-18).dp)
@@ -409,24 +405,14 @@ fun AboutIllustrationSection() {
 
 @Composable
 fun OrbitingIcon(
-    icon: ImageVector,
-    color: Color,
+    drawableRes: Int,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .size(40.dp)
-            .background(color.copy(alpha = 0.15f), CircleShape)
-            .border(1.5.dp, color.copy(alpha = 0.6f), CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(20.dp)
-        )
-    }
+    Image(
+        painter = painterResource(id = drawableRes),
+        contentDescription = null,
+        modifier = modifier.size(38.dp)
+    )
 }
 
 @Composable

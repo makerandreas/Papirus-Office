@@ -874,22 +874,19 @@ fun HomeDashboard(
                                 modifier = Modifier.padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val (iconColor, bgIconColor, charSymbol) = when (file.fileType) {
-                                    "Inky" -> Triple(BrandInky, BrandInky.copy(alpha = 0.12f), "W")
-                                    "Cellina" -> Triple(BrandCellina, BrandCellina.copy(alpha = 0.12f), "S")
-                                    "Slidia" -> Triple(BrandSlidia, BrandSlidia.copy(alpha = 0.12f), "P")
-                                    "Pagella" -> Triple(BrandPagella, BrandPagella.copy(alpha = 0.12f), "D")
-                                    else -> Triple(Color.Gray, Color.LightGray, "F")
+                                val iconRes = when (file.fileType) {
+                                    "Inky" -> R.drawable.ic_inky_logo
+                                    "Cellina" -> R.drawable.ic_cellina_logo
+                                    "Slidia" -> R.drawable.ic_slidia_logo
+                                    "Pagella" -> R.drawable.ic_pagella_logo
+                                    else -> R.drawable.ic_papirus_logo
                                 }
 
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(bgIconColor, shape = RoundedCornerShape(10.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(charSymbol, fontWeight = FontWeight.ExtraBold, color = iconColor, fontSize = 16.sp)
-                                }
+                                Image(
+                                    painter = painterResource(id = iconRes),
+                                    contentDescription = file.fileType,
+                                    modifier = Modifier.size(44.dp)
+                                )
 
                                 Spacer(modifier = Modifier.width(14.dp))
 

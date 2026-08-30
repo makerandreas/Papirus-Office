@@ -2,16 +2,11 @@ package com.makerandreas.papirusoffice.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Article
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.GridOn
-import androidx.compose.material.icons.rounded.Slideshow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,7 +22,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -80,12 +75,12 @@ fun PapirusEngineLoadingIndicator(
         label = "GlowAlpha"
     )
 
-    val moduleIcon: ImageVector = when (moduleName.uppercase()) {
-        "INKY" -> Icons.Rounded.Description
-        "CELLINA" -> Icons.Rounded.GridOn
-        "SLIDIA" -> Icons.Rounded.Slideshow
-        "PAGELLA" -> Icons.AutoMirrored.Rounded.Article
-        else -> Icons.Rounded.AutoAwesome
+    val moduleDrawableRes: Int = when (moduleName.uppercase()) {
+        "INKY" -> com.example.R.drawable.ic_inky_logo
+        "CELLINA" -> com.example.R.drawable.ic_cellina_logo
+        "SLIDIA" -> com.example.R.drawable.ic_slidia_logo
+        "PAGELLA" -> com.example.R.drawable.ic_pagella_logo
+        else -> com.example.R.drawable.ic_papirus_logo
     }
 
     Surface(
@@ -153,13 +148,12 @@ fun PapirusEngineLoadingIndicator(
                 }
 
                 // Central Module Icon
-                Icon(
-                    imageVector = moduleIcon,
+                Image(
+                    painter = painterResource(id = moduleDrawableRes),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(36.dp)
-                        .scale(pulseScale),
-                    tint = moduleColor
+                        .size(44.dp)
+                        .scale(pulseScale)
                 )
             }
 

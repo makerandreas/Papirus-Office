@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -240,19 +242,11 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     modifier = Modifier.padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .background(BrandInky.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Description,
-                            contentDescription = null,
-                            tint = BrandInky,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_inky_logo),
+                        contentDescription = "Inky Document",
+                        modifier = Modifier.size(52.dp)
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 
@@ -295,19 +289,11 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     modifier = Modifier.padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .background(BrandCellina.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.GridView,
-                            contentDescription = null,
-                            tint = BrandCellina,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_cellina_logo),
+                        contentDescription = "Cellina Spreadsheet",
+                        modifier = Modifier.size(52.dp)
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 
@@ -350,19 +336,11 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                     modifier = Modifier.padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .background(BrandSlidia.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Slideshow,
-                            contentDescription = null,
-                            tint = BrandSlidia,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_slidia_logo),
+                        contentDescription = "Slidia Presentation",
+                        modifier = Modifier.size(52.dp)
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 
@@ -376,6 +354,53 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.slidia_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        // Option 4: Pagella PDF Document
+        item {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onNavigateToModule("Pagella") }
+                    .testTag("item_new_pagella")
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_pagella_logo),
+                        contentDescription = "Pagella PDF Document",
+                        modifier = Modifier.size(52.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Pagella Document",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "PDF viewer and document annotation module",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
