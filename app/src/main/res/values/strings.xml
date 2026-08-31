@@ -35,6 +35,12 @@
     <string name="filter_pagella">Pagella PDF</string>
     <string name="no_recent_documents_title">No Recent Documents</string>
     <string name="no_recent_documents_desc">Documents that have been opened or saved will appear here.</string>
+    <string name="no_recent_spreadsheets_title">No Recent Spreadsheets</string>
+    <string name="no_recent_spreadsheets_desc">Spreadsheets that have been opened or saved will appear here.</string>
+    <string name="no_recent_presentations_title">No Recent Presentations</string>
+    <string name="no_recent_presentations_desc">Presentations that have been opened or saved will appear here.</string>
+    <string name="no_recent_pdfs_title">No Recent PDFs</string>
+    <string name="no_recent_pdfs_desc">PDFs that have been opened or saved will appear here.</string>
     <string name="recent_documents_header">RECENT DOCUMENTS</string>
     <string name="opening_file">Opening %1$s...</string>
 

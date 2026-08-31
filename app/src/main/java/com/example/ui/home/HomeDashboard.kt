@@ -783,6 +783,20 @@ fun HomeDashboard(
             }
 
             if (filteredFiles.isEmpty()) {
+                val emptyTitle = when (selectedFilter) {
+                    "Cellina Spreadsheets" -> stringResource(R.string.no_recent_spreadsheets_title)
+                    "Slidia Presentations" -> stringResource(R.string.no_recent_presentations_title)
+                    "Pagella PDF" -> stringResource(R.string.no_recent_pdfs_title)
+                    else -> stringResource(R.string.no_recent_documents_title)
+                }
+
+                val emptyDesc = when (selectedFilter) {
+                    "Cellina Spreadsheets" -> stringResource(R.string.no_recent_spreadsheets_desc)
+                    "Slidia Presentations" -> stringResource(R.string.no_recent_presentations_desc)
+                    "Pagella PDF" -> stringResource(R.string.no_recent_pdfs_desc)
+                    else -> stringResource(R.string.no_recent_documents_desc)
+                }
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -796,13 +810,14 @@ fun HomeDashboard(
                         modifier = Modifier.fillMaxWidth(0.9f)
                     ) {
                         RecentsEmptyStateIllustration(
+                            filter = selectedFilter,
                             modifier = Modifier.size(140.dp)
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
                         
                         Text(
-                            text = stringResource(R.string.no_recent_documents_title),
+                            text = emptyTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp,
@@ -813,7 +828,7 @@ fun HomeDashboard(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = stringResource(R.string.no_recent_documents_desc),
+                            text = emptyDesc,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Medium,
                             fontSize = 12.sp,
@@ -831,23 +846,38 @@ fun HomeDashboard(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.recent_documents_header),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
                     items(filteredFiles) { file ->
                         var showItemMenu by remember { mutableStateOf(false) }
 
+                        val displayNameWithSuffix = remember(file.name, file.fileType) {
+                            if (file.name.contains(".")) {
+                                file.name
+                            } else {
+                                when (file.fileType) {
+                                    "Inky" -> "${file.name}.docx"
+                                    "Cellina" -> "${file.name}.ods"
+                                    "Slidia" -> "${file.name}.odp"
+                                    "Pagella" -> "${file.name}.pdf"
+                                    else -> file.name
+                                }
+                            }
+                        }
+
+                        val formattedDateTime = remember(file.lastOpened) {
+                            try {
+                                val date = Date(file.lastOpened)
+                                val dFormat = android.text.format.DateFormat.getMediumDateFormat(context)
+                                val tFormat = android.text.format.DateFormat.getTimeFormat(context)
+                                "${dFormat.format(date)}, ${tFormat.format(date)}"
+                            } catch (e: Exception) {
+                                SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastOpened))
+                            }
+                        }
+
                         Card(
                             shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
@@ -857,58 +887,97 @@ fun HomeDashboard(
                                         com.example.MainActivity.openedFilePath = file.path
                                         com.example.MainActivity.openedFileType = file.fileType
                                         onNavigateToModule(file.fileType)
-                                        val toastMsg = context.getString(R.string.opening_file, file.name)
+                                        val toastMsg = context.getString(R.string.opening_file, displayNameWithSuffix)
                                         Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 }
+                                .testTag("recent_file_item_${file.name.lowercase().replace(" ", "_").replace(".", "_")}")
                         ) {
                             Row(
-                                modifier = Modifier.padding(14.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                val iconRes = when (file.fileType) {
-                                    "Inky" -> R.drawable.ic_inky_logo
-                                    "Cellina" -> R.drawable.ic_cellina_logo
-                                    "Slidia" -> R.drawable.ic_slidia_logo
-                                    "Pagella" -> R.drawable.ic_pagella_logo
+                                val lowerName = file.name.lowercase()
+                                val iconRes = when {
+                                    file.fileType == "Inky" || lowerName.endsWith(".odt") || lowerName.endsWith(".docx") || lowerName.endsWith(".doc") || lowerName.endsWith(".txt") || lowerName.endsWith(".rtf") -> R.drawable.ic_inky_logo
+                                    file.fileType == "Cellina" || lowerName.endsWith(".ods") || lowerName.endsWith(".ots") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".csv") -> R.drawable.ic_cellina_logo
+                                    file.fileType == "Slidia" || lowerName.endsWith(".odp") || lowerName.endsWith(".otp") || lowerName.endsWith(".pptx") || lowerName.endsWith(".ppt") -> R.drawable.ic_slidia_logo
+                                    file.fileType == "Pagella" || lowerName.endsWith(".pdf") -> R.drawable.ic_pagella_logo
                                     else -> R.drawable.ic_papirus_logo
                                 }
 
                                 Image(
                                     painter = painterResource(id = iconRes),
-                                    contentDescription = file.fileType,
-                                    modifier = Modifier.size(44.dp)
+                                    contentDescription = "${file.fileType} Document",
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                    modifier = Modifier.size(width = 32.dp, height = 40.dp)
                                 )
 
-                                Spacer(modifier = Modifier.width(14.dp))
-
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
                                     Text(
-                                        text = file.name,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
+                                        text = displayNameWithSuffix,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontSize = 16.sp,
+                                            lineHeight = 24.sp,
+                                            letterSpacing = 0.5.sp,
+                                            fontWeight = FontWeight.Normal
+                                        ),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Opened: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(file.lastOpened))} • ${file.size}",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = formattedDateTime,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 14.sp,
+                                            lineHeight = 20.sp,
+                                            letterSpacing = 0.25.sp,
+                                            fontWeight = FontWeight.Normal
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
 
-                                Box {
+                                Box(contentAlignment = Alignment.Center) {
                                     IconButton(
-                                        onClick = { showItemMenu = true }
+                                        onClick = { showItemMenu = true },
+                                        modifier = Modifier.size(48.dp)
                                     ) {
-                                        Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                        Icon(
+                                            imageVector = Icons.Rounded.MoreVert,
+                                            contentDescription = "More Options for ${file.name}",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(24.dp)
+                                        )
                                     }
 
                                     DropdownMenu(
                                         expanded = showItemMenu,
                                         onDismissRequest = { showItemMenu = false }
                                     ) {
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Rounded.OpenInNew, contentDescription = null) },
+                                            text = { Text("Open") },
+                                            onClick = {
+                                                showItemMenu = false
+                                                if (!File(file.path).exists()) {
+                                                    showFileNotFoundDialog = true
+                                                } else {
+                                                    com.example.MainActivity.openedFilePath = file.path
+                                                    com.example.MainActivity.openedFileType = file.fileType
+                                                    onNavigateToModule(file.fileType)
+                                                }
+                                            }
+                                        )
                                         DropdownMenuItem(
                                             leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                                             text = { Text(stringResource(R.string.menu_share)) },
@@ -919,8 +988,8 @@ fun HomeDashboard(
                                                 } else {
                                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                         type = "text/plain"
-                                                        putExtra(Intent.EXTRA_SUBJECT, file.name)
-                                                        putExtra(Intent.EXTRA_TEXT, "Document: ${file.name}\nPath: ${file.path}")
+                                                        putExtra(Intent.EXTRA_SUBJECT, displayNameWithSuffix)
+                                                        putExtra(Intent.EXTRA_TEXT, "Document: $displayNameWithSuffix\nPath: ${file.path}")
                                                     }
                                                     context.startActivity(Intent.createChooser(shareIntent, "Share Document"))
                                                 }
@@ -934,22 +1003,24 @@ fun HomeDashboard(
                                                 if (!File(file.path).exists()) {
                                                     showFileNotFoundDialog = true
                                                 } else {
-                                                    Toast.makeText(context, "Exported ${file.name} to PDF", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, "Exported $displayNameWithSuffix to PDF", Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
-                                        DropdownMenuItem(
-                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null) },
-                                            text = { Text(stringResource(R.string.menu_export_epub)) },
-                                            onClick = {
-                                                showItemMenu = false
-                                                if (!File(file.path).exists()) {
-                                                    showFileNotFoundDialog = true
-                                                } else {
-                                                    Toast.makeText(context, "Exported ${file.name} to ePub", Toast.LENGTH_SHORT).show()
+                                        if (file.fileType == "Inky") {
+                                            DropdownMenuItem(
+                                                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null) },
+                                                text = { Text(stringResource(R.string.menu_export_epub)) },
+                                                onClick = {
+                                                    showItemMenu = false
+                                                    if (!File(file.path).exists()) {
+                                                        showFileNotFoundDialog = true
+                                                    } else {
+                                                        Toast.makeText(context, "Exported $displayNameWithSuffix to ePub", Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
-                                            }
-                                        )
+                                            )
+                                        }
                                         DropdownMenuItem(
                                             leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
                                             text = { Text(stringResource(R.string.menu_doc_properties)) },
@@ -984,10 +1055,16 @@ fun HomeDashboard(
 
 @Composable
 fun RecentsEmptyStateIllustration(
+    filter: String = "All",
     modifier: Modifier = Modifier
 ) {
+    val iconRes = when (filter) {
+        "Inky Documents" -> R.drawable.ic_recents_empty_inky
+        "Cellina Spreadsheets" -> R.drawable.ic_recents_empty_cellina
+        else -> R.drawable.ic_recents_empty_illustration
+    }
     Image(
-        painter = painterResource(id = R.drawable.ic_recents_empty_illustration),
+        painter = painterResource(id = iconRes),
         contentDescription = null,
         modifier = modifier
     )
