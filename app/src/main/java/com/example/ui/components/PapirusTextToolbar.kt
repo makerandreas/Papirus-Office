@@ -189,22 +189,22 @@ class PapirusTextToolbar : TextToolbar {
                                 ) {
                                     if (isEditMode) {
                                         // Editor Mode Compact
-                                        if (hasSelection && (onCutClick != null || onCut != null)) {
+                                        if (hasSelection && (onCut != null || onCutClick != null)) {
                                             FctIconButton(Icons.Default.ContentCut, stringResource(R.string.fct_cut)) {
                                                 hide()
-                                                if (onCutClick != null) onCutClick() else onCut?.invoke()
+                                                if (onCut != null) onCut?.invoke() else onCutClick?.invoke()
                                             }
                                         }
-                                        if (hasSelection && (onCopyClick != null || onCopy != null)) {
+                                        if (hasSelection && (onCopy != null || onCopyClick != null)) {
                                             FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
                                                 hide()
-                                                if (onCopyClick != null) onCopyClick() else onCopy?.invoke()
+                                                if (onCopy != null) onCopy?.invoke() else onCopyClick?.invoke()
                                             }
                                         }
-                                        if (hasClipboardContent && (onPasteClick != null || onPaste != null)) {
+                                        if (hasClipboardContent && (onPaste != null || onPasteClick != null)) {
                                             FctIconButton(Icons.Default.ContentPaste, stringResource(R.string.fct_paste)) {
                                                 hide()
-                                                if (onPasteClick != null) onPasteClick() else onPaste?.invoke()
+                                                if (onPaste != null) onPaste?.invoke() else onPasteClick?.invoke()
                                             }
                                         }
                                         if (hasSelection) {
@@ -214,19 +214,19 @@ class PapirusTextToolbar : TextToolbar {
                                             )
                                             FctIconButton(Icons.Default.Delete, "Delete") {
                                                 hide()
-                                                if (onDeleteClick != null) {
-                                                    onDeleteClick()
-                                                } else if (onDelete != null) {
+                                                if (onDelete != null) {
                                                     onDelete?.invoke()
+                                                } else if (onDeleteClick != null) {
+                                                    onDeleteClick()
                                                 } else {
                                                     onCut?.invoke()
                                                 }
                                             }
                                         }
-                                        if (onSelectAllClick != null || onSelectAll != null) {
+                                        if (onSelectAll != null || onSelectAllClick != null) {
                                             FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
                                                 hide()
-                                                if (onSelectAllClick != null) onSelectAllClick() else onSelectAll?.invoke()
+                                                if (onSelectAll != null) onSelectAll?.invoke() else onSelectAllClick?.invoke()
                                             }
                                         }
                                         FctIconButton(Icons.Default.AutoAwesome, "AI options") {
@@ -237,16 +237,17 @@ class PapirusTextToolbar : TextToolbar {
                                         }
                                     } else {
                                         // Viewer Mode Compact
-                                        if (hasSelection && (onCopyClick != null || onCopy != null)) {
+                                        val canCopy = hasSelection || onCopy != null || onCopyClick != null
+                                        if (canCopy) {
                                             FctIconButton(Icons.Default.ContentCopy, stringResource(R.string.fct_copy)) {
                                                 hide()
-                                                if (onCopyClick != null) onCopyClick() else onCopy?.invoke()
+                                                if (onCopy != null) onCopy?.invoke() else onCopyClick?.invoke()
                                             }
                                         }
-                                        if (onSelectAllClick != null || onSelectAll != null) {
+                                        if (onSelectAll != null || onSelectAllClick != null) {
                                             FctIconButton(Icons.Default.SelectAll, stringResource(R.string.fct_select_all)) {
                                                 hide()
-                                                if (onSelectAllClick != null) onSelectAllClick() else onSelectAll?.invoke()
+                                                if (onSelectAll != null) onSelectAll?.invoke() else onSelectAllClick?.invoke()
                                             }
                                         }
                                     }

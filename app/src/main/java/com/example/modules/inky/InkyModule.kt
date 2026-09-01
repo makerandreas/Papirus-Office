@@ -168,8 +168,6 @@ fun InkyModule(
         )
     }
 
-
-
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
     var showOptionsDialog by remember { mutableStateOf(false) }
@@ -282,6 +280,13 @@ fun InkyModule(
         mutableStateOf(
             androidx.compose.ui.text.input.TextFieldValue("")
         )
+    }
+
+    LaunchedEffect(isEditMode) {
+        editorMode = if (isEditMode) com.example.modules.inky.state.EditorMode.EDIT else com.example.modules.inky.state.EditorMode.VIEW
+        if (docBodyText.selection.length > 0) {
+            docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(docBodyText.selection.end.coerceIn(0, docBodyText.text.length)))
+        }
     }
 
     var lastTextRecordedValue by remember { mutableStateOf("") }
@@ -593,38 +598,19 @@ fun InkyModule(
                     )
                 )
 
-                // Scroll viewfinder
-                if (isEditMode) {
-                    if (scrollState.maxValue > 0) {
-                        val scrollRatio = targetCharIndex.toFloat() / fullDocText.length.toFloat()
-                        val targetScroll = (scrollRatio * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
-                        if (viewOptions.enableSmoothScrolling) {
-                            scrollState.animateScrollTo(targetScroll)
-                        } else {
-                            scrollState.scrollTo(targetScroll)
-                        }
-                    }
-                } else {
-                    // Multi-page Viewer Mode
-                    if (pagesList.isNotEmpty()) {
-                        var acc = 0
-                        var targetPageIdx = 0
-                        for ((pIdx, pText) in pagesList.withIndex()) {
-                            acc += pText.length
-                            if (targetCharIndex <= acc) {
-                                targetPageIdx = pIdx
-                                break
-                            }
-                        }
-                        val pageRatio = if (pagesList.size > 1) targetPageIdx.toFloat() / (pagesList.size - 1).toFloat() else 0f
-                        val pageScroll = (pageRatio * scrollState.maxValue).toInt().coerceIn(0, scrollState.maxValue)
-                        if (viewOptions.enableSmoothScrolling) {
-                            scrollState.animateScrollTo(pageScroll)
-                        } else {
-                            scrollState.scrollTo(pageScroll)
-                        }
-                    } else if (signal.targetPageIndex > 0) {
-                        documentNavigator.goToPage(signal.targetPageIndex)
+                // Scroll viewfinder: calculate viewport position with headroom so target heading is never obstructed
+                if (scrollState.maxValue > 0 && fullDocText.isNotEmpty()) {
+                    val charRatio = (targetCharIndex.toFloat() / fullDocText.length.toFloat()).coerceIn(0f, 1f)
+                    val approxViewportPx = 360f * density
+                    val totalVirtualHeight = scrollState.maxValue.toFloat() + approxViewportPx
+                    val targetY = charRatio * totalVirtualHeight
+                    val safeTopHeadroom = 36f * density
+                    val targetScroll = (targetY - safeTopHeadroom).toInt().coerceIn(0, scrollState.maxValue)
+
+                    if (viewOptions.enableSmoothScrolling) {
+                        scrollState.animateScrollTo(targetScroll)
+                    } else {
+                        scrollState.scrollTo(targetScroll)
                     }
                 }
             } else if (signal.targetPageIndex > 0) {
@@ -1417,12 +1403,11 @@ fun InkyModule(
 
     LaunchedEffect(isEditMode) {
         editorMode = if (isEditMode) com.example.modules.inky.state.EditorMode.EDIT else com.example.modules.inky.state.EditorMode.VIEW
-        if (!isEditMode) {
-            customTextToolbar.hide()
-            focusManager.clearFocus()
-            if (!docBodyText.selection.collapsed) {
-                docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
-            }
+        customTextToolbar.hide()
+        focusManager.clearFocus()
+        // Automatically deselect any selected text or objects when switching modes
+        if (!docBodyText.selection.collapsed) {
+            docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
         }
     }
 
@@ -1952,37 +1937,158 @@ fun InkyModule(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (!isEditMode) {
-                        // Multi-page Viewer Mode: Render distinct page paper sheets
-                        pagesList.forEachIndexed { pageIndex, pageContent ->
+                        // Multi-page Viewer Mode: Render distinct page paper sheets inside a single SelectionContainer
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                pagesList.forEachIndexed { pageIndex, pageContent ->
+                                    Surface(
+                                        modifier = Modifier
+                                            .width((340 * zoomScale).dp)
+                                            .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                            .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                            .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                        color = pageBgColor,
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding((20 * zoomScale).dp)
+                                        ) {
+                                            Text(
+                                                text = pageContent,
+                                                color = textPrimaryColor,
+                                                fontSize = (activeFontSize * zoomScale).sp,
+                                                fontFamily = when (activeFontFamily.lowercase()) {
+                                                    "serif", "times new roman" -> FontFamily.Serif
+                                                    "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
+                                                    "monospace", "courier" -> FontFamily.Monospace
+                                                    else -> FontFamily.Default
+                                                },
+                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                textDecoration = buildList {
+                                                    if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
+                                                    if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                                }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
+                                                textAlign = textAlignment,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .weight(1f, fill = false)
+                                            )
+                                        }
+                                    }
+                                    if (pageIndex < pagesList.size - 1) {
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Edit Mode: Render separated page paper sheets matching Viewer Mode structure
+                        if (!isWebView && pagesList.size > 1) {
+                            pagesList.forEachIndexed { pageIndex, pageContent ->
+                                Surface(
+                                    modifier = Modifier
+                                        .width((340 * zoomScale).dp)
+                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                    color = pageBgColor,
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding((20 * zoomScale).dp)
+                                    ) {
+                                        var pageTextVal by remember(pageContent) {
+                                            mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(pageContent))
+                                        }
+                                        androidx.compose.foundation.text.BasicTextField(
+                                            value = pageTextVal,
+                                            onValueChange = { newPageVal ->
+                                                pageTextVal = newPageVal
+                                                val newPages = pagesList.toMutableList()
+                                                newPages[pageIndex] = newPageVal.text
+                                                val combined = newPages.joinToString("\n\n")
+                                                if (combined != docBodyText.text) {
+                                                    isSaved = false
+                                                    docBodyText = docBodyText.copy(text = combined)
+                                                    triggerAutosave()
+                                                }
+                                            },
+                                            enabled = true,
+                                            readOnly = false,
+                                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                color = textPrimaryColor,
+                                                fontSize = (activeFontSize * zoomScale).sp,
+                                                fontFamily = when (activeFontFamily.lowercase()) {
+                                                    "serif", "times new roman" -> FontFamily.Serif
+                                                    "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
+                                                    "monospace", "courier" -> FontFamily.Monospace
+                                                    else -> FontFamily.Default
+                                                },
+                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
+                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                                                textDecoration = buildList {
+                                                    if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
+                                                    if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
+                                                }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
+                                                textAlign = textAlignment
+                                            ),
+                                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .defaultMinSize(minHeight = (440 * zoomScale).dp)
+                                                .testTag("doc_body_editor_page_$pageIndex")
+                                        )
+                                    }
+                                }
+                                if (pageIndex < pagesList.size - 1) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                }
+                            }
+                        } else {
+                            // Single sheet for Web View or single-page documents
                             Surface(
-                                modifier = Modifier
-                                    .width((340 * zoomScale).dp)
-                                    .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                                    .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
+                                modifier = if (isWebView) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp)
+                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                        .shadow(elevation = 2.dp, shape = RoundedCornerShape(4.dp))
+                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                } else {
+                                    Modifier
+                                        .width((340 * zoomScale).dp)
+                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
+                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
+                                },
                                 color = pageBgColor,
                                 shape = RoundedCornerShape(4.dp)
                             ) {
-                                Column(
+                                Box(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .padding((20 * zoomScale).dp)
                                 ) {
-                                    // Header (if document has title)
-                                    if (docTitle.isNotBlank() && pagesList.size > 1) {
-                                        Text(
-                                            text = docTitle,
-                                            fontSize = (10 * zoomScale).sp,
-                                            color = Color.Gray,
-                                            modifier = Modifier.padding(bottom = 8.dp)
-                                        )
-                                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 0.5.dp)
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                    }
-
-                                    androidx.compose.foundation.text.selection.SelectionContainer {
-                                        Text(
-                                            text = pageContent,
+                                    androidx.compose.foundation.text.BasicTextField(
+                                        value = docBodyText,
+                                        onValueChange = { newValue ->
+                                            if (newValue.text != docBodyText.text) {
+                                                isSaved = false
+                                            }
+                                            docBodyText = newValue
+                                            triggerAutosave()
+                                        },
+                                        enabled = true,
+                                        readOnly = false,
+                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
                                             color = textPrimaryColor,
                                             fontSize = (activeFontSize * zoomScale).sp,
                                             fontFamily = when (activeFontFamily.lowercase()) {
@@ -1997,84 +2103,17 @@ fun InkyModule(
                                                 if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
                                                 if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
                                             }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
-                                            textAlign = textAlignment,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .weight(1f, fill = false)
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-
-                                    // Footer with Page Number
-                                    if (pagesList.size > 1) {
-                                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), thickness = 0.5.dp)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text(
-                                            text = "Page ${pageIndex + 1} of ${pagesList.size}",
-                                            fontSize = (10 * zoomScale).sp,
-                                            color = Color.Gray,
-                                            modifier = Modifier.align(Alignment.End)
-                                        )
-                                    }
+                                            textAlign = textAlignment
+                                        ),
+                                        cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .defaultMinSize(minHeight = (440 * zoomScale).dp)
+                                            .focusRequester(focusRequester)
+                                            .onGloballyPositioned { bodyTextFieldCoordinates = it }
+                                            .testTag("doc_body_editor")
+                                    )
                                 }
-                            }
-                            if (pageIndex < pagesList.size - 1) {
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
-                        }
-                    } else {
-                        // Edit Mode: Document Paper Sheet
-                        Surface(
-                            modifier = Modifier
-                                .width((340 * zoomScale).dp)
-                                .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                                .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
-                            color = pageBgColor,
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding((20 * zoomScale).dp)
-                            ) {
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = docBodyText,
-                                    onValueChange = { newValue ->
-                                        if (newValue.text != docBodyText.text) {
-                                            isSaved = false
-                                        }
-                                        docBodyText = newValue
-                                        triggerAutosave()
-                                    },
-                                    enabled = true,
-                                    readOnly = false,
-                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                        color = textPrimaryColor,
-                                        fontSize = (activeFontSize * zoomScale).sp,
-                                        fontFamily = when (activeFontFamily.lowercase()) {
-                                            "serif", "times new roman" -> FontFamily.Serif
-                                            "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
-                                            "monospace", "courier" -> FontFamily.Monospace
-                                            else -> FontFamily.Default
-                                        },
-                                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                        fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                        textDecoration = buildList {
-                                            if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
-                                            if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
-                                        }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
-                                        textAlign = textAlignment
-                                    ),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .defaultMinSize(minHeight = (440 * zoomScale).dp)
-                                        .focusRequester(focusRequester)
-                                        .onGloballyPositioned { bodyTextFieldCoordinates = it }
-                                        .testTag("doc_body_editor")
-                                )
                             }
                         }
                     }
@@ -3975,6 +4014,10 @@ fun InkyModule(
         ) {
             FloatingActionButton(
                 onClick = {
+                    if (!docBodyText.selection.collapsed) {
+                        docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
+                    }
+                    customTextToolbar.hide()
                     isEditMode = true
                     showBottomBar = false
                     Toast.makeText(context, "Edit Mode Active", Toast.LENGTH_SHORT).show()
