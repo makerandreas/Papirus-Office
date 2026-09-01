@@ -130,8 +130,11 @@ object CrashHandlerManager {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_SUBJECT, "Papirus Office Crash Report")
                 putExtra(Intent.EXTRA_TEXT, shareText)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            val chooserIntent = Intent.createChooser(sendIntent, "Share Crash Report via")
+            val chooserIntent = Intent.createChooser(sendIntent, "Share Crash Report via").apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
             val sharePendingIntent = PendingIntent.getActivity(
                 context,
                 103,

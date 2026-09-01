@@ -187,10 +187,10 @@ fun CrashLogsScreen(
                 putExtra(Intent.EXTRA_TEXT, text)
                 putExtra(Intent.EXTRA_SUBJECT, title)
                 type = "text/plain"
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             val shareIntent = Intent.createChooser(sendIntent, title).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(shareIntent)
         } catch (e: Exception) {

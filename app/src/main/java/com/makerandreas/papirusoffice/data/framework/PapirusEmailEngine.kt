@@ -265,9 +265,12 @@ object PapirusEmailEngine {
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
                 putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, emailBody)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(intent, "Dispatch Workspace Link"))
+            val chooser = Intent.createChooser(intent, "Dispatch Workspace Link").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(chooser)
         }
 
         addLog("Workspace link dispatch completed.")
@@ -374,7 +377,7 @@ object PapirusEmailEngine {
                 type = "text/plain"
                 `package` = appPackageName
                 putExtra(Intent.EXTRA_TEXT, text)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
                 if (attachmentPath != null) {
                     val file = File(attachmentPath)

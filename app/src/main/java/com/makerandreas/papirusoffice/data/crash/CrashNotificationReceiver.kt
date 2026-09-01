@@ -89,10 +89,10 @@ class CrashNotificationReceiver : BroadcastReceiver() {
                         type = "text/plain"
                         putExtra(Intent.EXTRA_SUBJECT, "Papirus Office Crash Report")
                         putExtra(Intent.EXTRA_TEXT, "Headline: Papirus Office crashed!\nSummary: $errorSummary\n\n=== StackTrace ===\n$stackTrace")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     val chooserIntent = Intent.createChooser(shareIntent, "Share Crash Report via").apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(chooserIntent)
                 } catch (e: Exception) {

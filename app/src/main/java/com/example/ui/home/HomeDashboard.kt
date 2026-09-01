@@ -986,12 +986,27 @@ fun HomeDashboard(
                                                 if (!File(file.path).exists()) {
                                                     showFileNotFoundDialog = true
                                                 } else {
+                                                    val shareFile = File(file.path)
                                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = "text/plain"
                                                         putExtra(Intent.EXTRA_SUBJECT, displayNameWithSuffix)
                                                         putExtra(Intent.EXTRA_TEXT, "Document: $displayNameWithSuffix\nPath: ${file.path}")
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                        try {
+                                                            val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                                                                context,
+                                                                "${context.packageName}.fileprovider",
+                                                                shareFile
+                                                            )
+                                                            putExtra(Intent.EXTRA_STREAM, contentUri)
+                                                            type = "application/octet-stream"
+                                                        } catch (e: Exception) {
+                                                            type = "text/plain"
+                                                        }
                                                     }
-                                                    context.startActivity(Intent.createChooser(shareIntent, "Share Document"))
+                                                    val chooser = Intent.createChooser(shareIntent, "Share Document").apply {
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(chooser)
                                                 }
                                             }
                                         )
