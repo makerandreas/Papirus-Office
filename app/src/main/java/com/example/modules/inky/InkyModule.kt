@@ -1023,6 +1023,38 @@ fun InkyModule(
         }
     }
 
+    val savePdfLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri?.let {
+            coroutineScope.launch {
+                showSavingProgressPopup = true
+                val cleanName = if (docTitle.endsWith(".pdf", ignoreCase = true)) docTitle else "${docTitle.substringBeforeLast(".")}.pdf"
+                savingProgressDocName = cleanName
+                delay(1000)
+                var actualSuccess = false
+                try {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                        actualSuccess = InkyPdfExporter.exportToPdf(
+                            context = context,
+                            docTitle = docTitle.substringBeforeLast("."),
+                            bodyText = docBodyText.text,
+                            outputStream = outputStream
+                        )
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                showSavingProgressPopup = false
+                if (actualSuccess) {
+                    Toast.makeText(context, "Document exported as PDF successfully!", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "Failed to export PDF", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     val handleSaveCommand: () -> Unit = {
         if (isNewDocument || com.example.MainActivity.openedFilePath == null) {
             showSaveAsDialog = true
@@ -1795,6 +1827,45 @@ fun InkyModule(
                                             onClick = {
                                                 showMoreMenuInAppBar = false
                                                 Toast.makeText(context, "Exporting and sharing as PDF...", Toast.LENGTH_SHORT).show()
+                                                coroutineScope.launch {
+                                                    try {
+                                                        val cleanName = docTitle.substringBeforeLast(".").replace(" ", "_")
+                                                        val shareFile = java.io.File(context.cacheDir, "$cleanName.pdf")
+                                                        if (shareFile.exists()) shareFile.delete()
+                                                        
+                                                        val outputStream = java.io.FileOutputStream(shareFile)
+                                                        val success = InkyPdfExporter.exportToPdf(
+                                                            context = context,
+                                                            docTitle = docTitle.substringBeforeLast("."),
+                                                            bodyText = docBodyText.text,
+                                                            outputStream = outputStream
+                                                        )
+                                                        outputStream.close()
+                                                        
+                                                        if (success && shareFile.exists()) {
+                                                            val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                                                                context,
+                                                                "${context.packageName}.fileprovider",
+                                                                shareFile
+                                                            )
+                                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                                type = "application/pdf"
+                                                                putExtra(android.content.Intent.EXTRA_STREAM, contentUri)
+                                                                putExtra(android.content.Intent.EXTRA_SUBJECT, "Share PDF: $docTitle")
+                                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            val chooserIntent = android.content.Intent.createChooser(shareIntent, "Share Document via").apply {
+                                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                            }
+                                                            context.startActivity(chooserIntent)
+                                                        } else {
+                                                            Toast.makeText(context, "Failed to generate PDF for sharing", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                        Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
                                             },
                                             leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "Share as PDF") }
                                         )
@@ -3091,6 +3162,11 @@ fun InkyModule(
                                                  },
                                                  onShareDocument = {
                                                      showUniversalEmailSheet = true
+                                                 },
+                                                 onExportPdf = {
+                                                     showBottomBar = false
+                                                     val baseName = docTitle.substringBeforeLast(".")
+                                                     savePdfLauncher.launch(if (baseName.isBlank()) "Inky_Dokumen.pdf" else "$baseName.pdf")
                                                  }
                                              )
                                          }
@@ -4053,7 +4129,8 @@ private fun FileSubpage(
     onReloadDocument: () -> Unit = {},
     onDocumentProperties: () -> Unit = {},
     onPrintDocument: () -> Unit = {},
-    onShareDocument: () -> Unit = {}
+    onShareDocument: () -> Unit = {},
+    onExportPdf: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         // Grup File
@@ -4089,10 +4166,10 @@ private fun FileSubpage(
             onSaveAsDocument()
         }
         FileMenuListItem(
-            icon = Icons.Rounded.ImportExport,
-            title = "Export as..."
+            icon = Icons.Rounded.PictureAsPdf,
+            title = androidx.compose.ui.res.stringResource(R.string.menu_export_pdf)
         ) {
-            Toast.makeText(context, "Export options: PDF, EPUB, XHTML", Toast.LENGTH_SHORT).show()
+            onExportPdf()
         }
         FileMenuListItem(
             icon = Icons.Rounded.Share,
