@@ -1207,16 +1207,11 @@ fun InkyModule(
 
     LaunchedEffect(showBottomBar) {
         if (showBottomBar) {
-            if (!wasKeyboardOpenBeforeBottomSheet) {
-                wasKeyboardOpenBeforeBottomSheet = isKeyboardVisible
-            }
+            wasKeyboardOpenBeforeBottomSheet = isKeyboardVisible
             keyboardController?.hide()
+            focusManager.clearFocus(force = true)
         } else {
-            if (wasKeyboardOpenBeforeBottomSheet) {
-                focusRequester.requestFocus()
-                keyboardController?.show()
-                wasKeyboardOpenBeforeBottomSheet = false
-            }
+            wasKeyboardOpenBeforeBottomSheet = false
             // Reset subpage states when closing
             activeInkySubpage = ""
             openedFromExternalHub = false
@@ -1272,9 +1267,8 @@ fun InkyModule(
     LaunchedEffect(isKeyboardVisible) {
         if (isKeyboardVisible) {
             isControlsVisible = true
-            customTextToolbar.hide()
             if (showBottomBar) {
-                keyboardController?.hide()
+                showBottomBar = false
             } else {
                 // Restore scroll position to prevent autoscroll-up
                 scrollState.scrollTo(previousScrollBeforeKeyboard)
@@ -1282,6 +1276,12 @@ fun InkyModule(
         } else {
             isControlsVisible = true
             previousScrollBeforeKeyboard = scrollState.value
+        }
+    }
+
+    LaunchedEffect(customTextToolbar.status) {
+        if (customTextToolbar.status == androidx.compose.ui.platform.TextToolbarStatus.Shown && showBottomBar) {
+            showBottomBar = false
         }
     }
 

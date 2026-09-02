@@ -1091,8 +1091,8 @@ fun RecentsEmptyStateIllustration(
     val context = LocalContext.current
     val isDynamicEnabled = ThemeSettings.isDynamicColorEnabled(context)
 
-    // When Material You dynamic accent color is active in Papirus settings, use dynamic Material 3 Expressive primary color.
-    // Otherwise, use each module's static status accent color.
+    // When Material You dynamic accent color is active in Papirus settings, use dynamic Material 3 Expressive primary and onPrimary colors.
+    // Otherwise, use each module's static status accent color with white icons.
     val shapeColor = if (isDynamicEnabled) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -1105,6 +1105,12 @@ fun RecentsEmptyStateIllustration(
         }
     }
 
+    val iconColor = if (isDynamicEnabled) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        Color.White
+    }
+
     val (translateX, translateY, bgPathData, docPathData) = when (filter) {
         "Inky Documents" -> Quadruple(-136f, -344f, EMPTY_BG_INKY, EMPTY_DOC_INKY)
         "Cellina Spreadsheets" -> Quadruple(-136f, -344f, EMPTY_BG_CELLINA, EMPTY_DOC_CELLINA)
@@ -1113,7 +1119,7 @@ fun RecentsEmptyStateIllustration(
         else -> Quadruple(-58f, 0f, EMPTY_BG_ROSETTE, EMPTY_DOC_BASE_ILLUSTRATION)
     }
 
-    val imageVector = remember(filter, shapeColor) {
+    val imageVector = remember(filter, shapeColor, iconColor) {
         ImageVector.Builder(
             name = "recents_empty_$filter",
             defaultWidth = 140.dp,
@@ -1131,7 +1137,7 @@ fun RecentsEmptyStateIllustration(
                 )
                 addPath(
                     pathData = PathParser().parsePathString(docPathData).toNodes(),
-                    fill = SolidColor(Color.White)
+                    fill = SolidColor(iconColor)
                 )
             }
         }.build()
