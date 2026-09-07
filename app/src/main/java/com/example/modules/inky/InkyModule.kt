@@ -16,6 +16,7 @@ import com.example.ui.components.GeminiCopilotDialog
 import com.example.core.util.TemplateManager
 import com.example.ui.home.RecentFilesTracker
 import com.example.ui.home.ShortcutCard
+import com.example.ui.home.RecentsEmptyStateIllustration
 import androidx.compose.ui.res.stringResource
 import com.example.R
 
@@ -4518,8 +4519,45 @@ fun OpenDocumentDialog(
                                     else list.filter { it.name.contains(searchQuery, ignoreCase = true) }
                                 }
                                 if (recents.isEmpty()) {
-                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("No recent documents found", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(24.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center,
+                                            modifier = Modifier.fillMaxWidth(0.9f)
+                                        ) {
+                                            RecentsEmptyStateIllustration(
+                                                filter = "Inky Documents",
+                                                modifier = Modifier.size(140.dp)
+                                            )
+
+                                            Spacer(modifier = Modifier.height(24.dp))
+
+                                            Text(
+                                                text = stringResource(R.string.no_recent_documents_title),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                textAlign = TextAlign.Center
+                                            )
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
+                                            Text(
+                                                text = stringResource(R.string.no_recent_documents_desc),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 12.sp,
+                                                lineHeight = 16.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                 } else {
                                     LazyColumn(

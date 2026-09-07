@@ -268,7 +268,7 @@ fun AboutScreen(
                             text = stringResource(R.string.aboutDeveloperNote),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

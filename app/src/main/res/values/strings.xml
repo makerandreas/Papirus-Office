@@ -213,7 +213,7 @@
     <string name="aboutComponentTinyxml">TinyXML Parser: Lightweight C++ XML parser optimized for memory-constrained environments.</string>
     <string name="aboutLicensesTitle">Licenses &amp; Credits</string>
     <string name="aboutLicensesDesc">This suite builds on top of LibreOffice SDK, Microsoft OpenXML specifications, and ECMA-376 standards. Licensed under GNU LGPL v3 and Mozilla Public License 2.0.</string>
-    <string name="aboutDeveloperNote">Design with ❤️ from An Open-source and AI Enthusiast</string>
+    <string name="aboutDeveloperNote">Designed with care by an Open-source and AI Enthusiast</string>
     <!-- Navigator Strings -->
     <string name="navigator_title">Navigator</string>
     <string name="navigate_by_title">Navigate by...</string>

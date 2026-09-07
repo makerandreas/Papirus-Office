@@ -51,10 +51,6 @@ fun GeminiCopilotDialog(
     var citations by remember { mutableStateOf<List<GeminiAiService.WebCitation>>(emptyList()) }
     var selectedModel by remember { mutableStateOf(GeminiAiService.getSelectedModel(context)) }
 
-    val primaryGradient = Brush.horizontalGradient(
-        colors = listOf(Color(0xFF6750A4), Color(0xFF9C27B0), Color(0xFF006399))
-    )
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -83,13 +79,13 @@ fun GeminiCopilotDialog(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(primaryGradient),
+                                .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.AutoAwesome,
+                                imageVector = Icons.Default.SmartToy,
                                 contentDescription = "Gemini",
-                                tint = Color.White,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -101,7 +97,7 @@ fun GeminiCopilotDialog(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Powered by Google AI • Papirus Engine",
+                                text = "Google AI • Papirus Engine",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -129,7 +125,7 @@ fun GeminiCopilotDialog(
                         },
                         leadingIcon = {
                             Icon(
-                                imageVector = if (useSearchGrounding) Icons.Default.Search else Icons.Default.AutoAwesome,
+                                imageVector = if (useSearchGrounding) Icons.Default.Search else Icons.Default.SmartToy,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -189,7 +185,7 @@ fun GeminiCopilotDialog(
                                     isGenerating = false
                                 }
                             },
-                            label = { Text("📝 Summarize Doc") },
+                            label = { Text("Summarize Document") },
                             colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
                         )
                     }
@@ -202,7 +198,7 @@ fun GeminiCopilotDialog(
                                     isGenerating = false
                                 }
                             },
-                            label = { Text("✨ Grammar & Polish") }
+                            label = { Text("Grammar & Polish") }
                         )
                     }
                     if (moduleType == "CALC" || moduleType == "SPREADSHEET") {
@@ -211,7 +207,7 @@ fun GeminiCopilotDialog(
                                 onClick = {
                                     userPrompt = "Generate formula for calculating total revenue with 10% tax discount"
                                 },
-                                label = { Text("📊 Formula Helper") }
+                                label = { Text("Formula Helper") }
                             )
                         }
                     }
@@ -221,7 +217,7 @@ fun GeminiCopilotDialog(
                                 onClick = {
                                     userPrompt = "Generate 5-slide outline for Business Strategy Proposal"
                                 },
-                                label = { Text("💡 Slide Deck Outline") }
+                                label = { Text("Slide Deck Outline") }
                             )
                         }
                     }
@@ -231,7 +227,7 @@ fun GeminiCopilotDialog(
                                 useSearchGrounding = true
                                 userPrompt = "Find modern document templates and stock reference photos for business report"
                             },
-                            label = { Text("🔍 Search Templates & Images") }
+                            label = { Text("Search Templates & Images") }
                         )
                     }
                 }
@@ -411,12 +407,12 @@ fun GeminiCopilotDialog(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(CircleShape)
-                            .background(primaryGradient)
+                            .background(MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "Send",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }

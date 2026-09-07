@@ -1040,16 +1040,40 @@ private fun ProgrammaticFormSdkTab(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text("${res.totalControlsCreated} Controls Created") },
-                    leadingIcon = { Icon(Icons.Default.Widgets, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
-                AssistChip(
-                    onClick = {},
-                    label = { Text("DB: ${res.databaseName}") },
-                    leadingIcon = { Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Widgets, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "${res.totalControlsCreated} Controls Created",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "DB: ${res.databaseName}",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

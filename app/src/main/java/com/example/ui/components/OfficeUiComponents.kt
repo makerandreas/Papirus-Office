@@ -71,7 +71,7 @@ fun FloatingContextualToolbar(
                         FctButton("Copy", Icons.Default.ContentCopy) { onActionClick("copy") }
                         FctButton("Paste", Icons.Default.ContentPaste) { onActionClick("paste") }
                         FctSeparator()
-                        FctButton("Gemini Write", Icons.Default.AutoAwesome) { onActionClick("ai_write") }
+                        FctButton("Gemini Write", Icons.Default.EditNote) { onActionClick("ai_write") }
                     }
                     "calc_cell" -> {
                         FctButton("Cut", Icons.Default.ContentCut) { onActionClick("cut") }
@@ -92,7 +92,7 @@ fun FloatingContextualToolbar(
                         FctButton("Delete", Icons.Default.Delete) { onActionClick("delete") }
                         FctButton("Fit", Icons.Default.AspectRatio) { onActionClick("fit") }
                         FctSeparator()
-                        FctButton("AI Style", Icons.Default.AutoAwesome) { onActionClick("ai_style") }
+                        FctButton("AI Style", Icons.Default.Style) { onActionClick("ai_style") }
                     }
                     "chart" -> {
                         FctButton("Data", Icons.Default.Edit) { onActionClick("edit_data") }

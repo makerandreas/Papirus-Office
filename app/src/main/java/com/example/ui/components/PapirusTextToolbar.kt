@@ -229,7 +229,7 @@ class PapirusTextToolbar : TextToolbar {
                                                 if (onSelectAll != null) onSelectAll?.invoke() else onSelectAllClick?.invoke()
                                             }
                                         }
-                                        FctIconButton(Icons.Default.AutoAwesome, "AI options") {
+                                        FctIconButton(Icons.Default.EditNote, "AI options") {
                                             mode = FctMode.AI_OPTIONS
                                         }
                                         FctIconButton(Icons.Default.MoreVert, stringResource(R.string.fct_more)) {
@@ -535,7 +535,7 @@ class PapirusTextToolbar : TextToolbar {
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                                     FctMenuItem(
-                                        icon = Icons.Default.AutoAwesome,
+                                        icon = Icons.Default.EditNote,
                                         label = "Generate Text",
                                         onClick = {
                                             hide()

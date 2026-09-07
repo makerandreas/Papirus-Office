@@ -881,7 +881,7 @@ private fun HelpAndOptimizationTab() {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "⚙️ Hardware Optimizations: Realme C3 & Galaxy A11",
+                    text = "Hardware Optimizations: Realme C3 & Galaxy A11",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -913,14 +913,14 @@ private fun HelpAndOptimizationTab() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "2. Streaming Unzip Cleanup (Analogy)",
+                    text = "2. Streaming Unzip Cleanup",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.secondary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Analogy: \"Think of unzip operations like unpacking a suitcase in a small hotel room — only take out one item at a time instead of dumping everything on the floor!\" Always close ZipFile instances inside 'try-with-resources' statements immediately after reading. Leaving package file handles open causes kernel-level leaks on eMMC storage engines.",
+                    text = "Extract package entries sequentially rather than uncompressing all streams simultaneously. Always close ZipFile instances inside 'try-with-resources' statements immediately after reading. Leaving package file handles open causes kernel-level leaks on eMMC storage engines.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -703,7 +703,7 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                                     row.forEach { cell ->
                                         Box(modifier = Modifier.width(100.dp).border(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)).padding(4.dp)) {
                                             Text(
-                                                text = if (cell.toString().isEmpty()) "—" else cell.toString(),
+                                                text = if (cell.toString().isEmpty()) "-" else cell.toString(),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontFamily = FontFamily.Monospace,
                                                 color = if (cell.toString().isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f) else MaterialTheme.colorScheme.onSurface
