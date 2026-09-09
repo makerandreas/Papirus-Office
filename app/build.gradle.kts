@@ -114,7 +114,7 @@ android {
   }
   sourceSets {
     getByName("main") {
-      assets.srcDirs("src/main/assets", "src/main/share")
+      assets.directories.addAll(listOf("src/main/assets", "src/main/share"))
     }
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }

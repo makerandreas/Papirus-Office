@@ -1,5 +1,7 @@
 package com.example.modules.cellina
 
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.components.SaveAsDialog
@@ -589,7 +591,7 @@ fun CellinaModule(
                             },
                             modifier = Modifier.testTag("btn_prev_cell")
                         ) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Previous Cell")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Cell")
                         }
                         IconButton(
                             onClick = {
@@ -601,7 +603,7 @@ fun CellinaModule(
                             },
                             modifier = Modifier.testTag("btn_next_cell")
                         ) {
-                            Icon(Icons.Default.ArrowForward, contentDescription = "Next Cell")
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Cell")
                         }
                     }
 
@@ -886,10 +888,10 @@ fun CellinaModule(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             IconButton(onClick = { Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
+                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
                             }
                             IconButton(onClick = { Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
+                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
                             }
                             IconButton(onClick = { showBottomBar = false }) {
                                 Icon(Icons.Rounded.Close, contentDescription = "Close Standard Bottom Sheet", tint = MaterialTheme.colorScheme.error)
@@ -1170,7 +1172,7 @@ fun CellinaModule(
                                         OutlinedButton(onClick = { 
                                             Toast.makeText(context, "Sorted cells (XSortable)", Toast.LENGTH_SHORT).show() 
                                         }) {
-                                            Icon(Icons.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Sort Data")
                                         }
@@ -1184,7 +1186,7 @@ fun CellinaModule(
                                         OutlinedButton(onClick = { 
                                             Toast.makeText(context, "Added Annotations and Borders (XSheetAnnotations)", Toast.LENGTH_SHORT).show() 
                                         }) {
-                                            Icon(Icons.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Add Annotations")
                                         }
@@ -1331,7 +1333,7 @@ fun CellinaModule(
                                         OutlinedButton(onClick = { 
                                             Toast.makeText(context, "colLineChart: ColumnWithLine Template (ColumnChartType + LineChartType)", Toast.LENGTH_SHORT).show() 
                                         }) {
-                                            Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Column + Line Combo")
                                         }
@@ -1378,7 +1380,7 @@ fun CellinaModule(
                                              bridge.insertLineChart(0, "E27:G39", "Expenditure Per Pupil", "LineSymbol", showDataLabels = false)
                                              Toast.makeText(context, "linesChart: LineSymbol template with DP_NONE labels", Toast.LENGTH_SHORT).show() 
                                          }) {
-                                             Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
                                              Text("Line Chart")
                                          }
@@ -1417,7 +1419,7 @@ fun CellinaModule(
                                              bridge.addStockLine("StockChart1", "J141", "J142:J146", lineColorHex = 0xFFFF0000)
                                              Toast.makeText(context, "addStockLine: Added Pork Bellies line graph series to Stock Chart", Toast.LENGTH_SHORT).show() 
                                          }) {
-                                             Icon(Icons.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
+                                             Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
                                              Text("Add Stock Line (Pork Bellies)")
                                          }
@@ -1521,7 +1523,7 @@ fun CellinaModule(
                                             Text("AutoFilter")
                                         }
                                         OutlinedButton(onClick = { Toast.makeText(context, "Sorted range ascending (TableSortField)", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Sort A-Z")
                                         }

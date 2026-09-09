@@ -111,6 +111,7 @@ class PapirusApplication : Application(), ComponentCallbacks2 {
      * Handles system memory trimming events to protect low-RAM devices (Galaxy A11, Realme C3)
      * and prevent Android 17 AnonSwap memory limiter kills.
      */
+    @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         PapirusLogger.w("MemoryTrim", "onTrimMemory received level: $level")

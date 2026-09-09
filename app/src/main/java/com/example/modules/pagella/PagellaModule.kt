@@ -1,5 +1,7 @@
 package com.example.modules.pagella
 
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.automirrored.filled.*
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -84,14 +86,14 @@ fun PagellaModule(
                     onClick = { if (currentPage > 1) currentPage-- },
                     enabled = currentPage > 1
                 ) {
-                    Icon(Icons.Default.NavigateBefore, contentDescription = "Previous Page")
+                    Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "Previous Page")
                 }
                 Text("Page $currentPage / $totalPages", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 IconButton(
                     onClick = { if (currentPage < totalPages) currentPage++ },
                     enabled = currentPage < totalPages
                 ) {
-                    Icon(Icons.Default.NavigateNext, contentDescription = "Next Page")
+                    Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "Next Page")
                 }
             }
 

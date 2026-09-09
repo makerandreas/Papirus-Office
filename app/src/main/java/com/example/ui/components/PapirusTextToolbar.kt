@@ -1,5 +1,7 @@
 package com.example.ui.components
 
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -271,7 +273,7 @@ class PapirusTextToolbar : TextToolbar {
                                             icon = Icons.Default.SelectAll,
                                             label = "Selection Mode...",
                                             enabled = true,
-                                            trailingIcon = Icons.Default.KeyboardArrowRight,
+                                            trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                             onClick = { mode = FctMode.SELECTION_MODE }
                                         )
                                         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
@@ -281,15 +283,15 @@ class PapirusTextToolbar : TextToolbar {
                                     FctMenuItem(
                                         icon = Icons.Default.TextFields,
                                         label = "Character",
-                                        trailingIcon = Icons.Default.KeyboardArrowRight,
+                                        trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                         onClick = { mode = FctMode.CHARACTER }
                                     )
 
                                     // Paragraph -> Paragraph Mode
                                     FctMenuItem(
-                                        icon = Icons.Default.FormatAlignLeft,
+                                        icon = Icons.AutoMirrored.Filled.FormatAlignLeft,
                                         label = "Paragraph",
-                                        trailingIcon = Icons.Default.KeyboardArrowRight,
+                                        trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                         onClick = { mode = FctMode.PARAGRAPH }
                                     )
 
@@ -317,7 +319,7 @@ class PapirusTextToolbar : TextToolbar {
 
                                     // Bullets and Numbering Options...
                                     FctMenuItem(
-                                        icon = Icons.Default.FormatListBulleted,
+                                        icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                                         label = "Bullets and Numbering Options...",
                                         onClick = {
                                             hide()
@@ -326,7 +328,7 @@ class PapirusTextToolbar : TextToolbar {
                                     )
                                     // Skip Numbering [2]
                                     FctMenuItem(
-                                        icon = Icons.Default.FormatListBulleted,
+                                        icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                                         label = "Skip Numbering",
                                         enabled = isListParagraph,
                                         onClick = {
@@ -336,7 +338,7 @@ class PapirusTextToolbar : TextToolbar {
                                     )
                                     // Remove Numbering [2]
                                     FctMenuItem(
-                                        icon = Icons.Default.FormatListBulleted,
+                                        icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                                         label = "Remove Numbering",
                                         enabled = isListParagraph,
                                         onClick = {
@@ -393,7 +395,7 @@ class PapirusTextToolbar : TextToolbar {
                                             icon = Icons.Default.Spellcheck,
                                             label = "Synonyms",
                                             enabled = isDictionaryDownloaded,
-                                            trailingIcon = Icons.Default.KeyboardArrowRight,
+                                            trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                             onClick = { mode = FctMode.SYNONYMS }
                                         )
                                     }

@@ -93,7 +93,7 @@ fun FilesSubPage(
     }
 
     val externalStorageDirs = remember { 
-        androidx.core.content.ContextCompat.getExternalFilesDirs(context, null) 
+        context.getExternalFilesDirs(null) 
     }
     val hasRemovableStorage = externalStorageDirs.size > 1 && externalStorageDirs[1] != null
 

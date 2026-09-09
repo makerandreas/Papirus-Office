@@ -1,5 +1,7 @@
 package com.example.modules.slidia
 
+import androidx.compose.material.icons.automirrored.rounded.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.components.SaveAsDialog
@@ -320,7 +322,7 @@ fun SlidiaModule(
                     enabled = activeSlideIndex > 0,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Previous Slide", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Slide", tint = Color.White)
                 }
 
                 Text(
@@ -336,7 +338,7 @@ fun SlidiaModule(
                         enabled = activeSlideIndex < slides.size - 1,
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                     ) {
-                        Icon(Icons.Default.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
                     }
 
                     IconButton(
@@ -990,10 +992,10 @@ fun SlidiaModule(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             IconButton(onClick = { Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
+                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
                             }
                             IconButton(onClick = { Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
+                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
                             }
                             IconButton(onClick = { showBottomBar = false }) {
                                 Icon(Icons.Rounded.Close, contentDescription = "Close Standard Bottom Sheet", tint = MaterialTheme.colorScheme.error)
@@ -1039,7 +1041,7 @@ fun SlidiaModule(
                                     Text("Slide Deck Manipulation (SDK Ch. 17)", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = moduleColor)
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = { showImportNotesDialog = true }) {
-                                            Icon(Icons.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Import Notes to Deck")
                                         }
@@ -1049,7 +1051,7 @@ fun SlidiaModule(
                                             Text("Append Deck")
                                         }
                                         OutlinedButton(onClick = { showExtractTextDialog = true }) {
-                                            Icon(Icons.Rounded.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Extract All Text")
                                         }
@@ -1277,7 +1279,7 @@ fun SlidiaModule(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = { showCustomShowDialog = true }) {
-                                            Icon(Icons.Rounded.PlaylistAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Custom Show Playlist...")
                                         }
@@ -1289,7 +1291,7 @@ fun SlidiaModule(
                                                 },
                                                 colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
                                             ) {
-                                                Icon(Icons.Rounded.PlaylistPlay, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, contentDescription = null, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text("Start '$customShowName'")
                                             }
@@ -1468,7 +1470,7 @@ fun SlidiaModule(
         if (showImportNotesDialog) {
             AlertDialog(
                 onDismissRequest = { showImportNotesDialog = false },
-                icon = { Icon(Icons.Rounded.NoteAdd, contentDescription = null, tint = moduleColor) },
+                icon = { Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = null, tint = moduleColor) },
                 title = { Text("Import Notes to Slide Deck") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1532,7 +1534,7 @@ fun SlidiaModule(
             }
             AlertDialog(
                 onDismissRequest = { showExtractTextDialog = false },
-                icon = { Icon(Icons.Rounded.ReceiptLong, contentDescription = null, tint = moduleColor) },
+                icon = { Icon(Icons.AutoMirrored.Rounded.ReceiptLong, contentDescription = null, tint = moduleColor) },
                 title = { Text("Extracted Presentation Text") },
                 text = {
                     Column(modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
@@ -1686,7 +1688,7 @@ fun SlidiaModule(
         if (showCustomShowDialog) {
             AlertDialog(
                 onDismissRequest = { showCustomShowDialog = false },
-                icon = { Icon(Icons.Rounded.PlaylistAdd, contentDescription = null, tint = moduleColor) },
+                icon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null, tint = moduleColor) },
                 title = { Text("Build Custom Slide Show (Playlist)") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1933,7 +1935,7 @@ fun SlidiaModule(
                                 },
                                 enabled = playlistCurrentIndex < totalInPlay - 1 || isEndless
                             ) {
-                                Icon(Icons.Default.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
                             }
                             Text(
                                 text = "Slide ${playlistCurrentIndex + 1} / $totalInPlay",

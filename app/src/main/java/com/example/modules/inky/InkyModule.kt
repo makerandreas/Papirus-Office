@@ -1,4 +1,5 @@
 package com.example.modules.inky
+import androidx.compose.material.icons.automirrored.rounded.*
 import android.util.Log
 import kotlin.math.roundToInt
 import com.makerandreas.papirusoffice.data.toOfficeDocument
@@ -405,7 +406,7 @@ fun InkyModule(
 
     DisposableEffect(docxParser) {
         val observer = androidx.lifecycle.Observer<com.makerandreas.papirusoffice.data.ParsingProgress> { progress ->
-            if (progress != null) {
+            run {
                 loadingProgressStatus = progress.statusMessage
                 if (progress.isFailed) {
                     isLoadingDocument = false
@@ -1807,7 +1808,7 @@ fun InkyModule(
                                     },
                                     enabled = canUndo
                                 ) {
-                                    Icon(Icons.Rounded.Undo, contentDescription = "Undo")
+                                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo")
                                 }
                             }
 
@@ -1901,7 +1902,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Read aloud") }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Print") },
@@ -1935,7 +1936,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Read aloud") }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Open Navigation Bar") },
@@ -2463,7 +2464,7 @@ fun InkyModule(
                                 activeInkySubpage = "bulleted_list"
                                 openedFromExternalHub = true
                             }) {
-                                Icon(Icons.Rounded.FormatListBulleted, contentDescription = "Bulleted List")
+                                Icon(Icons.AutoMirrored.Rounded.FormatListBulleted, contentDescription = "Bulleted List")
                             }
 
                             // 10. Create numbered list
@@ -2488,7 +2489,7 @@ fun InkyModule(
                                 )
                                 triggerAutosave()
                             }) {
-                                Icon(Icons.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
+                                Icon(Icons.AutoMirrored.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
                             }
 
                             // 12. Decrease indent
@@ -2508,7 +2509,7 @@ fun InkyModule(
                                     Toast.makeText(context, "Cannot decrease indent further", Toast.LENGTH_SHORT).show()
                                 }
                             }) {
-                                Icon(Icons.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
+                                Icon(Icons.AutoMirrored.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
                             }
 
                             // 13. Add image
@@ -2536,7 +2537,7 @@ fun InkyModule(
                             IconButton(onClick = {
                                 Toast.makeText(context, "Add comment selected", Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.Comment, contentDescription = "Add Comment")
+                                Icon(Icons.AutoMirrored.Rounded.Comment, contentDescription = "Add Comment")
                             }
                         }
 
@@ -2569,7 +2570,7 @@ fun InkyModule(
                                     triggerAutosave()
                                 }
                             ) {
-                                Icon(Icons.Rounded.KeyboardTab, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardTab, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
                             }
 
                             // b. Toggle Keyboard
@@ -2741,7 +2742,7 @@ fun InkyModule(
                                             }
                                         }) {
                                             Icon(
-                                                imageVector = Icons.Rounded.ArrowBack,
+                                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                                 contentDescription = "Back",
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
@@ -2837,7 +2838,7 @@ fun InkyModule(
                                             }
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Undo,
+                                                imageVector = Icons.AutoMirrored.Rounded.Undo,
                                                 contentDescription = "Undo",
                                                 tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
@@ -2864,7 +2865,7 @@ fun InkyModule(
                                             }
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Rounded.Redo,
+                                                imageVector = Icons.AutoMirrored.Rounded.Redo,
                                                 contentDescription = "Redo",
                                                 tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
@@ -2962,7 +2963,7 @@ fun InkyModule(
                                         }
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Undo,
+                                            imageVector = Icons.AutoMirrored.Rounded.Undo,
                                             contentDescription = "Undo",
                                             tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
@@ -2989,7 +2990,7 @@ fun InkyModule(
                                         }
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Rounded.Redo,
+                                            imageVector = Icons.AutoMirrored.Rounded.Redo,
                                             contentDescription = "Redo",
                                             tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
@@ -4137,7 +4138,7 @@ private fun FileSubpage(
         // Grup File
         FileMenuSectionHeader("File")
         FileMenuThreeColumnRow(
-            item1 = Triple(Icons.Rounded.NoteAdd, "New", onNewDocument),
+            item1 = Triple(Icons.AutoMirrored.Rounded.NoteAdd, "New", onNewDocument),
             item2 = Triple(Icons.Rounded.FolderOpen, "Open", onOpenDocument),
             item3 = Triple(Icons.Rounded.Close, "Close", onCloseDocument)
         )
@@ -4198,7 +4199,7 @@ private fun FileSubpage(
             item2 = Triple(Icons.Rounded.RemoveRedEye, "Preview") {
                 onPrintDocument()
             },
-            item3 = Triple(Icons.Rounded.CallMerge, "Merge") {
+            item3 = Triple(Icons.AutoMirrored.Rounded.CallMerge, "Merge") {
                 Toast.makeText(context, "Print merge wizard...", Toast.LENGTH_SHORT).show()
             }
         )
@@ -4633,7 +4634,7 @@ fun OpenDocumentDialog(
                                         title = "Documents",
                                         path = "/storage/emulated/0/Documents",
                                         description = "Documents folder",
-                                        icon = Icons.Rounded.Article
+                                        icon = Icons.AutoMirrored.Rounded.Article
                                     ) {
                                         openDocumentLauncher.launch(arrayOf("*/*"))
                                     }

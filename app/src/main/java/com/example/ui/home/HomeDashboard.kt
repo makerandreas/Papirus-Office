@@ -1,5 +1,6 @@
 package com.example.ui.home
 
+import androidx.compose.material.icons.automirrored.filled.*
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -189,7 +190,7 @@ fun getDirectoryShortcut(context: Context, path: String): File {
 }
 
 fun getExternalStorageShortcut(context: Context): File? {
-    val dirs = androidx.core.content.ContextCompat.getExternalFilesDirs(context, null)
+    val dirs = context.getExternalFilesDirs(null)
     if (dirs.size > 1) {
         val extFile = dirs[1]
         if (extFile != null) {
@@ -970,7 +971,7 @@ fun HomeDashboard(
                                         onDismissRequest = { showItemMenu = false }
                                     ) {
                                         DropdownMenuItem(
-                                            leadingIcon = { Icon(Icons.Rounded.OpenInNew, contentDescription = null) },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null) },
                                             text = { Text("Open") },
                                             onClick = {
                                                 showItemMenu = false

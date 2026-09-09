@@ -1,5 +1,6 @@
 package com.example.modules.inky
 
+import androidx.compose.material.icons.automirrored.rounded.*
 import android.content.Context
 import android.widget.Toast
 import com.makerandreas.papirusoffice.data.PapirusAssetEngine
@@ -506,9 +507,9 @@ fun HomeSubpage(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val alignments = listOf(
-                TextAlign.Left to Icons.Rounded.FormatAlignLeft,
+                TextAlign.Left to Icons.AutoMirrored.Rounded.FormatAlignLeft,
                 TextAlign.Center to Icons.Rounded.FormatAlignCenter,
-                TextAlign.Right to Icons.Rounded.FormatAlignRight,
+                TextAlign.Right to Icons.AutoMirrored.Rounded.FormatAlignRight,
                 TextAlign.Justify to Icons.Rounded.FormatAlignJustify
             )
             alignments.forEach { (align, icon) ->
@@ -544,13 +545,13 @@ fun HomeSubpage(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ExpressiveActionCard(
-                icon = Icons.Rounded.FormatIndentIncrease,
+                icon = Icons.AutoMirrored.Rounded.FormatIndentIncrease,
                 label = "Increase Indent",
                 onClick = { Toast.makeText(context, "Indent increased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
             )
             ExpressiveActionCard(
-                icon = Icons.Rounded.FormatIndentDecrease,
+                icon = Icons.AutoMirrored.Rounded.FormatIndentDecrease,
                 label = "Decrease Indent",
                 onClick = { Toast.makeText(context, "Indent decreased", Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
@@ -577,7 +578,7 @@ fun HomeSubpage(
             headlineText = "Create bulleted list",
             leadingIcon = {
                 Icon(
-                    Icons.Rounded.FormatListBulleted,
+                    Icons.AutoMirrored.Rounded.FormatListBulleted,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
@@ -625,7 +626,7 @@ fun HomeSubpage(
             headlineText = "Toggle paragraph marks",
             leadingIcon = {
                 Icon(
-                    Icons.Rounded.Notes,
+                    Icons.AutoMirrored.Rounded.Notes,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
@@ -657,7 +658,7 @@ fun HomeSubpage(
             headlineText = "Toggle RTL writing direction",
             leadingIcon = {
                 Icon(
-                    Icons.Rounded.FormatTextdirectionRToL,
+                    Icons.AutoMirrored.Rounded.FormatTextdirectionRToL,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
@@ -807,7 +808,7 @@ fun PasteOptionsSubpage(context: Context, onShowPasteSpecial: () -> Unit) {
         M3ListItem(
             headlineText = "Merge formatting",
             supportingText = "Merge source style with document style",
-            leadingIcon = { Icon(Icons.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
+            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = { Toast.makeText(context, "Pasted text with Merge Formatting", Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
