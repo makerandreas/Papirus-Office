@@ -57,6 +57,8 @@ class DocumentIndexEngine(
         val remindersList = mutableListOf<ReminderNode>()
 
         var currentPages = 1
+        var charCounterInPage = 0
+        val charsPerPage = 1700
         var paragraphCounter = 0
         var tableCounter = 1
         var imageCounter = 1
@@ -72,6 +74,7 @@ class DocumentIndexEngine(
             when (element) {
                 is OfficePageBreak -> {
                     currentPages++
+                    charCounterInPage = 0
                 }
 
                 is OfficeHeading -> {
@@ -86,9 +89,15 @@ class DocumentIndexEngine(
                             title = element.text.ifBlank { "Heading ${element.level}" },
                             collapsed = isCollapsed,
                             pageIndex = currentPages,
+                            elementIndex = elemIndex,
                             layoutNodeId = "layout_p_$paragraphCounter"
                         )
                     )
+                    charCounterInPage += element.text.length + 80
+                    if (charCounterInPage >= charsPerPage) {
+                        currentPages += charCounterInPage / charsPerPage
+                        charCounterInPage %= charsPerPage
+                    }
                 }
 
                 is OfficeParagraph -> {
@@ -118,9 +127,16 @@ class DocumentIndexEngine(
                                 title = pText.ifBlank { "Heading $headingLevel" },
                                 collapsed = isCollapsed,
                                 pageIndex = currentPages,
+                                elementIndex = elemIndex,
                                 layoutNodeId = "layout_p_$paragraphCounter"
                             )
                         )
+                    }
+
+                    charCounterInPage += pText.length + 20
+                    if (charCounterInPage >= charsPerPage) {
+                        currentPages += charCounterInPage / charsPerPage
+                        charCounterInPage %= charsPerPage
                     }
 
                     // Check for inline bookmark in paragraph
@@ -183,6 +199,11 @@ class DocumentIndexEngine(
                         )
                     )
                     tableCounter++
+                    charCounterInPage += element.rows.sumOf { r -> r.cells.sumOf { c -> c.text.length } } + 250
+                    if (charCounterInPage >= charsPerPage) {
+                        currentPages += charCounterInPage / charsPerPage
+                        charCounterInPage %= charsPerPage
+                    }
                 }
 
                 is OfficeImage -> {
@@ -200,6 +221,11 @@ class DocumentIndexEngine(
                         )
                     )
                     imageCounter++
+                    charCounterInPage += 750
+                    if (charCounterInPage >= charsPerPage) {
+                        currentPages += charCounterInPage / charsPerPage
+                        charCounterInPage %= charsPerPage
+                    }
                 }
 
                 is OfficeBookmark -> {

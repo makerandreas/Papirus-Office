@@ -253,6 +253,7 @@ data class DocumentMetadata(
     val wordCount: Int = 0,
     val paragraphCount: Int = 0,
     val characterCount: Int = 0,
+    val pageCount: Int = 0,
     val description: String = ""
 )
 
@@ -386,7 +387,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
         creator = "Papirus Office",
         wordCount = this.plainText.split(Regex("\\s+")).count { it.isNotBlank() },
         paragraphCount = this.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().size,
-        characterCount = this.plainText.length
+        characterCount = this.plainText.length,
+        pageCount = this.pageCount
     )
 
     return OfficeDocument(

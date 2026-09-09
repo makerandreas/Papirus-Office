@@ -128,7 +128,7 @@ class NavigationEngine(
                 targetType = NavigateBy.HEADING,
                 targetId = heading.id,
                 targetPageIndex = heading.pageIndex,
-                targetElementIndex = heading.paragraphIndex,
+                targetElementIndex = heading.elementIndex,
                 targetParagraphIndex = heading.paragraphIndex,
                 titleOrLabel = heading.title
             ),

@@ -10,6 +10,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipInputStream
 
 data class ParsingProgress(
@@ -39,6 +40,104 @@ data class DocxStyleMeta(
  * Logs malformed XML structures or unsupported tags into crash.log via DocumentParsingLogger.
  */
 class OfficeDocumentParser(private val context: Context) {
+
+    companion object {
+        private val inMemoryParsedDocCache = ConcurrentHashMap<String, Pair<Long, OfficeParsedDocument>>()
+
+        fun clearCacheForFile(path: String) {
+            inMemoryParsedDocCache.remove(path)
+        }
+
+        fun getCachedDocument(path: String, lastModified: Long): OfficeParsedDocument? {
+            val cached = inMemoryParsedDocCache[path] ?: return null
+            if (cached.first == lastModified && !cached.second.isParsingFailed) {
+                return cached.second
+            }
+            return null
+        }
+    }
+
+    private fun extractDocxRelationships(file: File): Map<String, String> {
+        val relsMap = mutableMapOf<String, String>()
+        if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return relsMap
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "word/_rels/document.xml.rels") {
+                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val factory = XmlPullParserFactory.newInstance()
+                        factory.isNamespaceAware = false
+                        val parser = factory.newPullParser()
+                        parser.setInput(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)), "UTF-8")
+                        var ev = parser.eventType
+                        while (ev != XmlPullParser.END_DOCUMENT) {
+                            if (ev == XmlPullParser.START_TAG && (parser.name?.equals("relationship", ignoreCase = true) == true || parser.name?.equals("Relationship", ignoreCase = true) == true)) {
+                                val id = parser.getAttributeValue(null, "Id")
+                                val target = parser.getAttributeValue(null, "Target")
+                                if (!id.isNullOrBlank() && !target.isNullOrBlank()) {
+                                    relsMap[id] = target
+                                }
+                            }
+                            ev = parser.next()
+                        }
+                        break
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            // Graceful fallback
+        }
+        return relsMap
+    }
+
+    private fun extractDocxPageCount(file: File): Int? {
+        if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return null
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "docProps/app.xml") {
+                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val match = Regex("<(?:[a-zA-Z0-9]+:)?Pages>(\\d+)</(?:[a-zA-Z0-9]+:)?Pages>", RegexOption.IGNORE_CASE).find(xml)
+                        val p = match?.groupValues?.get(1)?.toIntOrNull()
+                        if (p != null && p > 0) return p
+                        break
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            // Graceful fallback
+        }
+        return null
+    }
+
+    private fun extractOdtPageCount(file: File): Int? {
+        if (!file.exists() || !file.name.endsWith(".odt", ignoreCase = true)) return null
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "meta.xml") {
+                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val match = Regex("page-count=\"(\\d+)\"", RegexOption.IGNORE_CASE).find(xml)
+                        val p = match?.groupValues?.get(1)?.toIntOrNull()
+                        if (p != null && p > 0) return p
+                        break
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            // Graceful fallback
+        }
+        return null
+    }
 
     private fun extractDocxStyles(file: File): Map<String, DocxStyleMeta> {
         val stylesMap = mutableMapOf<String, DocxStyleMeta>()
@@ -465,38 +564,17 @@ class OfficeDocumentParser(private val context: Context) {
      * mapping paragraphs, headings, list items, tables, and images.
      */
     suspend fun parseDocument(file: File, bypassCache: Boolean = false): OfficeParsedDocument = withContext(Dispatchers.IO) {
-        // Fast path: Check Room cache first unless bypassed
+        // Fast path: Check in-memory rich parsed document cache first unless bypassed
         if (!bypassCache) {
-            val cached = cacheRepository.getCachedDocument(file)
-            if (cached != null && !cached.isParsingFailed) {
+            val memCached = inMemoryParsedDocCache[file.absolutePath]
+            if (memCached != null && memCached.first == file.lastModified() && !memCached.second.isParsingFailed) {
                 val statusMsg = try {
                     context.getString(com.example.R.string.loading_status_cached)
                 } catch (e: Exception) {
                     "Loading document from local cache..."
                 }
                 _parsingProgress.postValue(ParsingProgress(100, statusMsg))
-
-                val cachedElements = if (cached.plainText.isNotEmpty()) {
-                    cached.plainText.split("\n\n").map { block ->
-                        OfficeDocumentElement.Paragraph(text = block)
-                    }
-                } else {
-                    emptyList()
-                }
-                return@withContext OfficeParsedDocument(
-                    elements = cachedElements,
-                    rawXml = "",
-                    plainText = cached.plainText,
-                    extractedImages = emptyMap(),
-                    isOdt = cached.format == "ODT",
-                    isDocx = cached.format == "DOCX",
-                    isOds = cached.format == "ODS",
-                    isXlsx = cached.format == "XLSX",
-                    isOdp = cached.format == "ODP",
-                    isPptx = cached.format == "PPTX",
-                    isParsingFailed = cached.isParsingFailed,
-                    failureReason = cached.failureReason
-                )
+                return@withContext memCached.second
             }
         }
 
@@ -569,6 +647,10 @@ class OfficeDocumentParser(private val context: Context) {
             )
             if (!parsedDoc.isParsingFailed) {
                 var finalParsedDoc = parsedDoc
+                val odtPageCount = if (isOdt) extractOdtPageCount(file) else null
+                if (odtPageCount != null && odtPageCount > 0) {
+                    finalParsedDoc = finalParsedDoc.copy(pageCount = odtPageCount)
+                }
                 if (isOdt) {
                     try {
                         val packageEntries = mutableMapOf<String, ByteArray>()
@@ -588,12 +670,13 @@ class OfficeDocumentParser(private val context: Context) {
                             originalMetaXml = packageEntries["meta.xml"]?.toString(Charsets.UTF_8),
                             originalSettingsXml = packageEntries["settings.xml"]?.toString(Charsets.UTF_8)
                         )
-                        finalParsedDoc = parsedDoc.copy(odtPackageData = packageData)
+                        finalParsedDoc = finalParsedDoc.copy(odtPackageData = packageData)
                     } catch (e: Exception) {
                         // Keep parsedDoc if package entry read fails
                     }
                 }
                 _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
+                inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), finalParsedDoc)
                 cacheRepository.saveCachedDocument(file, finalParsedDoc)
                 return@withContext finalParsedDoc
             }
@@ -602,6 +685,7 @@ class OfficeDocumentParser(private val context: Context) {
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
         val docxStylesMap = if (isDocx) extractDocxStyles(file) else emptyMap()
+        val docxRelsMap = if (isDocx) extractDocxRelationships(file) else emptyMap()
 
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -798,6 +882,30 @@ class OfficeDocumentParser(private val context: Context) {
                                     )
                                 }
                             }
+                            nameLower == "a:blip" || nameLower == "blip" || nameLower == "v:imagedata" -> {
+                                var embedId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed")
+                                if (embedId.isNullOrBlank()) {
+                                    for (i in 0 until parser.attributeCount) {
+                                        val attrName = parser.getAttributeName(i).lowercase()
+                                        if (attrName == "embed" || attrName.endsWith(":embed") || attrName == "id" || attrName.endsWith(":id") || attrName == "href" || attrName.endsWith(":href")) {
+                                            embedId = parser.getAttributeValue(i)
+                                            break
+                                        }
+                                    }
+                                }
+                                if (!embedId.isNullOrBlank()) {
+                                    val target = docxRelsMap[embedId] ?: ""
+                                    val imgName = target.substringAfterLast("/").ifBlank { embedId }
+                                    val imgFile = extractedImages[imgName] ?: extractedImages[target] ?: extractedImages[embedId]
+                                    elements.add(
+                                        OfficeDocumentElement.ImageElement(
+                                            imagePath = target.ifBlank { embedId },
+                                            imageFile = imgFile
+                                        )
+                                    )
+                                    plainTextBuilder.append("\n[Image: ${imgName.ifBlank { embedId }}]\n\n")
+                                }
+                            }
                         }
                     }
 
@@ -944,6 +1052,7 @@ class OfficeDocumentParser(private val context: Context) {
             )
         }
 
+        val detectedDocPageCount = (if (isDocx) extractDocxPageCount(file) else if (isOdt) extractOdtPageCount(file) else null) ?: 0
         val plainTextResult = plainTextBuilder.toString().trim()
         val parsedDoc = OfficeParsedDocument(
             elements = elements,
@@ -956,8 +1065,10 @@ class OfficeDocumentParser(private val context: Context) {
             isXlsx = isXlsx,
             isOdp = detectedOdp,
             isPptx = detectedPptx,
-            isParsingFailed = false
+            isParsingFailed = false,
+            pageCount = detectedDocPageCount
         )
+        inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
         cacheRepository.saveCachedDocument(file, parsedDoc)
         return@withContext parsedDoc
     }

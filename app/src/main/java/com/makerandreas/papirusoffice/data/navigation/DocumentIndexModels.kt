@@ -18,9 +18,27 @@ data class HeadingNode(
     val title: String,
     val collapsed: Boolean = false,
     val pageIndex: Int = 1,
+    val elementIndex: Int = 0,
     val layoutNodeId: String = "heading_$paragraphIndex",
     val children: List<HeadingNode> = emptyList()
 )
+
+/**
+ * Flattens hierarchical HeadingNode tree into a single-depth list preserving document order.
+ */
+fun flattenHeadings(list: List<HeadingNode>): List<HeadingNode> {
+    val result = mutableListOf<HeadingNode>()
+    fun traverse(nodes: List<HeadingNode>) {
+        for (node in nodes) {
+            result.add(node)
+            if (node.children.isNotEmpty()) {
+                traverse(node.children)
+            }
+        }
+    }
+    traverse(list)
+    return result
+}
 
 /**
  * Node pointing to a Table in OfficeDocument.

@@ -84,6 +84,10 @@ class OdfTextBodyContext(
             OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token)
             OdfXmlToken.XML_PAGE -> OdfTextBodyContext(importFilter, token) // Slide page for ODP
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
+            OdfXmlToken.XML_SOFT_PAGE_BREAK -> {
+                importFilter.addElement(OfficeDocumentElement.PageBreak)
+                super.createChildContext(token, attributes)
+            }
             else -> super.createChildContext(token, attributes)
         }
     }
@@ -125,6 +129,10 @@ class OdfParagraphContext(
             OdfXmlToken.XML_LINE_BREAK -> {
                 textBuilder.append("\n")
                 runs.add(TextRun(text = "\n"))
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_SOFT_PAGE_BREAK -> {
+                importFilter.addElement(OfficeDocumentElement.PageBreak)
                 super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)

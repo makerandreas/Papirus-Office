@@ -16,6 +16,10 @@ jobs:
   build:
     name: Build & Test (SemVer & Nightly)
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+      GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
 
     steps:
       - name: Checkout Code

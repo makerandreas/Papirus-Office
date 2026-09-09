@@ -69,7 +69,8 @@ data class OfficeParsedDocument(
     val isPptx: Boolean = false,
     val isParsingFailed: Boolean = false,
     val failureReason: String? = null,
-    val odtPackageData: OdtPackageData? = null
+    val odtPackageData: OdtPackageData? = null,
+    val pageCount: Int = 0
 ) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier, XReplaceable {
     
     override val text: XText

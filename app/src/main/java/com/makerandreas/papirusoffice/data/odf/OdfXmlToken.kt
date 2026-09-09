@@ -41,6 +41,7 @@ enum class OdfXmlToken(val tokenName: String) {
     XML_NOTE("text:note"),
     XML_NOTE_BODY("text:note-body"),
     XML_NOTE_CITATION("text:note-citation"),
+    XML_SOFT_PAGE_BREAK("text:soft-page-break"),
     
     // Table elements
     XML_TABLE("table:table"),
