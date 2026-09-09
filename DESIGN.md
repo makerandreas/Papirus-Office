@@ -9,24 +9,24 @@ Dial: ENERGY 2 / RHYTHM 1 / MOTION 3
 
 ## Identity & Product Essence
 - **Target**: A PC-Level office suite that runs in a UI-friendly interface for smartphones and tablets.
-- **Core Essence**: Menghadirkan kapabilitas dan fitur-fitur office suite setara kelas PC yang dikemas secara ergonomis tanpa memaksakan UI mobile yang sempit, mengadopsi prinsip *Material 3 Expressive* yang bersahabat bagi pengguna smartphone dan tablet.
+- **Core Essence**: It delivers PC-class office suite capabilities and features, ergonomically packaged to avoid the constraints of a cramped mobile UI, by adopting the *Material 3 Expressive* design principles, which are optimized for smartphones and tablets.
 
 ## Personality & Character
-- **Nuansa**: *Modern office suite*.
-- **Karakter**: Utilitarian, terstruktur, presisi, profesional, produktif, dan bersih tanpa dekorasi berlebih yang mengalihkan fokus kerja dokumen.
+- **Personality**: *Modern office suite*.
+- **Karakter**: Utilitarian, structured, precise, professional, productive, and clean, free from excessive ornamentation that distracts from the document's work-related focus.
 
 ## Palette & Theming (Material 3 Expressive)
-- **Android 11 ke bawah**:
-  - Menggunakan palet warna statis berbasis Material 3 Expressive yang mengacu pada warna aksen modul yang didefinisikan di `AGENTS.md`:
+- **Android 11 and below**:
+  - Uses a static color palette based on Material 3 Expressive, referencing the module accent colors defined in `AGENTS.md`:
     - Base / Papirus Suite: `#2563EB` (Primary Suite Blue)
     - Inky (Word Processing): `#0F9D58` (Green)
     - Cellina (Spreadsheets): `#16A3B7` (Cyan/Teal)
     - Slidia (Presentations): `#F59E0B` (Amber/Orange)
     - Pagella (PDF Viewer): `#D93025` (Red)
-- **Android 12 ke atas**:
-  - Menggunakan palet warna dinamis (*Material You Dynamic Color Scheme*) sesuai standar Material 3 Expressive.
-  - Pengguna memiliki opsi untuk menonaktifkan warna dinamis dan tetap menggunakan palet warna statis modul.
+- **Android 12 and above**:
+  - Uses a dynamic color palette (*Material You Dynamic Color Scheme*) in accordance with Material 3 Expressive standards.
+  - Users have the option to disable dynamic colors and continue using the module's static color palette.
 
 ## Typography
-- **UI Interface**: Menggunakan keluarga font Google Sans (Google Sans, Google Sans Medium, Google Sans Bold, Google Sans Flex).
-- **Document Content**: Tipografi UI tidak memengaruhi font, rendering, atau konten dokumen yang dibuat atau dibuka di dalam aplikasi.
+- **UI Interface**: Uses the Google Sans font family (Google Sans, Google Sans Medium, Google Sans Bold, Google Sans Flex).
+- **Document Content**: UI typography does not affect the fonts, rendering, or content of documents created or opened within the application.
