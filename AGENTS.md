@@ -3,9 +3,11 @@
 ## Reference Material 
 ### `/sources`
 All document format specifications, standards, and schema definitions placed in `/sources` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
-- **ODF v1.2 / v1.3 Standards**:
-  - `Part 1: OpenDocument Schema` (elements, styles, XML schema rules)
-  - `Part 2/3: Packages` (ZIP container, `mimetype`, `META-INF/manifest.xml`, encryption, signatures)
+- **ODF v1.4 Standards**:
+  - `Part 1: Introduction` (architecture, conformance, namespaces, references)
+  - `Part 2: Packages` (ZIP container, `mimetype`, `META-INF/manifest.xml`, encryption, signatures)
+  - `Part 3: OpenDocument Schema` (elements, styles, XML schema rules for text, spreadsheets, presentations)
+  - `Part 4: Recalculated Formula (OpenFormula) Format` (OpenFormula expressions, syntax, evaluators)
 - Whenever implementing or modifying parsers, serializers, or document processors in `com.makerandreas.papirusoffice`:
   1. Consult the relevant specification files in `/sources`.
   2. Adhere strictly to the normative rules (e.g., exact namespace definitions, element ordering, MIME header constraints, non-destructive package preservation).

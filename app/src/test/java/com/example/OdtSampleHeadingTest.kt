@@ -19,7 +19,8 @@ class OdtSampleHeadingTest {
     fun testSample1OdtHeadings() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val parser = OfficeDocumentParser(context)
-        val file = File("tests/Sample 1.odt")
+        val candidateFile = File("tests/Sample-1.odt")
+        val file = if (candidateFile.exists()) candidateFile else File("tests/Sample 1.odt")
         println("File exists: ${file.exists()}, length: ${file.length()}")
         
         val parsedDoc = parser.parseDocument(file, bypassCache = true)
