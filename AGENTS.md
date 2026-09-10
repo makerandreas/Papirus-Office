@@ -18,8 +18,8 @@ There are subdirectories for each architecture. Make sure to consult these subdi
 ### `sdk-examples`
 When necessary, consult all SDK examples in `/sdk-references` directory.
 
-## Test Fixtures (`/tests`)
-Files in `/tests` (e.g., `.odt`, `.docx`) are reference test files for regression testing and compatibility verification across LibreOffice, Microsoft Word, and Papirus Office.
+## Test Sample Files (`/tests`)
+Files in `/tests` are reference sample files for analyzing, development references, regression testing, and compatibility verification across LibreOffice, Microsoft Word, and Papirus Office.
 
 ## Color Scheme & Module Accent Conventions
 Default static accent colors for Android 11 and below (devices without dynamic color / Material You support):
