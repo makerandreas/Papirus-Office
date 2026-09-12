@@ -10,10 +10,7 @@ class FontLoader {
     fun loadFontFamily(fontFiles: List<Pair<File, String>>): FontFamily? {
         if (fontFiles.isEmpty()) return null
 
-        // In a real app we'd load each font weight/style.
-        // For simplicity and to avoid compose API version issues,
-        // let's just create a Typeface from the "regular" or first file
-        // and return a FontFamily from it.
+        // Build FontFamily using regular style or primary font file.
         val regularFile = fontFiles.find { it.second == "regular" }?.first ?: fontFiles.first().first
         
         return try {

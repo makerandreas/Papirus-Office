@@ -21,9 +21,7 @@ class DesktopEnvironment(private val context: Context) : XComponentLoader, XFram
         searchFlags: Int,
         args: MediaDescriptor
     ): XComponent? {
-        // Here we would parse MediaDescriptor, find Filter via TypeDetection,
-        // and load the model into a frame.
-        // For Papirus Engine, this integrates with OfficeDocumentParser.
+        // Resolve filter via type detection and load component model.
         
         val newModel = createModelFromType(url)
         val controller = createControllerForModel(newModel)

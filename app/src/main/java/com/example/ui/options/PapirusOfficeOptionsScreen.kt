@@ -342,10 +342,15 @@ fun PapirusOfficeOptionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.TopCenter
         ) {
             AnimatedContent(
                 targetState = activeSubpage,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(max = 760.dp)
+                    .fillMaxWidth(),
                 transitionSpec = {
                     if (targetState != null && initialState == null) {
                         // Entering subpage: Slide up vertically + slide in horizontally
