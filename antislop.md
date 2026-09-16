@@ -70,6 +70,8 @@ antislop is used one of two ways. At the start of a session, ask the user which 
 - **Mode 1 (During):** follow the rules while generating. This prevents slop from the start and ends with the Delivery Gate. Use it when building new UI.
 - **Mode 2 (After):** audit an already-finished project. Produce a numbered findings list in `anti-slop/audit-001-YYYY-MM-DD.md` (numbers keep rising). Each finding cites the violated rule (R-XX) and a one-line reason. Priority follows the rule tier: Hard Gate = HIGH, Purpose-Gate = MEDIUM, Quality Locks = LOW. Do not modify anything until the user approves specific numbers; numbers not mentioned are not touched. Then fix the approved items and write a follow-up report.
 
+> **Three steps run in both modes, whatever else is driving the session.** Another skill or planning workflow, a brainstorm or a spec, may lead the work, but it never replaces these: settle direction before building (R-37), ask before creating any asset (R-23), and run the Delivery Gate before delivering. Naming a process is not the same as running it.
+
 ## What This Is (and What It Isn't)
 
 `antislop.md` is a **filter**, not a style guide. It stops AI coding agents from producing generic, recognizable "AI slop" UI, without falling into the opposite failure: a sterile, lifeless default.
@@ -193,6 +195,7 @@ These are the most common patterns found in AI-generated designs. Use this table
 | **Colored Left Stripe** | A thin colored vertical bar on the left edge of cards, rows, or section headers, as decoration |
 | **Small Arrows (→ / ↗)** | Placed on almost every button as pure decoration |
 | **AI Capsule Badges** | Pill shape, thin border, glow, small dot, uppercase, containing: "AI Powered", "Beta", "New" |
+| **Eyebrow Badge Above the Headline** | A small pill parked directly above the H1, often with a dot and a thin border, holding a category label the headline already says |
 | **Generic AI Typography** | Large monospace headings, HOW IT WORKS uppercase with wide tracking |
 | **Typeface Chosen Without Reason** | Font picked because it's the AI default, not because it fits brand character. Popular fonts like Inter are still valid if there's a reason |
 | **Generic Illustrations** | Undraw, Storyset, or 3D blob characters with no real connection to the product |
@@ -600,6 +603,8 @@ If none of these applies to an element, the element should not exist.
 Run this gate BEFORE delivering. Output its status with your deliverable as a **PASS/FAIL report**: one line per item, and every `PASS` backed by concrete evidence (e.g. "R-26 PASS: every button has a real `href` or `onClick`; no dead controls", "R-35 PASS: ran the build and clicked every control: Signup -> /signup, empty form -> validation, mobile menu -> opens, no console errors").
 If any item is **FAIL** (or any answer is **yes**), do not deliver: fix it first, then re-run. A report containing a FAIL must never be shipped.
 
+This gate cannot be delegated or replaced. If another workflow is leading the session, its own wrap-up or summary does not stand in for this report. A deliverable handed over without it is unfinished, not approved.
+
 The gate has four blocks: Hard Gate (absolute), Purpose-Gate (technique + written reason), Liveliness (dials + levers), Craftsmanship & Quality Locks (C-1..C-5 plus the consistency locks R-05, R-11, R-15, R-16, R-20, R-21, R-29, R-30, R-31).
 
 ### Block 1: Hard Gate (absolute)
@@ -633,7 +638,7 @@ For each technique, the technique itself is allowed. FAIL if it appears as a def
 - [ ] Is there a large monospace font, uppercase label with wide tracking, or a typeface chosen without a written brand-character reason? *(R-06)*
 - [ ] Is there a background grid, blueprint, graph paper, or dot pattern without a written visual-identity purpose? *(R-07)*
 - [ ] Are arrows (`→` / `↗`) placed on almost every button purely as decoration, with no written purpose? *(R-08)*
-- [ ] Are there capsule badges ("AI Powered", "Beta", "New", "Secure", "Fast") with no real function, or the full capsule + thin border + glow + uppercase combination? *(R-09)*
+- [ ] Are there capsule badges ("AI Powered", "Beta", "New", "Secure", "Fast") with no real function, the full capsule + thin border + glow + uppercase combination, or a pill parked above the H1 holding a label the headline already says? *(R-09)*
 - [ ] Is glassmorphism applied to more than 1-2 elements simultaneously (navbar + card + modal + sidebar)? *(R-10)*
 - [ ] Is a large shadow applied to every component, with no written elevation reason, making the page feel like it is floating? *(R-12)*
 - [ ] Is glow applied to cards, buttons, badges, icons, backgrounds, and borders simultaneously? *(R-13)*
