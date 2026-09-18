@@ -48,7 +48,10 @@ android {
       }
       val engineMajor = 1
       val engineMinor = 3
-      val enginePatch = fileCount + (kotlin.math.abs(hashSum) % 100).toInt()
+      // NOTE: kotlin.math is not available on the build-script classpath,
+      // so the non-negative remainder is computed manually.
+      val hashMod = ((hashSum % 100) + 100) % 100
+      val enginePatch = fileCount + hashMod.toInt()
       "$engineMajor.$engineMinor.$enginePatch-engine"
     } else {
       "1.3.0-engine"
