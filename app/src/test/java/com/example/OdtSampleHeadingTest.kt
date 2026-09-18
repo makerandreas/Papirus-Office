@@ -10,17 +10,24 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class OdtSampleHeadingTest {
 
     @Test
     fun testSample1OdtHeadings() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val parser = OfficeDocumentParser(context)
-        val candidateFile = File("tests/Sample-1.odt")
-        val file = if (candidateFile.exists()) candidateFile else File("tests/Sample 1.odt")
+        // Gradle runs module tests with working dir = app/, so also probe ../tests/.
+        val file = listOf(
+            File("tests/Sample-1.odt"),
+            File("../tests/Sample-1.odt"),
+            File("tests/Sample 1.odt"),
+            File("../tests/Sample 1.odt")
+        ).firstOrNull { it.exists() } ?: File("tests/Sample-1.odt")
         println("File exists: ${file.exists()}, length: ${file.length()}")
         
         val parsedDoc = parser.parseDocument(file, bypassCache = true)
