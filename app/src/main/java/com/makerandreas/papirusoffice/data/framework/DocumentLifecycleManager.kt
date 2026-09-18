@@ -3,9 +3,6 @@ package com.makerandreas.papirusoffice.data.framework
 import android.content.Context
 import com.example.ui.home.RecentFilesTracker
 import com.makerandreas.papirusoffice.data.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.io.File
 
 sealed class CloseResult {

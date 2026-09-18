@@ -672,7 +672,11 @@ fun CreateFromTemplateView(
                                 coroutineScope.launch {
                                     if (isDownloaded) {
                                         // Already downloaded, just open it
-                                        val filePath = downloadedFilesMap[template.name]!!
+                                        val filePath = downloadedFilesMap[template.name]
+                                        if (filePath == null) {
+                                            Toast.makeText(context, "Template file is missing, please re-download.", Toast.LENGTH_SHORT).show()
+                                            return@launch
+                                        }
                                         com.example.MainActivity.openedFilePath = filePath
                                         com.example.MainActivity.openedFileType = when (template.type) {
                                             "ODS" -> "Cellina"

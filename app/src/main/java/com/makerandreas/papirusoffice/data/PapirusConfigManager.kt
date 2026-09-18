@@ -158,10 +158,7 @@ object PapirusConfigManager {
                     val parts = trimmed.split("=", limit = 2)
                     val key = parts[0].trim()
                     val value = parts[1].trim()
-                    if (!resultMap.containsKey(currentSection)) {
-                        resultMap[currentSection] = mutableMapOf()
-                    }
-                    resultMap[currentSection]!![key] = value
+                    resultMap.getOrPut(currentSection) { mutableMapOf() }[key] = value
                 }
             }
         } catch (e: Exception) {
@@ -231,10 +228,7 @@ object PapirusConfigManager {
         if (!isInitialized) initialize(context)
 
         val valueStr = value.toString()
-        if (!userConfigMap.containsKey(section)) {
-            userConfigMap[section] = mutableMapOf()
-        }
-        userConfigMap[section]!![key] = valueStr
+        userConfigMap.getOrPut(section) { mutableMapOf() }[key] = valueStr
 
         // Persist to UserConfig.ini file
         writeIniFile(getUserConfigFile(context), userConfigMap)
@@ -346,7 +340,12 @@ object PapirusConfigManager {
     }
 
     /**
-     * Restarts the application process safely.
+     * Restarts the application task safely.
+     *
+     * Relaunches the launcher activity and finishes the whole task. The process
+     * itself is deliberately NOT killed (no Runtime.exit): abrupt kills can
+     * strand WorkManager jobs and pending writes, and the in-memory config
+     * caches are already reset by [performReset].
      */
     fun restartApp(context: Context) {
         try {
@@ -356,9 +355,8 @@ object PapirusConfigManager {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 context.startActivity(intent)
                 if (context is Activity) {
-                    context.finish()
+                    context.finishAffinity()
                 }
-                Runtime.getRuntime().exit(0)
             } else {
                 if (context is Activity) {
                     context.recreate()

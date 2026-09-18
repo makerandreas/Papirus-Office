@@ -8,6 +8,13 @@ import java.util.zip.ZipOutputStream
 
 class OdtDocumentWriter : DocumentFormatWriter {
 
+    /** An image resolved to embeddable package bytes. */
+    private data class ImageEmbed(
+        val href: String,
+        val mime: String,
+        val bytes: ByteArray
+    )
+
     override fun write(document: OfficeDocument): ByteArray {
         PapirusLogger.d("ODT", "WRITE_START")
         val elements = document.body.elements
@@ -18,14 +25,19 @@ class OdtDocumentWriter : DocumentFormatWriter {
             val useOriginalContentXml = !document.isModified &&
                 (packageData?.entries?.containsKey("content.xml") == true || packageData?.originalContentXml != null)
 
+            // Resolve embedded images only when regenerating content.xml; a
+            // preserved original already references its own Pictures/ entries.
+            val embeds = if (useOriginalContentXml) emptyList() else collectImages(document)
+            val imageHrefs = embeds.associate { it.first to it.second.href }
+
             val contentXmlBytes = if (useOriginalContentXml) {
                 PapirusLogger.d("ODT", "CONTENT_XML_PRESERVED_EXACT_ORIGINAL")
                 packageData?.entries?.get("content.xml")
                     ?: packageData?.originalContentXml?.toByteArray(Charsets.UTF_8)
-                    ?: buildContentXml(document)
+                    ?: buildContentXml(document, imageHrefs)
             } else {
                 PapirusLogger.d("ODT", "CONTENT_XML_GENERATED_STRUCTURED")
-                buildContentXml(document)
+                buildContentXml(document, imageHrefs)
             }
             PapirusLogger.d("ODT", "CONTENT_XML_READY")
             val baos = ByteArrayOutputStream()
@@ -61,13 +73,27 @@ class OdtDocumentWriter : DocumentFormatWriter {
                         zout.write(entryBytes)
                         zout.closeEntry()
                     }
+                    // Best effort: newly added images are embedded even though the
+                    // preserved manifest cannot be merged safely here.
+                    for ((_, embed) in embeds) {
+                        if (packageData.entries.containsKey(embed.href)) continue
+                        zout.putNextEntry(ZipEntry(embed.href))
+                        zout.write(embed.bytes)
+                        zout.closeEntry()
+                    }
                 } else {
                     PapirusLogger.d("ODT", "FRESH_GENERATION_MODE")
                     // Fresh package generation mode: generate standard ODF structure
-                    val manifestXmlBytes = buildManifestXml()
+                    val manifestXmlBytes = buildManifestXml(embeds.map { it.second })
                     zout.putNextEntry(ZipEntry("META-INF/manifest.xml"))
                     zout.write(manifestXmlBytes)
                     zout.closeEntry()
+
+                    for ((_, embed) in embeds) {
+                        zout.putNextEntry(ZipEntry(embed.href))
+                        zout.write(embed.bytes)
+                        zout.closeEntry()
+                    }
 
                     val stylesXmlBytes = buildStylesXml(document)
                     zout.putNextEntry(ZipEntry("styles.xml"))
@@ -97,7 +123,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
         }
     }
 
-    private fun buildContentXml(document: OfficeDocument): ByteArray {
+    private fun buildContentXml(document: OfficeDocument, imageHrefs: Map<String, String> = emptyMap()): ByteArray {
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         sb.append("<office:document-content ")
@@ -128,7 +154,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
 
         val elements = document.body.elements
         for (element in elements) {
-            writeElement(sb, element)
+            writeElement(sb, element, imageHrefs)
         }
 
         sb.append("    </office:text>\n")
@@ -137,7 +163,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
         return sb.toString().toByteArray(Charsets.UTF_8)
     }
 
-    private fun writeElement(sb: StringBuilder, element: OfficeElement) {
+    private fun writeElement(sb: StringBuilder, element: OfficeElement, imageHrefs: Map<String, String> = emptyMap()) {
         when (element) {
             is OfficeParagraph -> {
                 val styleAttr = if (!element.styleName.isNullOrEmpty()) " text:style-name=\"${escapeXml(element.styleName)}\"" else " text:style-name=\"P1\""
@@ -182,18 +208,26 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 sb.append("      </table:table>\n")
             }
             is OfficeImage -> {
-                sb.append("      <draw:frame draw:name=\"Image\">\n")
-                sb.append("        <draw:image xlink:href=\"${escapeXml(element.imagePath)}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>\n")
-                sb.append("      </draw:frame>\n")
+                val href = imageHrefs[element.imagePath]
+                if (href == null) {
+                    // Unresolvable image (missing file): skip instead of writing
+                    // a dangling absolute device path into the package.
+                    PapirusLogger.w("ODT", "Skipping unresolvable image: ${element.imagePath}")
+                } else {
+                    val frameName = href.substringAfterLast("/")
+                    sb.append("      <draw:frame draw:name=\"${escapeXml(frameName)}\" text:anchor-type=\"paragraph\">\n")
+                    sb.append("        <draw:image xlink:href=\"${escapeXml(href)}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>\n")
+                    sb.append("      </draw:frame>\n")
+                }
             }
             is OfficeDocElement.ParagraphElement -> {
-                writeElement(sb, element.paragraph)
+                writeElement(sb, element.paragraph, imageHrefs)
             }
             is OfficeDocElement.TableElement -> {
-                writeElement(sb, element.table)
+                writeElement(sb, element.table, imageHrefs)
             }
             is OfficeDocElement.ImageElement -> {
-                writeElement(sb, element.image)
+                writeElement(sb, element.image, imageHrefs)
             }
             else -> {
                 // Ignore other non-printable element types safely
@@ -280,18 +314,65 @@ class OdtDocumentWriter : DocumentFormatWriter {
         return xml.toByteArray(Charsets.UTF_8)
     }
 
-    private fun buildManifestXml(): ByteArray {
-        val xml = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
-              <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.text"/>
-              <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
-              <manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/>
-              <manifest:file-entry manifest:full-path="meta.xml" manifest:media-type="text/xml"/>
-              <manifest:file-entry manifest:full-path="settings.xml" manifest:media-type="text/xml"/>
-            </manifest:manifest>
-        """.trimIndent()
-        return xml.toByteArray(Charsets.UTF_8)
+    private fun buildManifestXml(embeds: List<ImageEmbed> = emptyList()): ByteArray {
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+        sb.append("<manifest:manifest xmlns:manifest=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" manifest:version=\"1.2\">\n")
+        sb.append("  <manifest:file-entry manifest:full-path=\"/\" manifest:version=\"1.2\" manifest:media-type=\"application/vnd.oasis.opendocument.text\"/>\n")
+        sb.append("  <manifest:file-entry manifest:full-path=\"content.xml\" manifest:media-type=\"text/xml\"/>\n")
+        sb.append("  <manifest:file-entry manifest:full-path=\"styles.xml\" manifest:media-type=\"text/xml\"/>\n")
+        sb.append("  <manifest:file-entry manifest:full-path=\"meta.xml\" manifest:media-type=\"text/xml\"/>\n")
+        sb.append("  <manifest:file-entry manifest:full-path=\"settings.xml\" manifest:media-type=\"text/xml\"/>\n")
+        for (embed in embeds) {
+            sb.append("  <manifest:file-entry manifest:full-path=\"${escapeXml(embed.href)}\" manifest:media-type=\"${escapeXml(embed.mime)}\"/>\n")
+        }
+        sb.append("</manifest:manifest>")
+        return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    /**
+     * Resolves top-level [OfficeImage] elements to embeddable package entries.
+     * Returns pairs of (original imagePath -> embed). Images whose files are
+     * missing or oversized are skipped (logged) rather than embedded.
+     */
+    private fun collectImages(document: OfficeDocument): List<Pair<String, ImageEmbed>> {
+        val result = mutableListOf<Pair<String, ImageEmbed>>()
+        var counter = 0
+        fun unwrap(element: OfficeElement): OfficeImage? = when (element) {
+            is OfficeImage -> element
+            is OfficeDocElement.ImageElement -> element.image
+            else -> null
+        }
+        for (element in document.body.elements) {
+            val image = unwrap(element) ?: continue
+            if (result.any { it.first == image.imagePath }) continue
+            try {
+                val source = image.imageFile?.takeIf { it.isFile }
+                    ?: java.io.File(image.imagePath).takeIf { it.isFile }
+                    ?: continue
+                if (source.length() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
+                    PapirusLogger.w("ODT", "Skipping oversized image: ${source.name}")
+                    continue
+                }
+                val rawExt = source.extension.lowercase().replace("[^a-z0-9]".toRegex(), "")
+                val ext = rawExt.ifEmpty { "png" }
+                val mime = when (ext) {
+                    "png" -> "image/png"
+                    "jpg", "jpeg" -> "image/jpeg"
+                    "gif" -> "image/gif"
+                    "bmp" -> "image/bmp"
+                    "webp" -> "image/webp"
+                    "svg" -> "image/svg+xml"
+                    else -> "image/$ext"
+                }
+                counter++
+                val href = "Pictures/image$counter.$ext"
+                result.add(image.imagePath to ImageEmbed(href, mime, source.readBytes()))
+            } catch (e: Exception) {
+                PapirusLogger.w("ODT", "Skipping unreadable image ${image.imagePath}: ${e.message}")
+            }
+        }
+        return result
     }
 
     private fun escapeXml(input: String?): String {

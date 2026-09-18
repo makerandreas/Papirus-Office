@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data.writer
 
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import com.makerandreas.papirusoffice.data.*
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
@@ -17,7 +18,7 @@ class OdtDocumentParser {
             ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
                 var entry = zip.nextEntry
                 while (entry != null) {
-                    val entryBytes = zip.readBytes()
+                    val entryBytes = zip.readCappedBytes()
                     packageEntries[entry.name] = entryBytes
                     zip.closeEntry()
                     entry = zip.nextEntry

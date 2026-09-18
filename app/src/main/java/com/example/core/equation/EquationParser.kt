@@ -36,7 +36,7 @@ object EquationParser {
             builder.append(parsedContent)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing LaTeX to MathML, running fallback wrapper", e)
-            builder.append("<mtext>").append(clean).append("</mtext>")
+            builder.append("<mtext>").append(escapeXml(clean)).append("</mtext>")
         }
         
         builder.append("</math>")
@@ -65,7 +65,7 @@ object EquationParser {
             builder.append(parsedContent)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing LaTeX to OMML, returning raw text tag", e)
-            builder.append("<m:r><m:t>").append(clean).append("</m:t></m:r>")
+            builder.append("<m:r><m:t>").append(escapeXml(clean)).append("</m:t></m:r>")
         }
         
         builder.append("</m:oMath>")
@@ -145,21 +145,24 @@ object EquationParser {
         while (i < latex.length) {
             val c = latex[i]
             when {
-                c.isLetter() -> {
-                    // Check for Greek letters or custom LaTeX symbols
-                    if (c == '\\') {
-                        val word = StringBuilder()
+                // Backslash commands (\alpha, \beta, ...) must be checked first:
+                // '\\' is never isLetter(), so testing it inside that branch was
+                // unreachable dead code.
+                c == '\\' -> {
+                    val word = StringBuilder()
+                    i++
+                    while (i < latex.length && latex[i].isLetter()) {
+                        word.append(latex[i])
                         i++
-                        while (i < latex.length && latex[i].isLetter()) {
-                            word.append(latex[i])
-                            i++
-                        }
-                        val symbol = word.toString()
-                        builder.append("<mi>&").append(symbol).append(";</mi>")
-                        continue
-                    } else {
-                        builder.append("<mi>").append(c).append("</mi>")
                     }
+                    val symbol = word.toString()
+                    if (symbol.isNotEmpty()) {
+                        builder.append("<mi>&").append(escapeXml(symbol)).append(";</mi>")
+                    }
+                    continue
+                }
+                c.isLetter() -> {
+                    builder.append("<mi>").append(c).append("</mi>")
                 }
                 c.isDigit() -> builder.append("<mn>").append(c).append("</mn>")
                 c in "+-*/=" -> builder.append("<mo>").append(c).append("</mo>")
@@ -172,12 +175,19 @@ object EquationParser {
                     builder.append("<mo><sub></mo>")
                 }
                 c == ' ' -> { /* skip */ }
-                else -> builder.append("<mo>").append(c).append("</mo>")
+                else -> builder.append("<mo>").append(escapeXml(c.toString())).append("</mo>")
             }
             i++
         }
         return builder.toString()
     }
+
+    private fun escapeXml(s: String): String =
+        s.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;")
 
     private fun parseFractionsToOMML(latex: String): String {
         val regex = "\\\\frac\\{([^\\}]+)\\}\\{([^\\}]+)\\}".toRegex()
@@ -210,7 +220,7 @@ object EquationParser {
                         i++
                     }
                     val symbol = word.toString()
-                    builder.append("<m:r><m:t>\\").append(symbol).append("</m:t></m:r>")
+                    builder.append("<m:r><m:t>\\").append(escapeXml(symbol)).append("</m:t></m:r>")
                     continue
                 }
                 c.isLetterOrDigit() || c in "+-*/=" -> {

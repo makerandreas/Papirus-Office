@@ -3,6 +3,7 @@ package com.example.core.util
 import android.content.Context
 import android.util.Log
 import com.example.core.ai.GeminiAiService
+import com.makerandreas.papirusoffice.data.util.ZipSafe
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -226,17 +227,22 @@ object TemplateManager {
         template: TemplateItem,
         onProgress: (Float) -> Unit
     ): File? = withContext(Dispatchers.IO) {
+        var partialFile: File? = null
         try {
             val templatesDir = context.getExternalFilesDir("templates") ?: return@withContext null
             if (!templatesDir.exists()) {
                 templatesDir.mkdirs()
             }
 
+            // Catalog metadata (incl. AI-generated entries) is untrusted: keep the
+            // extension strictly alphanumeric so it cannot traverse directories.
             val fileExtension = template.type.lowercase()
+                .replace("[^a-z0-9]".toRegex(), "").take(8).ifEmpty { "odt" }
             // Sanitize file name to prevent directory traversal or malformed paths
             val safeName = template.name.replace("[^a-zA-Z0-9_.-]".toRegex(), "_")
             val fileName = "$safeName.$fileExtension"
             val destinationFile = File(templatesDir, fileName)
+            partialFile = destinationFile
 
             if (template.url.startsWith("asset://")) {
                 val assetPath = template.url.removePrefix("asset://")
@@ -272,33 +278,49 @@ object TemplateManager {
 
                 val body = response.body ?: return@withContext null
                 val contentLength = body.contentLength()
+                if (contentLength > ZipSafe.MAX_DOWNLOAD_BYTES) {
+                    Log.e(TAG, "Template rejected: $contentLength bytes exceeds safety cap")
+                    return@withContext null
+                }
                 val inputStream: InputStream = body.byteStream()
-                val outputStream = FileOutputStream(destinationFile)
 
                 val buffer = ByteArray(8192)
                 var bytesRead: Int
                 var totalBytesRead = 0L
+                var lastReportedProgress = 0f
 
-                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                    outputStream.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
-                    if (contentLength > 0) {
-                        val progress = totalBytesRead.toFloat() / contentLength.toFloat()
-                        withContext(Dispatchers.Main) {
-                            onProgress(progress)
+                FileOutputStream(destinationFile).use { outputStream ->
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        totalBytesRead += bytesRead
+                        if (totalBytesRead > ZipSafe.MAX_DOWNLOAD_BYTES) {
+                            throw java.io.IOException("Template exceeds download safety cap")
+                        }
+                        outputStream.write(buffer, 0, bytesRead)
+                        if (contentLength > 0) {
+                            val progress = totalBytesRead.toFloat() / contentLength.toFloat()
+                            // Throttle main-thread progress hops: every 5% + completion.
+                            if (progress - lastReportedProgress >= 0.05f || progress >= 1f) {
+                                lastReportedProgress = progress
+                                withContext(Dispatchers.Main) {
+                                    onProgress(progress.coerceIn(0f, 1f))
+                                }
+                            }
                         }
                     }
+                    outputStream.flush()
                 }
-
-                outputStream.flush()
-                outputStream.close()
-                inputStream.close()
 
                 Log.d(TAG, "Template downloaded successfully to: ${destinationFile.absolutePath}")
                 destinationFile
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error downloading template: ${e.localizedMessage}", e)
+            // Delete partial output so a failed/capped download is never
+            // mistaken for a complete template on the next attempt.
+            try {
+                if (partialFile != null && partialFile.exists()) partialFile.delete()
+            } catch (_: Exception) {
+            }
             null
         }
     }

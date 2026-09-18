@@ -80,8 +80,9 @@ object SystemClipboard {
     private var instance: XSystemClipboard? = null
 
     fun create(context: XComponentContext?): XSystemClipboard {
-        if (instance == null) {
-            instance = object : XSystemClipboard {
+        synchronized(this) {
+            instance?.let { return it }
+            val created = object : XSystemClipboard {
                 private var currentContents: XTransferable? = null
                 private var currentOwner: XClipboardOwner? = null
                 private val listeners = mutableListOf<XClipboardListener>()
@@ -127,7 +128,8 @@ object SystemClipboard {
                     listeners.remove(listener)
                 }
             }
+            instance = created
+            return created
         }
-        return instance!!
     }
 }

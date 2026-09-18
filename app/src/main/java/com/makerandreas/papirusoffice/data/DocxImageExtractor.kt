@@ -1,6 +1,9 @@
 package com.makerandreas.papirusoffice.data
 
 import android.content.Context
+import android.util.Log
+import com.makerandreas.papirusoffice.data.util.ZipSafe
+import com.makerandreas.papirusoffice.data.util.copyCappedTo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -9,8 +12,15 @@ import java.util.zip.ZipInputStream
 
 class DocxImageExtractor(private val context: Context) {
 
+    companion object {
+        private const val TAG = "DocxImageExtractor"
+    }
+
     /**
-     * Membaca dan mengekstrak gambar dari berkas DOCX/ODT tanpa membebani Main Thread UI
+     * Membaca dan mengekstrak gambar dari berkas DOCX/ODT tanpa membebani Main Thread UI.
+     *
+     * Extraction is bounded ([ZipSafe.MAX_IMAGE_COUNT] files,
+     * [ZipSafe.MAX_IMAGE_BYTES] each) so a hostile archive cannot fill the disk.
      */
     suspend fun extractImagesFromDocx(docxFile: File): Map<String, File> = withContext(Dispatchers.IO) {
         val extractedImages = mutableMapOf<String, File>()
@@ -19,20 +29,34 @@ class DocxImageExtractor(private val context: Context) {
         try {
             ZipInputStream(docxFile.inputStream()).use { zip ->
                 var entry = zip.nextEntry
+                var imageCount = 0
                 while (entry != null) {
                     // Berkas gambar di Microsoft OpenXML tersimpan di folder word/media/
                     // Berkas gambar di OpenDocument (ODT) tersimpan di folder Pictures/
                     val name = entry.name
                     if (name.startsWith("word/media/") || name.startsWith("Pictures/") || name.startsWith("pictures/")) {
-                        val imageName = name.substringAfterLast("/")
-                        if (imageName.isNotEmpty()) {
+                        val imageName = sanitizeImageName(name.substringAfterLast("/"))
+                        if (imageName != null) {
+                            if (imageCount >= ZipSafe.MAX_IMAGE_COUNT) {
+                                Log.w(TAG, "Image count cap reached, skipping remaining entries")
+                                break
+                            }
                             val outputFile = File(cacheDir, imageName)
 
                             if (!outputFile.exists()) {
-                                FileOutputStream(outputFile).use { output ->
-                                    zip.copyTo(output)
+                                try {
+                                    FileOutputStream(outputFile).use { output ->
+                                        zip.copyCappedTo(output, ZipSafe.MAX_IMAGE_BYTES)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Skipping oversized image $name: ${e.message}")
+                                    outputFile.delete()
+                                    zip.closeEntry()
+                                    entry = zip.nextEntry
+                                    continue
                                 }
                             }
+                            imageCount++
                             extractedImages[imageName] = outputFile
                             // Also store with full path key for ODT relative links (e.g. Pictures/image.png)
                             extractedImages[name] = outputFile
@@ -43,9 +67,20 @@ class DocxImageExtractor(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Image extraction failed for ${docxFile.name}", e)
         }
         return@withContext extractedImages
+    }
+
+    /**
+     * Returns a traversal-safe file name, or null when the entry name is
+     * suspicious (empty, parent refs, separators).
+     */
+    private fun sanitizeImageName(raw: String): String? {
+        if (raw.isEmpty() || raw == "." || raw == "..") return null
+        if (raw.contains('/') || raw.contains('\\')) return null
+        val safe = raw.replace("[^A-Za-z0-9 _.,()-]".toRegex(), "_").take(100)
+        return safe.ifEmpty { null }
     }
 
     suspend fun extractImagesFromOdt(odtFile: File): Map<String, File> = extractImagesFromDocx(odtFile)

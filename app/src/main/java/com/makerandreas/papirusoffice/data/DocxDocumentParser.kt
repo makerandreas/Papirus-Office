@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data
 
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
 import android.util.Xml
 import kotlinx.coroutines.Dispatchers
@@ -68,7 +69,7 @@ class DocxDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "word/document.xml") {
-                        val byteArray = zip.readBytes()
+                        val byteArray = zip.readCappedBytes()
                         documentXmlStream = byteArray.inputStream()
                         break
                     }
@@ -189,7 +190,7 @@ class DocxDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "content.xml") {
-                        contentXmlBytes = zip.readBytes()
+                        contentXmlBytes = zip.readCappedBytes()
                         break
                     }
                     zip.closeEntry()

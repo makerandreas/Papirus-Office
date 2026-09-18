@@ -16,3 +16,8 @@
 local.properties
 .env
 debug.keystore
+# Release signing keys must never be committed (see KEYSTORE_GUIDE.md)
+*.jks
+*.keystore
+# Local Firebase config (CI injects it from the GOOGLE_SERVICES_JSON secret)
+app/google-services.json

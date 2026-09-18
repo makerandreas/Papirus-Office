@@ -1,5 +1,7 @@
 package com.makerandreas.papirusoffice.data
 
+import com.makerandreas.papirusoffice.data.util.ZipSafe
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
 import android.net.Uri
 import java.io.File
@@ -16,7 +18,7 @@ class SafStorageProvider(private val context: Context) : StorageProvider {
     override suspend fun read(uri: String): ByteArray = withContext(Dispatchers.IO) {
         PapirusLogger.d("SafStorageProvider", "Reading via SAF URI: $uri")
         try {
-            context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readBytes() } ?: ByteArray(0)
+            context.contentResolver.openInputStream(Uri.parse(uri))?.use { it.readCappedBytes(ZipSafe.MAX_DOCUMENT_BYTES) } ?: ByteArray(0)
         } catch (e: Exception) {
             PapirusLogger.e("SafStorageProvider", "Failed to read SAF URI: $uri", e)
             ByteArray(0)
@@ -46,7 +48,7 @@ class AssetStorageProvider(private val context: Context) : StorageProvider {
         val assetPath = uri.removePrefix("asset://")
         PapirusLogger.d("AssetStorageProvider", "Reading asset: $assetPath")
         try {
-            context.assets.open(assetPath).use { it.readBytes() }
+            context.assets.open(assetPath).use { it.readCappedBytes(ZipSafe.MAX_DOCUMENT_BYTES) }
         } catch (e: Exception) {
             PapirusLogger.e("AssetStorageProvider", "Failed to read asset: $assetPath", e)
             ByteArray(0)

@@ -14,8 +14,14 @@ import java.io.File
 /**
  * Papirus Email & Dispatch Engine.
  * Combines LibreOffice SDK Chapter 42 Email Dispatch specifications
- * with native Android Share Sheets, SMTP client engines, Google Workspace/Firebase integration,
- * and smart messaging fallbacks (RCS Google Messages, mainstream chat apps).
+ * with native Android Share Sheets, an SMTP dry-run simulator, Google
+ * Workspace/Firebase integration, and smart messaging fallbacks
+ * (RCS Google Messages, mainstream chat apps).
+ *
+ * NOTE: [sendEmailViaSMTP] is a protocol simulator for SDK-demonstration
+ * purposes: it walks the SMTP handshake for logging/display but opens no
+ * socket and delivers no mail. Real user sharing goes through
+ * [sendEmailViaSystemClient] (ACTION_SEND chooser).
  */
 object PapirusEmailEngine {
 
@@ -108,8 +114,11 @@ object PapirusEmailEngine {
     }
 
     /**
-     * Option 2: LibreOffice MailServiceProvider (SMTP Socket based) execution.
-     * Simulates full SMTP protocol handshake, TLS negotiation, and data packet routing.
+     * Option 2: LibreOffice MailServiceProvider dry-run simulation.
+     *
+     * Walks the SMTP handshake against the in-process [SMTPMailService] stub for
+     * SDK-demonstration purposes. Opens no network socket and delivers no mail;
+     * returns true when the simulated transcript completed.
      */
     suspend fun sendEmailViaSMTP(
         host: String,
@@ -123,6 +132,11 @@ object PapirusEmailEngine {
         attachmentPath: String?
     ): Boolean = withContext(Dispatchers.IO) {
         clearLogs()
+        if (recipient.isBlank() || user.isBlank() || host.isBlank()) {
+            addLog("SIMULATION aborted: host, account and recipient are required.")
+            return@withContext false
+        }
+        addLog("SIMULATION START — no network connection is opened and no email is sent.")
         addLog("Initializing MailServiceProvider instance...")
         addLog("Target host: $host:$port | Encryption: ${if (sslEnabled) "SSL/TLS" else "Plaintext/Insecure"}")
 
@@ -191,7 +205,7 @@ object PapirusEmailEngine {
             addLog("Disconnecting client safely. 221 Goodbye.")
             service.disconnect()
 
-            addLog("Email successfully dispatched via SMTP provider!")
+            addLog("SIMULATION COMPLETE — transcript only, no email was actually sent.")
             true
         } catch (e: Exception) {
             addLog("SMTP Connection crashed: ${e.localizedMessage}")

@@ -46,10 +46,8 @@
 
     <!-- Welcome Screen -->
     <string name="welcome_title">Welcome to Papirus Office</string>
-    <string name="welcome_desc">To start using Papirus Office and access your documents securely, you need to grant the application access to manage your files.</string>
-    <string name="welcome_grant_btn">Grant Access</string>
-    <string name="welcome_settings_desc">Permission denied. Please grant file access from your system settings to continue.</string>
-    <string name="welcome_open_settings_btn">Open App Settings</string>
+    <string name="welcome_desc">Your documents stay on your device. Open files from anywhere with the system file picker, or create a new document to get started.</string>
+    <string name="welcome_grant_btn">Get Started</string>
 
     <!-- Open Document & Context Menu -->
     <string name="open_document_title">Open</string>
@@ -176,6 +174,7 @@
     <string name="save_as_with_password">Save with Password</string>
     <string name="save_as_encrypt_gpg">Encrypt with GPG</string>
     <string name="save_as_auto_suffix">Automatically Add File Format Suffix</string>
+    <string name="save_as_protection_unsupported">Password protection and GPG encryption are not supported yet. The file will be saved unprotected.</string>
     <string name="warn_non_odf_title">Confirm File Format</string>
     <string name="warn_non_odf_msg">This document may contain formatting or features that cannot be saved in the selected Microsoft Office format (%1$s). Do you want to save in this format anyway?</string>
     <string name="btn_continue">Continue</string>

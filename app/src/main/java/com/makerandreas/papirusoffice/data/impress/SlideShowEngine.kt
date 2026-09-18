@@ -1,5 +1,7 @@
 package com.makerandreas.papirusoffice.data.impress
 
+import androidx.annotation.WorkerThread
+
 // ============================================================================
 // LibreOffice SDK Guide: Chapter 18. Slide Shows
 // Papirus Engine Mock Implementation
@@ -151,6 +153,8 @@ object SlideShowDraw {
         return PapirusPresentation()
     }
 
+    /** Blocking poll loop: must never run on the main thread. */
+    @WorkerThread
     fun getShowController(show: XPresentation2): XSlideShowController? {
         var sc = show.getController()
         var numTries = 1
@@ -162,6 +166,8 @@ object SlideShowDraw {
         return sc
     }
 
+    /** Blocking wait: must never run on the main thread. */
+    @WorkerThread
     fun waitEnded(sc: XSlideShowController) {
         while (sc.getCurrentSlideIndex() != -1) {
             Thread.sleep(100)
@@ -171,6 +177,8 @@ object SlideShowDraw {
         println("End of presentation detected")
     }
 
+    /** Blocking wait: must never run on the main thread. */
+    @WorkerThread
     fun waitLast(sc: XSlideShowController, delay: Int) {
         val numSlides = sc.getSlideCount()
         while (sc.getCurrentSlideIndex() < numSlides - 1) {

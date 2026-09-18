@@ -34,11 +34,11 @@ import com.example.ui.home.WelcomeScreen
 import com.example.ui.home.AboutScreen
 import com.example.ui.theme.PapirusTheme
 import android.os.Build
-import android.os.Environment
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.content.Intent
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.home.RecentFilesTracker
 
 class MainActivity : ComponentActivity() {
@@ -46,22 +46,76 @@ class MainActivity : ComponentActivity() {
         var openedFilePath: String? = null
         var openedFileType: String? = null
         var newDocIndex: Int = 1
+        /**
+         * Bumped every time an external file is received. Compose screens key
+         * their load effects on this (plain statics are not observable, so a
+         * second VIEW intent while the app is alive would otherwise be ignored).
+         */
+        var openedFileNonce by mutableStateOf(0)
+            private set
+
+        /** Maximum accepted size for an incoming shared/opened document (250 MB). */
+        const val MAX_INCOMING_FILE_BYTES = 250L * 1024 * 1024
+    }
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                android.util.Log.w(
+                    "MainActivity",
+                    "POST_NOTIFICATIONS denied: crash-report notifications will be suppressed by the system."
+                )
+            }
+        }
+
+    /**
+     * Sanitizes a DISPLAY_NAME coming from an arbitrary content provider so it
+     * can never escape [cacheDir] (no separators, no parent refs, allowlisted
+     * charset, bounded length).
+     */
+    private fun sanitizeIncomingFileName(raw: String?): String {
+        val base = raw?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()
+            .orEmpty().ifEmpty { "document.odt" }
+        val safe = base.replace("[^A-Za-z0-9 _.,+()\\[\\]-]".toRegex(), "_").take(120)
+        val withExt = if (safe.contains('.')) safe else "$safe.odt"
+        return withExt.ifBlank { "document.odt" }
+    }
+
+    private fun copyCapped(
+        input: java.io.InputStream,
+        output: java.io.OutputStream,
+        displayName: String
+    ) {
+        val buffer = ByteArray(8192)
+        var total = 0L
+        while (true) {
+            val n = input.read(buffer)
+            if (n == -1) break
+            total += n
+            if (total > MAX_INCOMING_FILE_BYTES) {
+                throw java.io.IOException(
+                    "File exceeds ${MAX_INCOMING_FILE_BYTES / 1024 / 1024} MB limit: $displayName"
+                )
+            }
+            output.write(buffer, 0, n)
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action
         val dataUri = intent.data
-        if ((action == Intent.ACTION_VIEW || action == Intent.ACTION_SEND) && dataUri != null) {
+        if ((action == Intent.ACTION_VIEW || action == Intent.ACTION_EDIT) && dataUri != null) {
             try {
-                var displayName = "document.odt"
+                var rawName: String? = null
                 contentResolver.query(dataUri, null, null, null, null)?.use { cursor ->
                     val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                     if (nameIndex != -1 && cursor.moveToFirst()) {
-                        displayName = cursor.getString(nameIndex)
+                        rawName = cursor.getString(nameIndex)
                     }
                 }
-                
+                val displayName = sanitizeIncomingFileName(rawName)
+
                 val lowerName = displayName.lowercase()
                 val fileType = when {
                     lowerName.endsWith(".ods") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") -> "Cellina"
@@ -69,23 +123,24 @@ class MainActivity : ComponentActivity() {
                     lowerName.endsWith(".pdf") -> "Pagella"
                     else -> "Inky"
                 }
-                
+
                 val cacheFile = java.io.File(cacheDir, displayName)
                 contentResolver.openInputStream(dataUri)?.use { input ->
                     java.io.FileOutputStream(cacheFile).use { output ->
-                        input.copyTo(output)
+                        copyCapped(input, output, displayName)
                     }
-                }
-                
+                } ?: throw java.io.IOException("Unable to open input stream for: $dataUri")
+
                 openedFilePath = cacheFile.absolutePath
                 openedFileType = fileType
-                
+                openedFileNonce++
+
                 // Track in recent files too
                 RecentFilesTracker.addFile(this, cacheFile.absolutePath, fileType)
-                
+
                 Toast.makeText(this, "Opening: $displayName", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                e.printStackTrace()
+                android.util.Log.e("MainActivity", "Failed to resolve incoming file", e)
                 Toast.makeText(this, "Failed to resolve file: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -108,7 +163,7 @@ class MainActivity : ComponentActivity() {
         // Request POST_NOTIFICATIONS permission for Android 13+ if needed
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
         
@@ -175,7 +230,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
     }
 
-    LaunchedEffect(MainActivity.openedFilePath, MainActivity.openedFileType) {
+    LaunchedEffect(MainActivity.openedFileNonce) {
         val path = MainActivity.openedFilePath
         val type = MainActivity.openedFileType
         if (path != null && type != null) {
@@ -187,14 +242,12 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         currentWorkspace = "home"
     }
     
-    // Check initial permission state
+    // Show onboarding only on first run. Papirus works entirely within
+    // app-private storage and the Storage Access Framework, so no storage
+    // permission gate is required.
     LaunchedEffect(Unit) {
-        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        }
-        if (!hasPermission) {
+        val prefs = context.getSharedPreferences("papirus_first_run", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("is_first_run", true)) {
             currentWorkspace = "welcome"
         }
     }
@@ -256,6 +309,8 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                 when (normalizedWorkspace) {
                     "welcome" -> WelcomeScreen(
                         onAccessGranted = {
+                            context.getSharedPreferences("papirus_first_run", android.content.Context.MODE_PRIVATE)
+                                .edit().putBoolean("is_first_run", false).apply()
                             currentWorkspace = "home"
                         }
                     )

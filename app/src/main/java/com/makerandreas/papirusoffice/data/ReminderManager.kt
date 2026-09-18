@@ -16,9 +16,6 @@ class ReminderManager {
         reminders.removeAll { it.paragraphIndex == paragraphIndex && it.offset == offset }
         reminders.add(DocumentReminder(paragraphIndex, offset, note))
         reminders.sortBy { it.paragraphIndex }
-        if (reminders.size > 5) {
-            reminders.removeAt(0)
-        }
         return true
     }
 
