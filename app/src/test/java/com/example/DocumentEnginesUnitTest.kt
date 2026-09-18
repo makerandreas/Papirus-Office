@@ -523,4 +523,73 @@ class DocumentEnginesUnitTest {
         val result = OfficeDocumentComparator.compare(modifiedDoc, restoredDoc)
         assertTrue("Default.ott -> Edit -> ODT Roundtrip failed: ${result.differences}", result.isSuccess)
     }
+
+    @Test
+    fun testTwoLinesTypingSelectionDeletionAndUndo() = kotlinx.coroutines.runBlocking {
+        val undoManager = com.makerandreas.papirusoffice.data.undo.UndoManager()
+        var currentText = ""
+        var lastRecorded = ""
+
+        suspend fun recordTyping(newText: String) {
+            val oldVal = lastRecorded
+            val newVal = newText
+            if (oldVal != newVal) {
+                undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                    override val title = "Typing"
+                    override val timestamp = System.currentTimeMillis()
+                    override val icon = "text_fields"
+                    override val commandType = "EDIT_TEXT"
+                    override suspend fun undo() {
+                        currentText = oldVal
+                        lastRecorded = oldVal
+                    }
+                    override suspend fun redo() {
+                        currentText = newVal
+                        lastRecorded = newVal
+                    }
+                })
+                lastRecorded = newVal
+            }
+        }
+
+        // 1. Type two lines
+        val twoLines = "Hello world!\nHello world!"
+        currentText = twoLines
+        recordTyping(currentText)
+
+        // 2. Select all and delete (e.g. keyboard delete)
+        val beforeDelete = currentText
+        currentText = ""
+        undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+            override val title = "Delete selection"
+            override val timestamp = System.currentTimeMillis()
+            override val icon = "backspace"
+            override val commandType = "DELETE_SELECTION"
+            override suspend fun undo() {
+                currentText = beforeDelete
+                lastRecorded = beforeDelete
+            }
+            override suspend fun redo() {
+                currentText = ""
+                lastRecorded = ""
+            }
+        })
+        lastRecorded = ""
+
+        assertEquals("", currentText)
+
+        // 3. Undo via App Bar (calls undoManager.undo())
+        val undoSuccess = undoManager.undo()
+        assertTrue(undoSuccess)
+        assertEquals("Hello world!\nHello world!", currentText)
+
+        // 4. Redo
+        val redoSuccess = undoManager.redo()
+        assertTrue(redoSuccess)
+        assertEquals("", currentText)
+
+        // 5. Undo again
+        undoManager.undo()
+        assertEquals("Hello world!\nHello world!", currentText)
+    }
 }

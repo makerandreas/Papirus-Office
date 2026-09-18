@@ -304,6 +304,9 @@ fun InkyModule(
     }
 
     var lastTextRecordedValue by remember { mutableStateOf("") }
+    val isUndoEnabled by remember(canUndo, docBodyText.text, lastTextRecordedValue) {
+        derivedStateOf { canUndo || (docBodyText.text != lastTextRecordedValue) }
+    }
     var initialLoadedText by remember { mutableStateOf("") }
 
     LaunchedEffect(docBodyText.text, docTitle, currentSessionState?.document) {
@@ -1395,6 +1398,283 @@ fun InkyModule(
         }
     }
 
+    // Autosave helper
+    fun triggerAutosave() {
+        isSaved = false
+    }
+
+    var typingDebounceJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    val flushPendingTyping: suspend (String) -> Unit = { textToCommit ->
+        typingDebounceJob?.cancel()
+        typingDebounceJob = null
+        if (textToCommit != lastTextRecordedValue) {
+            val oldValue = lastTextRecordedValue
+            val newValue = textToCommit
+            val diff = newValue.length - oldValue.length
+            val title = when {
+                diff > 0 -> {
+                    val added = if (newValue.startsWith(oldValue)) {
+                        newValue.substring(oldValue.length)
+                    } else {
+                        newValue
+                    }
+                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
+                }
+                diff < 0 -> "Delete text"
+                else -> "Edit Document"
+            }
+            val icon = if (diff >= 0) "text_fields" else "backspace"
+            val cmdType = if (diff >= 0) "TYPING" else "DELETE_TEXT"
+            val oldSel = androidx.compose.ui.text.TextRange(oldValue.length)
+            val newSel = androidx.compose.ui.text.TextRange(newValue.length)
+
+            val session = currentSessionState
+            if (session != null) {
+                session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                    override val title = title
+                    override val timestamp = System.currentTimeMillis()
+                    override val icon = icon
+                    override val commandType = cmdType
+                    override suspend fun undo() {
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                            text = oldValue,
+                            selection = oldSel
+                        )
+                        lastTextRecordedValue = oldValue
+                    }
+                    override suspend fun redo() {
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                            text = newValue,
+                            selection = newSel
+                        )
+                        lastTextRecordedValue = newValue
+                    }
+                })
+            }
+            lastTextRecordedValue = newValue
+            triggerAutosave()
+        }
+    }
+
+    val performUndo: () -> Unit = {
+        customTextToolbar.hide()
+        coroutineScope.launch {
+            flushPendingTyping(docBodyText.text)
+            val success = currentSessionState?.undoManager?.undo() ?: false
+            if (success) {
+                triggerAutosave()
+                Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+            }
+        }
+        addLokitLog("lok::Document::postWindow(event=UNDO)")
+    }
+
+    val performRedo: () -> Unit = {
+        customTextToolbar.hide()
+        coroutineScope.launch {
+            flushPendingTyping(docBodyText.text)
+            val success = currentSessionState?.undoManager?.redo() ?: false
+            if (success) {
+                triggerAutosave()
+                Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+            }
+        }
+        addLokitLog("lok::Document::postWindow(event=REDO)")
+    }
+
+    val performUndoTo: (com.makerandreas.papirusoffice.data.undo.HistoryEntry) -> Unit = { entry ->
+        customTextToolbar.hide()
+        coroutineScope.launch {
+            flushPendingTyping(docBodyText.text)
+            currentSessionState?.undoManager?.undoTo(entry)
+            triggerAutosave()
+            Toast.makeText(context, "Actions undone", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val performRedoTo: (com.makerandreas.papirusoffice.data.undo.HistoryEntry) -> Unit = { entry ->
+        customTextToolbar.hide()
+        coroutineScope.launch {
+            flushPendingTyping(docBodyText.text)
+            currentSessionState?.undoManager?.redoTo(entry)
+            triggerAutosave()
+            Toast.makeText(context, "Actions redone", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val handleTextValueChange: (androidx.compose.ui.text.input.TextFieldValue) -> Unit = { newValue ->
+        val prevValue = docBodyText
+        val prevText = prevValue.text
+        val prevSel = prevValue.selection
+        val newText = newValue.text
+        val newSel = newValue.selection
+
+        if (newText == prevText) {
+            // Selection or cursor change only
+            docBodyText = newValue
+        } else {
+            isSaved = false
+            val hadSelection = !prevSel.collapsed
+
+            if (hadSelection) {
+                typingDebounceJob?.cancel()
+                typingDebounceJob = null
+
+                val start = kotlin.math.min(prevSel.start, prevSel.end)
+                val end = kotlin.math.max(prevSel.start, prevSel.end)
+                val selRange = com.makerandreas.papirusoffice.data.writer.SelectionRange(start, end)
+                val fullText = prevText
+                val priorOld = lastTextRecordedValue
+                val isDelete = newText.length < prevText.length
+
+                coroutineScope.launch {
+                    val session = currentSessionState
+                    // 1. Flush uncommitted typing that occurred before this selection
+                    if (session != null && fullText != priorOld) {
+                        flushPendingTyping(fullText)
+                    }
+
+                    // 2. Record selection delete/replace
+                    if (isDelete) {
+                        inkyEditingEngine.deleteSelection(
+                            selection = selRange,
+                            fullText = fullText,
+                            onApply = { appliedText, s ->
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = appliedText,
+                                    selection = androidx.compose.ui.text.TextRange(s.min, s.max)
+                                )
+                                lastTextRecordedValue = appliedText
+                                isSaved = false
+                            }
+                        )
+                    } else if (session != null) {
+                        session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                            override val title = "Replace text"
+                            override val timestamp = System.currentTimeMillis()
+                            override val icon = "edit"
+                            override val commandType = "REPLACE_SELECTION"
+                            override suspend fun undo() {
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = fullText,
+                                    selection = prevSel
+                                )
+                                lastTextRecordedValue = fullText
+                            }
+                            override suspend fun redo() {
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = newText,
+                                    selection = newSel
+                                )
+                                lastTextRecordedValue = newText
+                            }
+                        })
+                        lastTextRecordedValue = newText
+                    }
+                }
+
+                if (!isDelete) {
+                    docBodyText = newValue
+                }
+                triggerAutosave()
+            } else {
+                // Collapsed cursor: typing, enter, backspace
+                docBodyText = newValue
+                triggerAutosave()
+
+                val isEnter = (newText.length == prevText.length + 1) &&
+                        (prevSel.min < newText.length && newText[prevSel.min] == '\n')
+
+                if (isEnter) {
+                    typingDebounceJob?.cancel()
+                    typingDebounceJob = null
+                    val priorOld = lastTextRecordedValue
+                    val priorNew = newText
+                    coroutineScope.launch {
+                        val session = currentSessionState
+                        if (session != null && priorNew != priorOld) {
+                            session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                                override val title = "New Paragraph"
+                                override val timestamp = System.currentTimeMillis()
+                                override val icon = "keyboard_return"
+                                override val commandType = "SPLIT_PARAGRAPH"
+                                override suspend fun undo() {
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = priorOld,
+                                        selection = prevSel
+                                    )
+                                    lastTextRecordedValue = priorOld
+                                }
+                                override suspend fun redo() {
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = priorNew,
+                                        selection = newSel
+                                    )
+                                    lastTextRecordedValue = priorNew
+                                }
+                            })
+                        }
+                        lastTextRecordedValue = priorNew
+                    }
+                } else {
+                    // Continuous typing / backspacing: debounce for 800ms
+                    typingDebounceJob?.cancel()
+                    typingDebounceJob = coroutineScope.launch {
+                        kotlinx.coroutines.delay(800)
+                        val session = currentSessionState
+                        val currentText = docBodyText.text
+                        if (session != null && currentText != lastTextRecordedValue) {
+                            val oldValue = lastTextRecordedValue
+                            val newValueText = currentText
+                            val diff = newValueText.length - oldValue.length
+                            val title = when {
+                                diff > 0 -> {
+                                    val added = if (newValueText.startsWith(oldValue)) {
+                                        newValueText.substring(oldValue.length)
+                                    } else {
+                                        newValueText
+                                    }
+                                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
+                                }
+                                diff < 0 -> "Delete text"
+                                else -> "Edit Document"
+                            }
+                            val icon = if (diff >= 0) "text_fields" else "backspace"
+                            val cmdType = if (diff >= 0) "TYPING" else "DELETE_TEXT"
+                            val currentSel = docBodyText.selection
+                            session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                                override val title = title
+                                override val timestamp = System.currentTimeMillis()
+                                override val icon = icon
+                                override val commandType = cmdType
+                                override suspend fun undo() {
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = oldValue,
+                                        selection = androidx.compose.ui.text.TextRange(oldValue.length)
+                                    )
+                                    lastTextRecordedValue = oldValue
+                                }
+                                override suspend fun redo() {
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = newValueText,
+                                        selection = currentSel
+                                    )
+                                    lastTextRecordedValue = newValueText
+                                }
+                            })
+                            lastTextRecordedValue = newValueText
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     val handleFctDelete: () -> Unit = {
         val selection = docBodyText.selection
         if (!selection.collapsed) {
@@ -1403,19 +1683,26 @@ fun InkyModule(
             val selRange = com.makerandreas.papirusoffice.data.writer.SelectionRange(start, end)
             val fullText = docBodyText.text
 
-            com.makerandreas.papirusoffice.data.PapirusLogger.d("UNDO", "DeleteSelectionCommand")
-            inkyEditingEngine.deleteSelection(
-                selection = selRange,
-                fullText = fullText,
-                onApply = { appliedText, newSel ->
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                        text = appliedText,
-                        selection = androidx.compose.ui.text.TextRange(newSel.min, newSel.max)
-                    )
-                    lastTextRecordedValue = appliedText
-                    isSaved = false
+            typingDebounceJob?.cancel()
+            typingDebounceJob = null
+            coroutineScope.launch {
+                if (fullText != lastTextRecordedValue) {
+                    flushPendingTyping(fullText)
                 }
-            )
+                com.makerandreas.papirusoffice.data.PapirusLogger.d("UNDO", "DeleteSelectionCommand")
+                inkyEditingEngine.deleteSelection(
+                    selection = selRange,
+                    fullText = fullText,
+                    onApply = { appliedText, newSel ->
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                            text = appliedText,
+                            selection = androidx.compose.ui.text.TextRange(newSel.min, newSel.max)
+                        )
+                        lastTextRecordedValue = appliedText
+                        isSaved = false
+                    }
+                )
+            }
         }
     }
 
@@ -1478,53 +1765,8 @@ fun InkyModule(
         previousScrollValue = scrollState.value
     }
 
-    // Helper functions
-    fun triggerAutosave() {
-        isSaved = false
-    }
-
     LaunchedEffect(currentSessionState) {
         lastTextRecordedValue = docBodyText.text
-    }
-
-    LaunchedEffect(docBodyText.text) {
-        if (docBodyText.text != lastTextRecordedValue) {
-            kotlinx.coroutines.delay(1000) // Debounce typing for 1 second
-            val oldValue = lastTextRecordedValue
-            val newValue = docBodyText.text
-            val diff = newValue.length - oldValue.length
-            val title = when {
-                diff > 0 -> {
-                    val added = newValue.substring(oldValue.length.coerceAtMost(newValue.length))
-                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
-                }
-                diff < 0 -> "Delete text"
-                else -> "Edit Document"
-            }
-
-            currentSessionState?.undoManager?.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
-                override val title = title
-                override val timestamp = System.currentTimeMillis()
-                override val icon = if (diff >= 0) "text_fields" else "backspace"
-                override val commandType = "EDIT_TEXT"
-                override suspend fun undo() {
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                        text = oldValue,
-                        selection = androidx.compose.ui.text.TextRange(oldValue.length)
-                    )
-                    lastTextRecordedValue = oldValue
-                }
-                override suspend fun redo() {
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                        text = newValue,
-                        selection = androidx.compose.ui.text.TextRange(newValue.length)
-                    )
-                    lastTextRecordedValue = newValue
-                }
-            })
-            lastTextRecordedValue = newValue
-            triggerAutosave()
-        }
     }
 
     fun Float.safeCoerceIn(min: Float, max: Float): Float {
@@ -1712,6 +1954,16 @@ fun InkyModule(
                             } else if (event.key == androidx.compose.ui.input.key.Key.O) {
                                 handleOpenDocument()
                                 true
+                            } else if (event.key == androidx.compose.ui.input.key.Key.Z) {
+                                if (event.isShiftPressed) {
+                                    performRedo()
+                                } else {
+                                    performUndo()
+                                }
+                                true
+                            } else if (event.key == androidx.compose.ui.input.key.Key.Y) {
+                                performRedo()
+                                true
                             } else {
                                 false
                             }
@@ -1815,13 +2067,8 @@ fun InkyModule(
 
                                 // 4. Undo (Edit Mode only)
                                 IconButton(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            currentSessionState?.undoManager?.undo()
-                                            triggerAutosave()
-                                        }
-                                    },
-                                    enabled = canUndo
+                                    onClick = performUndo,
+                                    enabled = isUndoEnabled
                                 ) {
                                     Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo")
                                 }
@@ -2167,13 +2414,7 @@ fun InkyModule(
                                 ) {
                                     androidx.compose.foundation.text.BasicTextField(
                                         value = docBodyText,
-                                        onValueChange = { newValue ->
-                                            if (newValue.text != docBodyText.text) {
-                                                isSaved = false
-                                            }
-                                            docBodyText = newValue
-                                            triggerAutosave()
-                                        },
+                                        onValueChange = handleTextValueChange,
                                         enabled = true,
                                         readOnly = false,
                                         textStyle = MaterialTheme.typography.bodyLarge.copy(
@@ -2649,34 +2890,10 @@ fun InkyModule(
                                 navEngine = navEngine,
                                 isEditMode = isEditMode,
                                 onOpenNavigateBy = { bottomBarDeck = "navigate_by" },
-                                onUndo = {
-                                    customTextToolbar.hide()
-                                    coroutineScope.launch {
-                                        val success = currentSessionState?.undoManager?.undo() ?: false
-                                        if (success) {
-                                            triggerAutosave()
-                                            Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                },
-                                onRedo = {
-                                    customTextToolbar.hide()
-                                    coroutineScope.launch {
-                                        val success = currentSessionState?.undoManager?.redo() ?: false
-                                        if (success) {
-                                            triggerAutosave()
-                                            Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    addLokitLog("lok::Document::postWindow(event=REDO)")
-                                },
+                                onUndo = performUndo,
+                                onRedo = performRedo,
                                 onClose = { showBottomBar = false },
-                                canUndo = canUndo,
+                                canUndo = isUndoEnabled,
                                 canRedo = canRedo
                             )
                         } else if (bottomBarDeck == "navigate_by") {
@@ -2684,34 +2901,10 @@ fun InkyModule(
                                 navEngine = navEngine,
                                 isEditMode = isEditMode,
                                 onBackToNavigator = { bottomBarDeck = "navigator" },
-                                onUndo = {
-                                    customTextToolbar.hide()
-                                    coroutineScope.launch {
-                                        val success = currentSessionState?.undoManager?.undo() ?: false
-                                        if (success) {
-                                            triggerAutosave()
-                                            Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                },
-                                onRedo = {
-                                    customTextToolbar.hide()
-                                    coroutineScope.launch {
-                                        val success = currentSessionState?.undoManager?.redo() ?: false
-                                        if (success) {
-                                            triggerAutosave()
-                                            Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                    addLokitLog("lok::Document::postWindow(event=REDO)")
-                                },
+                                onUndo = performUndo,
+                                onRedo = performRedo,
                                 onClose = { showBottomBar = false },
-                                canUndo = canUndo,
+                                canUndo = isUndoEnabled,
                                 canRedo = canRedo
                             )
                         } else {
@@ -2832,22 +3025,11 @@ fun InkyModule(
                                     // Persistent undo/redo/close
                                     if (activeInkySubpage != "actions_to_undo" && activeInkySubpage != "actions_to_redo") {
                                         LongClickIconButton(
-                                            enabled = canUndo,
-                                            onClick = {
-                                                customTextToolbar.hide()
-                                                coroutineScope.launch {
-                                                    val success = currentSessionState?.undoManager?.undo() ?: false
-                                                    if (success) {
-                                                        triggerAutosave()
-                                                        Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                                addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                            },
+                                            enabled = isUndoEnabled,
+                                            onClick = performUndo,
                                             onLongClick = {
                                                 customTextToolbar.hide()
+                                                coroutineScope.launch { flushPendingTyping(docBodyText.text) }
                                                 previousInkySubpage = activeInkySubpage
                                                 activeInkySubpage = "actions_to_undo"
                                             }
@@ -2855,26 +3037,15 @@ fun InkyModule(
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.Undo,
                                                 contentDescription = "Undo",
-                                                tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                                tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
                                         }
                                         LongClickIconButton(
                                             enabled = canRedo,
-                                            onClick = {
-                                                customTextToolbar.hide()
-                                                coroutineScope.launch {
-                                                    val success = currentSessionState?.undoManager?.redo() ?: false
-                                                    if (success) {
-                                                        triggerAutosave()
-                                                        Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                                addLokitLog("lok::Document::postWindow(event=REDO)")
-                                            },
+                                            onClick = performRedo,
                                             onLongClick = {
                                                 customTextToolbar.hide()
+                                                coroutineScope.launch { flushPendingTyping(docBodyText.text) }
                                                 previousInkySubpage = activeInkySubpage
                                                 activeInkySubpage = "actions_to_redo"
                                             }
@@ -2957,22 +3128,11 @@ fun InkyModule(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     LongClickIconButton(
-                                        enabled = canUndo,
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch {
-                                                val success = currentSessionState?.undoManager?.undo() ?: false
-                                                if (success) {
-                                                    triggerAutosave()
-                                                    Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                            addLokitLog("lok::Document::postWindow(event=UNDO)")
-                                        },
+                                        enabled = isUndoEnabled,
+                                        onClick = performUndo,
                                         onLongClick = {
                                             customTextToolbar.hide()
+                                            coroutineScope.launch { flushPendingTyping(docBodyText.text) }
                                             previousInkySubpage = activeInkySubpage
                                             activeInkySubpage = "actions_to_undo"
                                         }
@@ -2980,26 +3140,15 @@ fun InkyModule(
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Undo,
                                             contentDescription = "Undo",
-                                            tint = if (canUndo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                            tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
                                     LongClickIconButton(
                                         enabled = canRedo,
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch {
-                                                val success = currentSessionState?.undoManager?.redo() ?: false
-                                                if (success) {
-                                                    triggerAutosave()
-                                                    Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
-                                                } else {
-                                                    Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                            addLokitLog("lok::Document::postWindow(event=REDO)")
-                                        },
+                                        onClick = performRedo,
                                         onLongClick = {
                                             customTextToolbar.hide()
+                                            coroutineScope.launch { flushPendingTyping(docBodyText.text) }
                                             previousInkySubpage = activeInkySubpage
                                             activeInkySubpage = "actions_to_redo"
                                         }
@@ -3088,26 +3237,14 @@ fun InkyModule(
                                             val undoHistory = currentSessionState?.undoManager?.historyManager?.undoHistory?.collectAsState()?.value ?: emptyList()
                                             com.example.ui.components.ActionsToUndoSubpage(
                                                 undoHistory = undoHistory,
-                                                onSelectEntry = { entry ->
-                                                    coroutineScope.launch {
-                                                        currentSessionState?.undoManager?.undoTo(entry)
-                                                        triggerAutosave()
-                                                        Toast.makeText(context, "Actions undone", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
+                                                onSelectEntry = { entry -> performUndoTo(entry) }
                                             )
                                         }
                                         "actions_to_redo" -> {
                                             val redoHistory = currentSessionState?.undoManager?.historyManager?.redoHistory?.collectAsState()?.value ?: emptyList()
                                             com.example.ui.components.ActionsToRedoSubpage(
                                                 redoHistory = redoHistory,
-                                                onSelectEntry = { entry ->
-                                                    coroutineScope.launch {
-                                                        currentSessionState?.undoManager?.redoTo(entry)
-                                                        triggerAutosave()
-                                                        Toast.makeText(context, "Actions redone", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
+                                                onSelectEntry = { entry -> performRedoTo(entry) }
                                             )
                                         }
                                     }
