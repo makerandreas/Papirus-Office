@@ -1420,7 +1420,14 @@ fun SlidiaModule(
                 moduleType = "Slidia",
                 currentTitle = docTitle,
                 onDismiss = { showSaveAsDialog = false },
-                onConfirmSave = { selectedFormat, extension, mimeType ->
+                onConfirmSave = { selectedFormat, extension, mimeType, withPassword, encryptWithGpg ->
+                    if (withPassword || encryptWithGpg) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.save_as_protection_unsupported),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     currentSaveMimeType = mimeType
                     val baseName = docTitle.substringBeforeLast(".")
                     currentSaveDefaultFilename = if (baseName.isBlank()) "Slidia_Presentation$extension" else "$baseName$extension"

@@ -87,12 +87,15 @@ data class OfficeParsedDocument(
         // Implementation for reformatting layout
     }
 
-    override fun createReplaceDescriptor(): XReplaceDescriptor = throw NotImplementedError()
-    override fun replaceAll(descriptor: XSearchDescriptor): Long = throw NotImplementedError()
-    override fun createSearchDescriptor(): XSearchDescriptor = throw NotImplementedError()
-    override fun findAll(descriptor: XSearchDescriptor): Any = throw NotImplementedError()
-    override fun findFirst(descriptor: XSearchDescriptor): Any? = throw NotImplementedError()
-    override fun findNext(startAt: Any, descriptor: XSearchDescriptor): Any? = throw NotImplementedError()
+    // Search/replace is not implemented for the parsed model yet. These
+    // deliberately return safe no-op results instead of throwing, so any
+    // current or future caller (e.g. Find & Replace UI) degrades gracefully.
+    override fun createReplaceDescriptor(): XReplaceDescriptor = SearchDescriptorStub(replace = "")
+    override fun replaceAll(descriptor: XSearchDescriptor): Long = 0L
+    override fun createSearchDescriptor(): XSearchDescriptor = SearchDescriptorStub(replace = null)
+    override fun findAll(descriptor: XSearchDescriptor): Any = emptyList<Any>()
+    override fun findFirst(descriptor: XSearchDescriptor): Any? = null
+    override fun findNext(startAt: Any, descriptor: XSearchDescriptor): Any? = null
 }
 
 class DocumentTextImpl(private val document: OfficeParsedDocument) : XText {
@@ -103,10 +106,46 @@ class DocumentTextImpl(private val document: OfficeParsedDocument) : XText {
         get() = document.plainText
         set(value) {}
 
-    override fun createTextCursor(): XTextCursor = throw NotImplementedError()
-    override fun createTextCursorByRange(textPosition: XTextRange): XTextCursor = throw NotImplementedError()
+    override fun createTextCursor(): XTextCursor = TextCursorStub(text)
+    override fun createTextCursorByRange(textPosition: XTextRange): XTextCursor = TextCursorStub(text)
     override fun insertString(range: XTextRange, string: String, absorb: Boolean) {}
     override fun insertControlCharacter(range: XTextRange, controlCharacter: Short, absorb: Boolean) {}
     override fun insertTextContent(range: XTextRange, content: XTextContent, absorb: Boolean) {}
     override fun removeTextContent(content: XTextContent) {}
+}
+
+/**
+ * Mutable search/replace descriptor stub. Carries the query options so
+ * callers can construct descriptors; the parsed-model search itself is
+ * unimplemented and always yields no matches (see [OfficeParsedDocument]).
+ */
+private class SearchDescriptorStub(replace: String?) : XReplaceDescriptor {
+    override var searchString: String = ""
+    override var searchBackwards: Boolean = false
+    override var searchCaseSensitive: Boolean = false
+    override var searchRegularExpression: Boolean = false
+    override var searchWords: Boolean = false
+    override var replaceString: String = replace ?: ""
+}
+
+/**
+ * Collapsed no-op text cursor over [owner]. All movement collapses to the
+ * start; never throws so cursor-driven callers degrade gracefully.
+ */
+private class TextCursorStub(private val owner: XText) : XTextCursor {
+    override val text: XText get() = owner
+    override val start: XTextRange get() = this
+    override val end: XTextRange get() = this
+    override var string: String
+        get() = ""
+        set(_) { }
+
+    override fun collapseToStart() { }
+    override fun collapseToEnd() { }
+    override fun isCollapsed(): Boolean = true
+    override fun goLeft(count: Short, expand: Boolean): Boolean = false
+    override fun goRight(count: Short, expand: Boolean): Boolean = false
+    override fun gotoStart(expand: Boolean) { }
+    override fun gotoEnd(expand: Boolean) { }
+    override fun gotoRange(range: XTextRange, expand: Boolean) { }
 }

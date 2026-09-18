@@ -147,7 +147,7 @@ fun CellinaModule(
         }
     }
 
-    LaunchedEffect(com.example.MainActivity.openedFilePath) {
+    LaunchedEffect(com.example.MainActivity.openedFileNonce, com.example.MainActivity.openedFilePath) {
         val path = com.example.MainActivity.openedFilePath
         if (path != null) {
             val file = java.io.File(path)
@@ -1738,7 +1738,14 @@ fun CellinaModule(
                 moduleType = "Cellina",
                 currentTitle = docTitle,
                 onDismiss = { showSaveAsDialog = false },
-                onConfirmSave = { selectedFormat, extension, mimeType ->
+                onConfirmSave = { selectedFormat, extension, mimeType, withPassword, encryptWithGpg ->
+                    if (withPassword || encryptWithGpg) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.save_as_protection_unsupported),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                     currentSaveMimeType = mimeType
                     val baseName = docTitle.substringBeforeLast(".")
                     currentSaveDefaultFilename = if (baseName.isBlank()) "Cellina_Data$extension" else "$baseName$extension"

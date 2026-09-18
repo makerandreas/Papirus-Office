@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data
 
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import android.content.Context
@@ -44,6 +45,13 @@ class OfficeDocumentParser(private val context: Context) {
     companion object {
         private val inMemoryParsedDocCache = ConcurrentHashMap<String, Pair<Long, OfficeParsedDocument>>()
 
+        // Precompiled style-classification patterns (was: recompiled per style).
+        private val PARA_STYLE_REGEX = Regex("(?i)para[1-9]")
+        private val PARA_STYLE_ANCHORED_REGEX = Regex("(?i)^para[1-9]$")
+        private val HEADING_STYLE_REGEX = Regex("(?i)heading[1-9]")
+        private val SINGLE_DIGIT_REGEX = Regex("^[1-6]$")
+        private val DIGITS_REGEX = Regex("\\d+")
+
         fun clearCacheForFile(path: String) {
             inMemoryParsedDocCache.remove(path)
         }
@@ -65,7 +73,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "word/_rels/document.xml.rels") {
-                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val xml = zip.readCappedBytes().toString(Charsets.UTF_8)
                         val factory = XmlPullParserFactory.newInstance()
                         factory.isNamespaceAware = false
                         val parser = factory.newPullParser()
@@ -100,7 +108,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "docProps/app.xml") {
-                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val xml = zip.readCappedBytes().toString(Charsets.UTF_8)
                         val match = Regex("<(?:[a-zA-Z0-9]+:)?Pages>(\\d+)</(?:[a-zA-Z0-9]+:)?Pages>", RegexOption.IGNORE_CASE).find(xml)
                         val p = match?.groupValues?.get(1)?.toIntOrNull()
                         if (p != null && p > 0) return p
@@ -123,7 +131,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "meta.xml") {
-                        val xml = zip.readBytes().toString(Charsets.UTF_8)
+                        val xml = zip.readCappedBytes().toString(Charsets.UTF_8)
                         val match = Regex("page-count=\"(\\d+)\"", RegexOption.IGNORE_CASE).find(xml)
                         val p = match?.groupValues?.get(1)?.toIntOrNull()
                         if (p != null && p > 0) return p
@@ -148,7 +156,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var entry = zip.nextEntry
                 while (entry != null) {
                     if (entry.name == "word/styles.xml") {
-                        stylesXmlContent = zip.readBytes().toString(Charsets.UTF_8)
+                        stylesXmlContent = zip.readCappedBytes().toString(Charsets.UTF_8)
                         break
                     }
                     zip.closeEntry()
@@ -188,16 +196,15 @@ class OfficeDocumentParser(private val context: Context) {
                                 val isHeading = sName.contains("heading", ignoreCase = true) ||
                                         sName.contains("judul", ignoreCase = true) ||
                                         sName.contains("title", ignoreCase = true) ||
-                                        currentStyleId.matches(Regex("(?i)para[1-9]")) ||
-                                        currentStyleId.matches(Regex("(?i)heading[1-9]")) ||
+                                        currentStyleId.matches(PARA_STYLE_REGEX) ||
+                                        currentStyleId.matches(HEADING_STYLE_REGEX) ||
                                         currentOutlineLvl != null
 
                                 val level = when {
                                     currentOutlineLvl != null -> currentOutlineLvl + 1
-                                    Regex("\\d+").find(sName) != null -> Regex("\\d+").find(sName)!!.value.toInt()
-                                    Regex("\\d+").find(currentStyleId) != null -> Regex("\\d+").find(currentStyleId)!!.value.toInt()
-                                    sName.contains("title", ignoreCase = true) -> 1
-                                    else -> 1
+                                    else -> DIGITS_REGEX.find(sName)?.value?.toIntOrNull()
+                                        ?: DIGITS_REGEX.find(currentStyleId)?.value?.toIntOrNull()
+                                        ?: 1
                                 }
                                 stylesMap[currentStyleId.lowercase()] = DocxStyleMeta(
                                     styleId = currentStyleId,
@@ -466,19 +473,19 @@ class OfficeDocumentParser(private val context: Context) {
                 while (entry != null) {
                     val name = entry.name
                     if (name == targetEntry) {
-                        val rawContent = zip.readBytes().toString(Charsets.UTF_8)
+                        val rawContent = zip.readCappedBytes().toString(Charsets.UTF_8)
                         return@withContext sanitizeXmlContent(rawContent, file.name)
                     }
                     if (name == "content.xml") {
-                        contentXmlFound = zip.readBytes().toString(Charsets.UTF_8)
+                        contentXmlFound = zip.readCappedBytes().toString(Charsets.UTF_8)
                     } else if (name == "word/document.xml") {
-                        wordDocumentFound = zip.readBytes().toString(Charsets.UTF_8)
+                        wordDocumentFound = zip.readCappedBytes().toString(Charsets.UTF_8)
                     } else if (name.startsWith("xl/worksheets/sheet") && fallbackSheetContent == null) {
-                        fallbackSheetContent = zip.readBytes().toString(Charsets.UTF_8)
+                        fallbackSheetContent = zip.readCappedBytes().toString(Charsets.UTF_8)
                     } else if (name.startsWith("ppt/slides/slide")) {
-                        slideContents.add(zip.readBytes().toString(Charsets.UTF_8))
+                        slideContents.add(zip.readCappedBytes().toString(Charsets.UTF_8))
                     } else if (name == "ppt/presentation.xml" && fallbackSlideContent == null) {
-                        fallbackSlideContent = zip.readBytes().toString(Charsets.UTF_8)
+                        fallbackSlideContent = zip.readCappedBytes().toString(Charsets.UTF_8)
                     }
                     zip.closeEntry()
                     entry = zip.nextEntry
@@ -657,7 +664,7 @@ class OfficeDocumentParser(private val context: Context) {
                         java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
                             var entry = zip.nextEntry
                             while (entry != null) {
-                                packageEntries[entry.name] = zip.readBytes()
+                                packageEntries[entry.name] = zip.readCappedBytes()
                                 zip.closeEntry()
                                 entry = zip.nextEntry
                             }
@@ -791,11 +798,11 @@ class OfficeDocumentParser(private val context: Context) {
                                     val isHeadingStyle = styleVal.contains("Heading", ignoreCase = true) ||
                                             styleVal.contains("Judul", ignoreCase = true) ||
                                             styleVal.contains("Title", ignoreCase = true) ||
-                                            styleVal.matches(Regex("(?i)^para[1-9]$")) ||
-                                            styleVal.matches(Regex("^[1-6]$"))
+                                            styleVal.matches(PARA_STYLE_ANCHORED_REGEX) ||
+                                            styleVal.matches(SINGLE_DIGIT_REGEX)
                                     if (isHeadingStyle) {
                                         inHeading = true
-                                        val levelDigit = Regex("\\d+").find(styleVal)?.value?.toIntOrNull()
+                                        val levelDigit = DIGITS_REGEX.find(styleVal)?.value?.toIntOrNull()
                                         headingLevel = levelDigit ?: 1
                                     }
                                 }
@@ -1313,7 +1320,7 @@ class OfficeDocumentParser(private val context: Context) {
                 java.util.zip.ZipInputStream(outputFile.inputStream()).use { zip ->
                     var entry = zip.nextEntry
                     while (entry != null) {
-                        map[entry.name] = zip.readBytes()
+                        map[entry.name] = zip.readCappedBytes()
                         zip.closeEntry()
                         entry = zip.nextEntry
                     }

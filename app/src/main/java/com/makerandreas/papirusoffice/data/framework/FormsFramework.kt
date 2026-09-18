@@ -375,11 +375,7 @@ object Forms {
 
     fun insertForm(formName: String, doc: Any?): XNameContainer {
         val formMap = documentFormsStore.getOrPut(doc) { mutableMapOf() }
-        if (!formMap.containsKey(formName)) {
-            val newFormContainer = DynamicNameContainer()
-            formMap[formName] = newFormContainer
-        }
-        return formMap[formName]!!
+        return formMap.getOrPut(formName) { DynamicNameContainer() }
     }
 
     fun getForm(doc: Any?, formName: String): XForm? {

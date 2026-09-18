@@ -125,7 +125,9 @@ class FirebaseCloudManager private constructor(context: Context) {
                 authorEmail = user.email ?: "anonymous@papirus.office",
                 updatedAt = System.currentTimeMillis(),
                 sizeBytes = document.content.toByteArray().size.toLong(),
-                driveSyncUrl = "https://drive.google.com/open?id=$docId"
+                // No Google Drive integration exists: never fabricate a drive
+                // URL. Stays null until a real Drive upload returns one.
+                driveSyncUrl = null
             )
 
             database.collection("users")

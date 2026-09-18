@@ -35,18 +35,20 @@ android {
       "$semVerMajor.$semVerMinor.$semVerPatch"
     })
 
-    // Compute dynamic Papirus Engine version based on engine source changes
+    // Compute dynamic Papirus Engine version based on engine source changes.
+    // NOTE: uses only file sizes + relative paths (never lastModified) so the
+    // version is deterministic across checkouts and reproducible builds.
     val engineDir = file("src/main/java/com/makerandreas/papirusoffice")
     val engineVersion = if (engineDir.exists()) {
       var hashSum = 0L
       var fileCount = 0
       engineDir.walkTopDown().filter { it.isFile }.forEach { f ->
-        hashSum += f.length() + f.lastModified()
+        hashSum += f.length() + f.relativeTo(engineDir).path.hashCode()
         fileCount++
       }
       val engineMajor = 1
       val engineMinor = 3
-      val enginePatch = fileCount + (hashSum % 100).toInt()
+      val enginePatch = fileCount + (kotlin.math.abs(hashSum) % 100).toInt()
       "$engineMajor.$engineMinor.$enginePatch-engine"
     } else {
       "1.3.0-engine"
@@ -72,19 +74,25 @@ android {
     buildConfigField("String", "GOOGLE_FONTS_REST_API", "\"$fontsApiKey\"")
   }
 
+  // Release keystore is optional at configuration time: fresh clones and CI jobs
+  // without secrets must still be able to assemble debug builds. Release builds
+  // are only signed when a keystore file is actually present (see buildTypes).
+  val releaseKeyFile = if (file("papirus-release.jks").exists()) file("papirus-release.jks") else file("release.jks")
+  val hasReleaseKeystore = releaseKeyFile.exists()
+
   signingConfigs {
     create("release") {
-      val keyFile = if (file("papirus-release.jks").exists()) file("papirus-release.jks") else file("release.jks")
-      if (keyFile.exists()) {
-        storeFile = keyFile
-        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "papirus123"
-        keyAlias = System.getenv("KEY_ALIAS") ?: "papirus_key"
-        keyPassword = System.getenv("KEY_PASSWORD") ?: "papirus123"
-      } else {
-        storeFile = file("${rootDir}/debug.keystore")
-        storePassword = "android"
-        keyAlias = "androiddebugkey"
-        keyPassword = "android"
+      if (hasReleaseKeystore) {
+        storeFile = releaseKeyFile
+        // Credentials come from environment or Gradle properties only; there are
+        // intentionally no hardcoded fallback passwords in this script.
+        storePassword = System.getenv("KEYSTORE_PASSWORD")
+          ?: project.findProperty("KEYSTORE_PASSWORD")?.toString()
+        keyAlias = System.getenv("KEY_ALIAS")
+          ?: project.findProperty("KEY_ALIAS")?.toString()
+          ?: "papirus_key"
+        keyPassword = System.getenv("KEY_PASSWORD")
+          ?: project.findProperty("KEY_PASSWORD")?.toString()
       }
     }
   }
@@ -97,11 +105,16 @@ android {
         getDefaultProguardFile("proguard-android-optimize.txt"),
         "proguard-rules.pro"
       )
-      signingConfig = signingConfigs.getByName("release")
+      // Only sign when a keystore exists; otherwise produce an unsigned APK
+      // instead of failing with "Keystore file not found".
+      if (hasReleaseKeystore) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
     debug {
       isMinifyEnabled = false
-      signingConfig = signingConfigs.getByName("release") // Paksa mode debug ikut menggunakan kunci otomatis ini
+      // Deliberately uses the standard auto-generated debug key so that
+      // `./gradlew assembleDebug` works on a fresh clone with no secrets.
     }
   }
   compileOptions {
@@ -164,6 +177,7 @@ dependencies {
   // implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.security.crypto)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)

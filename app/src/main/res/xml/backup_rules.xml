@@ -1,13 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Papirus Office backup rules (API 31 and below via fullBackupContent).
+   Sensitive and device-local data is excluded: API keys, logs, caches and
+   absolute file paths that would go stale after a restore.
    See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Encrypted user secrets must never leave the device via backup -->
+    <exclude domain="sharedpref" path="papirus_office_ai_prefs.xml" />
+        <exclude domain="sharedpref" path="papirus_office_ai_prefs_enc.xml" />
+    <!-- Logs may contain stack traces and document metadata -->
+    <exclude domain="file" path="crash.log" />
+    <exclude domain="file" path="runtime.log" />
+    <!-- NOTE: docx_media_* extraction dirs live in cacheDir, which Auto Backup
+         never includes, so they need no exclude rule. -->
+    <!-- Recents store absolute cache paths that are meaningless on restore -->
+    <exclude domain="sharedpref" path="papirus_recents_prefs.xml" />
+    <!-- Session restore points at absolute local files -->
+    <exclude domain="sharedpref" path="papirus_session_restore.xml" />
+    <exclude domain="database" path="papirus_document_cache.db" />
 </full-backup-content>

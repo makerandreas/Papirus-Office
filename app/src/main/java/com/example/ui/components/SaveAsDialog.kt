@@ -21,7 +21,13 @@ fun SaveAsDialog(
     moduleType: String = "Inky", // "Inky", "Cellina", "Slidia", "Pagella"
     currentTitle: String = "",
     onDismiss: () -> Unit,
-    onConfirmSave: (selectedFormat: String, extension: String, mimeType: String) -> Unit
+    onConfirmSave: (
+        selectedFormat: String,
+        extension: String,
+        mimeType: String,
+        withPassword: Boolean,
+        encryptWithGpg: Boolean
+    ) -> Unit
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("papirus_options", Context.MODE_PRIVATE) }
@@ -37,7 +43,7 @@ fun SaveAsDialog(
 
     val (odfSub, ooxmlSub, odfExt, ooxmlExt, odfMime, ooxmlMime) = when (moduleType) {
         "Cellina" -> Sextuple("ODS", "XLSX", ".ods", ".xlsx", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        "Slidia" -> Sextuple("ODP", "PPTX", ".odp", ".pptx", "application/vnd.oasis.opendocument.presentation", "application/vnd.openxmlformats-officedocument.presentationml.slideshow")
+        "Slidia" -> Sextuple("ODP", "PPTX", ".odp", ".pptx", "application/vnd.oasis.opendocument.presentation", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
         "Pagella" -> Sextuple("PDF", "PDF/A", ".pdf", ".pdf", "application/pdf", "application/pdf")
         else -> Sextuple("ODT", "DOCX", ".odt", ".docx", "application/vnd.oasis.opendocument.text", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     }
@@ -64,7 +70,7 @@ fun SaveAsDialog(
                 Button(
                     onClick = {
                         showNonOdfWarning = false
-                        onConfirmSave("Microsoft Office", ooxmlExt, ooxmlMime)
+                        onConfirmSave("Microsoft Office", ooxmlExt, ooxmlMime, saveWithPassword, encryptWithGpg)
                     },
                     modifier = Modifier.testTag("btn_warning_continue")
                 ) {
@@ -241,7 +247,7 @@ fun SaveAsDialog(
                             } else {
                                 Pair(odfExt, odfMime)
                             }
-                            onConfirmSave(selectedFormatOption, ext, mime)
+                            onConfirmSave(selectedFormatOption, ext, mime, saveWithPassword, encryptWithGpg)
                         }
                     },
                     modifier = Modifier.testTag("btn_save_as_confirm")

@@ -55,6 +55,23 @@ data class CrashLog(
     val stackTrace: String
 )
 
+/**
+ * Reads at most the last [maxBytes] of [file] as text, dropping a possible
+ * partial first line so crash-report parsing stays aligned.
+ */
+private fun readTailText(file: File, maxBytes: Long): String {
+    if (!file.exists() || file.length() <= maxBytes) return file.readText()
+    java.io.RandomAccessFile(file, "r").use { raf ->
+        val keep = maxBytes.coerceAtMost(file.length())
+        val tail = ByteArray(keep.toInt())
+        raf.seek(file.length() - keep)
+        raf.readFully(tail)
+        val newline = tail.indexOf('\n'.code.toByte())
+        val start = if (newline >= 0) newline + 1 else 0
+        return tail.copyOfRange(start, tail.size).toString(Charsets.UTF_8)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CrashLogsScreen(
@@ -85,12 +102,13 @@ fun CrashLogsScreen(
         pendingSaveText = null
     }
 
-    // Helper function to read/parse logs from crash.log
+    // Helper function to read/parse logs from crash.log.
+    // Only the tail is read so a large log file can never OOM the viewer.
     fun readLogsFromFile() {
         initialLogs.clear()
         if (crashLogFile.exists()) {
             try {
-                val fileContent = crashLogFile.readText()
+                val fileContent = readTailText(crashLogFile, 512L * 1024)
                 val entries = fileContent.split("=== END CRASH REPORT ===")
                 var idCounter = 1
                 entries.forEach { entry ->

@@ -1,7 +1,10 @@
 package com.example.core.ai
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.example.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,9 +27,65 @@ import java.util.concurrent.TimeUnit
 object GeminiAiService {
     private const val TAG = "GeminiAiService"
     private const val PREFS_NAME = "papirus_office_ai_prefs"
+    private const val PREFS_NAME_ENCRYPTED = "papirus_office_ai_prefs_enc"
     private const val KEY_API_KEY = "user_gemini_api_key"
     private const val KEY_IS_ENABLED = "ai_features_enabled"
     private const val KEY_MODEL = "selected_gemini_model"
+
+    @Volatile
+    private var cachedPrefs: SharedPreferences? = null
+
+    /**
+     * Returns EncryptedSharedPreferences for AI settings, migrating any legacy
+     * plaintext values forward exactly once. Falls back to plaintext prefs only
+     * when the Android Keystore is unavailable (e.g. broken test environments),
+     * so the feature keeps working instead of crashing.
+     */
+    private fun securePrefs(context: Context): SharedPreferences {
+        cachedPrefs?.let { return it }
+        return synchronized(this) {
+            cachedPrefs?.let { return it }
+            val appContext = context.applicationContext
+            val prefs = try {
+                val masterKey = MasterKey.Builder(appContext)
+                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                    .build()
+                val encrypted = EncryptedSharedPreferences.create(
+                    appContext,
+                    PREFS_NAME_ENCRYPTED,
+                    masterKey,
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                )
+                migrateLegacyPlaintextPrefs(appContext, encrypted)
+                encrypted
+            } catch (e: Exception) {
+                Log.w(TAG, "Encrypted prefs unavailable, using plaintext fallback", e)
+                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            }
+            cachedPrefs = prefs
+            prefs
+        }
+    }
+
+    /** One-time migration from the legacy plaintext prefs file. */
+    private fun migrateLegacyPlaintextPrefs(appContext: Context, encrypted: SharedPreferences) {
+        try {
+            val legacy = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!legacy.contains(KEY_API_KEY) && !legacy.contains(KEY_MODEL)) return
+            encrypted.edit().apply {
+                legacy.getString(KEY_API_KEY, null)?.let { putString(KEY_API_KEY, it) }
+                legacy.getString(KEY_MODEL, null)?.let { putString(KEY_MODEL, it) }
+                putBoolean(KEY_IS_ENABLED, legacy.getBoolean(KEY_IS_ENABLED, true))
+                apply()
+            }
+            // Wipe the legacy plaintext file so the key exists only encrypted.
+            legacy.edit().clear().apply()
+            Log.i(TAG, "Migrated AI prefs to encrypted storage")
+        } catch (e: Exception) {
+            Log.w(TAG, "AI prefs migration skipped: ${e.message}")
+        }
+    }
 
     // Supported modern models according to skill guidelines
     const val MODEL_FLASH = "gemini-3.5-flash"
@@ -46,26 +105,26 @@ object GeminiAiService {
         .build()
 
     fun setAiEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        securePrefs(context)
             .edit()
             .putBoolean(KEY_IS_ENABLED, enabled)
             .apply()
     }
 
     fun isAiEnabled(context: Context): Boolean {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return securePrefs(context)
             .getBoolean(KEY_IS_ENABLED, true) // Enable by default for seamless assistant experience
     }
 
     fun saveUserApiKey(context: Context, apiKey: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        securePrefs(context)
             .edit()
             .putString(KEY_API_KEY, apiKey.trim())
             .apply()
     }
 
     fun getUserApiKey(context: Context): String {
-        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val saved = securePrefs(context)
             .getString(KEY_API_KEY, "") ?: ""
         
         return saved.ifEmpty { 
@@ -78,14 +137,14 @@ object GeminiAiService {
     }
 
     fun saveSelectedModel(context: Context, model: String) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        securePrefs(context)
             .edit()
             .putString(KEY_MODEL, model)
             .apply()
     }
 
     fun getSelectedModel(context: Context): String {
-        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return securePrefs(context)
             .getString(KEY_MODEL, MODEL_FLASH) ?: MODEL_FLASH
     }
 
@@ -121,7 +180,7 @@ object GeminiAiService {
         }
 
         val model = customModel ?: MODEL_FLASH
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
 
         try {
             val requestJson = JSONObject().apply {
@@ -141,7 +200,7 @@ object GeminiAiService {
             }
 
             val body = requestJson.toString().toRequestBody("application/json".toMediaType())
-            val request = Request.Builder().url(url).post(body).build()
+            val request = Request.Builder().url(url).header("x-goog-api-key", apiKey).post(body).build()
 
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
@@ -210,7 +269,7 @@ object GeminiAiService {
         }
 
         val model = targetModel ?: getSelectedModel(context)
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
 
         val complianceInstruction = """
             You are the Papirus Office Gemini Copilot.
@@ -235,7 +294,7 @@ object GeminiAiService {
             }
 
             val body = requestJson.toString().toRequestBody("application/json".toMediaType())
-            val request = Request.Builder().url(url).post(body).build()
+            val request = Request.Builder().url(url).header("x-goog-api-key", apiKey).post(body).build()
 
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {

@@ -1,19 +1,36 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   Papirus Office data extraction rules (API 31+).
    See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <include domain="sharedpref" path="." />
+        <include domain="file" path="." />
+        <include domain="database" path="." />
+        <!-- Encrypted user secrets must never leave the device via backup -->
+        <exclude domain="sharedpref" path="papirus_office_ai_prefs.xml" />
+        <exclude domain="sharedpref" path="papirus_office_ai_prefs_enc.xml" />
+        <!-- Logs may contain stack traces and document metadata -->
+        <exclude domain="file" path="crash.log" />
+        <exclude domain="file" path="runtime.log" />
+        <!-- NOTE: docx_media_* extraction dirs live in cacheDir, which backup
+             never includes, so they need no exclude rule. -->
+        <!-- Recents store absolute cache paths that are meaningless on restore -->
+        <exclude domain="sharedpref" path="papirus_recents_prefs.xml" />
+        <!-- Session restore points at absolute local files -->
+        <exclude domain="sharedpref" path="papirus_session_restore.xml" />
+        <exclude domain="database" path="papirus_document_cache.db" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="." />
+        <include domain="file" path="." />
+        <include domain="database" path="." />
+        <exclude domain="sharedpref" path="papirus_office_ai_prefs.xml" />
+        <exclude domain="sharedpref" path="papirus_office_ai_prefs_enc.xml" />
+        <exclude domain="file" path="crash.log" />
+        <exclude domain="file" path="runtime.log" />
+        <exclude domain="sharedpref" path="papirus_recents_prefs.xml" />
+        <exclude domain="sharedpref" path="papirus_session_restore.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

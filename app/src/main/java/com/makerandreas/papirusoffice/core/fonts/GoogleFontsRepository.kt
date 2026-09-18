@@ -25,7 +25,7 @@ class GoogleFontsRepository(private val context: Context) {
     suspend fun fetchFontsFromNetwork(): List<GoogleFontMetadata>? = withContext(Dispatchers.IO) {
         ApiKeyManager.executeWithFallback("Google Fonts REST API Fetch") { apiKey ->
             val url = "https://www.googleapis.com/webfonts/v1/webfonts?key=$apiKey&sort=popularity"
-            Log.d(TAG, "Fetching Google Fonts catalog with key prefix [${apiKey.take(6)}...]")
+            Log.d(TAG, "Fetching Google Fonts catalog")
 
             val client = OkHttpClient.Builder()
                 .connectTimeout(12, TimeUnit.SECONDS)
@@ -39,7 +39,7 @@ class GoogleFontsRepository(private val context: Context) {
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    Log.e(TAG, "Google Fonts REST API failed HTTP ${response.code} with key prefix [${apiKey.take(6)}...]")
+                    Log.e(TAG, "Google Fonts REST API failed HTTP ${response.code}")
                     return@use null
                 }
 
@@ -47,7 +47,7 @@ class GoogleFontsRepository(private val context: Context) {
                 val fontResponse = adapter.fromJson(bodyString)
                 val items = fontResponse?.items?.sortedBy { it.family }
                 if (items.isNullOrEmpty()) {
-                    Log.w(TAG, "Google Fonts REST API returned empty list for key prefix [${apiKey.take(6)}...]")
+                    Log.w(TAG, "Google Fonts REST API returned empty list")
                     return@use null
                 }
                 items

@@ -35,6 +35,24 @@ object PapirusXmlEngine {
         logBuffer.add(logLine)
     }
 
+    /**
+     * Creates an XXE-hardened [DocumentBuilderFactory].
+     *
+     * [extractXmlAsLabeledStrings] parses user-supplied XML, so DOCTYPE
+     * declarations, external entities and XInclude must stay disabled to
+     * prevent billion-laughs / external-file disclosure attacks.
+     */
+    private fun secureDocumentBuilderFactory(): DocumentBuilderFactory {
+        return DocumentBuilderFactory.newInstance().apply {
+            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            setXIncludeAware(false)
+            isExpandEntityReferences = false
+        }
+    }
+
     // --- XML SAMPLES ---
 
     val PAY_XML = """
@@ -303,7 +321,7 @@ object PapirusXmlEngine {
         addLog("[DOM] Loading and parsing company.xml into a Document tree.")
         val list = mutableListOf<Map<String, String>>()
         try {
-            val factory = DocumentBuilderFactory.newInstance()
+            val factory = secureDocumentBuilderFactory()
             val builder = factory.newDocumentBuilder()
             val inputSource = org.xml.sax.InputSource(java.io.StringReader(COMPANY_XML))
             val doc: Document = builder.parse(inputSource)
@@ -356,7 +374,7 @@ object PapirusXmlEngine {
         dataList.add(cols.map { it as Any }.toTypedArray())
 
         try {
-            val factory = DocumentBuilderFactory.newInstance()
+            val factory = secureDocumentBuilderFactory()
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(org.xml.sax.InputSource(java.io.StringReader(PAY_XML)))
             val payments = doc.getElementsByTagName("payment")
@@ -383,7 +401,7 @@ object PapirusXmlEngine {
     fun extractXmlAsLabeledStrings(xmlContent: String): String {
         addLog("[LabeledStrings] Traversing DOM to generate labeled indented text.")
         return try {
-            val factory = DocumentBuilderFactory.newInstance()
+            val factory = secureDocumentBuilderFactory()
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(org.xml.sax.InputSource(java.io.StringReader(xmlContent)))
             val writer = StringWriter()

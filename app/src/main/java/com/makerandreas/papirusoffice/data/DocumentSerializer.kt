@@ -1,5 +1,7 @@
 package com.makerandreas.papirusoffice.data
 
+import com.makerandreas.papirusoffice.data.util.ZipSafe
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentParser
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
@@ -26,10 +28,10 @@ class OdtDocumentSerializer : DocumentSerializerContract {
     override suspend fun read(source: DocumentReference, context: Context): OfficeDocument = withContext(Dispatchers.IO) {
         val bytes = when (source) {
             is DocumentReference.LocalFile -> {
-                if (source.file.exists() && source.file.length() > 0) source.file.readBytes() else ByteArray(0)
+                if (source.file.exists() && source.file.length() in 1..ZipSafe.MAX_DOCUMENT_BYTES) source.file.readBytes() else ByteArray(0)
             }
             is DocumentReference.SafUri -> {
-                context.contentResolver.openInputStream(source.uri)?.use { it.readBytes() } ?: ByteArray(0)
+                context.contentResolver.openInputStream(source.uri)?.use { it.readCappedBytes(ZipSafe.MAX_DOCUMENT_BYTES) } ?: ByteArray(0)
             }
             else -> ByteArray(0)
         }

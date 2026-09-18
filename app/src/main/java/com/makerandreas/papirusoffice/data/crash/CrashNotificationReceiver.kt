@@ -6,10 +6,11 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -46,6 +47,38 @@ class CrashNotificationReceiver : BroadcastReceiver() {
         }
     }
 
+    /**
+     * Saves a crash report to Downloads via MediaStore on Android 10+ (no
+     * storage permission needed for our own entry), falling back to internal
+     * storage on older releases or when MediaStore is unavailable.
+     *
+     * @return human-readable save location for the confirmation toast.
+     */
+    private fun saveCrashReport(context: Context, fileName: String, content: String): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                }
+                val uri = context.contentResolver.insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, values
+                )
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                        stream.write(content.toByteArray())
+                    } ?: throw java.io.IOException("MediaStore refused output stream")
+                    return "Downloads/$fileName"
+                }
+            } catch (e: Exception) {
+                Log.w("CrashReceiver", "MediaStore save failed, using internal storage", e)
+            }
+        }
+        val fallback = File(context.filesDir, fileName)
+        fallback.writeText(content)
+        return fallback.absolutePath
+    }
+
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent == null) return
         val action = intent.action ?: return
@@ -67,18 +100,8 @@ class CrashNotificationReceiver : BroadcastReceiver() {
                 try {
                     val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                     val fileName = "Papirus_Crash_Report_$timeStamp.txt"
-                    
-                    var targetFile: File? = null
-                    val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    if (downloadsDir != null && (downloadsDir.exists() || downloadsDir.mkdirs())) {
-                        targetFile = File(downloadsDir, fileName)
-                    }
-                    if (targetFile == null) {
-                        targetFile = File(context.filesDir, fileName)
-                    }
-
-                    targetFile.writeText(stackTrace)
-                    Toast.makeText(context, "Saved crash report to:\n${targetFile.absolutePath}", Toast.LENGTH_LONG).show()
+                    val savedLocation = saveCrashReport(context, fileName, stackTrace)
+                    Toast.makeText(context, "Saved crash report to:\n$savedLocation", Toast.LENGTH_LONG).show()
                 } catch (e: Exception) {
                     Toast.makeText(context, "Failed to save crash log: ${e.message}", Toast.LENGTH_SHORT).show()
                 }

@@ -50,9 +50,10 @@ object CrashHandlerManager {
                     === END CRASH REPORT ===
                 """.trimIndent()
 
-                // 1. Write crash report to internal crash.log
+                // 1. Write crash report to internal crash.log (rotated, never unbounded)
                 try {
                     val file = File(context.filesDir, "crash.log")
+                    com.makerandreas.papirusoffice.data.PapirusLogger.rotateIfNeeded(file)
                     file.appendText(fullReport + "\n\n")
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed writing crash.log", e)

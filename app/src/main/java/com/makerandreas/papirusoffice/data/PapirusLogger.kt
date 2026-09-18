@@ -23,6 +23,14 @@ data class LogEntry(
 
 object PapirusLogger {
     private const val TAG_PREFIX = "PapirusOffice"
+
+    /**
+     * Log-file rotation bounds. runtime.log is append-only, so without a cap a
+     * long-lived install (or a logging hotspot) can fill internal storage.
+     */
+    const val MAX_LOG_FILE_BYTES = 512L * 1024
+    private const val TRUNCATED_KEEP_BYTES = 256L * 1024
+
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs = _logs.asStateFlow()
 
@@ -34,9 +42,33 @@ object PapirusLogger {
             if (logFile?.exists() == false) {
                 logFile?.createNewFile()
             }
+            rotateIfNeeded(logFile)
             i("System", "PapirusLogger initialized. Writing logs to ${logFile?.absolutePath}")
         } catch (e: Exception) {
             Log.e("PapirusLogger", "Initialization failed", e)
+        }
+    }
+
+    /**
+     * Truncates [file] to its last [TRUNCATED_KEEP_BYTES] when it grows past
+     * [MAX_LOG_FILE_BYTES]. Shared by the crash log, which has the same
+     * append-only growth pattern.
+     */
+    fun rotateIfNeeded(file: File?) {
+        try {
+            if (file == null || !file.exists() || file.length() <= MAX_LOG_FILE_BYTES) return
+            val keep = TRUNCATED_KEEP_BYTES.coerceAtMost(file.length())
+            val tail = ByteArray(keep.toInt())
+            java.io.RandomAccessFile(file, "r").use { raf ->
+                raf.seek(file.length() - keep)
+                raf.readFully(tail)
+            }
+            // Drop a possible partial first line so the file stays parseable.
+            val newline = tail.indexOf('\n'.code.toByte())
+            val start = if (newline >= 0) newline + 1 else 0
+            file.writeBytes(tail.copyOfRange(start, tail.size))
+        } catch (e: Exception) {
+            Log.w("PapirusLogger", "Log rotation skipped: ${e.message}")
         }
     }
 

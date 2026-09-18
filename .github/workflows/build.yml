@@ -13,8 +13,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    env:
+      GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Run Unit Tests
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest
+
   build:
-    name: Build & Test (SemVer & Nightly)
+    name: Build (SemVer & Nightly)
     runs-on: ubuntu-latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: "true"
@@ -82,12 +102,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'papirus123' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'papirus_key' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'papirus123' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+          GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
       # 2. Release Manual: HANYA generate app-release.apk
       - name: Build Release APK (Manual Release)
@@ -96,12 +117,13 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'papirus123' }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'papirus_key' }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'papirus123' }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+          GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
       # Upload HANYA app-debug.apk untuk nightly/commit push
       - name: Drop Papirus Nightly Release (Debug APK Only)

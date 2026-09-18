@@ -215,6 +215,9 @@ fun InkyModule(
     }
 
     LaunchedEffect(zoomScale) {
+        // Debounced: restarting on every frame collapses pinch-zoom write spam
+        // into a single DataStore write when the gesture settles.
+        kotlinx.coroutines.delay(500)
         val calculatedPercent = (zoomScale * 100).toInt().coerceIn(25, 400)
         if (calculatedPercent != viewOptions.customZoomPercent) {
             preferencesRepository.updateCustomZoomPercent(calculatedPercent)
@@ -270,11 +273,20 @@ fun InkyModule(
     }
 
     val currentSessionState by com.makerandreas.papirusoffice.data.SessionManager.getInstance().current.collectAsState()
-    val canUndo by (currentSessionState?.undoManager?.historyManager?.canUndo ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
-    val canRedo by (currentSessionState?.undoManager?.historyManager?.canRedo ?: kotlinx.coroutines.flow.MutableStateFlow(false)).collectAsState()
+    // Subscribed for its recomposition side effect: StateFlow conflates
+    // same-instance sessions, so every dirty-flag transition bumps this
+    // revision to refresh the `session.dirty` reads below.
+    @Suppress("unused")
+    val dirtyRevision by com.makerandreas.papirusoffice.data.SessionManager.getInstance().dirtyRevision.collectAsState()
+    // Stable fallbacks: allocating a new StateFlow here on every recomposition
+    // would restart the collectors each time the session is null.
+    val undoFallbackFlow = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val redoFallbackFlow = remember { kotlinx.coroutines.flow.MutableStateFlow(false) }
+    val canUndo by (currentSessionState?.undoManager?.historyManager?.canUndo ?: undoFallbackFlow).collectAsState()
+    val canRedo by (currentSessionState?.undoManager?.historyManager?.canRedo ?: redoFallbackFlow).collectAsState()
     var layoutCursor by remember { mutableStateOf(com.makerandreas.papirusoffice.data.DocumentCursor()) }
 
-    val navEngine = remember(currentSessionState) {
+    val navEngine = remember {
         currentSessionState?.navigationEngine ?: com.makerandreas.papirusoffice.data.navigation.NavigationEngine()
     }
 
@@ -295,6 +307,9 @@ fun InkyModule(
     var initialLoadedText by remember { mutableStateOf("") }
 
     LaunchedEffect(docBodyText.text, docTitle, currentSessionState?.document) {
+        // Debounced: re-indexing the whole document on every keystroke janks,
+        // so wait until typing pauses.
+        kotlinx.coroutines.delay(350)
         val activeDoc = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
             metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = docTitle)
         )
@@ -334,7 +349,7 @@ fun InkyModule(
     var showDocOpenFailedDialog by remember { mutableStateOf(false) }
     var docOpenFailedError by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(com.example.MainActivity.openedFilePath) {
+    LaunchedEffect(com.example.MainActivity.openedFileNonce, com.example.MainActivity.openedFilePath) {
         val filePath = com.example.MainActivity.openedFilePath
         if (filePath != null && com.example.MainActivity.openedFileType == "Inky") {
             val f = java.io.File(filePath)
@@ -3733,7 +3748,14 @@ fun InkyModule(
             moduleType = "Inky",
             currentTitle = docTitle,
             onDismiss = { showSaveAsDialog = false },
-            onConfirmSave = { selectedFormat, extension, mimeType ->
+            onConfirmSave = { selectedFormat, extension, mimeType, withPassword, encryptWithGpg ->
+                    if (withPassword || encryptWithGpg) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.save_as_protection_unsupported),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 currentSaveMimeType = mimeType
                 val baseName = docTitle.substringBeforeLast(".")
                 currentSaveDefaultFilename = if (baseName.isBlank()) "Inky_Dokumen$extension" else "$baseName$extension"

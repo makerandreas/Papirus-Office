@@ -53,12 +53,12 @@ fun UniversalEmailSheet(
     // SMTP Config State
     var smtpHost by remember { mutableStateOf("smtp.gmail.com") }
     var smtpPort by remember { mutableStateOf("587") }
-    var smtpUser by remember { mutableStateOf("user@gmail.com") }
-    var smtpPass by remember { mutableStateOf("app_password") }
+    var smtpUser by remember { mutableStateOf("") }
+    var smtpPass by remember { mutableStateOf("") }
     var useSsl by remember { mutableStateOf(true) }
 
     // Fallbacks State
-    var targetPhone by remember { mutableStateOf("+628123456789") }
+    var targetPhone by remember { mutableStateOf("") }
     var selectedMessengerPackage by remember { mutableStateOf("com.whatsapp") } // com.whatsapp or org.telegram.messenger
 
     // SDK Code Examples
@@ -458,7 +458,7 @@ private fun EmailAndShareTab(
                             )
                             onRefreshLogs()
                             if (success) {
-                                Toast.makeText(context, "SMTP Dispatch successful!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "SMTP simulation finished — no email was actually sent.", Toast.LENGTH_LONG).show()
                             } else {
                                 Toast.makeText(context, "SMTP Connection Failed. Check console logs.", Toast.LENGTH_LONG).show()
                             }
@@ -468,7 +468,7 @@ private fun EmailAndShareTab(
                 ) {
                     Icon(Icons.Rounded.Settings, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Execute Direct SMTP Handshake")
+                    Text("Simulate Direct SMTP Handshake")
                 }
             }
         }

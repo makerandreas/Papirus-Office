@@ -128,8 +128,8 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         styles: DocumentStyles,
         forceRebuild: Boolean = false
     ): ParagraphLayout {
-        if (!forceRebuild && paragraphLayoutCache.containsKey(paragraphIndex)) {
-            return paragraphLayoutCache[paragraphIndex]!!
+        if (!forceRebuild) {
+            paragraphLayoutCache[paragraphIndex]?.let { return it }
         }
 
         val style = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
