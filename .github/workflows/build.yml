@@ -29,20 +29,9 @@ jobs:
           java-version: '17'
 
       - name: Run Unit Tests
-        # TEMPORARY DIAGNOSTIC (logs unreachable from dev sandbox): on failure,
-        # the Gradle error excerpt is re-emitted as ::error annotations so the
-        # exact message is visible via the checks API. Revert before merging.
         run: |
           chmod +x gradlew
-          set +e
-          ./gradlew testDebugUnitTest --stacktrace > /tmp/gradle.log 2>&1
-          CODE=$?
-          echo "GRADLE_EXIT=$CODE"
-          tail -n 5 /tmp/gradle.log
-          grep -aE "e: |error:|FAILED|What went wrong|Caused by|Execution failed|Plugin .* not found|Could not|Unresolved reference" /tmp/gradle.log | tail -n 30 | sed 's/%/%25/g' > /tmp/err.txt || true
-          ERR_ONELINE=$(sed ':a;N;$!ba;s/\n/%0A/g' /tmp/err.txt | head -c 6000)
-          echo "::error::GRADLE_DIAGNOSTIC%0A$ERR_ONELINE"
-          exit $CODE
+          ./gradlew testDebugUnitTest
 
   build:
     name: Build (SemVer & Nightly)
