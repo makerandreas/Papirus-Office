@@ -4,11 +4,12 @@
 
 ## 📘 1. Product Identity & Overview
 
-**Papirus Office** is a modern, modular, open-source office suite engineered for Android smartphones, foldables, and tablets. It delivers a PC-class productivity and document editing experience on mobile devices while remaining strictly open-source, compliant with international document standards, and ergonomically optimized for touch interfaces.
+**Papirus Office** (initially codenamed and developed as **LibreDroid Office**) is a modern, modular, open-source office suite engineered for Android smartphones, foldables, and tablets. It delivers a PC-class productivity and document editing experience on mobile devices while remaining strictly open-source, compliant with international document standards, legally compliant (adopting the "Papirus Office" brand to respect trademark separation from LibreOffice and The Document Foundation), and ergonomically optimized for touch interfaces.
 
-- **Open-Source Heritage**: Derived from and inspired by the **LibreOffice** desktop suite architecture and the **Document Liberation Project**.
+- **Codename / Concept Heritage**: Originally conceptualized as **LibreDroid Office**, created to bridge the full power of desktop-class office editing (based on LibreOffice architecture and the Document Liberation Project) to mobile devices.
 - **Document Standards Compliance**: Built on the **OASIS OpenDocument Format (ODF v1.4)** standards (`.odt`, `.ods`, `.odp`, `.ott`, `.ots`, `.otp`), with complete import/export compatibility for Microsoft Office OpenXML (`.docx`, `.xlsx`, `.pptx`) and Adobe PDF (`.pdf`).
 - **Design System**: Strict adherence to **Material Design 3 (M3) Expressive**, featuring 8dp grid rhythm, fluid micro-interactions, full edge-to-edge layout, dynamic Google Sans UI typography, and module-specific color branding.
+- **License**: Follows the same open-source licensing principles as LibreOffice (MPLv2 / GPLv3 / LGPLv3 tri-license).
 
 ### The Suite Modules & Color Conventions
 Default static accent colors (for Android 11 and below, or when Dynamic Color is disabled):
@@ -26,16 +27,25 @@ Papirus Office utilizes a **Dual-Engine Architecture** balancing lightweight mob
 
 ### A. The Papirus Engine (`com.makerandreas.papirusoffice.data`)
 A pure Kotlin and Jetpack Compose document engine that directly parses document structures and renders them dynamically in Compose canvas and layout components:
-- **`OfficeDocumentParser` & `DocxDocumentParser`**: Unpacks ZIP packages (`content.xml`, `styles.xml`, `document.xml`), parses XML nodes, extracts inline images, metadata, and styles.
+- **`OfficeDocumentParser` & `DocxDocumentParser`**: Unpacks ZIP packages (`content.xml`, `styles.xml`, `document.xml`, `xl/worksheets/`, `ppt/slides/`), parses XML nodes, extracts inline images, metadata, and styles.
+  - **ODF Processing (`SvXMLImport`, `SvXMLImportContext`, `OdfXmlToken`)**: Fully modular context-driven parsing for text documents (`.odt`), spreadsheets (`.ods` with table column/row repeating and sheet metadata), and presentations (`.odp` with `<draw:page>`, `<draw:frame>`, `<draw:text-box>`, `<draw:custom-shape>`, `<draw:g>`).
+  - **OpenXML / OOXML Processing**:
+    - `.docx`: Direct WordprocessingML paragraph, run, heading, table, and style parsing.
+    - `.xlsx`: Dedicated SpreadsheetML parser extracting shared strings (`xl/sharedStrings.xml`), workbook sheet definitions (`xl/workbook.xml`), cell references (A1 coordinate mapping), and sheet tables.
+    - `.pptx`: Dedicated PresentationML parser extracting slides (`ppt/slides/slide*.xml`), slide title placeholders, body paragraphs, and slide breaks.
 - **`LayoutEngine` & `TextLayoutManager`**: Calculates line wraps, margins, paragraph indentations, tabs, bullet prefixes, and multi-page layouts.
 - **`SwDocEngine` / `EditingEngine`**: Core word processing document model handling character spans, formatting attributes, and cursor selections.
 - **`DocumentSerializer`**: Writes lossless ODF v1.4 and OOXML packages respecting strict namespace schemas.
 
-### B. LibreOfficeKit (LOKit) JNI Bridge
+### B. LibreOfficeKit (LOKit) JNI Bridge & C++ OOXML / Equation Layer
 Located in `/app/src/libs` (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`):
 - Native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`).
 - Used for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
 - Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) track LOKit dispatch states.
+- **Modular Equation Pipeline**:
+  - LaTeX-style syntax user input rendered via KaTeX / MathJax.
+  - Bidirectional conversion: LaTeX ↔ MathML for ODF (`.odt`, `.ods`, `.odp`), LaTeX ↔ OMML for OOXML (`.docx`, `.xlsx`, `.pptx`).
+  - Modular build-flag design (`ENABLE_MATHML_SUPPORT`, `ENABLE_OMML_SUPPORT`).
 
 ### C. State & Session Management
 - **`DocumentSessionState` & `DocumentSession`**: Represents the active document lifecycle, file path, temporary caches, dirty flags (`isSaved`), and layout configurations.
@@ -237,13 +247,49 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
             ├── UndoManager.kt               # UndoManager, HistoryManager, UndoAction
             ├── SwDocEngine.kt               # Word processing document model
             ├── LayoutEngine.kt              # Text layout and line calculation engine
-            ├── OfficeDocumentParser.kt      # ODF XML package parser
-            └── DocxDocumentParser.kt        # DOCX OpenXML package parser
+            ├── OfficeDocumentParser.kt      # ODF & OOXML package parser (ODT, ODS, ODP, DOCX, XLSX, PPTX)
+            ├── DocxDocumentParser.kt        # DOCX & multi-format parser adapter
+            └── odf/                         # Modular ODF import engine
+                ├── OdfXmlToken.kt           # ODF XML tokens (styles, draw, text, table)
+                ├── SvXMLImport.kt           # Parser coordinator & document builder
+                └── SvXMLImportContext.kt    # Context hierarchy for paragraphs, tables, drawings, pages
 ```
 
 ---
 
-## ⚙️ 7. Engineering Guidelines for Future AI Agents
+## 🗺️ 7. Architecture Phases & Development Roadmap
+
+Papirus Office (codenamed LibreDroid Office during conceptualization) follows a structured phased development roadmap:
+
+- **Phase 1: Environment Setup** ✅ — Android build environment, Gradle Kotlin DSL, Version Catalog, Room, and Compose setup.
+- **Phase 2: JNI Implementation & Stress Test Stage 1** ✅ — LibreOfficeKit C++ bindings integration in `/app/src/libs` across 4 ABIs.
+- **Phase 3: Building LibreOffice Core Engine & OOXML Compatibility Foundation** ✅ / 🔄
+  - *Task 1: LibreOffice Core JNI Integration* ✅
+  - *Task 2: Real-World Document Stress Testing* ✅ — Tested against real-world ODT, DOCX, ODS, XLSX, ODP, PPTX files in `/tests` with layout fidelity verification.
+  - *Task 3: OOXML Standards & SDK References* ✅ — ECMA-376 specifications, OpenXML SDK architecture.
+  - *Task 4: OOXML Compatibility Layer* ✅ — WordprocessingML, SpreadsheetML, PresentationML Kotlin/Compose parsers and OMML/MathML equation pipelines.
+  - *Task 5: Reverse Engineering & Behavioral Testing* ✅ — Verification against LibreOffice and MS Office output.
+- **Phase 4: Core Editing & UI Implementation (Material 3 Expressive)** 🔄 — FCT, Toolbar Hub, 40% Standard Bottom Sheet Ribbon, Touch Targets, Navigator Deck.
+- **Phase 5: ARM Optimization** 🔜 — ARMv7 and ARM64-v8a neon optimizations, binary size minimization.
+- **Phase 6: Low-End Device Testing** 🔜 — Memory constraints profiling (2GB RAM devices), stream-based XML parsing to prevent OOM.
+- **Phase 7: PC-Level Office Features Rollout** 🔜 — Diagrams (Mermaid.js), Equations (KaTeX/MathML/OMML), Stylus Ink (Google Ink API), Citations/BibTeX, Full 500+ OpenFormula functions, and Optional Gemini AI Copilot.
+
+---
+
+## 🔗 8. Key Reference Links & Specifications
+- **LibreOffice Core**: [gerrit.libreoffice.org](https://gerrit.libreoffice.org/) / [github.com/LibreOffice/core](https://github.com/LibreOffice/core)
+- **Collabora Online**: [github.com/CollaboraOnline/online](https://github.com/CollaboraOnline/online)
+- **ECMA-376 OOXML**: [ecma-international.org](https://ecma-international.org/publications-and-standards/standards/ecma-376/)
+- **Microsoft OpenXML SDK**: [learn.microsoft.com](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) / [github.com/dotnet/Open-XML-SDK](https://github.com/dotnet/Open-XML-SDK)
+- **OASIS OpenDocument (ODF v1.4)**: Authoritative specification in `/sources`
+- **Google Ink API**: [developer.android.com/develop/ui/views/touch-and-input/stylus-input/about-ink-api](https://developer.android.com/develop/ui/views/touch-and-input/stylus-input/about-ink-api)
+- **KaTeX / MathML**: [github.com/KaTeX/KaTeX](https://github.com/KaTeX/KaTeX)
+- **Mermaid.js**: [github.com/mermaid-js/mermaid](https://github.com/mermaid-js/mermaid)
+- **Material 3 Expressive**: [m3.material.io](https://m3.material.io/)
+
+---
+
+## ⚙️ 9. Engineering Guidelines for Future AI Agents
 
 1. **ODF v1.4 Normative Rule**: When parsing, serializing, or modifying OpenDocument structures, always consult the standard files in `/sources`. Preserve existing XML nodes non-destructively so documents round-trip cleanly with LibreOffice desktop and Microsoft Office.
 2. **Text Input & Undo Synchronization**: When modifying text editing or Undo/Redo logic, always ensure the active typing buffer is synchronously flushed to `UndoManager` prior to handling deletions, selections, or external undo actions to avoid debounce race conditions.

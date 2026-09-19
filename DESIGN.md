@@ -308,7 +308,26 @@ Uses a static color palette based on Material 3 Expressive, referencing the modu
   - Minimum touch target: `48dp x 48dp`.
   - Icon centered with ripple indication and active state fill or tint.
 
-### 2. Cards & File Tiles
+### 2. Toolbars & Office Ergonomics (Mobile vs. Tablet)
+- **Toolbar Hub (Mobile Quick Bar)**:
+  - Docked directly above the virtual keyboard (or viewport bottom in edit mode).
+  - Horizontally scrollable standard formatting items + persistent trailing actions: `\t` (Insert Tab), Soft Keyboard toggle, and Ribbon button.
+  - Contextual adaptation: Adapts dynamically based on selected objects (text, table, shape, cell range).
+  - Overflow handling: Persistent drop-down or switcher button if toolbars exceed threshold.
+- **Simplified Ribbon Bar (Mobile Deck)**:
+  - 40% height bottom sheet deck inspired by modern mobile office suites (M365 Copilot / Word / Excel).
+  - Header with `Ribbon options (inverted triangle)` on left and `Undo | Redo | Close` on right.
+  - Dropdown menu allows switching between 8-18 contextual ribbon categories (File, Home, Insert, Layout, Formulas, Data, Review, Transitions, Animations, Slide Show, View, Drawing, Table, Picture, Chart).
+- **Ribbon Full View (Tablet & Foldables)**:
+  - Full desktop-grade ribbon tab bar along the top.
+  - Collapsible/minimizable by double-tapping a tab or clicking `^ Hide ribbon`.
+  - Multi-pane layouts (sidebars for PivotTable in Cellina, Animation Timelines in Slidia, Document Navigator).
+- **Floating Contextual Toolbar (FCT)**:
+  - Anchored dynamically above/below text, cells, or objects with auto-flip boundary checks.
+  - Rightmost item opens expanded options (`...` / More options).
+  - Cell multi-selection feedback (Sum, Average, Count snackbar) in Calc.
+
+### 3. Cards & File Tiles
 - **List & Grid Cards**:
   - Shape: Rounded corners (`{rounded.md}` — `16px`) to ensure touchable, modern M3 aesthetics.
   - Background: Surface container (`#F6F3F7`) or subtle outlined border (`1px` `#E8E0E8`).

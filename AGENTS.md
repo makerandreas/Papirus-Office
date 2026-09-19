@@ -2,7 +2,9 @@
 
 ## 📘 Papirus Office — Description Context & Architecture Summary
 
-**Papirus Office** is a modular, open-source office suite for Android based on the LibreOffice architecture, Document Liberation Project, and OASIS OpenDocument Format (ODF v1.4) standards. It delivers a PC-class document editing experience optimized ergonomically for mobile devices (smartphones, foldables, tablets) using **Material 3 Expressive** and Jetpack Compose.
+**Papirus Office** (originally conceptualized as **LibreDroid Office**) is a modular, open-source office suite for Android based on the LibreOffice architecture, Document Liberation Project, and OASIS OpenDocument Format (ODF v1.4) standards. It delivers a PC-class document editing experience optimized ergonomically for mobile devices (smartphones, foldables, tablets) using **Material 3 Expressive** and Jetpack Compose.
+
+> *Note on Naming*: The project was initially conceived under the codename **LibreDroid Office**. To ensure trademark safety and prevent trademark conflicts with LibreOffice and The Document Foundation, the production name **Papirus Office** is adopted.
 
 For complete deep architectural documentation, consult `PROJECT_CONTEXT.md` and `DESIGN.md`.
 
@@ -85,10 +87,14 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 
 ## 🏛️ Papirus Engine & Architecture
 
-- **Papirus Engine (`com.makerandreas.papirusoffice.data`)**: Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
+- **Papirus Engine (`com.makerandreas.papirusoffice.data`)**:
+  - Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
+  - **ODF Import System (`data.odf`)**: Context-driven parser implementing `SvXMLImport`, `SvXMLImportContext`, and `OdfXmlToken` supporting `.odt`, `.ods` (multi-sheet tables with repeated columns/rows and values), and `.odp` (slides, frames, custom shapes, text boxes, and drawing groups).
+  - **OpenXML / OOXML Engine**: Complete parsing for `.docx` (WordprocessingML), `.xlsx` (SpreadsheetML with sharedStrings and sheet mapping), and `.pptx` (PresentationML with slide titles, body placeholders, and slide counts).
 - **LibreOfficeKit (LOKit) JNI Bridge**: Native C++ `.so` libraries in `/app/src/libs` providing desktop-class document rendering, complex layouts, OpenFormula evaluation, and PDF export.
 - **DocumentSession & SessionManager**: Tracks active document lifecycle, file path, dirty flags (`isSaved`), autosave timers, and undo/redo stacks.
 - **UndoManager & HistoryManager**: Dual-stack Command Pattern (`UndoAction`). Includes a synchronous typing buffer flusher (`flushPendingTyping`) before deletions and undo actions to prevent race conditions.
+- **Modular Equation Pipeline**: LaTeX-style input via KaTeX/MathJax preview with bidirectional conversion to MathML (ODF) and OMML (OOXML).
 
 ---
 

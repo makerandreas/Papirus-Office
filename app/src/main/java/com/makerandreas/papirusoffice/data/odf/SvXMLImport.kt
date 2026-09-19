@@ -25,6 +25,8 @@ class SvXMLImport(
     private val contextStack = ArrayDeque<SvXMLImportContext>()
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
 
+    val elements: List<OfficeDocumentElement> get() = parsedElements
+
     fun addElement(element: OfficeDocumentElement) {
         parsedElements.add(element)
     }
@@ -115,6 +117,9 @@ class SvXMLImport(
                     is OfficeDocumentElement.Heading -> plainTextBuilder.append(element.text).append("\n\n")
                     is OfficeDocumentElement.ListItem -> plainTextBuilder.append(element.bullet).append(element.text).append("\n")
                     is OfficeDocumentElement.Table -> {
+                        if (!element.name.isNullOrBlank()) {
+                            plainTextBuilder.append("=== Sheet: ").append(element.name).append(" ===\n")
+                        }
                         element.rows.forEach { row ->
                             plainTextBuilder.append(row.cells.joinToString("\t") { it.text }).append("\n")
                         }
@@ -123,6 +128,11 @@ class SvXMLImport(
                     else -> {}
                 }
             }
+
+            val odpSlideCount = if (isOdp) {
+                val breaks = parsedElements.count { it is OfficeDocumentElement.PageBreak }
+                if (parsedElements.isNotEmpty()) breaks + 1 else 0
+            } else 0
 
             return OfficeParsedDocument(
                 elements = parsedElements.toList(),
@@ -136,7 +146,8 @@ class SvXMLImport(
                 isOdp = isOdp,
                 isPptx = false,
                 isParsingFailed = false,
-                failureReason = null
+                failureReason = null,
+                pageCount = odpSlideCount
             )
 
         } catch (e: Exception) {

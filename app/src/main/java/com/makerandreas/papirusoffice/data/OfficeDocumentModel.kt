@@ -27,7 +27,8 @@ sealed class OfficeDocumentElement {
 
     data class Table(
         val rows: List<TableRow>,
-        val numColumns: Int = 0
+        val numColumns: Int = 0,
+        val name: String? = null
     ) : OfficeDocumentElement()
 
     data class ImageElement(

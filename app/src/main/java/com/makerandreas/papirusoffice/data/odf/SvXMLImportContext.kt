@@ -81,13 +81,72 @@ class OdfTextBodyContext(
             OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
             OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
             OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
-            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token)
-            OdfXmlToken.XML_PAGE -> OdfTextBodyContext(importFilter, token) // Slide page for ODP
+            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
+            OdfXmlToken.XML_PAGE -> OdfSlidePageContext(importFilter, token, attributes) // Slide page for ODP
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
+            OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
+                OdfDrawingContainerContext(importFilter, token)
+            }
             OdfXmlToken.XML_SOFT_PAGE_BREAK -> {
                 importFilter.addElement(OfficeDocumentElement.PageBreak)
                 super.createChildContext(token, attributes)
             }
+            else -> super.createChildContext(token, attributes)
+        }
+    }
+}
+
+/**
+ * Context for <draw:page> (ODP Slide page).
+ */
+class OdfSlidePageContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken,
+    attributes: Map<String, String>
+) : SvXMLImportContext(importFilter, token) {
+
+    init {
+        if (importFilter.elements.isNotEmpty()) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
+        val pageName = attributes["draw:name"] ?: attributes["name"]
+        if (!pageName.isNullOrBlank()) {
+            importFilter.addElement(OfficeDocumentElement.Heading(text = pageName, level = 1, styleName = "SlideTitle"))
+        }
+    }
+
+    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+        return when (token) {
+            OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
+            OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
+            OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
+                OdfDrawingContainerContext(importFilter, token)
+            }
+            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
+            else -> super.createChildContext(token, attributes)
+        }
+    }
+}
+
+/**
+ * Context for nested drawing containers (<draw:g>, <draw:custom-shape>, <draw:text-box>).
+ */
+class OdfDrawingContainerContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken
+) : SvXMLImportContext(importFilter, token) {
+    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+        return when (token) {
+            OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
+            OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
+            OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
+                OdfDrawingContainerContext(importFilter, token)
+            }
+            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
             else -> super.createChildContext(token, attributes)
         }
     }
@@ -350,15 +409,17 @@ class OdfListItemParagraphContext(
  */
 class OdfTableContext(
     importFilter: SvXMLImport,
-    token: OdfXmlToken
+    token: OdfXmlToken,
+    attributes: Map<String, String> = emptyMap()
 ) : SvXMLImportContext(importFilter, token) {
 
+    val tableName: String = attributes["table:name"] ?: attributes["name"] ?: ""
     val rows = mutableListOf<TableRow>()
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
             OdfXmlToken.XML_TABLE_ROW, OdfXmlToken.XML_TABLE_HEADER_ROWS -> {
-                OdfTableRowContext(importFilter, token, this)
+                OdfTableRowContext(importFilter, token, attributes, this)
             }
             else -> super.createChildContext(token, attributes)
         }
@@ -369,7 +430,8 @@ class OdfTableContext(
             val maxCols = rows.maxOfOrNull { it.cells.size } ?: 0
             val tableElement = OfficeDocumentElement.Table(
                 rows = rows.toList(),
-                numColumns = maxCols
+                numColumns = maxCols,
+                name = tableName.ifBlank { null }
             )
             importFilter.addElement(tableElement)
         }
@@ -382,6 +444,7 @@ class OdfTableContext(
 class OdfTableRowContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
+    private val attributes: Map<String, String> = emptyMap(),
     private val parentTableContext: OdfTableContext
 ) : SvXMLImportContext(importFilter, token) {
 
@@ -390,7 +453,7 @@ class OdfTableRowContext(
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
             OdfXmlToken.XML_TABLE_CELL, OdfXmlToken.XML_COVERED_TABLE_CELL -> {
-                OdfTableCellContext(importFilter, token, this)
+                OdfTableCellContext(importFilter, token, attributes, this)
             }
             else -> super.createChildContext(token, attributes)
         }
@@ -398,7 +461,12 @@ class OdfTableRowContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         if (cells.isNotEmpty()) {
-            parentTableContext.rows.add(TableRow(cells = cells.toList()))
+            val repeatStr = attributes["table:number-rows-repeated"] ?: attributes["number-rows-repeated"]
+            val repeatCount = (repeatStr?.toIntOrNull() ?: 1).coerceIn(1, 64)
+            val row = TableRow(cells = cells.toList())
+            for (i in 0 until repeatCount) {
+                parentTableContext.rows.add(row)
+            }
         }
     }
 }
@@ -409,6 +477,7 @@ class OdfTableRowContext(
 class OdfTableCellContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
+    private val attributes: Map<String, String>,
     private val parentRowContext: OdfTableRowContext
 ) : SvXMLImportContext(importFilter, token) {
 
@@ -431,11 +500,33 @@ class OdfTableCellContext(
     }
 
     override fun onEndElement(token: OdfXmlToken) {
+        var rawText = textBuilder.toString().trim()
+        if (rawText.isEmpty()) {
+            val officeVal = attributes["office:value"] ?: attributes["office:date-value"] ?: attributes["office:boolean-value"]
+            if (!officeVal.isNullOrBlank()) {
+                rawText = officeVal
+            }
+        }
+        val repeatStr = attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
+        val repeatCount = repeatStr?.toIntOrNull() ?: 1
+
         val cell = TableCell(
-            text = textBuilder.toString(),
-            paragraphs = cellParagraphs.toList()
+            text = rawText,
+            paragraphs = if (cellParagraphs.isNotEmpty()) cellParagraphs.toList() else if (rawText.isNotEmpty()) listOf(OfficeDocumentElement.Paragraph(text = rawText)) else emptyList()
         )
-        parentRowContext.cells.add(cell)
+
+        if (rawText.isNotEmpty()) {
+            val count = repeatCount.coerceIn(1, 256)
+            for (i in 0 until count) {
+                parentRowContext.cells.add(cell)
+            }
+        } else {
+            // For empty cells, only replicate if small (<= 16), otherwise avoid explosive empty columns in ODS
+            val count = repeatCount.coerceIn(1, 16)
+            for (i in 0 until count) {
+                parentRowContext.cells.add(cell)
+            }
+        }
     }
 }
 
@@ -483,6 +574,12 @@ class OdfFrameContext(
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
             OdfXmlToken.XML_IMAGE -> OdfImageContext(importFilter, token, attributes, widthDp, heightDp)
+            OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
+                OdfDrawingContainerContext(importFilter, token)
+            }
+            OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
+            OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
             else -> super.createChildContext(token, attributes)
         }
     }

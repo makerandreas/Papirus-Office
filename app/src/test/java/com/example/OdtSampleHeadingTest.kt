@@ -23,11 +23,13 @@ class OdtSampleHeadingTest {
         val parser = OfficeDocumentParser(context)
         // Gradle runs module tests with working dir = app/, so also probe ../tests/.
         val file = listOf(
+            File("tests/inky/Sample-1.odt"),
+            File("../tests/inky/Sample-1.odt"),
             File("tests/Sample-1.odt"),
             File("../tests/Sample-1.odt"),
             File("tests/Sample 1.odt"),
             File("../tests/Sample 1.odt")
-        ).firstOrNull { it.exists() } ?: File("tests/Sample-1.odt")
+        ).firstOrNull { it.exists() } ?: File("tests/inky/Sample-1.odt")
         println("File exists: ${file.exists()}, length: ${file.length()}")
         
         val parsedDoc = parser.parseDocument(file, bypassCache = true)

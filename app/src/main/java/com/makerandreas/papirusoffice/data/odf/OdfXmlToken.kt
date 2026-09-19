@@ -59,6 +59,11 @@ enum class OdfXmlToken(val tokenName: String) {
     XML_TEXT_BOX("draw:text-box"),
     XML_OBJECT("draw:object"),
     XML_OBJECT_OLE("draw:object-ole"),
+    XML_G("draw:g"),
+    XML_CUSTOM_SHAPE("draw:custom-shape"),
+    XML_LINE("draw:line"),
+    XML_RECT("draw:rect"),
+    XML_CIRCLE("draw:circle"),
     
     // Style elements
     XML_STYLE("style:style"),

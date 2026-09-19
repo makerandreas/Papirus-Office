@@ -689,6 +689,22 @@ class OfficeDocumentParser(private val context: Context) {
             }
         }
 
+        if (isXlsx) {
+            val parsedDoc = parseXlsxDocument(file, extractedImages)
+            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
+            inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
+            cacheRepository.saveCachedDocument(file, parsedDoc)
+            return@withContext parsedDoc
+        }
+
+        if (detectedPptx) {
+            val parsedDoc = parsePptxDocument(file, extractedImages)
+            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
+            inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
+            cacheRepository.saveCachedDocument(file, parsedDoc)
+            return@withContext parsedDoc
+        }
+
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
         val docxStylesMap = if (isDocx) extractDocxStyles(file) else emptyMap()
@@ -2118,5 +2134,386 @@ class OfficeDocumentParser(private val context: Context) {
             .replace(">", "&gt;")
             .replace("\"", "&quot;")
             .replace("'", "&apos;")
+    }
+
+    private fun parseXlsxDocument(
+        file: File,
+        extractedImages: Map<String, File>
+    ): OfficeParsedDocument {
+        val sharedStrings = mutableListOf<String>()
+        val sheetList = mutableListOf<Pair<String, String>>() // (sheetName, rId or path)
+        val relsMap = mutableMapOf<String, String>() // rId -> target
+        val zipEntries = mutableMapOf<String, ByteArray>()
+
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (name == "xl/sharedStrings.xml" ||
+                        name == "xl/workbook.xml" ||
+                        name == "xl/_rels/workbook.xml.rels" ||
+                        name.startsWith("xl/worksheets/")
+                    ) {
+                        zipEntries[name] = zip.readCappedBytes()
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+
+            // 1. Parse sharedStrings.xml
+            zipEntries["xl/sharedStrings.xml"]?.let { bytes ->
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(bytes), "UTF-8")
+                var event = parser.eventType
+                var inSi = false
+                val currentString = StringBuilder()
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    when (event) {
+                        XmlPullParser.START_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            if (tag == "si") {
+                                inSi = true
+                                currentString.clear()
+                            }
+                        }
+                        XmlPullParser.TEXT -> {
+                            if (inSi) {
+                                currentString.append(parser.text ?: "")
+                            }
+                        }
+                        XmlPullParser.END_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            if (tag == "si") {
+                                inSi = false
+                                sharedStrings.add(currentString.toString())
+                                currentString.clear()
+                            }
+                        }
+                    }
+                    event = parser.next()
+                }
+            }
+
+            // 2. Parse xl/_rels/workbook.xml.rels
+            zipEntries["xl/_rels/workbook.xml.rels"]?.let { bytes ->
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(bytes), "UTF-8")
+                var event = parser.eventType
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    if (event == XmlPullParser.START_TAG) {
+                        val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                        if (tag == "relationship") {
+                            val id = parser.getAttributeValue(null, "Id") ?: ""
+                            var target = parser.getAttributeValue(null, "Target") ?: ""
+                            if (target.startsWith("/")) {
+                                target = target.removePrefix("/")
+                            } else if (!target.startsWith("xl/")) {
+                                target = "xl/$target"
+                            }
+                            if (id.isNotEmpty() && target.isNotEmpty()) {
+                                relsMap[id] = target
+                            }
+                        }
+                    }
+                    event = parser.next()
+                }
+            }
+
+            // 3. Parse xl/workbook.xml
+            zipEntries["xl/workbook.xml"]?.let { bytes ->
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(bytes), "UTF-8")
+                var event = parser.eventType
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    if (event == XmlPullParser.START_TAG) {
+                        val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                        if (tag == "sheet") {
+                            val name = parser.getAttributeValue(null, "name") ?: "Sheet"
+                            var rId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
+                            if (rId.isNullOrEmpty()) {
+                                rId = parser.getAttributeValue(null, "r:id")
+                            }
+                            if (rId.isNullOrEmpty()) {
+                                rId = parser.getAttributeValue(null, "id")
+                            }
+                            sheetList.add(Pair(name, rId ?: ""))
+                        }
+                    }
+                    event = parser.next()
+                }
+            }
+
+            // Fallback if workbook.xml didn't find sheets: scan worksheets/sheet*.xml
+            if (sheetList.isEmpty()) {
+                val sheetNames = zipEntries.keys.filter { it.startsWith("xl/worksheets/sheet") }
+                    .sortedBy { key ->
+                        Regex("sheet(\\d+)").find(key)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                    }
+                sheetNames.forEachIndexed { index, path ->
+                    sheetList.add(Pair("Sheet${index + 1}", path))
+                }
+            }
+
+            val elements = mutableListOf<OfficeDocumentElement>()
+            val plainTextBuilder = StringBuilder()
+
+            fun colIndexFromRef(ref: String): Int {
+                val colLetters = ref.takeWhile { it.isLetter() }.uppercase()
+                if (colLetters.isEmpty()) return -1
+                var col = 0
+                for (ch in colLetters) {
+                    col = col * 26 + (ch - 'A' + 1)
+                }
+                return col - 1
+            }
+
+            // 4. Parse each worksheet
+            for ((sheetName, rIdOrPath) in sheetList) {
+                val targetPath = relsMap[rIdOrPath] ?: if (rIdOrPath.startsWith("xl/")) rIdOrPath else "xl/worksheets/sheet${sheetList.indexOfFirst { it.first == sheetName } + 1}.xml"
+                val sheetBytes = zipEntries[targetPath] ?: zipEntries.entries.firstOrNull { it.key.endsWith(targetPath.substringAfterLast("/")) }?.value
+                if (sheetBytes == null) continue
+
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(sheetBytes), "UTF-8")
+                var event = parser.eventType
+
+                val rows = mutableListOf<TableRow>()
+                val currentRowCells = mutableListOf<TableCell>()
+                var currentCellRef = ""
+                var currentCellType = ""
+                val currentValText = StringBuilder()
+                var inV = false
+                var inIs = false
+
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    when (event) {
+                        XmlPullParser.START_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            when (tag) {
+                                "row" -> {
+                                    currentRowCells.clear()
+                                }
+                                "c" -> {
+                                    currentCellRef = parser.getAttributeValue(null, "r") ?: ""
+                                    currentCellType = parser.getAttributeValue(null, "t") ?: ""
+                                    currentValText.clear()
+                                }
+                                "v", "t" -> {
+                                    inV = true
+                                }
+                                "is" -> {
+                                    inIs = true
+                                }
+                            }
+                        }
+                        XmlPullParser.TEXT -> {
+                            if (inV || inIs) {
+                                currentValText.append(parser.text ?: "")
+                            }
+                        }
+                        XmlPullParser.END_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            when (tag) {
+                                "v", "t" -> {
+                                    inV = false
+                                }
+                                "is" -> {
+                                    inIs = false
+                                }
+                                "c" -> {
+                                    val rawVal = currentValText.toString().trim()
+                                    val cellText = when (currentCellType) {
+                                        "s" -> {
+                                            val idx = rawVal.toIntOrNull() ?: -1
+                                            if (idx in sharedStrings.indices) sharedStrings[idx] else rawVal
+                                        }
+                                        "b" -> if (rawVal == "1") "TRUE" else "FALSE"
+                                        else -> rawVal
+                                    }
+                                    val colIdx = colIndexFromRef(currentCellRef)
+                                    if (colIdx >= 0) {
+                                        while (currentRowCells.size < colIdx) {
+                                            currentRowCells.add(TableCell(text = ""))
+                                        }
+                                        currentRowCells.add(TableCell(text = cellText))
+                                    } else {
+                                        currentRowCells.add(TableCell(text = cellText))
+                                    }
+                                    currentValText.clear()
+                                }
+                                "row" -> {
+                                    if (currentRowCells.isNotEmpty() && currentRowCells.any { it.text.isNotBlank() }) {
+                                        rows.add(TableRow(cells = currentRowCells.toList()))
+                                    }
+                                    currentRowCells.clear()
+                                }
+                            }
+                        }
+                    }
+                    event = parser.next()
+                }
+
+                if (rows.isNotEmpty()) {
+                    val maxCols = rows.maxOfOrNull { it.cells.size } ?: 0
+                    val tableElement = OfficeDocumentElement.Table(
+                        rows = rows.toList(),
+                        numColumns = maxCols,
+                        name = sheetName
+                    )
+                    elements.add(tableElement)
+
+                    plainTextBuilder.append("=== Sheet: ").append(sheetName).append(" ===\n")
+                    rows.forEach { row ->
+                        plainTextBuilder.append(row.cells.joinToString("\t") { it.text }).append("\n")
+                    }
+                    plainTextBuilder.append("\n")
+                }
+            }
+
+            return OfficeParsedDocument(
+                elements = elements,
+                rawXml = "",
+                plainText = plainTextBuilder.toString().trim(),
+                extractedImages = extractedImages,
+                isXlsx = true,
+                isParsingFailed = false,
+                pageCount = sheetList.size
+            )
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: "Failed to parse XLSX document"
+            return OfficeParsedDocument(
+                elements = emptyList(),
+                rawXml = "",
+                plainText = "",
+                extractedImages = extractedImages,
+                isXlsx = true,
+                isParsingFailed = true,
+                failureReason = errorMsg
+            )
+        }
+    }
+
+    private fun parsePptxDocument(
+        file: File,
+        extractedImages: Map<String, File>
+    ): OfficeParsedDocument {
+        val slideEntries = mutableMapOf<String, ByteArray>()
+        val elements = mutableListOf<OfficeDocumentElement>()
+        val plainTextBuilder = StringBuilder()
+
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) {
+                        slideEntries[name] = zip.readCappedBytes()
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+
+            val sortedSlideNames = slideEntries.keys.sortedBy { name ->
+                Regex("slide(\\d+)\\.xml").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            }
+
+            for ((slideIndex, slideName) in sortedSlideNames.withIndex()) {
+                val bytes = slideEntries[slideName] ?: continue
+                val factory = XmlPullParserFactory.newInstance()
+                factory.isNamespaceAware = true
+                val parser = factory.newPullParser()
+                parser.setInput(ByteArrayInputStream(bytes), "UTF-8")
+                var event = parser.eventType
+
+                val slideParagraphs = mutableListOf<String>()
+                val currentRunText = StringBuilder()
+                var inPara = false
+                var inTitle = false
+
+                while (event != XmlPullParser.END_DOCUMENT) {
+                    when (event) {
+                        XmlPullParser.START_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            if (tag == "p") {
+                                inPara = true
+                                currentRunText.clear()
+                            } else if (tag == "ph") {
+                                val type = parser.getAttributeValue(null, "type") ?: ""
+                                if (type == "title" || type == "ctrTitle") {
+                                    inTitle = true
+                                }
+                            }
+                        }
+                        XmlPullParser.TEXT -> {
+                            if (inPara) {
+                                currentRunText.append(parser.text ?: "")
+                            }
+                        }
+                        XmlPullParser.END_TAG -> {
+                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            if (tag == "p") {
+                                inPara = false
+                                val pText = currentRunText.toString().trim()
+                                if (pText.isNotEmpty()) {
+                                    slideParagraphs.add(pText)
+                                }
+                                currentRunText.clear()
+                            } else if (tag == "sp") {
+                                inTitle = false
+                            }
+                        }
+                    }
+                    event = parser.next()
+                }
+
+                if (elements.isNotEmpty()) {
+                    elements.add(OfficeDocumentElement.PageBreak)
+                }
+
+                val titleText = slideParagraphs.firstOrNull() ?: "Slide ${slideIndex + 1}"
+                elements.add(OfficeDocumentElement.Heading(text = titleText, level = 1, styleName = "SlideTitle"))
+
+                plainTextBuilder.append("[Slide ").append(slideIndex + 1).append(": ").append(titleText).append("]\n")
+
+                for (i in 1 until slideParagraphs.size) {
+                    val pText = slideParagraphs[i]
+                    elements.add(OfficeDocumentElement.Paragraph(text = pText))
+                    plainTextBuilder.append(pText).append("\n")
+                }
+                plainTextBuilder.append("\n")
+            }
+
+            return OfficeParsedDocument(
+                elements = elements,
+                rawXml = "",
+                plainText = plainTextBuilder.toString().trim(),
+                extractedImages = extractedImages,
+                isPptx = true,
+                isParsingFailed = false,
+                pageCount = sortedSlideNames.size
+            )
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: "Failed to parse PPTX document"
+            return OfficeParsedDocument(
+                elements = emptyList(),
+                rawXml = "",
+                plainText = "",
+                extractedImages = extractedImages,
+                isPptx = true,
+                isParsingFailed = true,
+                failureReason = errorMsg
+            )
+        }
     }
 }
