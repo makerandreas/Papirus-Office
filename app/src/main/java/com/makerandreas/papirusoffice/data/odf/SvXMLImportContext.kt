@@ -1,4 +1,5 @@
 package com.makerandreas.papirusoffice.data.odf
+import java.util.Locale
 
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.TableCell
@@ -465,7 +466,8 @@ class OdfTableRowContext(
             val repeatCount = (repeatStr?.toIntOrNull() ?: 1).coerceIn(1, 64)
             val row = TableRow(cells = cells.toList())
             for (i in 0 until repeatCount) {
-                parentTableContext.rows.add(row)
+                // Copy per repeat: sharing one instance would alias mutations across rows.
+                parentTableContext.rows.add(if (i == 0) row else row.copy())
             }
         }
     }
@@ -518,13 +520,14 @@ class OdfTableCellContext(
         if (rawText.isNotEmpty()) {
             val count = repeatCount.coerceIn(1, 256)
             for (i in 0 until count) {
-                parentRowContext.cells.add(cell)
+                // Copy per repeat: sharing one instance would alias mutations across cells.
+                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
             }
         } else {
             // For empty cells, only replicate if small (<= 16), otherwise avoid explosive empty columns in ODS
             val count = repeatCount.coerceIn(1, 16)
             for (i in 0 until count) {
-                parentRowContext.cells.add(cell)
+                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
             }
         }
     }
@@ -586,7 +589,7 @@ class OdfFrameContext(
 
     private fun parseDimensionToDp(dimStr: String?): Float {
         if (dimStr.isNullOrBlank()) return 100f
-        val clean = dimStr.lowercase().trim()
+        val clean = dimStr.lowercase(Locale.ROOT).trim()
         val num = clean.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 100f
         return when {
             clean.endsWith("in") -> num * 160f

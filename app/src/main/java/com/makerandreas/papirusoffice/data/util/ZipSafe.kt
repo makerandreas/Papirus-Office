@@ -33,6 +33,16 @@ object ZipSafe {
     /** Max bytes for a downloaded template / font file. */
     const val MAX_DOWNLOAD_BYTES = 100L * 1024 * 1024
     const val MAX_FONT_BYTES = 30L * 1024 * 1024
+
+    /**
+     * Max worksheet rows materialized per XLSX sheet (Phase 6). Bounds the
+     * parsed *model* (TableRow/Cell objects); the streamed raw XML is
+     * separately bounded by [MAX_DOCUMENT_BYTES] via [ZipScanBudget].
+     */
+    const val MAX_XLSX_ROWS = 200_000
+
+    /** Max spreadsheet column index (XFD, the OOXML spec limit). Guards the sparse-cell fill loop. */
+    const val MAX_XLSX_COLUMN_INDEX = 16383
 }
 
 /**
@@ -77,4 +87,86 @@ fun InputStream.copyCappedTo(out: OutputStream, maxBytes: Long): Long {
         out.write(buf, 0, n)
     }
     return total
+}
+
+/**
+ * Cross-entry scan budget for one archive pass (Phase 6 hardening).
+ *
+ * Per-entry caps ([InputStream.readCappedBytes]) stop single-entry bombs; the
+ * budget additionally stops many-entries / many-total-bytes bombs across a
+ * whole scan. Create one budget per scan pass and thread it through
+ * [ZipInputStream.nextEntryBudgeted], [InputStream.readCappedBytes] and
+ * [BudgetedInputStream].
+ */
+class ZipScanBudget(
+    val maxEntries: Long = ZipSafe.MAX_ZIP_ENTRIES,
+    val maxTotalBytes: Long = ZipSafe.MAX_DOCUMENT_BYTES
+) {
+    var entriesCharged: Long = 0L
+        private set
+    var bytesCharged: Long = 0L
+        private set
+
+    /** @throws IOException if the entry count cap is exceeded. */
+    fun chargeEntry(entryName: String) {
+        entriesCharged += 1
+        if (entriesCharged > maxEntries) {
+            throw IOException("Zip archive exceeds $maxEntries entries safety cap (at '$entryName')")
+        }
+    }
+
+    /** @throws IOException if the total-bytes cap is exceeded. */
+    fun chargeBytes(byteCount: Long) {
+        if (byteCount <= 0) return
+        bytesCharged += byteCount
+        if (bytesCharged > maxTotalBytes) {
+            throw IOException("Zip archive exceeds ${maxTotalBytes / 1024 / 1024} MB total safety cap")
+        }
+    }
+}
+
+/**
+ * [ZipInputStream.nextEntry] with entry-count budgeting.
+ * A null [budget] behaves exactly like plain [ZipInputStream.nextEntry].
+ */
+fun ZipInputStream.nextEntryBudgeted(budget: ZipScanBudget?): java.util.zip.ZipEntry? {
+    val entry = nextEntry ?: return null
+    budget?.chargeEntry(entry.name)
+    return entry
+}
+
+/**
+ * [InputStream.readCappedBytes] variant that additionally charges [budget].
+ */
+fun InputStream.readCappedBytes(maxBytes: Long, budget: ZipScanBudget?): ByteArray {
+    val bytes = readCappedBytes(maxBytes)
+    budget?.chargeBytes(bytes.size.toLong())
+    return bytes
+}
+
+/**
+ * Pass-through stream that charges every consumed byte to [budget].
+ *
+ * Use when a parser (e.g. XmlPullParser) consumes a ZIP entry as a stream
+ * instead of a buffered [ByteArray], so streamed bytes stay inside the
+ * archive's total-bytes budget. Does NOT close [budget]; closing this stream
+ * closes the wrapped stream (callers parsing ZIP entries must still call
+ * [ZipInputStream.closeEntry] themselves).
+ */
+class BudgetedInputStream(
+    wrapped: InputStream,
+    private val budget: ZipScanBudget?
+) : java.io.FilterInputStream(wrapped) {
+
+    override fun read(): Int {
+        val byte = super.read()
+        if (byte != -1) budget?.chargeBytes(1)
+        return byte
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = super.read(b, off, len)
+        if (n > 0) budget?.chargeBytes(n.toLong())
+        return n
+    }
 }

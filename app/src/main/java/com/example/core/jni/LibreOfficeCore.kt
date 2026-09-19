@@ -10,15 +10,47 @@ object LibreOfficeCore {
     private const val TAG = "LibreOfficeCore"
     private var isLibraryLoaded = false
 
+    /**
+     * True when a real native library was found (Phase 2 drop-in present).
+     * Until then every call below runs its JVM fallback — see [LokitEngine].
+     */
+    val isNativeLibraryLoaded: Boolean
+        get() = isLibraryLoaded
+
+    /** Soname load order for a stock LibreOffice-Android build (single .so + NSS deps). */
+    private val LO_NATIVE_LOAD_ORDER = listOf(
+        "nspr4", "plds4", "plc4", "nssutil3", "freebl3", "sqlite3",
+        "softokn3", "nss3", "nssckbi", "nssdbm3", "smime3", "ssl3",
+        "c++_shared", "lo-native-code"
+    )
+
     // Load native libraries if available. In prototype mode, we fail gracefully.
     init {
+        isLibraryLoaded = tryLoadNative()
+        if (isLibraryLoaded) {
+            Log.i(TAG, "Native LibreOffice library loaded successfully.")
+        } else {
+            Log.w(TAG, "No native library found (tried lo-native-code chain + libreoffice-core). Running simulated/JVM fallback mode.")
+        }
+    }
+
+    /**
+     * Phase 2 drop-in probe: stock `liblo-native-code.so` first (with its
+     * dependency chain), then the legacy `liblibreoffice-core.so` custom name.
+     * Pure probe — any UnsatisfiedLinkError means "simulated mode".
+     */
+    private fun tryLoadNative(): Boolean {
         try {
+            LO_NATIVE_LOAD_ORDER.forEach { System.loadLibrary(it) }
+            return true
+        } catch (ignored: UnsatisfiedLinkError) {
+            // Fall through to the legacy/custom soname.
+        }
+        return try {
             System.loadLibrary("libreoffice-core")
-            isLibraryLoaded = true
-            Log.i(TAG, "LibreOffice Core Native Library loaded successfully.")
-        } catch (e: UnsatisfiedLinkError) {
-            isLibraryLoaded = false
-            Log.w(TAG, "Native library 'libreoffice-core' not found. Running in mock/compatibility fallback mode.")
+            true
+        } catch (ignored: UnsatisfiedLinkError) {
+            false
         }
     }
 
