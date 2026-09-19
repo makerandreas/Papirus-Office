@@ -1,4 +1,5 @@
 package com.makerandreas.papirusoffice.data
+import java.util.Locale
 
 import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
@@ -27,7 +28,7 @@ class DocxDocumentParser(private val context: Context) {
     suspend fun parseDocument(file: File, bypassCache: Boolean = false): DocxParseResult = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext DocxParseResult("")
 
-        val fileName = file.name.lowercase()
+        val fileName = file.name.lowercase(Locale.ROOT)
         if (fileName.endsWith(".docx") || fileName.endsWith(".docm") || fileName.endsWith(".odt") || fileName.endsWith(".ott") || fileName.endsWith(".ods") || fileName.endsWith(".ots") || fileName.endsWith(".odp") || fileName.endsWith(".otp") || fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm") || fileName.endsWith(".pptx") || fileName.endsWith(".pptm") || isZipFile(file)) {
             val parsedDoc = officeParser.parseDocument(file, bypassCache)
             return@withContext DocxParseResult(
@@ -93,7 +94,7 @@ class DocxDocumentParser(private val context: Context) {
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             val tagName = parser.name
-                            val tagLower = tagName.lowercase()
+                            val tagLower = tagName.lowercase(Locale.ROOT)
                             when {
                                 tagLower == "w:p" || tagLower == "p" -> {
                                     inParagraph = true
@@ -137,7 +138,7 @@ class DocxDocumentParser(private val context: Context) {
                         }
                         XmlPullParser.END_TAG -> {
                             val tagName = parser.name
-                            val tagLower = tagName.lowercase()
+                            val tagLower = tagName.lowercase(Locale.ROOT)
                             when {
                                 tagLower == "w:t" || tagLower == "t" -> {
                                     inText = false
@@ -316,7 +317,7 @@ class DocxDocumentParser(private val context: Context) {
             isPptx = file.name.endsWith(".pptx", ignoreCase = true) || file.name.endsWith(".pptm", ignoreCase = true),
             isParsingFailed = false
         )
-        val fileName = file.name.lowercase()
+        val fileName = file.name.lowercase(Locale.ROOT)
         if (parsedDoc.isXlsx) return@withContext officeParser.saveXlsxDocument(file, parsedDoc)
         if (parsedDoc.isOds) return@withContext officeParser.saveOdsDocument(file, parsedDoc)
         if (parsedDoc.isOdp) return@withContext officeParser.saveOdpDocument(file, parsedDoc)
@@ -327,7 +328,7 @@ class DocxDocumentParser(private val context: Context) {
     }
 
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
-        val fileName = file.name.lowercase()
+        val fileName = file.name.lowercase(Locale.ROOT)
         val isXlsx = fileName.endsWith(".xlsx") || fileName.endsWith(".xlsm")
         val isOds = fileName.endsWith(".ods")
         val isOdp = fileName.endsWith(".odp")

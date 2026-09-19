@@ -1,4 +1,5 @@
 package com.makerandreas.papirusoffice.data.odf
+import java.util.Locale
 
 /**
  * Modern Kotlin enumeration and mapping system for ODF XML tokens,
@@ -112,11 +113,11 @@ enum class OdfXmlToken(val tokenName: String) {
             val map = mutableMapOf<String, OdfXmlToken>()
             values().forEach { token ->
                 if (token.tokenName.isNotEmpty()) {
-                    map[token.tokenName.lowercase()] = token
+                    map[token.tokenName.lowercase(Locale.ROOT)] = token
                     // Also strip prefix for namespace-agnostic lookup (e.g., "p" -> XML_P)
                     if (token.tokenName.contains(":")) {
                         val simpleName = token.tokenName.substringAfter(":")
-                        map.putIfAbsent(simpleName.lowercase(), token)
+                        map.putIfAbsent(simpleName.lowercase(Locale.ROOT), token)
                     }
                 }
             }
@@ -125,7 +126,7 @@ enum class OdfXmlToken(val tokenName: String) {
 
         fun fromTag(rawTag: String?): OdfXmlToken {
             if (rawTag.isNullOrBlank()) return XML_UNKNOWN
-            val cleanTag = rawTag.trim().lowercase()
+            val cleanTag = rawTag.trim().lowercase(Locale.ROOT)
             return tokenMap[cleanTag] ?: tokenMap[cleanTag.substringAfter(":")] ?: XML_UNKNOWN
         }
     }
