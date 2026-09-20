@@ -131,7 +131,22 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.addAll(listOf("src/main/assets", "src/main/share"))
-      jniLibs.srcDir("src/main/libs")
+      jniLibs.directories.add("src/main/libs")
+    }
+  }
+  splits {
+    // Membagi APK berdasarkan arsitektur ABI (Native Code)
+    abi {
+      isEnable = true
+      isUniversalApk = false // Set 'true' jika tetap ingin memproduksi 1 APK gabungan sebagai cadangan
+      reset()
+      // Daftarkan arsitektur yang didukung oleh Papirus Office
+      include("arm64-v8a", "armeabi-v7a", "x86_64")
+    }
+  }
+  packaging {
+    jniLibs {
+      keepDebugSymbols.add("**/*.so")
     }
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
