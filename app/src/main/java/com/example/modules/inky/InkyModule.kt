@@ -641,13 +641,14 @@ fun InkyModule(
         }
     }
 
-    // LibreOffice Kit Diagnostics Logs State
+    // LibreOfficeKit diagnostics log. When no native LOKit build has loaded
+    // (see LokitEngine.statusLabel), the engine runs simulated and entries
+    // below are produced locally, not by native dispatch.
     val lokitLogs = remember {
         mutableStateListOf(
-            "LOKit Core: Connected (v7.6.2)",
-            "lok::Office::documentLoad(\"Inky_Dokumen.odt\") -> SUCCESS",
-            "lok::Document::registerCallback(LOK_CALLBACK_INVALIDATE_TILES)",
-            "lok::Document::paintTileList() -> Initialized 4 screen tiles"
+            "LOKit Core: " + com.example.core.jni.LokitEngine.statusLabel,
+            com.example.core.jni.LokitEngine.tagLog("lok::Office::documentLoad(\"Inky_Dokumen.odt\")"),
+            com.example.core.jni.LokitEngine.tagLog("lok::Document::registerCallback(LOK_CALLBACK_INVALIDATE_TILES)")
         )
     }
 
@@ -655,7 +656,9 @@ fun InkyModule(
         if (lokitLogs.size > 15) {
             lokitLogs.removeAt(0)
         }
-        lokitLogs.add(message)
+        // Event names mirror LOKit dispatch; the tag keeps the simulated
+        // engine honest until a native build is bundled.
+        lokitLogs.add(com.example.core.jni.LokitEngine.tagLog(message))
     }
 
     var activeToolbarTypeState by remember { mutableStateOf("Standard") } // For compatibility or internal tracking
@@ -1121,7 +1124,7 @@ fun InkyModule(
     val handleLoadTemplate = { template: TemplateManager.TemplateItem ->
         val loadTemplate = {
             val name = "Document.odt"
-            val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Tuned JNI Bridge bottlenecks to boost LibreOfficeCore rendering by 45%.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
+            val sampleTemplateContent = "RESUME (MODERN)\n\nJohn Doe • Professional Software Engineer\nEmail: john.doe@email.com • Tel: +1 555-0199\n\nSUMMARY\nHighly motivated developer with experience building native Android productivity engines.\n\nEXPERIENCE\nSenior Developer • Papirus Office Inc.\n- Designed and implemented Google Gemini ODF template recommendation search APIs.\n- Optimized document parsing pipelines to improve large-file load times.\n\nEDUCATION\nBachelor of Science in Computer Science • University of Antigravity"
             
             val filePath = com.example.MainActivity.openedFilePath
             val file = if (filePath != null) java.io.File(filePath) else null
@@ -1403,56 +1406,58 @@ fun InkyModule(
         isSaved = false
     }
 
-    var typingDebounceJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val typingBuffer = remember {
+        com.example.modules.inky.state.PendingTypingBuffer(
+            scope = coroutineScope,
+            getLiveText = { docBodyText.text },
+            getBaseline = { lastTextRecordedValue },
+            setBaseline = { lastTextRecordedValue = it },
+            getSelection = { docBodyText.selection },
+            recordCommittedTyping = { oldValue, newValue, selectionAtCommit ->
+                val diff = newValue.length - oldValue.length
+                val title = when {
+                    diff > 0 -> {
+                        val added = if (newValue.startsWith(oldValue)) {
+                            newValue.substring(oldValue.length)
+                        } else {
+                            newValue
+                        }
+                        "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
+                    }
+                    diff < 0 -> "Delete text"
+                    else -> "Edit Document"
+                }
+                val icon = if (diff >= 0) "text_fields" else "backspace"
+                val cmdType = if (diff >= 0) "TYPING" else "DELETE_TEXT"
+                val session = currentSessionState
+                if (session != null) {
+                    session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
+                        override val title = title
+                        override val timestamp = System.currentTimeMillis()
+                        override val icon = icon
+                        override val commandType = cmdType
+                        override suspend fun undo() {
+                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                text = oldValue,
+                                selection = androidx.compose.ui.text.TextRange(oldValue.length)
+                            )
+                            lastTextRecordedValue = oldValue
+                        }
+                        override suspend fun redo() {
+                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                text = newValue,
+                                selection = selectionAtCommit
+                            )
+                            lastTextRecordedValue = newValue
+                        }
+                    })
+                }
+            }
+        )
+    }
 
     val flushPendingTyping: suspend (String) -> Unit = { textToCommit ->
-        typingDebounceJob?.cancel()
-        typingDebounceJob = null
-        if (textToCommit != lastTextRecordedValue) {
-            val oldValue = lastTextRecordedValue
-            val newValue = textToCommit
-            val diff = newValue.length - oldValue.length
-            val title = when {
-                diff > 0 -> {
-                    val added = if (newValue.startsWith(oldValue)) {
-                        newValue.substring(oldValue.length)
-                    } else {
-                        newValue
-                    }
-                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
-                }
-                diff < 0 -> "Delete text"
-                else -> "Edit Document"
-            }
-            val icon = if (diff >= 0) "text_fields" else "backspace"
-            val cmdType = if (diff >= 0) "TYPING" else "DELETE_TEXT"
-            val oldSel = androidx.compose.ui.text.TextRange(oldValue.length)
-            val newSel = androidx.compose.ui.text.TextRange(newValue.length)
-
-            val session = currentSessionState
-            if (session != null) {
-                session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
-                    override val title = title
-                    override val timestamp = System.currentTimeMillis()
-                    override val icon = icon
-                    override val commandType = cmdType
-                    override suspend fun undo() {
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                            text = oldValue,
-                            selection = oldSel
-                        )
-                        lastTextRecordedValue = oldValue
-                    }
-                    override suspend fun redo() {
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                            text = newValue,
-                            selection = newSel
-                        )
-                        lastTextRecordedValue = newValue
-                    }
-                })
-            }
-            lastTextRecordedValue = newValue
+        if (typingBuffer.flush(textToCommit)) {
             triggerAutosave()
         }
     }
@@ -1522,28 +1527,25 @@ fun InkyModule(
             val hadSelection = !prevSel.collapsed
 
             if (hadSelection) {
-                typingDebounceJob?.cancel()
-                typingDebounceJob = null
+                typingBuffer.cancelPending()
 
                 val start = kotlin.math.min(prevSel.start, prevSel.end)
                 val end = kotlin.math.max(prevSel.start, prevSel.end)
                 val selRange = com.makerandreas.papirusoffice.data.writer.SelectionRange(start, end)
                 val fullText = prevText
-                val priorOld = lastTextRecordedValue
                 val isDelete = newText.length < prevText.length
 
                 coroutineScope.launch {
                     val session = currentSessionState
-                    // 1. Flush uncommitted typing that occurred before this selection
-                    if (session != null && fullText != priorOld) {
-                        flushPendingTyping(fullText)
-                    }
+                    // Flush-then-delete is owned by the typing buffer, so the
+                    // delete always records against a committed baseline.
 
-                    // 2. Record selection delete/replace
+                    // Record selection delete/replace
                     if (isDelete) {
-                        inkyEditingEngine.deleteSelection(
+                        typingBuffer.deleteSelection(
                             selection = selRange,
                             fullText = fullText,
+                            engine = inkyEditingEngine,
                             onApply = { appliedText, s ->
                                 docBodyText = androidx.compose.ui.text.input.TextFieldValue(
                                     text = appliedText,
@@ -1591,8 +1593,7 @@ fun InkyModule(
                         (prevSel.min < newText.length && newText[prevSel.min] == '\n')
 
                 if (isEnter) {
-                    typingDebounceJob?.cancel()
-                    typingDebounceJob = null
+                    typingBuffer.cancelPending()
                     val priorOld = lastTextRecordedValue
                     val priorNew = newText
                     coroutineScope.launch {
@@ -1623,53 +1624,7 @@ fun InkyModule(
                     }
                 } else {
                     // Continuous typing / backspacing: debounce for 800ms
-                    typingDebounceJob?.cancel()
-                    typingDebounceJob = coroutineScope.launch {
-                        kotlinx.coroutines.delay(800)
-                        val session = currentSessionState
-                        val currentText = docBodyText.text
-                        if (session != null && currentText != lastTextRecordedValue) {
-                            val oldValue = lastTextRecordedValue
-                            val newValueText = currentText
-                            val diff = newValueText.length - oldValue.length
-                            val title = when {
-                                diff > 0 -> {
-                                    val added = if (newValueText.startsWith(oldValue)) {
-                                        newValueText.substring(oldValue.length)
-                                    } else {
-                                        newValueText
-                                    }
-                                    "Typing \"${added.take(15)}${if (added.length > 15) "..." else ""}\""
-                                }
-                                diff < 0 -> "Delete text"
-                                else -> "Edit Document"
-                            }
-                            val icon = if (diff >= 0) "text_fields" else "backspace"
-                            val cmdType = if (diff >= 0) "TYPING" else "DELETE_TEXT"
-                            val currentSel = docBodyText.selection
-                            session.undoManager.recordAction(object : com.makerandreas.papirusoffice.data.undo.UndoAction {
-                                override val title = title
-                                override val timestamp = System.currentTimeMillis()
-                                override val icon = icon
-                                override val commandType = cmdType
-                                override suspend fun undo() {
-                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                        text = oldValue,
-                                        selection = androidx.compose.ui.text.TextRange(oldValue.length)
-                                    )
-                                    lastTextRecordedValue = oldValue
-                                }
-                                override suspend fun redo() {
-                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                        text = newValueText,
-                                        selection = currentSel
-                                    )
-                                    lastTextRecordedValue = newValueText
-                                }
-                            })
-                            lastTextRecordedValue = newValueText
-                        }
-                    }
+                    typingBuffer.onTextChanged()
                 }
             }
         }
@@ -1683,16 +1638,12 @@ fun InkyModule(
             val selRange = com.makerandreas.papirusoffice.data.writer.SelectionRange(start, end)
             val fullText = docBodyText.text
 
-            typingDebounceJob?.cancel()
-            typingDebounceJob = null
             coroutineScope.launch {
-                if (fullText != lastTextRecordedValue) {
-                    flushPendingTyping(fullText)
-                }
                 com.makerandreas.papirusoffice.data.PapirusLogger.d("UNDO", "DeleteSelectionCommand")
-                inkyEditingEngine.deleteSelection(
+                typingBuffer.deleteSelection(
                     selection = selRange,
                     fullText = fullText,
+                    engine = inkyEditingEngine,
                     onApply = { appliedText, newSel ->
                         docBodyText = androidx.compose.ui.text.input.TextFieldValue(
                             text = appliedText,

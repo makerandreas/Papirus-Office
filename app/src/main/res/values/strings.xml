@@ -174,7 +174,10 @@
     <string name="save_as_with_password">Save with Password</string>
     <string name="save_as_encrypt_gpg">Encrypt with GPG</string>
     <string name="save_as_auto_suffix">Automatically Add File Format Suffix</string>
-    <string name="save_as_protection_unsupported">Password protection and GPG encryption are not supported yet. The file will be saved unprotected.</string>
+    <string name="save_as_protection_unsupported">File protection with this format is not supported by this device</string>
+    <string name="about_native_engine_label">Native rendering engine</string>
+    <string name="about_native_engine_none">None (pure Kotlin, simulated)</string>
+    <string name="about_native_engine_lokit">LibreOfficeKit (LOKit)</string>
     <string name="warn_non_odf_title">Confirm File Format</string>
     <string name="warn_non_odf_msg">This document may contain formatting or features that cannot be saved in the selected Microsoft Office format (%1$s). Do you want to save in this format anyway?</string>
     <string name="btn_continue">Continue</string>

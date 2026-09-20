@@ -91,10 +91,10 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
   - Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
   - **ODF Import System (`data.odf`)**: Context-driven parser implementing `SvXMLImport`, `SvXMLImportContext`, and `OdfXmlToken` supporting `.odt`, `.ods` (multi-sheet tables with repeated columns/rows and values), and `.odp` (slides, frames, custom shapes, text boxes, and drawing groups).
   - **OpenXML / OOXML Engine**: Complete parsing for `.docx` (WordprocessingML), `.xlsx` (SpreadsheetML with sharedStrings and sheet mapping), and `.pptx` (PresentationML with slide titles, body placeholders, and slide counts).
-- **LibreOfficeKit (LOKit) JNI Bridge**: Native C++ `.so` libraries in `/app/src/libs` providing desktop-class document rendering, complex layouts, OpenFormula evaluation, and PDF export.
+- **LibreOfficeKit (LOKit) JNI Bridge**: native `.so` libraries shipped under `app/src/main/libs/<abi>/` (`liblo-native-code.so` + NSS chain, from LibreOffice Viewer for Android). `LibreOfficeCore` probes them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when absent.
 - **DocumentSession & SessionManager**: Tracks active document lifecycle, file path, dirty flags (`isSaved`), autosave timers, and undo/redo stacks.
-- **UndoManager & HistoryManager**: Dual-stack Command Pattern (`UndoAction`). Includes a synchronous typing buffer flusher (`flushPendingTyping`) before deletions and undo actions to prevent race conditions.
-- **Modular Equation Pipeline**: LaTeX-style input via KaTeX/MathJax preview with bidirectional conversion to MathML (ODF) and OMML (OOXML).
+- **UndoManager & HistoryManager**: Dual-stack Command Pattern (`UndoAction`). Includes `PendingTypingBuffer`, which owns the debounce → baseline-commit protocol and the flush-then-delete sequence (surfaced via `flushPendingTyping`) before deletions and undo actions to prevent race conditions.
+- **Modular Equation Pipeline**: LaTeX-style input converted by `EquationParser` (fractions, roots, symbols) with bidirectional conversion to MathML (ODF) and OMML (OOXML); rendered KaTeX/MathJax preview is planned.
 
 ---
 
@@ -110,8 +110,8 @@ All document format specifications, standards, and schema definitions placed in 
   1. Consult the relevant specification files in `/sources`.
   2. Adhere strictly to the normative rules (e.g., exact namespace definitions, element ordering, MIME header constraints, non-destructive package preservation).
 
-### `/app/src/libs`
-There are subdirectories for each architecture. Make sure to consult these subdirectories and its necessary `so` libraries if needed.
+### `app/src/main/libs`
+Pre-built native `.so` libraries per ABI (`arm64-v8a`, `armeabi-v7a`) from the official LibreOffice Viewer for Android. Never assume a native capability without checking `LokitEngine.isNativeAvailable`.
 
 ### `sdk-references`
 When necessary, consult all SDK examples in `/sdk-references` directory.

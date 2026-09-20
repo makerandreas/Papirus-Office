@@ -145,6 +145,12 @@ fun AboutScreen(
                             value = BuildConfig.PAPIRUS_ENGINE_VERSION,
                             icon = Icons.Rounded.SettingsSuggest
                         )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        VersionRow(
+                            label = stringResource(R.string.about_native_engine_label),
+                            value = com.example.core.jni.LokitEngine.statusLabel,
+                            icon = Icons.Rounded.SettingsSuggest
+                        )
                     }
                 }
             }

@@ -9,7 +9,7 @@
 - **Codename / Concept Heritage**: Originally conceptualized as **LibreDroid Office**, created to bridge the full power of desktop-class office editing (based on LibreOffice architecture and the Document Liberation Project) to mobile devices.
 - **Document Standards Compliance**: Built on the **OASIS OpenDocument Format (ODF v1.4)** standards (`.odt`, `.ods`, `.odp`, `.ott`, `.ots`, `.otp`), with complete import/export compatibility for Microsoft Office OpenXML (`.docx`, `.xlsx`, `.pptx`) and Adobe PDF (`.pdf`).
 - **Design System**: Strict adherence to **Material Design 3 (M3) Expressive**, featuring 8dp grid rhythm, fluid micro-interactions, full edge-to-edge layout, dynamic Google Sans UI typography, and module-specific color branding.
-- **License**: Follows the same open-source licensing principles as LibreOffice (MPLv2 / GPLv3 / LGPLv3 tri-license).
+- **License**: Mozilla Public License 2.0 — see [LICENSE](LICENSE) (file-level copyleft; same steward-license family as LibreOffice's MPL-2.0).
 
 ### The Suite Modules & Color Conventions
 Default static accent colors (for Android 11 and below, or when Dynamic Color is disabled):
@@ -38,14 +38,13 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
 - **`DocumentSerializer`**: Writes lossless ODF v1.4 and OOXML packages respecting strict namespace schemas.
 
 ### B. LibreOfficeKit (LOKit) JNI Bridge & C++ OOXML / Equation Layer
-Located in `/app/src/libs` (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`):
-- Native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`).
-- Used for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
-- Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) track LOKit dispatch states.
+**Status: native libraries bundled — Kotlin/JNI facade calls are the remaining piece.** Pre-built LibreOffice Viewer for Android binaries (`liblo-native-code.so` + NSS dependency chain) ship under `app/src/main/libs/<abi>/` (`arm64-v8a`, `armeabi-v7a`). `LibreOfficeCore` loads them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode to the About screen and diagnostics log, falling back to the pure-Kotlin engine when loading fails.
+- Planned: native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`) for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
+- Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) mirror LOKit dispatch names; entries are tagged `[simulated]` until a native build is bundled.
 - **Modular Equation Pipeline**:
-  - LaTeX-style syntax user input rendered via KaTeX / MathJax.
+  - LaTeX-style syntax user input converted by `EquationParser` (fractions, roots, symbols; rendered KaTeX / MathJax preview is planned).
   - Bidirectional conversion: LaTeX ↔ MathML for ODF (`.odt`, `.ods`, `.odp`), LaTeX ↔ OMML for OOXML (`.docx`, `.xlsx`, `.pptx`).
-  - Modular build-flag design (`ENABLE_MATHML_SUPPORT`, `ENABLE_OMML_SUPPORT`).
+  - Conversion is unconditional today; build-flag gating (`ENABLE_MATHML_SUPPORT`, `ENABLE_OMML_SUPPORT`) is planned.
 
 ### C. State & Session Management
 - **`DocumentSessionState` & `DocumentSession`**: Represents the active document lifecycle, file path, temporary caches, dirty flags (`isSaved`), and layout configurations.
@@ -187,7 +186,7 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 | **Slidia** | Presentation Module | The slide presentation component of Papirus Office (equivalent to LibreOffice Impress / MS PowerPoint). |
 | **Pagella** | PDF & Document Manager | The PDF viewing, annotating, and format conversion component of Papirus Office. |
 | **Start Center / Start Screen** | Welcome & Document Hub | Top-level dashboard containing Recents, Device File Explorer, Google Drive Sync, and Create New actions. |
-| **LOKit / LibreOfficeKit** | LibreOffice Native C++ Engine | The underlying native engine providing document parsing, filter import/export, layout calculation, and PDF conversion. |
+| **LOKit / LibreOfficeKit** | Native C++ engine (bundled `.so` under `app/src/main/libs/<abi>/`) | `liblo-native-code.so` + NSS chain from LibreOffice Viewer for Android; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when loading fails. |
 | **ODF v1.4** | OASIS OpenDocument Format 1.4 | The open international standard format for office documents (`.odt`, `.ods`, `.odp`), authoritative in `/sources`. |
 | **OOXML** | Office Open XML | Microsoft Office document format standard (`.docx`, `.xlsx`, `.pptx`). |
 | **DocumentSession** | Active Document Session | State container tracking the open document, edit mode, dirty flag, file URI, autosave state, and engine instances. |
@@ -207,11 +206,9 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 │   ├── OpenDocument-v1.4-cs01-part2-packages.odt
 │   ├── OpenDocument-v1.4-cs01-part3-schema.odt
 │   └── OpenDocument-v1.4-cs01-part4-formula.odt
-├── app/src/libs/                            # Architecture-specific precompiled native .so libraries
-│   ├── arm64-v8a/
-│   ├── armeabi-v7a/
-│   ├── x86/
-│   └── x86_64/
+├── app/src/main/libs/                       # Pre-built native .so per ABI (LibreOffice Viewer for Android)
+│   ├── arm64-v8a/                           # liblo-native-code.so + NSS dependency chain
+│   └── armeabi-v7a/                         # liblo-native-code.so + NSS dependency chain
 └── app/src/main/java/
     ├── com/example/
     │   ├── MainActivity.kt                  # Root Activity, edge-to-edge window setup, navigation host
@@ -262,16 +259,16 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 Papirus Office (codenamed LibreDroid Office during conceptualization) follows a structured phased development roadmap:
 
 - **Phase 1: Environment Setup** ✅ — Android build environment, Gradle Kotlin DSL, Version Catalog, Room, and Compose setup.
-- **Phase 2: JNI Implementation & Stress Test Stage 1** ✅ — LibreOfficeKit C++ bindings integration in `/app/src/libs` across 4 ABIs.
+- **Phase 2: JNI Implementation & Stress Test Stage 1** 🔄 — native `.so` bundled under `app/src/main/libs/<abi>/` (LibreOffice Viewer for Android); `LokitEngine` probe + fallback landed, Kotlin→JNI facade calls pending.
 - **Phase 3: Building LibreOffice Core Engine & OOXML Compatibility Foundation** ✅ / 🔄
-  - *Task 1: LibreOffice Core JNI Integration* ✅
-  - *Task 2: Real-World Document Stress Testing* ✅ — Tested against real-world ODT, DOCX, ODS, XLSX, ODP, PPTX files in `/tests` with layout fidelity verification.
+  - *Task 1: LibreOffice Core JNI Integration* 🔄 — native probe + simulated fallback landed; remaining Kotlin `external` facade methods not yet wired to native.
+  - *Task 2: Real-World Document Stress Testing* 🔄 — compatibility suite added (`SampleFilesCompatibilityTest`); must be green in CI before claiming.
   - *Task 3: OOXML Standards & SDK References* ✅ — ECMA-376 specifications, OpenXML SDK architecture.
   - *Task 4: OOXML Compatibility Layer* ✅ — WordprocessingML, SpreadsheetML, PresentationML Kotlin/Compose parsers and OMML/MathML equation pipelines.
-  - *Task 5: Reverse Engineering & Behavioral Testing* ✅ — Verification against LibreOffice and MS Office output.
+  - *Task 5: Reverse Engineering & Behavioral Testing* 🔄 — planned; no verification artifacts in the repo yet.
 - **Phase 4: Core Editing & UI Implementation (Material 3 Expressive)** 🔄 — FCT, Toolbar Hub, 40% Standard Bottom Sheet Ribbon, Touch Targets, Navigator Deck.
 - **Phase 5: ARM Optimization** 🔜 — ARMv7 and ARM64-v8a neon optimizations, binary size minimization.
-- **Phase 6: Low-End Device Testing** 🔜 — Memory constraints profiling (2GB RAM devices), stream-based XML parsing to prevent OOM.
+- **Phase 6: Low-End Device Testing** 🔄 — XLSX/PPTX streaming + archive budgets landed; on-device 2 GB profiling pending (see `docs/PHASE6_MEMORY_PLAN.md`).
 - **Phase 7: PC-Level Office Features Rollout** 🔜 — Diagrams (Mermaid.js), Equations (KaTeX/MathML/OMML), Stylus Ink (Google Ink API), Citations/BibTeX, Full 500+ OpenFormula functions, and Optional Gemini AI Copilot.
 
 ---
