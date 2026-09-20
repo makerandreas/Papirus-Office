@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 import kotlinx.coroutines.runBlocking
 
@@ -20,6 +21,7 @@ import kotlinx.coroutines.runBlocking
  * Actions) with no Android SDK/device required.
  */
 @org.junit.runner.RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class SampleFilesCompatibilityTest {
 
     private fun context(): Context =
