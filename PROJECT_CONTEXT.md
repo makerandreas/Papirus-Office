@@ -38,7 +38,7 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
 - **`DocumentSerializer`**: Writes lossless ODF v1.4 and OOXML packages respecting strict namespace schemas.
 
 ### B. LibreOfficeKit (LOKit) JNI Bridge & C++ OOXML / Equation Layer
-**Status: native libraries bundled — Kotlin/JNI facade calls are the remaining piece.** Pre-built LibreOffice Viewer for Android binaries (`liblo-native-code.so` + NSS dependency chain) ship under `app/src/main/libs/<abi>/` (`arm64-v8a`, `armeabi-v7a`). `LibreOfficeCore` loads them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode to the About screen and diagnostics log, falling back to the pure-Kotlin engine when loading fails.
+**Status: native libraries bundled and integrated into build.** Pre-built LibreOffice Viewer for Android binaries (`liblo-native-code.so` + NSS dependency chain) ship under `app/src/main/libs/<abi>/` (`arm64-v8a`, `armeabi-v7a`) and are packaged via `sourceSets { main { jniLibs.srcDir("src/main/libs") } }` in `app/build.gradle.kts`. `LibreOfficeCore` loads them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode to the About screen and diagnostics log, falling back to the pure-Kotlin engine when loading fails.
 - Planned: native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`) for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
 - Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) mirror LOKit dispatch names; entries are tagged `[simulated]` until a native build is bundled.
 - **Modular Equation Pipeline**:

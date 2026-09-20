@@ -131,6 +131,7 @@ android {
   sourceSets {
     getByName("main") {
       assets.directories.addAll(listOf("src/main/assets", "src/main/share"))
+      jniLibs.srcDir("src/main/libs")
     }
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
