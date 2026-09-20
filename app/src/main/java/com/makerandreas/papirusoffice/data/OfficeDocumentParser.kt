@@ -1,6 +1,11 @@
 package com.makerandreas.papirusoffice.data
 
 import com.makerandreas.papirusoffice.data.util.readCappedBytes
+import com.makerandreas.papirusoffice.data.util.BudgetedInputStream
+import com.makerandreas.papirusoffice.data.util.ZipSafe
+import com.makerandreas.papirusoffice.data.util.ZipScanBudget
+import com.makerandreas.papirusoffice.data.util.nextEntryBudgeted
+import java.util.Locale
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import android.content.Context
@@ -51,6 +56,11 @@ class OfficeDocumentParser(private val context: Context) {
         private val HEADING_STYLE_REGEX = Regex("(?i)heading[1-9]")
         private val SINGLE_DIGIT_REGEX = Regex("^[1-6]$")
         private val DIGITS_REGEX = Regex("\\d+")
+        // SpreadsheetML / PresentationML entry patterns (hoisted: matched per sheet/slide).
+        private val XLSX_SHEET_FILE_REGEX = Regex("sheet(\\d+)")
+        private val PPTX_SLIDE_FILE_REGEX = Regex("slide(\\d+)\\.xml")
+        // Strict full-entry match: slide layouts/masters share the ppt/slides/slide prefix.
+        private val PPTX_SLIDE_ENTRY_REGEX = Regex("^ppt/slides/slide\\d+\\.xml$")
 
         fun clearCacheForFile(path: String) {
             inMemoryParsedDocCache.remove(path)
@@ -176,7 +186,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var currentOutlineLvl: Int? = null
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
-                    val tagName = parser.name?.lowercase() ?: ""
+                    val tagName = parser.name?.lowercase(Locale.ROOT) ?: ""
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             if (tagName == "w:style" || tagName == "style") {
@@ -206,7 +216,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         ?: DIGITS_REGEX.find(currentStyleId)?.value?.toIntOrNull()
                                         ?: 1
                                 }
-                                stylesMap[currentStyleId.lowercase()] = DocxStyleMeta(
+                                stylesMap[currentStyleId.lowercase(Locale.ROOT)] = DocxStyleMeta(
                                     styleId = currentStyleId,
                                     name = sName,
                                     outlineLvl = currentOutlineLvl,
@@ -266,7 +276,7 @@ class OfficeDocumentParser(private val context: Context) {
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 if (eventType == XmlPullParser.START_TAG) {
                     val tagName = parser.name ?: ""
-                    val tagNameLower = tagName.lowercase()
+                    val tagNameLower = tagName.lowercase(Locale.ROOT)
                     tagCount++
 
                     if (rootTag == null) {
@@ -518,7 +528,7 @@ class OfficeDocumentParser(private val context: Context) {
         }
 
         if (isOdf) {
-            val nameLower = file.name.lowercase()
+            val nameLower = file.name.lowercase(Locale.ROOT)
             val fallbackXml = when {
                 nameLower.endsWith(".odt") || nameLower.endsWith(".ott") -> """
                     <?xml version="1.0" encoding="UTF-8"?>
@@ -765,7 +775,7 @@ class OfficeDocumentParser(private val context: Context) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
-                        val nameLower = name.lowercase()
+                        val nameLower = name.lowercase(Locale.ROOT)
 
                         // Check for unknown or custom XML tags to log diagnostic warnings
                         if (name.isNotEmpty() && !supportedTags.contains(name) && !supportedTags.contains(nameLower)) {
@@ -806,7 +816,7 @@ class OfficeDocumentParser(private val context: Context) {
                             nameLower == "w:pstyle" || nameLower == "pstyle" -> {
                                 val styleVal = parser.getAttributeValue(null, "w:val")
                                     ?: parser.getAttributeValue(null, "val") ?: ""
-                                val meta = docxStylesMap[styleVal.lowercase()]
+                                val meta = docxStylesMap[styleVal.lowercase(Locale.ROOT)]
                                 if (meta != null && meta.isHeading) {
                                     inHeading = true
                                     headingLevel = meta.headingLevel
@@ -909,7 +919,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 var embedId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed")
                                 if (embedId.isNullOrBlank()) {
                                     for (i in 0 until parser.attributeCount) {
-                                        val attrName = parser.getAttributeName(i).lowercase()
+                                        val attrName = parser.getAttributeName(i).lowercase(Locale.ROOT)
                                         if (attrName == "embed" || attrName.endsWith(":embed") || attrName == "id" || attrName.endsWith(":id") || attrName == "href" || attrName.endsWith(":href")) {
                                             embedId = parser.getAttributeValue(i)
                                             break
@@ -942,7 +952,7 @@ class OfficeDocumentParser(private val context: Context) {
 
                     XmlPullParser.END_TAG -> {
                         val name = parser.name ?: ""
-                        val nameLower = name.lowercase()
+                        val nameLower = name.lowercase(Locale.ROOT)
 
                         when {
                             nameLower == "text:h" || nameLower == "h" -> {
@@ -2143,27 +2153,34 @@ class OfficeDocumentParser(private val context: Context) {
         val sharedStrings = mutableListOf<String>()
         val sheetList = mutableListOf<Pair<String, String>>() // (sheetName, rId or path)
         val relsMap = mutableMapOf<String, String>() // rId -> target
-        val zipEntries = mutableMapOf<String, ByteArray>()
+        // Phase 6: only small metadata entries are buffered; worksheets are
+        // streamed one at a time in pass 2, so peak memory no longer scales
+        // with the workbook's total raw XML size.
+        val metaEntries = mutableMapOf<String, ByteArray>()
+        val worksheetPaths = mutableListOf<String>()
+        val budget = ZipScanBudget()
 
         try {
+            // Pass 1: metadata + worksheet inventory.
             ZipInputStream(file.inputStream()).use { zip ->
-                var entry = zip.nextEntry
+                var entry = zip.nextEntryBudgeted(budget)
                 while (entry != null) {
                     val name = entry.name
                     if (name == "xl/sharedStrings.xml" ||
                         name == "xl/workbook.xml" ||
-                        name == "xl/_rels/workbook.xml.rels" ||
-                        name.startsWith("xl/worksheets/")
+                        name == "xl/_rels/workbook.xml.rels"
                     ) {
-                        zipEntries[name] = zip.readCappedBytes()
+                        metaEntries[name] = zip.readCappedBytes(ZipSafe.MAX_ZIP_ENTRY_BYTES, budget)
+                    } else if (name.startsWith("xl/worksheets/") && name.endsWith(".xml")) {
+                        worksheetPaths.add(name)
                     }
                     zip.closeEntry()
-                    entry = zip.nextEntry
+                    entry = zip.nextEntryBudgeted(budget)
                 }
             }
 
             // 1. Parse sharedStrings.xml
-            zipEntries["xl/sharedStrings.xml"]?.let { bytes ->
+            metaEntries["xl/sharedStrings.xml"]?.let { bytes ->
                 val factory = XmlPullParserFactory.newInstance()
                 factory.isNamespaceAware = true
                 val parser = factory.newPullParser()
@@ -2174,7 +2191,7 @@ class OfficeDocumentParser(private val context: Context) {
                 while (event != XmlPullParser.END_DOCUMENT) {
                     when (event) {
                         XmlPullParser.START_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
                             if (tag == "si") {
                                 inSi = true
                                 currentString.clear()
@@ -2186,7 +2203,7 @@ class OfficeDocumentParser(private val context: Context) {
                             }
                         }
                         XmlPullParser.END_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                            val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
                             if (tag == "si") {
                                 inSi = false
                                 sharedStrings.add(currentString.toString())
@@ -2199,7 +2216,7 @@ class OfficeDocumentParser(private val context: Context) {
             }
 
             // 2. Parse xl/_rels/workbook.xml.rels
-            zipEntries["xl/_rels/workbook.xml.rels"]?.let { bytes ->
+            metaEntries["xl/_rels/workbook.xml.rels"]?.let { bytes ->
                 val factory = XmlPullParserFactory.newInstance()
                 factory.isNamespaceAware = true
                 val parser = factory.newPullParser()
@@ -2207,7 +2224,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var event = parser.eventType
                 while (event != XmlPullParser.END_DOCUMENT) {
                     if (event == XmlPullParser.START_TAG) {
-                        val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                        val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
                         if (tag == "relationship") {
                             val id = parser.getAttributeValue(null, "Id") ?: ""
                             var target = parser.getAttributeValue(null, "Target") ?: ""
@@ -2226,7 +2243,7 @@ class OfficeDocumentParser(private val context: Context) {
             }
 
             // 3. Parse xl/workbook.xml
-            zipEntries["xl/workbook.xml"]?.let { bytes ->
+            metaEntries["xl/workbook.xml"]?.let { bytes ->
                 val factory = XmlPullParserFactory.newInstance()
                 factory.isNamespaceAware = true
                 val parser = factory.newPullParser()
@@ -2234,7 +2251,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var event = parser.eventType
                 while (event != XmlPullParser.END_DOCUMENT) {
                     if (event == XmlPullParser.START_TAG) {
-                        val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
+                        val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
                         if (tag == "sheet") {
                             val name = parser.getAttributeValue(null, "name") ?: "Sheet"
                             var rId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
@@ -2253,9 +2270,9 @@ class OfficeDocumentParser(private val context: Context) {
 
             // Fallback if workbook.xml didn't find sheets: scan worksheets/sheet*.xml
             if (sheetList.isEmpty()) {
-                val sheetNames = zipEntries.keys.filter { it.startsWith("xl/worksheets/sheet") }
+                val sheetNames = worksheetPaths.filter { it.startsWith("xl/worksheets/sheet") }
                     .sortedBy { key ->
-                        Regex("sheet(\\d+)").find(key)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                        XLSX_SHEET_FILE_REGEX.find(key)?.groupValues?.get(1)?.toIntOrNull() ?: 0
                     }
                 sheetNames.forEachIndexed { index, path ->
                     sheetList.add(Pair("Sheet${index + 1}", path))
@@ -2265,103 +2282,14 @@ class OfficeDocumentParser(private val context: Context) {
             val elements = mutableListOf<OfficeDocumentElement>()
             val plainTextBuilder = StringBuilder()
 
-            fun colIndexFromRef(ref: String): Int {
-                val colLetters = ref.takeWhile { it.isLetter() }.uppercase()
-                if (colLetters.isEmpty()) return -1
-                var col = 0
-                for (ch in colLetters) {
-                    col = col * 26 + (ch - 'A' + 1)
-                }
-                return col - 1
-            }
-
-            // 4. Parse each worksheet
+            // Pass 2: stream each worksheet (fresh budget per scan; consumed
+            // bytes are charged as the pull parser reads the entry stream).
             for ((sheetName, rIdOrPath) in sheetList) {
                 val targetPath = relsMap[rIdOrPath] ?: if (rIdOrPath.startsWith("xl/")) rIdOrPath else "xl/worksheets/sheet${sheetList.indexOfFirst { it.first == sheetName } + 1}.xml"
-                val sheetBytes = zipEntries[targetPath] ?: zipEntries.entries.firstOrNull { it.key.endsWith(targetPath.substringAfterLast("/")) }?.value
-                if (sheetBytes == null) continue
-
-                val factory = XmlPullParserFactory.newInstance()
-                factory.isNamespaceAware = true
-                val parser = factory.newPullParser()
-                parser.setInput(ByteArrayInputStream(sheetBytes), "UTF-8")
-                var event = parser.eventType
-
-                val rows = mutableListOf<TableRow>()
-                val currentRowCells = mutableListOf<TableCell>()
-                var currentCellRef = ""
-                var currentCellType = ""
-                val currentValText = StringBuilder()
-                var inV = false
-                var inIs = false
-
-                while (event != XmlPullParser.END_DOCUMENT) {
-                    when (event) {
-                        XmlPullParser.START_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
-                            when (tag) {
-                                "row" -> {
-                                    currentRowCells.clear()
-                                }
-                                "c" -> {
-                                    currentCellRef = parser.getAttributeValue(null, "r") ?: ""
-                                    currentCellType = parser.getAttributeValue(null, "t") ?: ""
-                                    currentValText.clear()
-                                }
-                                "v", "t" -> {
-                                    inV = true
-                                }
-                                "is" -> {
-                                    inIs = true
-                                }
-                            }
-                        }
-                        XmlPullParser.TEXT -> {
-                            if (inV || inIs) {
-                                currentValText.append(parser.text ?: "")
-                            }
-                        }
-                        XmlPullParser.END_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
-                            when (tag) {
-                                "v", "t" -> {
-                                    inV = false
-                                }
-                                "is" -> {
-                                    inIs = false
-                                }
-                                "c" -> {
-                                    val rawVal = currentValText.toString().trim()
-                                    val cellText = when (currentCellType) {
-                                        "s" -> {
-                                            val idx = rawVal.toIntOrNull() ?: -1
-                                            if (idx in sharedStrings.indices) sharedStrings[idx] else rawVal
-                                        }
-                                        "b" -> if (rawVal == "1") "TRUE" else "FALSE"
-                                        else -> rawVal
-                                    }
-                                    val colIdx = colIndexFromRef(currentCellRef)
-                                    if (colIdx >= 0) {
-                                        while (currentRowCells.size < colIdx) {
-                                            currentRowCells.add(TableCell(text = ""))
-                                        }
-                                        currentRowCells.add(TableCell(text = cellText))
-                                    } else {
-                                        currentRowCells.add(TableCell(text = cellText))
-                                    }
-                                    currentValText.clear()
-                                }
-                                "row" -> {
-                                    if (currentRowCells.isNotEmpty() && currentRowCells.any { it.text.isNotBlank() }) {
-                                        rows.add(TableRow(cells = currentRowCells.toList()))
-                                    }
-                                    currentRowCells.clear()
-                                }
-                            }
-                        }
-                    }
-                    event = parser.next()
-                }
+                val resolvedPath = worksheetPaths.firstOrNull { it == targetPath }
+                    ?: worksheetPaths.firstOrNull { it.endsWith(targetPath.substringAfterLast("/")) }
+                    ?: continue
+                val rows = streamXlsxWorksheet(file, resolvedPath, sharedStrings)
 
                 if (rows.isNotEmpty()) {
                     val maxCols = rows.maxOfOrNull { it.cells.size } ?: 0
@@ -2403,93 +2331,183 @@ class OfficeDocumentParser(private val context: Context) {
         }
     }
 
+    /**
+     * Phase 6: parses one worksheet by streaming its ZIP entry straight into
+     * the pull parser — no intermediate ByteArray of the sheet XML is kept,
+     * and the materialized row model is capped by [ZipSafe.MAX_XLSX_ROWS].
+     */
+    private fun streamXlsxWorksheet(
+        file: File,
+        worksheetPath: String,
+        sharedStrings: List<String>
+    ): List<TableRow> {
+        val rows = mutableListOf<TableRow>()
+        val budget = ZipScanBudget()
+        ZipInputStream(file.inputStream()).use { zip ->
+            var entry = zip.nextEntryBudgeted(budget)
+            while (entry != null) {
+                if (entry.name == worksheetPath) {
+                    val factory = XmlPullParserFactory.newInstance()
+                    factory.isNamespaceAware = true
+                    val parser = factory.newPullParser()
+                    parser.setInput(BudgetedInputStream(zip, budget), "UTF-8")
+                    parseXlsxWorksheetStream(parser, sharedStrings, rows)
+                    zip.closeEntry()
+                    break
+                }
+                zip.closeEntry()
+                entry = zip.nextEntryBudgeted(budget)
+            }
+        }
+        return rows
+    }
+
+    private fun parseXlsxWorksheetStream(
+        parser: XmlPullParser,
+        sharedStrings: List<String>,
+        rows: MutableList<TableRow>
+    ) {
+        var event = parser.eventType
+
+        val currentRowCells = mutableListOf<TableCell>()
+        var currentCellRef = ""
+        var currentCellType = ""
+        val currentValText = StringBuilder()
+        var inV = false
+        var inIs = false
+
+        while (event != XmlPullParser.END_DOCUMENT) {
+            if (rows.size >= ZipSafe.MAX_XLSX_ROWS) break
+            when (event) {
+                XmlPullParser.START_TAG -> {
+                    val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
+                    when (tag) {
+                        "row" -> {
+                            currentRowCells.clear()
+                        }
+                        "c" -> {
+                            currentCellRef = parser.getAttributeValue(null, "r") ?: ""
+                            currentCellType = parser.getAttributeValue(null, "t") ?: ""
+                            currentValText.clear()
+                        }
+                        "v", "t" -> {
+                            inV = true
+                        }
+                        "is" -> {
+                            inIs = true
+                        }
+                    }
+                }
+                XmlPullParser.TEXT -> {
+                    if (inV || inIs) {
+                        currentValText.append(parser.text ?: "")
+                    }
+                }
+                XmlPullParser.END_TAG -> {
+                    val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
+                    when (tag) {
+                        "v", "t" -> {
+                            inV = false
+                        }
+                        "is" -> {
+                            inIs = false
+                        }
+                        "c" -> {
+                            val rawVal = currentValText.toString().trim()
+                            val cellText = when (currentCellType) {
+                                "s" -> {
+                                    val idx = rawVal.toIntOrNull() ?: -1
+                                    if (idx in sharedStrings.indices) sharedStrings[idx] else rawVal
+                                }
+                                "b" -> if (rawVal == "1") "TRUE" else "FALSE"
+                                else -> rawVal
+                            }
+                            val colIdx = colIndexFromCellRef(currentCellRef)
+                            if (colIdx >= 0) {
+                                while (currentRowCells.size < colIdx) {
+                                    currentRowCells.add(TableCell(text = ""))
+                                }
+                                currentRowCells.add(TableCell(text = cellText))
+                            } else {
+                                currentRowCells.add(TableCell(text = cellText))
+                            }
+                            currentValText.clear()
+                        }
+                        "row" -> {
+                            if (currentRowCells.isNotEmpty() && currentRowCells.any { it.text.isNotBlank() }) {
+                                rows.add(TableRow(cells = currentRowCells.toList()))
+                            }
+                            currentRowCells.clear()
+                        }
+                    }
+                }
+            }
+            event = parser.next()
+        }
+    }
+
+    /**
+     * A1-style column letters to 0-based index. Capped at the OOXML column
+     * limit (XFD) so absurd cell refs cannot drive giant sparse-row fills.
+     */
+    private fun colIndexFromCellRef(ref: String): Int {
+        val colLetters = ref.takeWhile { it.isLetter() }.uppercase(Locale.ROOT)
+        if (colLetters.isEmpty()) return -1
+        var col = 0
+        for (ch in colLetters) {
+            col = col * 26 + (ch - 'A' + 1)
+        }
+        return (col - 1).coerceIn(-1, ZipSafe.MAX_XLSX_COLUMN_INDEX)
+    }
+
     private fun parsePptxDocument(
         file: File,
         extractedImages: Map<String, File>
     ): OfficeParsedDocument {
-        val slideEntries = mutableMapOf<String, ByteArray>()
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
+        // Phase 6: slides stream one at a time; only the entry-name inventory
+        // is kept in memory.
+        val slideNames = mutableListOf<String>()
+        val budget = ZipScanBudget()
 
         try {
+            // Pass 1: strict slide inventory — slide layouts/masters share the
+            // ppt/slides/slide prefix but must not count as slides.
             ZipInputStream(file.inputStream()).use { zip ->
-                var entry = zip.nextEntry
+                var entry = zip.nextEntryBudgeted(budget)
                 while (entry != null) {
-                    val name = entry.name
-                    if (name.startsWith("ppt/slides/slide") && name.endsWith(".xml")) {
-                        slideEntries[name] = zip.readCappedBytes()
+                    if (PPTX_SLIDE_ENTRY_REGEX.matches(entry.name)) {
+                        slideNames.add(entry.name)
                     }
                     zip.closeEntry()
-                    entry = zip.nextEntry
+                    entry = zip.nextEntryBudgeted(budget)
                 }
             }
 
-            val sortedSlideNames = slideEntries.keys.sortedBy { name ->
-                Regex("slide(\\d+)\\.xml").find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val sortedSlideNames = slideNames.sortedBy { name ->
+                PPTX_SLIDE_FILE_REGEX.find(name)?.groupValues?.get(1)?.toIntOrNull() ?: 0
             }
 
+            // Pass 2: stream each slide.
             for ((slideIndex, slideName) in sortedSlideNames.withIndex()) {
-                val bytes = slideEntries[slideName] ?: continue
-                val factory = XmlPullParserFactory.newInstance()
-                factory.isNamespaceAware = true
-                val parser = factory.newPullParser()
-                parser.setInput(ByteArrayInputStream(bytes), "UTF-8")
-                var event = parser.eventType
-
-                val slideParagraphs = mutableListOf<String>()
-                val currentRunText = StringBuilder()
-                var inPara = false
-                var inTitle = false
-
-                while (event != XmlPullParser.END_DOCUMENT) {
-                    when (event) {
-                        XmlPullParser.START_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
-                            if (tag == "p") {
-                                inPara = true
-                                currentRunText.clear()
-                            } else if (tag == "ph") {
-                                val type = parser.getAttributeValue(null, "type") ?: ""
-                                if (type == "title" || type == "ctrTitle") {
-                                    inTitle = true
-                                }
-                            }
-                        }
-                        XmlPullParser.TEXT -> {
-                            if (inPara) {
-                                currentRunText.append(parser.text ?: "")
-                            }
-                        }
-                        XmlPullParser.END_TAG -> {
-                            val tag = (parser.name ?: "").lowercase().substringAfterLast(":")
-                            if (tag == "p") {
-                                inPara = false
-                                val pText = currentRunText.toString().trim()
-                                if (pText.isNotEmpty()) {
-                                    slideParagraphs.add(pText)
-                                }
-                                currentRunText.clear()
-                            } else if (tag == "sp") {
-                                inTitle = false
-                            }
-                        }
-                    }
-                    event = parser.next()
-                }
+                val slideParagraphs = streamPptxSlideParagraphs(file, slideName)
 
                 if (elements.isNotEmpty()) {
                     elements.add(OfficeDocumentElement.PageBreak)
                 }
 
-                val titleText = slideParagraphs.firstOrNull() ?: "Slide ${slideIndex + 1}"
+                val titleIndex = slideParagraphs.indexOfFirst { it.isTitle }.takeIf { it >= 0 }
+                    ?: slideParagraphs.indices.firstOrNull()
+                val titleText = titleIndex?.let { slideParagraphs[it].text } ?: "Slide ${slideIndex + 1}"
                 elements.add(OfficeDocumentElement.Heading(text = titleText, level = 1, styleName = "SlideTitle"))
 
                 plainTextBuilder.append("[Slide ").append(slideIndex + 1).append(": ").append(titleText).append("]\n")
 
-                for (i in 1 until slideParagraphs.size) {
-                    val pText = slideParagraphs[i]
-                    elements.add(OfficeDocumentElement.Paragraph(text = pText))
-                    plainTextBuilder.append(pText).append("\n")
+                slideParagraphs.forEachIndexed { index, para ->
+                    if (index == titleIndex) return@forEachIndexed
+                    elements.add(OfficeDocumentElement.Paragraph(text = para.text))
+                    plainTextBuilder.append(para.text).append("\n")
                 }
                 plainTextBuilder.append("\n")
             }
@@ -2515,5 +2533,74 @@ class OfficeDocumentParser(private val context: Context) {
                 failureReason = errorMsg
             )
         }
+    }
+
+    private data class SlideParagraph(val text: String, val isTitle: Boolean)
+
+    /**
+     * Phase 6: streams one slide's XML straight into the pull parser and
+     * flags paragraphs sitting in title placeholders (used for the heading;
+     * first paragraph stays the fallback when no title placeholder exists).
+     */
+    private fun streamPptxSlideParagraphs(file: File, slideName: String): List<SlideParagraph> {
+        val slideParagraphs = mutableListOf<SlideParagraph>()
+        val budget = ZipScanBudget()
+        ZipInputStream(file.inputStream()).use { zip ->
+            var entry = zip.nextEntryBudgeted(budget)
+            while (entry != null) {
+                if (entry.name == slideName) {
+                    val factory = XmlPullParserFactory.newInstance()
+                    factory.isNamespaceAware = true
+                    val parser = factory.newPullParser()
+                    parser.setInput(BudgetedInputStream(zip, budget), "UTF-8")
+                    var event = parser.eventType
+
+                    val currentRunText = StringBuilder()
+                    var inPara = false
+                    var inTitle = false
+
+                    while (event != XmlPullParser.END_DOCUMENT) {
+                        when (event) {
+                            XmlPullParser.START_TAG -> {
+                                val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
+                                if (tag == "p") {
+                                    inPara = true
+                                    currentRunText.clear()
+                                } else if (tag == "ph") {
+                                    val type = parser.getAttributeValue(null, "type") ?: ""
+                                    if (type == "title" || type == "ctrTitle") {
+                                        inTitle = true
+                                    }
+                                }
+                            }
+                            XmlPullParser.TEXT -> {
+                                if (inPara) {
+                                    currentRunText.append(parser.text ?: "")
+                                }
+                            }
+                            XmlPullParser.END_TAG -> {
+                                val tag = (parser.name ?: "").lowercase(Locale.ROOT).substringAfterLast(":")
+                                if (tag == "p") {
+                                    inPara = false
+                                    val pText = currentRunText.toString().trim()
+                                    if (pText.isNotEmpty()) {
+                                        slideParagraphs.add(SlideParagraph(pText, inTitle))
+                                    }
+                                    currentRunText.clear()
+                                } else if (tag == "sp") {
+                                    inTitle = false
+                                }
+                            }
+                        }
+                        event = parser.next()
+                    }
+                    zip.closeEntry()
+                    break
+                }
+                zip.closeEntry()
+                entry = zip.nextEntryBudgeted(budget)
+            }
+        }
+        return slideParagraphs
     }
 }
