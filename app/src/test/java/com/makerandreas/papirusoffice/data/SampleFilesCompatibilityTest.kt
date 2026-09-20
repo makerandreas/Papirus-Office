@@ -19,12 +19,12 @@ import kotlinx.coroutines.runBlocking
  * executes on every PR via `./gradlew :app:testDebugUnitTest` (GitHub
  * Actions) with no Android SDK/device required.
  */
-@androidx.test.runner.AndroidJUnit4
 @org.junit.runner.RunWith(RobolectricTestRunner::class)
 class SampleFilesCompatibilityTest {
 
     private fun context(): Context =
-        androidx.test.platform.app.ApplicationProvider.getApplicationContext()
+        androidx.test.core.app.ApplicationProvider.getApplicationContext()
+
 
     /** Locates a repo-root tests fixture regardless of the module's working dir. */
     private fun repoRoot(): File {
