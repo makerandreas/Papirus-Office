@@ -11,13 +11,17 @@ object LibreOfficeCore {
     private var isLibraryLoaded = false
 
     /**
-     * True when a real native library was found (Phase 2 drop-in present).
-     * Until then every call below runs its JVM fallback — see [LokitEngine].
+     * True when the pre-bundled native library was actually loaded from
+     * `app/src/main/libs/<abi>/`. Until then every call below runs its
+     * JVM fallback — see [LokitEngine].
      */
     val isNativeLibraryLoaded: Boolean
         get() = isLibraryLoaded
 
-    /** Soname load order for a stock LibreOffice-Android build (single .so + NSS deps). */
+    /**
+     * Soname load order for the LibreOffice Viewer for Android build shipped
+     * under `app/src/main/libs/<abi>/` (`liblo-native-code.so` + NSS deps).
+     */
     private val LO_NATIVE_LOAD_ORDER = listOf(
         "nspr4", "plds4", "plc4", "nssutil3", "freebl3", "sqlite3",
         "softokn3", "nss3", "nssckbi", "nssdbm3", "smime3", "ssl3",
@@ -35,9 +39,10 @@ object LibreOfficeCore {
     }
 
     /**
-     * Phase 2 drop-in probe: stock `liblo-native-code.so` first (with its
-     * dependency chain), then the legacy `liblibreoffice-core.so` custom name.
-     * Pure probe — any UnsatisfiedLinkError means "simulated mode".
+     * Native probe: loads the pre-bundled `liblo-native-code.so` first (with
+     * its dependency chain, resolved from `app/src/main/libs/<abi>/`), then
+     * the legacy `liblibreoffice-core.so` custom name. Pure probe — any
+     * UnsatisfiedLinkError means "simulated mode".
      */
     private fun tryLoadNative(): Boolean {
         try {

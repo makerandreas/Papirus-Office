@@ -38,7 +38,7 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
 - **`DocumentSerializer`**: Writes lossless ODF v1.4 and OOXML packages respecting strict namespace schemas.
 
 ### B. LibreOfficeKit (LOKit) JNI Bridge & C++ OOXML / Equation Layer
-**Status: planned (Phase 2 🔄)** — no native `.so` ships yet; the app runs its pure-Kotlin engine with a simulated fallback. The drop-in contract lives in `app/src/main/jniLibs/<abi>/` (see `docs/LOKIT_INTEGRATION.md`); `LokitEngine` reports the active mode to the About screen and diagnostics log.
+**Status: native libraries bundled — Kotlin/JNI facade calls are the remaining piece.** Pre-built LibreOffice Viewer for Android binaries (`liblo-native-code.so` + NSS dependency chain) ship under `app/src/main/libs/<abi>/` (`arm64-v8a`, `armeabi-v7a`). `LibreOfficeCore` loads them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode to the About screen and diagnostics log, falling back to the pure-Kotlin engine when loading fails.
 - Planned: native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`) for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
 - Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) mirror LOKit dispatch names; entries are tagged `[simulated]` until a native build is bundled.
 - **Modular Equation Pipeline**:
@@ -186,7 +186,7 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 | **Slidia** | Presentation Module | The slide presentation component of Papirus Office (equivalent to LibreOffice Impress / MS PowerPoint). |
 | **Pagella** | PDF & Document Manager | The PDF viewing, annotating, and format conversion component of Papirus Office. |
 | **Start Center / Start Screen** | Welcome & Document Hub | Top-level dashboard containing Recents, Device File Explorer, Google Drive Sync, and Create New actions. |
-| **LOKit / LibreOfficeKit** | Planned native C++ engine (Phase 2 🔄) | Drop-in contract in `app/src/main/jniLibs/` (see `docs/LOKIT_INTEGRATION.md`); until bundled, the pure-Kotlin Papirus engine runs with simulated telemetry. |
+| **LOKit / LibreOfficeKit** | Native C++ engine (bundled `.so` under `app/src/main/libs/<abi>/`) | `liblo-native-code.so` + NSS chain from LibreOffice Viewer for Android; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when loading fails. |
 | **ODF v1.4** | OASIS OpenDocument Format 1.4 | The open international standard format for office documents (`.odt`, `.ods`, `.odp`), authoritative in `/sources`. |
 | **OOXML** | Office Open XML | Microsoft Office document format standard (`.docx`, `.xlsx`, `.pptx`). |
 | **DocumentSession** | Active Document Session | State container tracking the open document, edit mode, dirty flag, file URI, autosave state, and engine instances. |
@@ -206,11 +206,9 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 │   ├── OpenDocument-v1.4-cs01-part2-packages.odt
 │   ├── OpenDocument-v1.4-cs01-part3-schema.odt
 │   └── OpenDocument-v1.4-cs01-part4-formula.odt
-├── app/src/main/jniLibs/                    # Phase 2 drop-in: native .so per ABI (empty; see docs/LOKIT_INTEGRATION.md)
-│   ├── arm64-v8a/                           # (planned) liblo-native-code.so + dependency chain
-│   ├── armeabi-v7a/                         # (planned)
-│   ├── x86_64/                              # (planned)
-│   └── x86/                                 # (planned)
+├── app/src/main/libs/                       # Pre-built native .so per ABI (LibreOffice Viewer for Android)
+│   ├── arm64-v8a/                           # liblo-native-code.so + NSS dependency chain
+│   └── armeabi-v7a/                         # liblo-native-code.so + NSS dependency chain
 └── app/src/main/java/
     ├── com/example/
     │   ├── MainActivity.kt                  # Root Activity, edge-to-edge window setup, navigation host
@@ -261,9 +259,9 @@ A persistent bottom sheet surface occupying exactly 40% of the screen height whe
 Papirus Office (codenamed LibreDroid Office during conceptualization) follows a structured phased development roadmap:
 
 - **Phase 1: Environment Setup** ✅ — Android build environment, Gradle Kotlin DSL, Version Catalog, Room, and Compose setup.
-- **Phase 2: JNI Implementation & Stress Test Stage 1** 🔄 — seam landed (`LokitEngine` probe + `jniLibs` drop-in contract, see `docs/LOKIT_INTEGRATION.md`); native `.so` not bundled yet.
+- **Phase 2: JNI Implementation & Stress Test Stage 1** 🔄 — native `.so` bundled under `app/src/main/libs/<abi>/` (LibreOffice Viewer for Android); `LokitEngine` probe + fallback landed, Kotlin→JNI facade calls pending.
 - **Phase 3: Building LibreOffice Core Engine & OOXML Compatibility Foundation** ✅ / 🔄
-  - *Task 1: LibreOffice Core JNI Integration* 🔄 — probe + simulated fallback; native facade pending (see `docs/LOKIT_INTEGRATION.md` §4).
+  - *Task 1: LibreOffice Core JNI Integration* 🔄 — native probe + simulated fallback landed; remaining Kotlin `external` facade methods not yet wired to native.
   - *Task 2: Real-World Document Stress Testing* 🔄 — compatibility suite added (`SampleFilesCompatibilityTest`); must be green in CI before claiming.
   - *Task 3: OOXML Standards & SDK References* ✅ — ECMA-376 specifications, OpenXML SDK architecture.
   - *Task 4: OOXML Compatibility Layer* ✅ — WordprocessingML, SpreadsheetML, PresentationML Kotlin/Compose parsers and OMML/MathML equation pipelines.

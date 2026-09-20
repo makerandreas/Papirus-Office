@@ -105,7 +105,7 @@ deletes a whole line" race:
 
 ## 9. Remaining / future targets
 
-- [ ] Native LOKit engine memory profiling (see `docs/LOKIT_INTEGRATION.md` §7).
+- [ ] Native LOKit engine memory profiling (native `.so` under `app/src/main/libs/<abi>/`).
 - [ ] Consider `ZipFile` (random access) instead of `ZipInputStream` for the
       common small-document path once streaming is validated (fewer rescans).
 - [ ] Add a "malicious document" test fixture (small zip-bomb) to CI that

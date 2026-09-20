@@ -2,15 +2,14 @@
 package com.example.core.jni
 
 /**
- * Integration seam for a real LibreOfficeKit native build (Phase 2).
+ * Integration seam for the LibreOfficeKit native engine.
  *
- * Drop-in contract: place a LibreOffice-Android build's
- * `liblo-native-code.so` (plus its dependency chain) under
- * `app/src/main/jniLibs/<abi>/` — see `docs/LOKIT_INTEGRATION.md` and
- * `app/src/main/jniLibs/README.md`. [LibreOfficeCore] probes for it at
- * startup; when absent (the current state) the app runs its pure-Kotlin
- * Papirus engine and every consumer below reports simulated mode instead
- * of fabricating native telemetry.
+ * The pre-built libraries from LibreOffice Viewer for Android ship under
+ * `app/src/main/libs/<abi>/` (`liblo-native-code.so` plus its NSS
+ * dependency chain). [LibreOfficeCore] probes for `liblo-native-code.so`
+ * at startup; when the probe fails the app runs its pure-Kotlin Papirus
+ * engine and every consumer below reports simulated mode instead of
+ * fabricating native telemetry.
  */
 object LokitEngine {
     enum class EngineMode { NATIVE, SIMULATED }

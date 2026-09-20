@@ -641,8 +641,8 @@ fun InkyModule(
         }
     }
 
-    // LibreOfficeKit diagnostics log. Until a native LOKit build is bundled
-    // (see docs/LOKIT_INTEGRATION.md), the engine runs simulated and entries
+    // LibreOfficeKit diagnostics log. When no native LOKit build has loaded
+    // (see LokitEngine.statusLabel), the engine runs simulated and entries
     // below are produced locally, not by native dispatch.
     val lokitLogs = remember {
         mutableStateListOf(
