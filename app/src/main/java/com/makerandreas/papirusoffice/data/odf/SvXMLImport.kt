@@ -11,6 +11,23 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.ArrayDeque
+import java.util.Locale
+
+// Pull-parser implementations expose attribute names either with their
+// namespace prefix ("style:name") or without it ("name") depending on the
+// runtime, so attribute lookups must match on the local name alone. Runs on
+// XMLPullParser output, not the JDK-11 DOM stack, so getLocalName is avoided.
+private fun attrIndex(parser: XmlPullParser): Map<String, String> {
+    val attrs = HashMap<String, String>(parser.attributeCount * 2)
+    for (i in 0 until parser.attributeCount) {
+        val local = parser.getAttributeName(i).substringAfterLast(':')
+        val value = parser.getAttributeValue(i)
+        if (!attrs.containsKey(local)) {
+            attrs[local] = value
+        }
+    }
+    return attrs
+}
 
 /**
  * Modern ODF SAX Import Filter class in Papirus Engine,
@@ -54,23 +71,12 @@ class SvXMLImport(
                 if (eventType == XmlPullParser.START_TAG) {
                     val rawTagName = parser.name ?: ""
                     if (rawTagName == "style" || rawTagName.endsWith(":style")) {
-                        var name: String? = null
-                        var family = "paragraph"
-                        var parent: String? = null
-                        var disp: String? = null
-                        var outline: String? = null
-
-                        for (i in 0 until parser.attributeCount) {
-                            val attrName = parser.getAttributeName(i)
-                            val attrVal = parser.getAttributeValue(i)
-                            when (attrName) {
-                                "name" -> name = attrVal
-                                "family" -> family = attrVal
-                                "parent-style-name" -> parent = attrVal
-                                "display-name" -> disp = attrVal
-                                "default-outline-level" -> outline = attrVal
-                            }
-                        }
+                        val attrs = attrIndex(parser)
+                        val name = attrs["name"]
+                        val family = attrs["family"] ?: "paragraph"
+                        val parent = attrs["parent-style-name"]
+                        val disp = attrs["display-name"]
+                        val outline = attrs["default-outline-level"]
 
                         if (!name.isNullOrBlank()) {
                             val info = OdfStyleInfo(
@@ -81,7 +87,7 @@ class SvXMLImport(
                                 outlineLevel = outline?.toIntOrNull()
                             )
                             styleMap[name] = info
-                            styleMap[name.lowercase(java.util.Locale.ROOT)] = info
+                            styleMap[name.lowercase(Locale.ROOT)] = info
                         }
                     }
                 }
