@@ -98,7 +98,12 @@ fun android.content.Context.findActivity(): androidx.activity.ComponentActivity?
     return null
 }
 
-fun partitionTextToPages(text: String, maxLinesPerPage: Int = 24): List<String> {
+fun partitionTextToPages(
+    text: String,
+    charsPerLine: Int = 75,
+    defaultLinesPerPage: Int = 46,
+    targetPageCount: Int? = null
+): List<String> {
     val rawText = text
     if (rawText.isEmpty()) return listOf("")
     
@@ -112,9 +117,16 @@ fun partitionTextToPages(text: String, maxLinesPerPage: Int = 24): List<String> 
         var currentPageLines = mutableListOf<String>()
         var currentLinesCount = 0
         
+        val effectiveLinesPerPage = if (targetPageCount != null && targetPageCount > 0) {
+            val totalApproxLines = rawParagraphs.sumOf { maxOf(1, (it.length + charsPerLine - 1) / charsPerLine) }
+            maxOf(20, (totalApproxLines + targetPageCount - 1) / targetPageCount)
+        } else {
+            defaultLinesPerPage
+        }
+        
         rawParagraphs.forEach { paragraph ->
-            val approxLinesInParagraph = maxOf(1, (paragraph.length + 42) / 43)
-            if (currentLinesCount + approxLinesInParagraph > maxLinesPerPage && currentPageLines.isNotEmpty()) {
+            val approxLinesInParagraph = maxOf(1, (paragraph.length + charsPerLine - 1) / charsPerLine)
+            if (currentLinesCount + approxLinesInParagraph > effectiveLinesPerPage && currentPageLines.isNotEmpty()) {
                 pages.add(currentPageLines.joinToString("\n").trim())
                 currentPageLines = mutableListOf()
                 currentLinesCount = 0
@@ -169,6 +181,8 @@ fun InkyModule(
             }
         )
     }
+
+    var detectedDocPageCount by remember { mutableStateOf<Int?>(null) }
 
     // Bottom Bar (Ribbon & sub-decks) States
     var showBottomBar by remember { mutableStateOf(false) }
@@ -372,7 +386,37 @@ fun InkyModule(
                             showDocOpenFailedDialog = true
                             docOpenFailedError = parseResult.parsedDocument.failureReason
                         } else {
-                            docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                            val parsedDoc = parseResult.parsedDocument
+                            if (parsedDoc?.pageCount != null && parsedDoc.pageCount > 0) {
+                                detectedDocPageCount = parsedDoc.pageCount
+                            }
+
+                            // Session state restore on reopen / process recreation
+                            val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
+                            val lastSession = sessionRestore.getLastSession()
+                            if (lastSession != null && lastSession.uri == f.absolutePath) {
+                                if (!lastSession.isSaved && !lastSession.draftText.isNullOrBlank()) {
+                                    val safeCursor = lastSession.cursor.coerceIn(0, lastSession.draftText.length)
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = lastSession.draftText,
+                                        selection = androidx.compose.ui.text.TextRange(safeCursor)
+                                    )
+                                    isSaved = false
+                                } else {
+                                    val safeCursor = lastSession.cursor.coerceIn(0, parseResult.text.length)
+                                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(
+                                        text = parseResult.text,
+                                        selection = androidx.compose.ui.text.TextRange(safeCursor)
+                                    )
+                                }
+                                coroutineScope.launch {
+                                    kotlinx.coroutines.delay(100)
+                                    scrollState.scrollTo(lastSession.scroll.coerceIn(0, scrollState.maxValue))
+                                }
+                            } else {
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                            }
+
                             lastTextRecordedValue = parseResult.text
                             initialLoadedText = parseResult.text
                             docxImages = parseResult.extractedImages
@@ -464,8 +508,8 @@ fun InkyModule(
     var showSetReminderDialog by remember { mutableStateOf(false) }
     var reminderNoteText by remember { mutableStateOf("") }
 
-    val pagesList = remember(docBodyText.text) {
-        partitionTextToPages(docBodyText.text)
+    val pagesList = remember(docBodyText.text, detectedDocPageCount) {
+        partitionTextToPages(docBodyText.text, targetPageCount = detectedDocPageCount)
     }
 
     val totalDocPages = remember(pagesList) {
@@ -526,77 +570,137 @@ fun InkyModule(
         if (signal != null) {
             val cleanTitle = signal.titleOrLabel.trim().removePrefix("\u200B").trim()
             val fullDocText = docBodyText.text
+            val elements = currentSessionState?.document?.body?.elements ?: emptyList()
+
+            fun getElementText(elem: com.makerandreas.papirusoffice.data.OfficeElement): String {
+                return when (elem) {
+                    is com.makerandreas.papirusoffice.data.OfficeParagraph -> elem.text
+                    is com.makerandreas.papirusoffice.data.OfficeHeading -> elem.text
+                    is com.makerandreas.papirusoffice.data.OfficeListItem -> "${elem.bullet} ${elem.text}"
+                    is com.makerandreas.papirusoffice.data.OfficeTable -> elem.rows.joinToString("\n") { r -> r.cells.joinToString("\t") { c -> c.text } }
+                    is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> elem.paragraph.text
+                    is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement -> elem.table.rows.joinToString("\n") { r -> r.cells.joinToString("\t") { c -> c.text } }
+                    else -> ""
+                }
+            }
+
+            // 1. Calculate structural estimated char offset based on element index, paragraph index, or page index
+            val estimatedOffset: Int = if (signal.targetElementIndex in elements.indices) {
+                elements.take(signal.targetElementIndex).fold(0) { acc, elem -> acc + getElementText(elem).length + 2 }
+            } else if (signal.targetParagraphIndex > 0) {
+                val blocks = fullDocText.split("\n\n")
+                blocks.take((signal.targetParagraphIndex - 1).coerceAtMost(blocks.size)).fold(0) { acc, b -> acc + b.length + 2 }
+            } else if (signal.targetPageIndex > 0 && totalDocPages > 0) {
+                val ratio = (signal.targetPageIndex - 1).toFloat() / totalDocPages.toFloat()
+                (ratio * fullDocText.length).toInt()
+            } else {
+                0
+            }
 
             var targetCharIndex: Int? = null
 
-            if (cleanTitle.isNotBlank()) {
-                var idx = fullDocText.indexOf(cleanTitle, ignoreCase = true)
-                if (idx < 0) {
-                    val normalizedDoc = fullDocText.replace("\u200B", "")
-                    val normalizedTitle = cleanTitle.replace("\u200B", "")
-                    val nIdx = normalizedDoc.indexOf(normalizedTitle, ignoreCase = true)
-                    if (nIdx >= 0) {
-                        idx = nIdx
+            // 2. Navigation by Target Type
+            when (signal.targetType) {
+                com.makerandreas.papirusoffice.data.navigation.NavigateBy.IMAGE -> {
+                    val imgElements = elements.filter { it is com.makerandreas.papirusoffice.data.OfficeImage || it is com.makerandreas.papirusoffice.data.OfficeDocElement.ImageElement }
+                    val targetImg = imgElements.getOrNull(signal.targetElementIndex)
+                    if (targetImg != null) {
+                        val elemIdx = elements.indexOf(targetImg)
+                        if (elemIdx >= 0) {
+                            targetCharIndex = elements.take(elemIdx).fold(0) { acc, elem -> acc + getElementText(elem).length + 2 }
+                        }
+                    }
+                    if (targetCharIndex == null && estimatedOffset > 0) {
+                        targetCharIndex = estimatedOffset
+                    } else if (targetCharIndex == null && docxImages.isNotEmpty()) {
+                        targetCharIndex = 0
                     }
                 }
-                if (idx < 0) {
-                    val simplified = cleanTitle.replace("\\s+".toRegex(), " ")
-                    idx = fullDocText.indexOf(simplified, ignoreCase = true)
+                com.makerandreas.papirusoffice.data.navigation.NavigateBy.TABLE -> {
+                    val tableElements = elements.filter { it is com.makerandreas.papirusoffice.data.OfficeTable || it is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement }
+                    val targetTable = tableElements.getOrNull(signal.targetElementIndex)
+                        ?: tableElements.getOrNull(signal.targetParagraphIndex - 1)
+                    val firstCell = when (targetTable) {
+                        is com.makerandreas.papirusoffice.data.OfficeTable -> targetTable.rows.firstOrNull()?.cells?.firstOrNull()?.text?.trim()
+                        is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement -> targetTable.table.rows.firstOrNull()?.cells?.firstOrNull()?.text?.trim()
+                        else -> null
+                    }
+                    if (!firstCell.isNullOrBlank()) {
+                        val idx = fullDocText.indexOf(firstCell, ignoreCase = true)
+                        if (idx >= 0) targetCharIndex = idx
+                    }
+                    if (targetCharIndex == null && estimatedOffset > 0) {
+                        targetCharIndex = estimatedOffset
+                    }
                 }
-                if (idx < 0 && cleanTitle.length > 8) {
-                    val prefix = cleanTitle.take(12)
-                    idx = fullDocText.indexOf(prefix, ignoreCase = true)
+                com.makerandreas.papirusoffice.data.navigation.NavigateBy.BOOKMARK -> {
+                    val bookmarkElements = elements.filter { it is com.makerandreas.papirusoffice.data.OfficeBookmark || it is com.makerandreas.papirusoffice.data.OfficeDocElement.BookmarkElement }
+                    val bm = bookmarkElements.find { elem ->
+                        val name = when (elem) {
+                            is com.makerandreas.papirusoffice.data.OfficeBookmark -> elem.name
+                            is com.makerandreas.papirusoffice.data.OfficeDocElement.BookmarkElement -> elem.bookmark.name
+                            else -> ""
+                        }
+                        name.equals(cleanTitle, ignoreCase = true)
+                    }
+                    if (bm != null) {
+                        val name = when (bm) {
+                            is com.makerandreas.papirusoffice.data.OfficeBookmark -> bm.name
+                            is com.makerandreas.papirusoffice.data.OfficeDocElement.BookmarkElement -> bm.bookmark.name
+                            else -> ""
+                        }
+                        val idx = fullDocText.indexOf(name, ignoreCase = true)
+                        if (idx >= 0) targetCharIndex = idx
+                    }
                 }
-                if (idx >= 0) {
-                    targetCharIndex = idx
+                else -> {}
+            }
+
+            // 3. Navigation by Title / Heading disambiguation (avoids Table of Contents traps)
+            if (targetCharIndex == null && cleanTitle.isNotBlank()) {
+                val escaped = Regex.escape(cleanTitle)
+
+                // Priority A: Standalone heading line match: ^\s*Title\s*$
+                val exactLineRegex = Regex("""(?m)^\s*$escaped\s*$""", RegexOption.IGNORE_CASE)
+                val exactMatches = exactLineRegex.findAll(fullDocText).toList()
+                if (exactMatches.isNotEmpty()) {
+                    targetCharIndex = exactMatches.minByOrNull { kotlin.math.abs(it.range.first - estimatedOffset) }?.range?.first
+                }
+
+                // Priority B: Line starting with Title (filtering out Table of Contents entries with dot leaders or trailing page numbers)
+                if (targetCharIndex == null) {
+                    val lineStartRegex = Regex("""(?m)^\s*$escaped\b[^\n]*$""", RegexOption.IGNORE_CASE)
+                    val candidateLines = lineStartRegex.findAll(fullDocText).filter { match ->
+                        val lineText = match.value
+                        val isTocEntry = lineText.contains("..") ||
+                                Regex("""\b\d+\s*$""").containsMatchIn(lineText.trim()) ||
+                                lineText.contains("Daftar Isi", ignoreCase = true)
+                        !isTocEntry
+                    }.toList()
+                    if (candidateLines.isNotEmpty()) {
+                        targetCharIndex = candidateLines.minByOrNull { kotlin.math.abs(it.range.first - estimatedOffset) }?.range?.first
+                    }
+                }
+
+                // Priority C: Any occurrence, filtering out occurrences near the beginning (TOC) if estimatedOffset > 1500
+                if (targetCharIndex == null) {
+                    val allOccurrences = Regex(escaped, RegexOption.IGNORE_CASE).findAll(fullDocText).toList()
+                    if (allOccurrences.isNotEmpty()) {
+                        val nonTocMatches = if (estimatedOffset > 1500) {
+                            allOccurrences.filter { it.range.first > 1200 }
+                        } else {
+                            allOccurrences
+                        }
+                        val pool = if (nonTocMatches.isNotEmpty()) nonTocMatches else allOccurrences
+                        targetCharIndex = pool.minByOrNull { kotlin.math.abs(it.range.first - estimatedOffset) }?.range?.first
+                    }
                 }
             }
 
-            // Fallback: search by elements in current session
+            // 4. Ultimate structural fallback
             if (targetCharIndex == null) {
-                val elements = currentSessionState?.document?.body?.elements ?: emptyList()
-                when (signal.targetType) {
-                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.HEADING -> {
-                        val headings = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeHeading>()
-                        val targetHeading = headings.getOrNull(signal.targetParagraphIndex - 1)
-                            ?: headings.find { it.text.contains(cleanTitle, ignoreCase = true) }
-                        if (targetHeading != null && targetHeading.text.isNotBlank()) {
-                            val hClean = targetHeading.text.trim().removePrefix("\u200B").trim()
-                            val idx = fullDocText.indexOf(hClean, ignoreCase = true)
-                            if (idx >= 0) targetCharIndex = idx
-                        }
-                    }
-                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.TABLE -> {
-                        val tables = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeTable>()
-                        val targetTable = tables.getOrNull(signal.targetElementIndex)
-                            ?: tables.getOrNull(signal.targetParagraphIndex - 1)
-                        val firstCell = targetTable?.rows?.firstOrNull()?.cells?.firstOrNull()?.text?.trim()
-                        if (!firstCell.isNullOrBlank()) {
-                            val idx = fullDocText.indexOf(firstCell, ignoreCase = true)
-                            if (idx >= 0) targetCharIndex = idx
-                        }
-                    }
-                    com.makerandreas.papirusoffice.data.navigation.NavigateBy.BOOKMARK -> {
-                        val bookmarks = elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeBookmark>()
-                        val bm = bookmarks.find { it.name.equals(cleanTitle, ignoreCase = true) }
-                        if (bm != null) {
-                            val idx = fullDocText.indexOf(bm.name, ignoreCase = true)
-                            if (idx >= 0) targetCharIndex = idx
-                        }
-                    }
-                    else -> {}
-                }
-            }
-
-            // Fallback: search by paragraph block or page fraction
-            if (targetCharIndex == null && fullDocText.isNotEmpty()) {
-                val blocks = fullDocText.split("\n\n")
-                if (signal.targetParagraphIndex > 0 && signal.targetParagraphIndex <= blocks.size) {
-                    var accumulated = 0
-                    for (i in 0 until (signal.targetParagraphIndex - 1)) {
-                        accumulated += blocks[i].length + 2
-                    }
-                    targetCharIndex = accumulated.coerceIn(0, fullDocText.length)
+                if (estimatedOffset > 0) {
+                    targetCharIndex = estimatedOffset.coerceIn(0, fullDocText.length)
                 } else if (signal.targetPageIndex > 0 && totalDocPages > 0) {
                     val ratio = (signal.targetPageIndex - 1).toFloat() / totalDocPages.toFloat()
                     targetCharIndex = (ratio * fullDocText.length).toInt().coerceIn(0, fullDocText.length)
@@ -604,7 +708,8 @@ fun InkyModule(
             }
 
             if (targetCharIndex != null && fullDocText.isNotEmpty()) {
-                val selLength = if (cleanTitle.isNotEmpty() && targetCharIndex + cleanTitle.length <= fullDocText.length) {
+                val safeCharIndex = targetCharIndex.coerceIn(0, fullDocText.length)
+                val selLength = if (cleanTitle.isNotEmpty() && safeCharIndex + cleanTitle.length <= fullDocText.length) {
                     cleanTitle.length
                 } else {
                     0
@@ -613,18 +718,18 @@ fun InkyModule(
                 // Move cursor and selection to target
                 docBodyText = docBodyText.copy(
                     selection = androidx.compose.ui.text.TextRange(
-                        start = targetCharIndex,
-                        end = (targetCharIndex + selLength).coerceAtMost(fullDocText.length)
+                        start = safeCharIndex,
+                        end = (safeCharIndex + selLength).coerceAtMost(fullDocText.length)
                     )
                 )
 
                 // Scroll viewfinder: calculate viewport position with headroom so target heading is never obstructed
                 if (scrollState.maxValue > 0 && fullDocText.isNotEmpty()) {
-                    val charRatio = (targetCharIndex.toFloat() / fullDocText.length.toFloat()).coerceIn(0f, 1f)
+                    val charRatio = (safeCharIndex.toFloat() / fullDocText.length.toFloat()).coerceIn(0f, 1f)
                     val approxViewportPx = 360f * density
                     val totalVirtualHeight = scrollState.maxValue.toFloat() + approxViewportPx
                     val targetY = charRatio * totalVirtualHeight
-                    val safeTopHeadroom = 36f * density
+                    val safeTopHeadroom = 48f * density
                     val targetScroll = (targetY - safeTopHeadroom).toInt().coerceIn(0, scrollState.maxValue)
 
                     if (viewOptions.enableSmoothScrolling) {
@@ -1247,6 +1352,7 @@ fun InkyModule(
             if (currentSession != null) {
                 com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.close(currentSession)
             }
+            com.makerandreas.papirusoffice.data.SafeSessionRestore(context).clearLastSession()
             com.example.MainActivity.openedFilePath = null
             onFormatAction("Back to start center")
         }
@@ -1404,6 +1510,41 @@ fun InkyModule(
     // Autosave helper
     fun triggerAutosave() {
         isSaved = false
+        val currentPath = com.example.MainActivity.openedFilePath
+        if (currentPath != null) {
+            val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
+            sessionRestore.saveLastSession(
+                com.makerandreas.papirusoffice.data.LastSessionInfo(
+                    uri = currentPath,
+                    cursor = docBodyText.selection.start,
+                    zoom = zoomScale,
+                    scroll = scrollState.value,
+                    module = com.makerandreas.papirusoffice.data.ModuleType.WRITER,
+                    docTitle = docTitle,
+                    draftText = docBodyText.text,
+                    isSaved = false
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(scrollState.value, docBodyText.selection) {
+        val currentPath = com.example.MainActivity.openedFilePath
+        if (currentPath != null && !isLoadingDocument) {
+            val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
+            sessionRestore.saveLastSession(
+                com.makerandreas.papirusoffice.data.LastSessionInfo(
+                    uri = currentPath,
+                    cursor = docBodyText.selection.start,
+                    zoom = zoomScale,
+                    scroll = scrollState.value,
+                    module = com.makerandreas.papirusoffice.data.ModuleType.WRITER,
+                    docTitle = docTitle,
+                    draftText = if (!isSaved) docBodyText.text else null,
+                    isSaved = isSaved
+                )
+            )
+        }
     }
 
     val typingBuffer = remember {
@@ -2016,10 +2157,18 @@ fun InkyModule(
                                     )
                                 }
 
-                                // 4. Undo (Edit Mode only)
-                                IconButton(
+                                // 4. Undo (Edit Mode only) - Click for Undo, Long press for Actions to Undo Bottom Sheet
+                                LongClickIconButton(
                                     onClick = performUndo,
-                                    enabled = isUndoEnabled
+                                    onLongClick = {
+                                        customTextToolbar.hide()
+                                        coroutineScope.launch { flushPendingTyping(docBodyText.text) }
+                                        previousInkySubpage = activeInkySubpage
+                                        activeInkySubpage = "actions_to_undo"
+                                        showBottomBar = true
+                                    },
+                                    enabled = isUndoEnabled,
+                                    modifier = Modifier.testTag("btn_top_app_bar_undo")
                                 ) {
                                     Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo")
                                 }
@@ -2244,6 +2393,22 @@ fun InkyModule(
                                                 .fillMaxSize()
                                                 .padding((20 * zoomScale).dp)
                                         ) {
+                                            // Document image on first page
+                                            if (pageIndex == 0 && docxImages.isNotEmpty()) {
+                                                val firstImg = docxImages.values.firstOrNull()
+                                                if (firstImg != null && firstImg.exists()) {
+                                                    coil.compose.AsyncImage(
+                                                        model = firstImg,
+                                                        contentDescription = "Document Cover Image",
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .heightIn(max = (140 * zoomScale).dp)
+                                                            .padding(bottom = (12 * zoomScale).dp),
+                                                        contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                                                    )
+                                                }
+                                            }
+
                                             Text(
                                                 text = pageContent,
                                                 color = textPrimaryColor,
@@ -2265,6 +2430,23 @@ fun InkyModule(
                                                     .fillMaxWidth()
                                                     .weight(1f, fill = false)
                                             )
+
+                                            Spacer(modifier = Modifier.weight(1f))
+
+                                            // Page Number Footer
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = (8 * zoomScale).dp),
+                                                horizontalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = "${pageIndex + 1} / $totalDocPages",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = (10 * zoomScale).sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                                )
+                                            }
                                         }
                                     }
                                     if (pageIndex < pagesList.size - 1) {
@@ -2286,11 +2468,26 @@ fun InkyModule(
                                     color = pageBgColor,
                                     shape = RoundedCornerShape(4.dp)
                                 ) {
-                                    Box(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .padding((20 * zoomScale).dp)
                                     ) {
+                                        if (pageIndex == 0 && docxImages.isNotEmpty()) {
+                                            val firstImg = docxImages.values.firstOrNull()
+                                            if (firstImg != null && firstImg.exists()) {
+                                                coil.compose.AsyncImage(
+                                                    model = firstImg,
+                                                    contentDescription = "Document Cover Image",
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .heightIn(max = (140 * zoomScale).dp)
+                                                        .padding(bottom = (12 * zoomScale).dp),
+                                                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
+                                                )
+                                            }
+                                        }
+
                                         var pageTextVal by remember(pageContent) {
                                             mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(pageContent))
                                         }
@@ -2329,9 +2526,25 @@ fun InkyModule(
                                             cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .defaultMinSize(minHeight = (440 * zoomScale).dp)
+                                                .defaultMinSize(minHeight = (420 * zoomScale).dp)
                                                 .testTag("doc_body_editor_page_$pageIndex")
                                         )
+
+                                        Spacer(modifier = Modifier.weight(1f))
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = (8 * zoomScale).dp),
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = "${pageIndex + 1} / $totalDocPages",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = (10 * zoomScale).sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                            )
+                                        }
                                     }
                                 }
                                 if (pageIndex < pagesList.size - 1) {

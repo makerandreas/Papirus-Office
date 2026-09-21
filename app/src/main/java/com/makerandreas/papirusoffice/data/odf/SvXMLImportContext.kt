@@ -203,12 +203,21 @@ class OdfParagraphContext(
     override fun onEndElement(token: OdfXmlToken) {
         val fullText = textBuilder.toString()
         if (fullText.isNotEmpty() || runs.isNotEmpty()) {
-            val paragraph = OfficeDocumentElement.Paragraph(
-                text = fullText,
-                styleName = styleName,
-                runs = runs.toList()
-            )
-            importFilter.addElement(paragraph)
+            val headingLvl = importFilter.resolveHeadingLevel(styleName)
+            val element = if (headingLvl != null) {
+                OfficeDocumentElement.Heading(
+                    text = fullText,
+                    level = headingLvl,
+                    styleName = styleName
+                )
+            } else {
+                OfficeDocumentElement.Paragraph(
+                    text = fullText,
+                    styleName = styleName,
+                    runs = runs.toList()
+                )
+            }
+            importFilter.addElement(element)
         }
     }
 }

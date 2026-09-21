@@ -52,7 +52,6 @@ class MainActivity : ComponentActivity() {
          * second VIEW intent while the app is alive would otherwise be ignored).
          */
         var openedFileNonce by mutableStateOf(0)
-            private set
 
         /** Maximum accepted size for an incoming shared/opened document (250 MB). */
         const val MAX_INCOMING_FILE_BYTES = 250L * 1024 * 1024
@@ -235,6 +234,26 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         val type = MainActivity.openedFileType
         if (path != null && type != null) {
             currentWorkspace = type
+        }
+    }
+
+    // Restore last session on app launch if the process was terminated/force-closed
+    LaunchedEffect(Unit) {
+        if (MainActivity.openedFilePath == null) {
+            val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
+            val lastSession = sessionRestore.getLastSession()
+            if (lastSession != null && java.io.File(lastSession.uri).exists()) {
+                val restoredType = when (lastSession.module) {
+                    com.makerandreas.papirusoffice.data.ModuleType.CALC -> "Cellina"
+                    com.makerandreas.papirusoffice.data.ModuleType.IMPRESS -> "Slidia"
+                    com.makerandreas.papirusoffice.data.ModuleType.PAGELLA -> "Pagella"
+                    else -> "Inky"
+                }
+                MainActivity.openedFilePath = lastSession.uri
+                MainActivity.openedFileType = restoredType
+                MainActivity.openedFileNonce++
+                currentWorkspace = restoredType
+            }
         }
     }
 

@@ -58,7 +58,7 @@ class DocumentIndexEngine(
 
         var currentPages = 1
         var charCounterInPage = 0
-        val charsPerPage = 1700
+        val charsPerPage = 2500
         var paragraphCounter = 0
         var tableCounter = 1
         var imageCounter = 1
@@ -103,15 +103,21 @@ class DocumentIndexEngine(
                 is OfficeParagraph -> {
                     paragraphCounter++
                     val pText = element.text
-                    val isHeadingStyle = element.styleName?.contains("Heading", ignoreCase = true) == true
+                    val sName = element.styleName ?: ""
+                    val isHeadingWord = sName.contains("Heading", ignoreCase = true) ||
+                            sName.contains("Judul", ignoreCase = true) ||
+                            sName.contains("Title", ignoreCase = true) ||
+                            sName.contains("Bab", ignoreCase = true) ||
+                            sName.contains("Titre", ignoreCase = true) ||
+                            sName.contains("Header", ignoreCase = true)
+
                     val headingLevel = if (element.outlineLevel > 0) {
                         element.outlineLevel
-                    } else if (isHeadingStyle) {
+                    } else if (isHeadingWord) {
+                        val digit = Regex("""\d+""").find(sName)?.value?.toIntOrNull()
                         when {
-                            element.styleName.contains("Heading 1", ignoreCase = true) -> 1
-                            element.styleName.contains("Heading 2", ignoreCase = true) -> 2
-                            element.styleName.contains("Heading 3", ignoreCase = true) -> 3
-                            element.styleName.contains("Heading 4", ignoreCase = true) -> 4
+                            digit != null -> digit.coerceIn(1, 6)
+                            sName.contains("title", ignoreCase = true) || sName.contains("judul", ignoreCase = true) -> 1
                             else -> 1
                         }
                     } else 0

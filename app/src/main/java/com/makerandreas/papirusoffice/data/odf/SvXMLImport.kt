@@ -17,6 +17,14 @@ import java.util.ArrayDeque
  * Maintains a stack of element contexts (SvXMLImportContext) for robust context-driven
  * document parsing and token mapping.
  */
+data class OdfStyleInfo(
+    val name: String,
+    val family: String = "paragraph",
+    val parentName: String? = null,
+    val displayName: String? = null,
+    val outlineLevel: Int? = null
+)
+
 class SvXMLImport(
     private val context: Context,
     val extractedImages: Map<String, File> = emptyMap()
@@ -24,11 +32,109 @@ class SvXMLImport(
 
     private val contextStack = ArrayDeque<SvXMLImportContext>()
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
+    private val styleMap = mutableMapOf<String, OdfStyleInfo>()
 
     val elements: List<OfficeDocumentElement> get() = parsedElements
 
     fun addElement(element: OfficeDocumentElement) {
         parsedElements.add(element)
+    }
+
+    fun parseOdfStyles(xml: String?) {
+        if (xml.isNullOrBlank()) return
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            factory.isNamespaceAware = true
+            val parser = factory.newPullParser()
+            parser.setInput(ByteArrayInputStream(xml.toByteArray(Charsets.UTF_8)), "UTF-8")
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    val rawTagName = parser.name ?: ""
+                    if (rawTagName == "style" || rawTagName.endsWith(":style")) {
+                        var name: String? = null
+                        var family = "paragraph"
+                        var parent: String? = null
+                        var disp: String? = null
+                        var outline: String? = null
+
+                        for (i in 0 until parser.attributeCount) {
+                            val attrName = parser.getAttributeName(i)
+                            val attrVal = parser.getAttributeValue(i)
+                            when (attrName) {
+                                "name" -> name = attrVal
+                                "family" -> family = attrVal
+                                "parent-style-name" -> parent = attrVal
+                                "display-name" -> disp = attrVal
+                                "default-outline-level" -> outline = attrVal
+                            }
+                        }
+
+                        if (!name.isNullOrBlank()) {
+                            val info = OdfStyleInfo(
+                                name = name,
+                                family = family,
+                                parentName = parent,
+                                displayName = disp,
+                                outlineLevel = outline?.toIntOrNull()
+                            )
+                            styleMap[name] = info
+                            styleMap[name.lowercase(java.util.Locale.ROOT)] = info
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+        } catch (e: Exception) {
+            // graceful fallback
+        }
+    }
+
+    fun resolveHeadingLevel(styleName: String?): Int? {
+        if (styleName.isNullOrBlank()) return null
+        var curr: String? = styleName
+        var depth = 0
+        while (curr != null && depth < 10) {
+            val info = styleMap[curr] ?: styleMap[curr.lowercase(java.util.Locale.ROOT)]
+            if (info != null) {
+                if (info.outlineLevel != null && info.outlineLevel > 0) {
+                    return info.outlineLevel.coerceIn(1, 6)
+                }
+                val disp = info.displayName
+                if (!disp.isNullOrBlank()) {
+                    val lvl = parseHeadingLevelFromText(disp)
+                    if (lvl != null) return lvl
+                }
+                val lvlFromName = parseHeadingLevelFromText(info.name)
+                if (lvlFromName != null) return lvlFromName
+                curr = info.parentName
+            } else {
+                val lvlFromName = parseHeadingLevelFromText(curr)
+                if (lvlFromName != null) return lvlFromName
+                break
+            }
+            depth++
+        }
+        return parseHeadingLevelFromText(styleName)
+    }
+
+    private fun parseHeadingLevelFromText(text: String): Int? {
+        val lower = text.lowercase(java.util.Locale.ROOT)
+        val isHeadingWord = lower.contains("heading") ||
+                lower.contains("judul") ||
+                lower.contains("title") ||
+                lower.contains("titre") ||
+                lower.contains("ueberschrift") ||
+                lower.contains("encabezado") ||
+                lower.contains("bab")
+        if (!isHeadingWord) return null
+
+        val digit = Regex("""\d+""").find(lower)?.value?.toIntOrNull()
+        return when {
+            digit != null -> digit.coerceIn(1, 6)
+            lower.contains("title") || lower.contains("judul") -> 1
+            else -> 1
+        }
     }
 
     /**
@@ -37,12 +143,20 @@ class SvXMLImport(
     fun parseOdfXml(
         xmlContent: String,
         fileName: String,
+        stylesXmlContent: String? = null,
         isOdt: Boolean = true,
         isOds: Boolean = false,
         isOdp: Boolean = false
     ): OfficeParsedDocument {
         parsedElements.clear()
         contextStack.clear()
+        styleMap.clear()
+
+        // Preload style hierarchies from styles.xml and content.xml automatic-styles
+        if (!stylesXmlContent.isNullOrBlank()) {
+            parseOdfStyles(stylesXmlContent)
+        }
+        parseOdfStyles(xmlContent)
 
         // Push initial Root document context
         val rootContext = OdfDocumentContentContext(this, OdfXmlToken.XML_DOCUMENT_CONTENT)

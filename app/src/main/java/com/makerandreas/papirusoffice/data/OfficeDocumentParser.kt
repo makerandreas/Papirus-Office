@@ -134,6 +134,25 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
+    private fun extractOdtStylesXml(file: File): String? {
+        if (!file.exists() || (!file.name.endsWith(".odt", ignoreCase = true) && !file.name.endsWith(".ott", ignoreCase = true))) return null
+        try {
+            ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "styles.xml") {
+                        return zip.readCappedBytes().toString(Charsets.UTF_8)
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            // Graceful fallback
+        }
+        return null
+    }
+
     private fun extractOdtPageCount(file: File): Int? {
         if (!file.exists() || !file.name.endsWith(".odt", ignoreCase = true)) return null
         try {
@@ -142,7 +161,8 @@ class OfficeDocumentParser(private val context: Context) {
                 while (entry != null) {
                     if (entry.name == "meta.xml") {
                         val xml = zip.readCappedBytes().toString(Charsets.UTF_8)
-                        val match = Regex("page-count=\"(\\d+)\"", RegexOption.IGNORE_CASE).find(xml)
+                        val match = Regex("""(?:meta:)?page-count="(\d+)"""", RegexOption.IGNORE_CASE).find(xml)
+                            ?: Regex("""<meta:page-count>(\d+)</meta:page-count>""", RegexOption.IGNORE_CASE).find(xml)
                         val p = match?.groupValues?.get(1)?.toIntOrNull()
                         if (p != null && p > 0) return p
                         break
@@ -655,9 +675,11 @@ class OfficeDocumentParser(private val context: Context) {
 
         if (isOdt || isOds || detectedOdp) {
             val odfImport = com.makerandreas.papirusoffice.data.odf.SvXMLImport(context, extractedImages)
+            val stylesXml = if (isOdt) extractOdtStylesXml(file) else null
             val parsedDoc = odfImport.parseOdfXml(
                 xmlContent = xmlContent,
                 fileName = file.name,
+                stylesXmlContent = stylesXml,
                 isOdt = isOdt,
                 isOds = isOds,
                 isOdp = detectedOdp
