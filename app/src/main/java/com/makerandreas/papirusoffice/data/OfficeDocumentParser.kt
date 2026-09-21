@@ -1948,15 +1948,6 @@ class OfficeDocumentParser(private val context: Context) {
                             val newEntry = java.util.zip.ZipEntry(entryName)
                             zout.putNextEntry(newEntry)
 
-                            if (entryName == "ppt/slides/slide1.xml" || (entryName.startsWith("ppt/sliutputStream()).use { zout ->
-                        var entry = zin.nextEntry
-                        var foundSlide = false
-
-                        while (entry != null) {
-                            val entryName = entry.name
-                            val newEntry = java.util.zip.ZipEntry(entryName)
-                            zout.putNextEntry(newEntry)
-
                             if (entryName == "ppt/slides/slide1.xml" || (entryName.startsWith("ppt/slides/slide") && !foundSlide)) {
                                 foundSlide = true
                                 zout.write(slideXmlBytes)
