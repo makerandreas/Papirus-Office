@@ -140,8 +140,10 @@ android {
       isEnable = true
       isUniversalApk = false // Set 'true' jika tetap ingin memproduksi 1 APK gabungan sebagai cadangan
       reset()
-      // Daftarkan arsitektur yang didukung oleh Papirus Office
-      include("arm64-v8a", "armeabi-v7a", "x86_64")
+      // Hanya ABIs yang bundel native libs-nya ada di src/main/libs. x86_64
+      // sengaja tidak disertakan: tidak ada .so untuk ABI itu, jadi APK-nya
+      // akan kosong native dan crash saat memuat LibreOffice core.
+      include("arm64-v8a", "armeabi-v7a")
     }
   }
   packaging {
