@@ -123,7 +123,8 @@ data class OfficeTextRun(
 
 data class OfficeTable(
     val rows: List<OfficeTableRow>,
-    val numColumns: Int = 0
+    val numColumns: Int = 0,
+    val name: String? = null
 ) : OfficeElement
 
 data class OfficeTableRow(
@@ -139,13 +140,15 @@ data class OfficeImage(
     val imagePath: String,
     val imageFile: File? = null,
     val widthDp: Float = 0f,
-    val heightDp: Float = 0f
+    val heightDp: Float = 0f,
+    val name: String? = null
 ) : OfficeElement
 
 data class OfficeShape(
     val type: String,
     val bounds: OfficeRect = OfficeRect(),
-    val fillColorHex: String? = null
+    val fillColorHex: String? = null,
+    val name: String? = null
 ) : OfficeElement
 
 data class OfficeFormula(
@@ -333,6 +336,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
             is OfficeDocumentElement.Table -> {
                 OfficeTable(
                     numColumns = elem.numColumns,
+                    name = elem.name,
                     rows = elem.rows.map { row ->
                         OfficeTableRow(
                             cells = row.cells.map { cell ->
@@ -363,7 +367,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     imagePath = elem.imagePath,
                     imageFile = elem.imageFile,
                     widthDp = elem.widthDp,
-                    heightDp = elem.heightDp
+                    heightDp = elem.heightDp,
+                    name = elem.name
                 )
             }
             is OfficeDocumentElement.PageBreak -> {
@@ -393,6 +398,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
 
     return OfficeDocument(
         metadata = metadata,
+        styles = this.styles,
         body = DocumentBody(elements = docElements),
         odtPackageData = this.odtPackageData
     )

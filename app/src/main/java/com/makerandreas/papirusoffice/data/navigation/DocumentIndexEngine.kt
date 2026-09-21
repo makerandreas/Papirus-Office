@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data.navigation
 
+import com.makerandreas.papirusoffice.data.DocumentLayoutResult
 import com.makerandreas.papirusoffice.data.OfficeBookmark
 import com.makerandreas.papirusoffice.data.OfficeComment
 import com.makerandreas.papirusoffice.data.OfficeDocument
@@ -22,7 +23,8 @@ import com.makerandreas.papirusoffice.data.OfficeTable
 class DocumentIndexEngine(
     var document: OfficeDocument = OfficeDocument(),
     var headingFoldStates: Map<String, Boolean> = emptyMap(),
-    var objectVisibilities: Map<String, VisibilityState> = emptyMap()
+    var objectVisibilities: Map<String, VisibilityState> = emptyMap(),
+    var layoutPageMap: Map<Int, Int> = emptyMap()
 ) : XBookmarksSupplier,
     XTextTablesSupplier,
     XTextGraphicObjectsSupplier,
@@ -35,6 +37,11 @@ class DocumentIndexEngine(
     private var currentIndex: DocumentIndex = DocumentIndex()
 
     init {
+        reindex()
+    }
+
+    fun applyLayout(layout: DocumentLayoutResult) {
+        layoutPageMap = layout.elementPageIndex
         reindex()
     }
 
@@ -57,8 +64,6 @@ class DocumentIndexEngine(
         val remindersList = mutableListOf<ReminderNode>()
 
         var currentPages = 1
-        var charCounterInPage = 0
-        val charsPerPage = 2500
         var paragraphCounter = 0
         var tableCounter = 1
         var imageCounter = 1
@@ -66,15 +71,21 @@ class DocumentIndexEngine(
         var sectionCounter = 1
         var bookmarkCounter = 1
         var shapeCounter = 1
-        var oleCounter = 1
 
         val rawElements = flattenDocumentElements(document)
+        val locale = NavigatorStringCatalog.detect(document)
+
+        fun pageFor(elemIndex: Int): Int = layoutPageMap[elemIndex] ?: currentPages
+        fun storedOrAuto(stored: String?, kind: NavigatorObjectKind, index: Int): String {
+            val trimmed = stored?.trim().orEmpty()
+            if (trimmed.isNotEmpty()) return trimmed
+            return locale.autoName(kind, index)
+        }
 
         rawElements.forEachIndexed { elemIndex, element ->
             when (element) {
                 is OfficePageBreak -> {
                     currentPages++
-                    charCounterInPage = 0
                 }
 
                 is OfficeHeading -> {
@@ -86,41 +97,19 @@ class DocumentIndexEngine(
                             id = id,
                             paragraphIndex = paragraphCounter,
                             outlineLevel = element.level,
-                            title = element.text.ifBlank { "Heading ${element.level}" },
+                            title = element.text.ifBlank { locale.untitledHeading(element.level) },
                             collapsed = isCollapsed,
-                            pageIndex = currentPages,
+                            pageIndex = pageFor(elemIndex),
                             elementIndex = elemIndex,
                             layoutNodeId = "layout_p_$paragraphCounter"
                         )
                     )
-                    charCounterInPage += element.text.length + 80
-                    if (charCounterInPage >= charsPerPage) {
-                        currentPages += charCounterInPage / charsPerPage
-                        charCounterInPage %= charsPerPage
-                    }
                 }
 
                 is OfficeParagraph -> {
                     paragraphCounter++
                     val pText = element.text
-                    val sName = element.styleName ?: ""
-                    val isHeadingWord = sName.contains("Heading", ignoreCase = true) ||
-                            sName.contains("Judul", ignoreCase = true) ||
-                            sName.contains("Title", ignoreCase = true) ||
-                            sName.contains("Bab", ignoreCase = true) ||
-                            sName.contains("Titre", ignoreCase = true) ||
-                            sName.contains("Header", ignoreCase = true)
-
-                    val headingLevel = if (element.outlineLevel > 0) {
-                        element.outlineLevel
-                    } else if (isHeadingWord) {
-                        val digit = Regex("""\d+""").find(sName)?.value?.toIntOrNull()
-                        when {
-                            digit != null -> digit.coerceIn(1, 6)
-                            sName.contains("title", ignoreCase = true) || sName.contains("judul", ignoreCase = true) -> 1
-                            else -> 1
-                        }
-                    } else 0
+                    val headingLevel = resolveParagraphHeadingLevel(element)
 
                     if (headingLevel > 0) {
                         val id = "heading_$paragraphCounter"
@@ -130,22 +119,15 @@ class DocumentIndexEngine(
                                 id = id,
                                 paragraphIndex = paragraphCounter,
                                 outlineLevel = headingLevel,
-                                title = pText.ifBlank { "Heading $headingLevel" },
+                                title = pText.ifBlank { locale.untitledHeading(headingLevel) },
                                 collapsed = isCollapsed,
-                                pageIndex = currentPages,
+                                pageIndex = pageFor(elemIndex),
                                 elementIndex = elemIndex,
                                 layoutNodeId = "layout_p_$paragraphCounter"
                             )
                         )
                     }
 
-                    charCounterInPage += pText.length + 20
-                    if (charCounterInPage >= charsPerPage) {
-                        currentPages += charCounterInPage / charsPerPage
-                        charCounterInPage %= charsPerPage
-                    }
-
-                    // Check for inline bookmark in paragraph
                     if (!element.bookmark.isNullOrBlank()) {
                         val bmName = element.bookmark
                         val bmId = "bookmark_${element.bookmark}"
@@ -155,12 +137,11 @@ class DocumentIndexEngine(
                                 name = bmName,
                                 paragraphIndex = paragraphCounter,
                                 elementIndex = elemIndex,
-                                pageIndex = currentPages
+                                pageIndex = pageFor(elemIndex)
                             )
                         )
                     }
 
-                    // Check for runs with hyperlinks, fields, etc.
                     element.runs.forEach { run ->
                         if (!run.hyperlink.isNullOrBlank()) {
                             val linkId = "link_${hyperlinksList.size + 1}"
@@ -170,7 +151,7 @@ class DocumentIndexEngine(
                                     text = run.text.ifBlank { run.hyperlink },
                                     url = run.hyperlink,
                                     elementIndex = elemIndex,
-                                    pageIndex = currentPages
+                                    pageIndex = pageFor(elemIndex)
                                 )
                             )
                         }
@@ -182,7 +163,7 @@ class DocumentIndexEngine(
                                     fieldType = "TextRunField",
                                     value = run.field,
                                     elementIndex = elemIndex,
-                                    pageIndex = currentPages
+                                    pageIndex = pageFor(elemIndex)
                                 )
                             )
                         }
@@ -191,7 +172,7 @@ class DocumentIndexEngine(
 
                 is OfficeTable -> {
                     val id = "table_$tableCounter"
-                    val autoName = "Table$tableCounter"
+                    val autoName = storedOrAuto(element.name, NavigatorObjectKind.TABLE, tableCounter)
                     val vis = objectVisibilities[id] ?: VisibilityState.VISIBLE
                     tablesList.add(
                         TableNode(
@@ -200,21 +181,17 @@ class DocumentIndexEngine(
                             rows = element.rows.size,
                             cols = element.numColumns.coerceAtLeast(if (element.rows.isNotEmpty()) element.rows[0].cells.size else 1),
                             elementIndex = elemIndex,
-                            pageIndex = currentPages,
+                            pageIndex = pageFor(elemIndex),
                             visibility = vis
                         )
                     )
                     tableCounter++
-                    charCounterInPage += element.rows.sumOf { r -> r.cells.sumOf { c -> c.text.length } } + 250
-                    if (charCounterInPage >= charsPerPage) {
-                        currentPages += charCounterInPage / charsPerPage
-                        charCounterInPage %= charsPerPage
-                    }
                 }
 
                 is OfficeImage -> {
                     val id = "image_$imageCounter"
-                    val autoName = "Image$imageCounter"
+                    val kind = NavigatorStringCatalog.kindOfStoredName(element.name) ?: NavigatorObjectKind.IMAGE
+                    val autoName = storedOrAuto(element.name, kind, imageCounter)
                     val vis = objectVisibilities[id] ?: VisibilityState.VISIBLE
                     imagesList.add(
                         ImageNode(
@@ -222,28 +199,23 @@ class DocumentIndexEngine(
                             imageName = autoName,
                             imagePath = element.imagePath,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages,
+                            pageIndex = pageFor(elemIndex),
                             visibility = vis
                         )
                     )
                     imageCounter++
-                    charCounterInPage += 750
-                    if (charCounterInPage >= charsPerPage) {
-                        currentPages += charCounterInPage / charsPerPage
-                        charCounterInPage %= charsPerPage
-                    }
                 }
 
                 is OfficeBookmark -> {
-                    val id = "bookmark_${element.name.ifBlank { "Bookmark$bookmarkCounter" }}"
-                    val bmName = element.name.ifBlank { "Bookmark$bookmarkCounter" }
+                    val bmName = storedOrAuto(element.name, NavigatorObjectKind.BOOKMARK, bookmarkCounter)
+                    val id = "bookmark_$bmName"
                     bookmarksList.add(
                         BookmarkNode(
                             id = id,
                             name = bmName,
                             paragraphIndex = paragraphCounter,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages
+                            pageIndex = pageFor(elemIndex)
                         )
                     )
                     bookmarkCounter++
@@ -258,21 +230,21 @@ class DocumentIndexEngine(
                             content = element.text,
                             date = element.date,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages
+                            pageIndex = pageFor(elemIndex)
                         )
                     )
                 }
 
                 is OfficeSection -> {
                     val id = "section_$sectionCounter"
-                    val name = element.name.ifBlank { "Section$sectionCounter" }
+                    val name = storedOrAuto(element.name, NavigatorObjectKind.SECTION, sectionCounter)
                     val vis = objectVisibilities[id] ?: VisibilityState.VISIBLE
                     sectionsList.add(
                         SectionNode(
                             id = id,
                             sectionName = name,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages,
+                            pageIndex = pageFor(elemIndex),
                             isProtected = false,
                             visibility = vis
                         )
@@ -282,7 +254,7 @@ class DocumentIndexEngine(
 
                 is OfficeShape -> {
                     val id = "shape_$shapeCounter"
-                    val name = "Shape$shapeCounter"
+                    val name = storedOrAuto(element.name, NavigatorObjectKind.SHAPE, shapeCounter)
                     val vis = objectVisibilities[id] ?: VisibilityState.VISIBLE
                     shapesList.add(
                         ShapeNode(
@@ -290,7 +262,7 @@ class DocumentIndexEngine(
                             shapeName = name,
                             shapeType = element.type,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages,
+                            pageIndex = pageFor(elemIndex),
                             visibility = vis
                         )
                     )
@@ -305,7 +277,7 @@ class DocumentIndexEngine(
                             fieldType = element.type,
                             value = element.value,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages
+                            pageIndex = pageFor(elemIndex)
                         )
                     )
                 }
@@ -318,7 +290,7 @@ class DocumentIndexEngine(
                             label = element.noteId.ifBlank { "${footnotesList.size + 1}" },
                             text = element.text,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages
+                            pageIndex = pageFor(elemIndex)
                         )
                     )
                 }
@@ -331,7 +303,7 @@ class DocumentIndexEngine(
                             text = element.text,
                             url = element.targetUri,
                             elementIndex = elemIndex,
-                            pageIndex = currentPages
+                            pageIndex = pageFor(elemIndex)
                         )
                     )
                 }
@@ -342,14 +314,14 @@ class DocumentIndexEngine(
             }
         }
 
-        // Process embedded resources (OLE Objects, Charts, Media, Extra Images)
         document.resources.objects.forEachIndexed { idx, objName ->
             val id = "ole_${idx + 1}"
             val vis = objectVisibilities[id] ?: VisibilityState.VISIBLE
+            val oleKind = NavigatorStringCatalog.kindOfStoredName(objName) ?: NavigatorObjectKind.OBJECT
             oleList.add(
                 OleNode(
                     id = id,
-                    oleName = if (objName.isNotBlank()) objName else "Object${idx + 1}",
+                    oleName = storedOrAuto(objName, oleKind, idx + 1),
                     elementIndex = 0,
                     pageIndex = 1,
                     visibility = vis
@@ -357,7 +329,6 @@ class DocumentIndexEngine(
             )
         }
 
-        // Build hierarchical Heading tree structure with children
         val hierarchicalHeadings = buildHeadingTree(headingsList)
 
         currentIndex = DocumentIndex(
@@ -380,8 +351,39 @@ class DocumentIndexEngine(
     }
 
     /**
-     * Builds hierarchical parent-child heading tree structure based on outline levels.
+     * Resolves outline level from [OfficeParagraph.outlineLevel] or the parent
+     * style chain (ODF `P*` → `JudulN`, DOCX `w:basedOn` / `w:outlineLvl`).
      */
+    private fun resolveParagraphHeadingLevel(element: OfficeParagraph): Int {
+        if (element.outlineLevel > 0) return element.outlineLevel.coerceIn(1, 6)
+        var curr: String? = element.styleName
+        var depth = 0
+        while (!curr.isNullOrBlank() && depth < 10) {
+            val fromName = headingLevelFromStyleName(curr)
+            if (fromName > 0) return fromName
+            val style = document.styles.paragraphStyles[curr]
+                ?: document.styles.paragraphStyles[curr.lowercase()]
+            if (style != null) {
+                val fromStyleName = headingLevelFromStyleName(style.name)
+                if (fromStyleName > 0) return fromStyleName
+                val parent = style.parentStyleName
+                if (!parent.isNullOrBlank()) {
+                    val fromParent = headingLevelFromStyleName(parent)
+                    if (fromParent > 0) return fromParent
+                    curr = parent
+                    depth++
+                    continue
+                }
+            }
+            break
+        }
+        return 0
+    }
+
+    private fun headingLevelFromStyleName(sName: String): Int {
+        return NavigatorStringCatalog.headingLevelFromStyleName(sName)
+    }
+
     private fun buildHeadingTree(flatHeadings: List<HeadingNode>): List<HeadingNode> {
         if (flatHeadings.isEmpty()) return emptyList()
 
@@ -419,24 +421,18 @@ class DocumentIndexEngine(
 
     private fun flattenDocumentElements(doc: OfficeDocument): List<OfficeElement> {
         val result = mutableListOf<OfficeElement>()
-
-        // 1. Extract elements from sections
         doc.sections.forEach { section ->
             result.add(OfficeSection(name = section.name))
             section.elements.forEach { elem ->
                 result.add(elem)
             }
         }
-
-        // 2. Extract elements from main body
         doc.body.elements.forEach { elem ->
             result.add(elem)
         }
-
         return result
     }
 
-    // UNO SUPPLIERS IMPLEMENTATIONS
     override fun getBookmarks(): List<BookmarkNode> = currentIndex.bookmarks
     override fun getTextTables(): List<TableNode> = currentIndex.tables
     override fun getGraphicObjects(): List<ImageNode> = currentIndex.images

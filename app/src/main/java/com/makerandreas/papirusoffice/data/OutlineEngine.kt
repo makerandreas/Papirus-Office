@@ -32,9 +32,9 @@ class OutlineEngineImpl : OutlineEngine {
                 is OfficeParagraph -> element.styleName
                 else -> null
             }
-            if (styleName != null && styleName.startsWith("Heading", ignoreCase = true)) {
-                val levelChar = styleName.replace("Heading", "", ignoreCase = true).trim()
-                val level = levelChar.toIntOrNull() ?: 1
+            val headingLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleName)
+            if (headingLevel > 0) {
+                val level = headingLevel
                 
                 // Find all child elements under this heading
                 val childIndices = mutableListOf<Int>()
@@ -45,9 +45,8 @@ class OutlineEngineImpl : OutlineEngine {
                         is OfficeParagraph -> nextElem.styleName
                         else -> null
                     }
-                    if (nextStyle != null && nextStyle.startsWith("Heading", ignoreCase = true)) {
-                        val nextLevelChar = nextStyle.replace("Heading", "", ignoreCase = true).trim()
-                        val nextLevel = nextLevelChar.toIntOrNull() ?: 1
+                    val nextLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(nextStyle)
+                    if (nextLevel > 0) {
                         if (nextLevel <= level) {
                             break
                         }

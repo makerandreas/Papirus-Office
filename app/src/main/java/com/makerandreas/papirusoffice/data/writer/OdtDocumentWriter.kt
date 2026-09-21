@@ -214,7 +214,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
                     // a dangling absolute device path into the package.
                     PapirusLogger.w("ODT", "Skipping unresolvable image: ${element.imagePath}")
                 } else {
-                    val frameName = href.substringAfterLast("/")
+                    val frameName = element.name?.takeIf { it.isNotBlank() } ?: href.substringAfterLast("/")
                     sb.append("      <draw:frame draw:name=\"${escapeXml(frameName)}\" text:anchor-type=\"paragraph\">\n")
                     sb.append("        <draw:image xlink:href=\"${escapeXml(href)}\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>\n")
                     sb.append("      </draw:frame>\n")

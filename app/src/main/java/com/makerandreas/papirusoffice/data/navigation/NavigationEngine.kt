@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data.navigation
 
+import com.makerandreas.papirusoffice.data.DocumentLayoutResult
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -96,10 +97,17 @@ class NavigationEngine(
     /**
      * Updates the active document model and re-indexes all elements.
      */
-    fun updateDocument(doc: OfficeDocument) {
+    fun updateDocument(doc: OfficeDocument, layout: DocumentLayoutResult? = null) {
         indexEngine.document = doc
+        if (layout != null) {
+            indexEngine.layoutPageMap = layout.elementPageIndex
+        }
         val updatedIndex = indexEngine.reindex()
-        val pagesCount = calculateTotalPages(updatedIndex)
+        val pagesCount = if (layout != null && layout.pages.isNotEmpty()) {
+            layout.pages.size
+        } else {
+            calculateTotalPages(updatedIndex)
+        }
 
         _state.value = _state.value.copy(
             index = updatedIndex,

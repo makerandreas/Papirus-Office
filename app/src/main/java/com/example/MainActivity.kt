@@ -53,6 +53,12 @@ class MainActivity : ComponentActivity() {
          */
         var openedFileNonce by mutableStateOf(0)
 
+        /**
+         * Set when the user explicitly creates a new document so session restore
+         * does not reopen the last file.
+         */
+        var pendingNewDocument by mutableStateOf(false)
+
         /** Maximum accepted size for an incoming shared/opened document (250 MB). */
         const val MAX_INCOMING_FILE_BYTES = 250L * 1024 * 1024
     }
@@ -123,19 +129,16 @@ class MainActivity : ComponentActivity() {
                     else -> "Inky"
                 }
 
-                val cacheFile = java.io.File(cacheDir, displayName)
-                contentResolver.openInputStream(dataUri)?.use { input ->
-                    java.io.FileOutputStream(cacheFile).use { output ->
-                        copyCapped(input, output, displayName)
-                    }
-                } ?: throw java.io.IOException("Unable to open input stream for: $dataUri")
+                val persisted = com.makerandreas.papirusoffice.data.OpenedDocumentStore.persistFromUri(
+                    this, dataUri, displayName
+                )
 
-                openedFilePath = cacheFile.absolutePath
+                openedFilePath = persisted.absolutePath
                 openedFileType = fileType
                 openedFileNonce++
 
                 // Track in recent files too
-                RecentFilesTracker.addFile(this, cacheFile.absolutePath, fileType)
+                RecentFilesTracker.addFile(this, persisted.absolutePath, fileType)
 
                 Toast.makeText(this, "Opening: $displayName", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
@@ -158,6 +161,20 @@ class MainActivity : ComponentActivity() {
         com.makerandreas.papirusoffice.data.crash.CrashHandlerManager.init(this)
 
         handleIntent(intent)
+
+        if (!pendingNewDocument && openedFilePath == null) {
+            val restorable = com.makerandreas.papirusoffice.data.SafeSessionRestore(this).getRestorableSession()
+            if (restorable != null) {
+                openedFilePath = restorable.uri
+                openedFileType = when (restorable.module) {
+                    com.makerandreas.papirusoffice.data.ModuleType.CALC -> "Cellina"
+                    com.makerandreas.papirusoffice.data.ModuleType.IMPRESS -> "Slidia"
+                    com.makerandreas.papirusoffice.data.ModuleType.PAGELLA -> "Pagella"
+                    else -> "Inky"
+                }
+                openedFileNonce++
+            }
+        }
         
         // Request POST_NOTIFICATIONS permission for Android 13+ if needed
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -207,6 +224,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onPause() {
+        super.onPause()
+        com.makerandreas.papirusoffice.data.SafeSessionRestore(this).flush()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        com.makerandreas.papirusoffice.data.SafeSessionRestore(this).flush()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -237,23 +264,34 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
         }
     }
 
-    // Restore last session on app launch if the process was terminated/force-closed
+    // Honor pendingNewDocument / process-death restore independently of rememberSaveable.
     LaunchedEffect(Unit) {
-        if (MainActivity.openedFilePath == null) {
-            val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
-            val lastSession = sessionRestore.getLastSession()
-            if (lastSession != null && java.io.File(lastSession.uri).exists()) {
-                val restoredType = when (lastSession.module) {
-                    com.makerandreas.papirusoffice.data.ModuleType.CALC -> "Cellina"
-                    com.makerandreas.papirusoffice.data.ModuleType.IMPRESS -> "Slidia"
-                    com.makerandreas.papirusoffice.data.ModuleType.PAGELLA -> "Pagella"
-                    else -> "Inky"
-                }
-                MainActivity.openedFilePath = lastSession.uri
-                MainActivity.openedFileType = restoredType
-                MainActivity.openedFileNonce++
-                currentWorkspace = restoredType
+        if (MainActivity.pendingNewDocument) {
+            MainActivity.pendingNewDocument = false
+            MainActivity.openedFilePath = null
+            MainActivity.openedFileType = null
+            currentWorkspace = "Inky"
+            return@LaunchedEffect
+        }
+        if (MainActivity.openedFilePath != null && MainActivity.openedFileType != null) {
+            currentWorkspace = MainActivity.openedFileType!!
+            return@LaunchedEffect
+        }
+        val restorable = com.makerandreas.papirusoffice.data.SafeSessionRestore(context).getRestorableSession()
+        if (restorable != null) {
+            val restoredType = when (restorable.module) {
+                com.makerandreas.papirusoffice.data.ModuleType.CALC -> "Cellina"
+                com.makerandreas.papirusoffice.data.ModuleType.IMPRESS -> "Slidia"
+                com.makerandreas.papirusoffice.data.ModuleType.PAGELLA -> "Pagella"
+                else -> "Inky"
             }
+            MainActivity.openedFilePath = restorable.uri
+            MainActivity.openedFileType = restoredType
+            MainActivity.openedFileNonce++
+            currentWorkspace = restoredType
+        } else if (currentWorkspace !in listOf("home", "welcome", "create_new_document", "crash_logs", "about")) {
+            // rememberSaveable restored a module but the session file is gone — go home, not Normal.ott
+            currentWorkspace = "home"
         }
     }
 

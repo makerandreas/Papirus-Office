@@ -36,7 +36,8 @@ data class DocxStyleMeta(
     val name: String,
     val outlineLvl: Int?,
     val isHeading: Boolean,
-    val headingLevel: Int
+    val headingLevel: Int,
+    val basedOn: String? = null
 )
 
 /**
@@ -223,9 +224,8 @@ class OfficeDocumentParser(private val context: Context) {
                         XmlPullParser.END_TAG -> {
                             if ((tagName == "w:style" || tagName == "style") && currentStyleId != null) {
                                 val sName = currentStyleName ?: currentStyleId
-                                val isHeading = sName.contains("heading", ignoreCase = true) ||
-                                        sName.contains("judul", ignoreCase = true) ||
-                                        sName.contains("title", ignoreCase = true) ||
+                                val catalogLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
+                                val isHeading = catalogLevel > 0 ||
                                         currentStyleId.matches(PARA_STYLE_REGEX) ||
                                         currentStyleId.matches(HEADING_STYLE_REGEX) ||
                                         currentOutlineLvl != null
@@ -753,6 +753,8 @@ class OfficeDocumentParser(private val context: Context) {
             var inHeading = false
             var headingLevel = 1
             var inTable = false
+            var currentTableName: String? = null
+            var lastGraphicName: String? = null
             val currentRows = mutableListOf<TableRow>()
             val currentCells = mutableListOf<TableCell>()
             val currentCellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
@@ -843,9 +845,7 @@ class OfficeDocumentParser(private val context: Context) {
                                     inHeading = true
                                     headingLevel = meta.headingLevel
                                 } else {
-                                    val isHeadingStyle = styleVal.contains("Heading", ignoreCase = true) ||
-                                            styleVal.contains("Judul", ignoreCase = true) ||
-                                            styleVal.contains("Title", ignoreCase = true) ||
+                                    val isHeadingStyle = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleVal) > 0 ||
                                             styleVal.matches(PARA_STYLE_ANCHORED_REGEX) ||
                                             styleVal.matches(SINGLE_DIGIT_REGEX)
                                     if (isHeadingStyle) {
@@ -887,6 +887,16 @@ class OfficeDocumentParser(private val context: Context) {
                             nameLower == "table:table" || nameLower == "w:tbl" || nameLower == "table" -> {
                                 inTable = true
                                 currentRows.clear()
+                                currentTableName = parser.getAttributeValue(null, "name")
+                                    ?: parser.getAttributeValue(null, "table:name")
+                            }
+                            nameLower == "draw:frame" || nameLower == "frame" -> {
+                                lastGraphicName = parser.getAttributeValue(null, "name")
+                                    ?: parser.getAttributeValue(null, "draw:name")
+                            }
+                            nameLower == "wp:docpr" || nameLower == "docpr" -> {
+                                lastGraphicName = parser.getAttributeValue(null, "name")
+                                    ?: parser.getAttributeValue(null, "wp:name")
                             }
                             nameLower == "table:table-row" || nameLower == "w:tr" || nameLower == "tr" -> {
                                 currentCells.clear()
@@ -932,7 +942,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     elements.add(
                                         OfficeDocumentElement.ImageElement(
                                             imagePath = href,
-                                            imageFile = imgFile
+                                            imageFile = imgFile,
+                                            name = lastGraphicName
                                         )
                                     )
                                 }
@@ -955,7 +966,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     elements.add(
                                         OfficeDocumentElement.ImageElement(
                                             imagePath = target.ifBlank { embedId },
-                                            imageFile = imgFile
+                                            imageFile = imgFile,
+                                            name = lastGraphicName
                                         )
                                     )
                                     plainTextBuilder.append("\n[Image: ${imgName.ifBlank { embedId }}]\n\n")
@@ -1057,8 +1069,10 @@ class OfficeDocumentParser(private val context: Context) {
                                     val maxCols = currentRows.maxOfOrNull { it.cells.size } ?: 0
                                     val tableObj = OfficeDocumentElement.Table(
                                         rows = currentRows.toList(),
-                                        numColumns = maxCols
+                                        numColumns = maxCols,
+                                        name = currentTableName
                                     )
+                                    currentTableName = null
                                     elements.add(tableObj)
 
                                     currentRows.forEach { row ->
@@ -1109,6 +1123,16 @@ class OfficeDocumentParser(private val context: Context) {
 
         val detectedDocPageCount = (if (isDocx) extractDocxPageCount(file) else if (isOdt) extractOdtPageCount(file) else null) ?: 0
         val plainTextResult = plainTextBuilder.toString().trim()
+        val docxDocumentStyles = if (isDocx) {
+            DocumentStyles(
+                paragraphStyles = docxStylesMap.mapValues { (_, meta) ->
+                    ParagraphStyle(
+                        name = meta.name,
+                        parentStyleName = meta.basedOn
+                    )
+                }
+            )
+        } else DocumentStyles()
         val parsedDoc = OfficeParsedDocument(
             elements = elements,
             rawXml = xmlContent,
@@ -1121,7 +1145,8 @@ class OfficeDocumentParser(private val context: Context) {
             isOdp = detectedOdp,
             isPptx = detectedPptx,
             isParsingFailed = false,
-            pageCount = detectedDocPageCount
+            pageCount = detectedDocPageCount,
+            styles = docxDocumentStyles
         )
         inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
         cacheRepository.saveCachedDocument(file, parsedDoc)
@@ -1915,6 +1940,15 @@ class OfficeDocumentParser(private val context: Context) {
             } else {
                 java.util.zip.ZipInputStream(outputFile.inputStream()).use { zin ->
                     java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
+                        var entry = zin.nextEntry
+                        var foundSlide = false
+
+                        while (entry != null) {
+                            val entryName = entry.name
+                            val newEntry = java.util.zip.ZipEntry(entryName)
+                            zout.putNextEntry(newEntry)
+
+                            if (entryName == "ppt/slides/slide1.xml" || (entryName.startsWith("ppt/sliutputStream()).use { zout ->
                         var entry = zin.nextEntry
                         var foundSlide = false
 

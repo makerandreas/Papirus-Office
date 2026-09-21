@@ -51,14 +51,6 @@ fun FilesSubPage(
     val openDocumentLauncher = rememberLauncherForActivityResult(OpenDocumentWithUri()) { uri ->
         uri?.let {
             try {
-                // Copy to cache dir to ensure LibreOfficeKit can read it as a local File
-                val cacheFile = File(context.cacheDir, "imported_document_tmp")
-                context.contentResolver.openInputStream(it)?.use { input ->
-                    cacheFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                
                 var displayName = "document"
                 val cursor = context.contentResolver.query(it, null, null, null, null)
                 if (cursor != null && cursor.moveToFirst()) {
@@ -68,7 +60,7 @@ fun FilesSubPage(
                     }
                     cursor.close()
                 }
-                
+
                 val lowerName = displayName.lowercase()
                 val fileType = when {
                     lowerName.endsWith(".ods") || lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".csv") -> "Cellina"
@@ -76,11 +68,11 @@ fun FilesSubPage(
                     lowerName.endsWith(".pdf") -> "Pagella"
                     else -> "Inky" // ODT, DOCX, DOC, TXT, etc
                 }
-                
-                val targetFile = File(context.cacheDir, displayName)
-                if (targetFile.exists()) targetFile.delete()
-                cacheFile.renameTo(targetFile)
-                
+
+                val targetFile = com.makerandreas.papirusoffice.data.OpenedDocumentStore.persistFromUri(
+                    context, it, displayName
+                )
+
                 RecentFilesTracker.addFile(context, targetFile.absolutePath, fileType)
                 com.example.MainActivity.openedFilePath = targetFile.absolutePath
                 com.example.MainActivity.openedFileType = fileType

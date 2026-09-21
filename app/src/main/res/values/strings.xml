@@ -241,6 +241,9 @@
     <string name="nav_next">Next</string>
     <string name="object_is_hidden">This object is hidden</string>
     <string name="open_navigation_bar">Open Navigation Bar</string>
+    <string name="navigator_page_item">Page %1$d</string>
+    <string name="navigator_footnote_item">Footnote %1$s</string>
+    <string name="navigator_hidden_label">Hidden</string>
 
     <!-- Undo and Redo Actions Sheet -->
     <string name="actionsToUndoTitle">Actions to Undo</string>

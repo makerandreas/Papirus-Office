@@ -43,12 +43,14 @@ data class PageLayout(
 data class PageElementLayout(
     val element: OfficeElement,
     val paragraphLayout: ParagraphLayout? = null,
-    val bounds: OfficeRect = OfficeRect() // Positioned bounds relative to page top-left
+    val bounds: OfficeRect = OfficeRect(), // Positioned bounds relative to page top-left
+    val elementIndex: Int = 0
 )
 
 data class DocumentLayoutResult(
     val pages: List<PageLayout> = emptyList(),
-    val totalHeightDp: Float = 0f
+    val totalHeightDp: Float = 0f,
+    val elementPageIndex: Map<Int, Int> = emptyMap()
 )
 
 // ==========================================
@@ -61,12 +63,13 @@ object StyleResolver {
         val style = styles.paragraphStyles[styleName]
         if (style != null) return style
 
-        // Fallback cascades
+        // Fallback cascades — heading tokens cover Heading / Judul / Titre / …
+        val headingLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleName)
         return when {
-            styleName.contains("Heading 1", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 24f, isBold = true)
-            styleName.contains("Heading 2", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 20f, isBold = true)
-            styleName.contains("Heading 3", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 16f, isBold = true)
-            styleName.contains("Heading", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 18f, isBold = true)
+            headingLevel == 1 -> ParagraphStyle(styleName, fontSizeSp = 24f, isBold = true)
+            headingLevel == 2 -> ParagraphStyle(styleName, fontSizeSp = 20f, isBold = true)
+            headingLevel == 3 -> ParagraphStyle(styleName, fontSizeSp = 16f, isBold = true)
+            headingLevel > 0 -> ParagraphStyle(styleName, fontSizeSp = 18f, isBold = true)
             styleName.contains("Title", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 28f, isBold = true)
             styleName.contains("Subtitle", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 18f, isItalic = true)
             styleName.contains("Quote", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 14f, isItalic = true, colorHex = "#555555")
@@ -141,7 +144,7 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         var currentLineWidth = 0f
         var startCharOffset = 0
 
-        val maxLineWidth = pageWidthDp * 2.0f // Measure boundary
+        val maxLineWidth = (pageWidthDp - 80f).coerceAtLeast(120f)
 
         for (word in words) {
             val spaceText = if (currentLineText.isNotEmpty()) " " else ""
@@ -223,6 +226,37 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         var currentY = 50f // top margin
         val marginX = 40f
         val maxUsableHeight = pageHeightDp - 60f // reserve space for headers/footers
+        val elementPageIndex = mutableMapOf<Int, Int>()
+
+        fun flushPage() {
+            if (currentPageElements.isNotEmpty()) {
+                pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
+                currentPageElements = mutableListOf()
+                currentY = 50f
+            }
+        }
+
+        fun ensureRoom(needed: Float) {
+            if (currentY + needed > maxUsableHeight && currentPageElements.isNotEmpty()) {
+                flushPage()
+            }
+        }
+
+        fun place(index: Int, element: OfficeElement, height: Float, width: Float = pageWidthDp - marginX * 2f, paragraphLayout: ParagraphLayout? = null) {
+            val h = height.coerceAtLeast(8f)
+            ensureRoom(h)
+            val pageNumber = pages.size + 1
+            elementPageIndex[index] = pageNumber
+            currentPageElements.add(
+                PageElementLayout(
+                    element = element,
+                    paragraphLayout = paragraphLayout,
+                    bounds = OfficeRect(marginX, currentY, marginX + width, currentY + h),
+                    elementIndex = index
+                )
+            )
+            currentY += h + 12f
+        }
 
         val rawElements = document.body.elements
 
@@ -238,73 +272,55 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
             }
 
             when (element) {
+                is OfficePageBreak -> {
+                    elementPageIndex[index] = pages.size + 1
+                    flushPage()
+                    if (pages.isEmpty()) {
+                        pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
+                    }
+                }
+                is OfficeParagraph -> {
+                    val pLayout = layoutParagraph(index, element, document.styles, forceRebuildAll)
+                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                }
+                is OfficeHeading -> {
+                    val asPara = OfficeParagraph(
+                        text = element.text,
+                        styleName = element.styleName ?: "Heading ${element.level}",
+                        runs = element.runs
+                    )
+                    val pLayout = layoutParagraph(index, asPara, document.styles, forceRebuildAll)
+                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                }
+                is OfficeListItem -> {
+                    val asPara = OfficeParagraph(text = "${element.bullet}${element.text}", runs = element.runs)
+                    val pLayout = layoutParagraph(index, asPara, document.styles, forceRebuildAll)
+                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                }
                 is OfficeDocElement.ParagraphElement -> {
                     val pLayout = layoutParagraph(index, element.paragraph, document.styles, forceRebuildAll)
-                    if (currentY + pLayout.height > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                        // Push current page
-                        pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                        currentPageElements = mutableListOf()
-                        currentY = 50f
-                    }
-
-                    currentPageElements.add(
-                        PageElementLayout(
-                            element = element,
-                            paragraphLayout = pLayout,
-                            bounds = OfficeRect(marginX, currentY, marginX + pLayout.width, currentY + pLayout.height)
-                        )
-                    )
-                    currentY += pLayout.height + 12f // spacer between paragraphs
+                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                }
+                is OfficeTable -> {
+                    val tableHeight = (element.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    place(index, element, tableHeight)
                 }
                 is OfficeDocElement.TableElement -> {
-                    // Approximate table height
-                    val tableHeight = element.table.rows.size * 35f + 10f
-                    if (currentY + tableHeight > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                        pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                        currentPageElements = mutableListOf()
-                        currentY = 50f
-                    }
-
-                    currentPageElements.add(
-                        PageElementLayout(
-                            element = element,
-                            bounds = OfficeRect(marginX, currentY, pageWidthDp - marginX, currentY + tableHeight)
-                        )
-                    )
-                    currentY += tableHeight + 16f
+                    val tableHeight = (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    place(index, element, tableHeight)
+                }
+                is OfficeImage -> {
+                    val imgHeight = if (element.heightDp > 0) element.heightDp else 180f
+                    val imgWidth = if (element.widthDp > 0) element.widthDp else (pageWidthDp - marginX * 2f)
+                    place(index, element, imgHeight, imgWidth)
                 }
                 is OfficeDocElement.ImageElement -> {
-                    val imgHeight = if (element.image.heightDp > 0) element.image.heightDp else 200f
-                    if (currentY + imgHeight > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                        pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                        currentPageElements = mutableListOf()
-                        currentY = 50f
-                    }
-
-                    currentPageElements.add(
-                        PageElementLayout(
-                            element = element,
-                            bounds = OfficeRect(marginX, currentY, marginX + (if (element.image.widthDp > 0) element.image.widthDp else 250f), currentY + imgHeight)
-                        )
-                    )
-                    currentY += imgHeight + 16f
+                    val imgHeight = if (element.image.heightDp > 0) element.image.heightDp else 180f
+                    val imgWidth = if (element.image.widthDp > 0) element.image.widthDp else (pageWidthDp - marginX * 2f)
+                    place(index, element, imgHeight, imgWidth)
                 }
                 else -> {
-                    // Fallback element size
-                    val itemHeight = 30f
-                    if (currentY + itemHeight > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                        pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                        currentPageElements = mutableListOf()
-                        currentY = 50f
-                    }
-
-                    currentPageElements.add(
-                        PageElementLayout(
-                            element = element,
-                            bounds = OfficeRect(marginX, currentY, pageWidthDp - marginX, currentY + itemHeight)
-                        )
-                    )
-                    currentY += itemHeight + 10f
+                    place(index, element, 30f)
                 }
             }
         }
@@ -312,8 +328,15 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         if (currentPageElements.isNotEmpty()) {
             pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
         }
+        if (pages.isEmpty()) {
+            pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
+        }
 
-        return DocumentLayoutResult(pages, totalHeightDp = pages.size * pageHeightDp)
+        return DocumentLayoutResult(
+            pages = pages,
+            totalHeightDp = pages.size * pageHeightDp,
+            elementPageIndex = elementPageIndex
+        )
     }
 
     // ==========================================

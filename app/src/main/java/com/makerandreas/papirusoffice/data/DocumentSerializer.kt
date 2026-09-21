@@ -86,17 +86,15 @@ class DocxDocumentSerializer : DocumentSerializerContract {
 
         val docxParser = DocxDocumentParser(context)
         val parseResult = docxParser.parseDocument(file)
-
-        val elements = mutableListOf<OfficeElement>()
-        val paragraphs = parseResult.text.split("\n\n").filter { it.isNotBlank() }
-        if (paragraphs.isEmpty()) {
-            elements.add(OfficeParagraph(""))
-        } else {
-            paragraphs.forEach { pText ->
-                elements.add(OfficeParagraph(pText))
-            }
+        val parsed = parseResult.parsedDocument
+        if (parsed != null && !parsed.isParsingFailed) {
+            return@withContext parsed.toOfficeDocument()
         }
-
+        val elements = if (parseResult.text.isBlank()) {
+            listOf(OfficeParagraph(""))
+        } else {
+            parseResult.text.split("\n\n").map { OfficeParagraph(it) }
+        }
         return@withContext OfficeDocument(
             metadata = DocumentMetadata(title = file.name),
             body = DocumentBody(elements = elements)
@@ -110,15 +108,14 @@ class DocxDocumentSerializer : DocumentSerializerContract {
     ): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
             val docxParser = DocxDocumentParser(context)
-            val plainText = document.toPlainText()
 
             when (destination) {
                 is DocumentReference.LocalFile -> {
-                    docxParser.saveDocument(destination.file, plainText)
+                    docxParser.saveDocument(destination.file, document)
                 }
                 is DocumentReference.SafUri -> {
                     val tempFile = File.createTempFile("temp_write_docx", ".docx", context.cacheDir)
-                    docxParser.saveDocument(tempFile, plainText)
+                    docxParser.saveDocument(tempFile, document)
                     context.contentResolver.openOutputStream(destination.uri)?.use { stream ->
                         tempFile.inputStream().use { input -> input.copyTo(stream) }
                     }
@@ -173,7 +170,7 @@ private fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsedD
             is com.makerandreas.papirusoffice.data.OfficeHeading -> OfficeDocumentElement.Heading(text = element.text, level = element.level)
             is com.makerandreas.papirusoffice.data.OfficeListItem -> OfficeDocumentElement.ListItem(text = element.text, bullet = element.bullet)
             is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement -> OfficeDocumentElement.Table(rows = element.table.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.table.numColumns)
-            is com.makerandreas.papirusoffice.data.OfficeTable -> OfficeDocumentElement.Table(rows = element.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.numColumns)
+            is com.makerandreas.papirusoffice.data.OfficeTable -> OfficeDocumentElement.Table(rows = element.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.numColumns, name = element.name)
             else -> null
         }
     }

@@ -582,10 +582,11 @@ class OdfFrameContext(
 
     private val widthDp = parseDimensionToDp(attributes["svg:width"] ?: attributes["width"])
     private val heightDp = parseDimensionToDp(attributes["svg:height"] ?: attributes["height"])
+    private val frameName: String? = attributes["draw:name"] ?: attributes["name"]
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_IMAGE -> OdfImageContext(importFilter, token, attributes, widthDp, heightDp)
+            OdfXmlToken.XML_IMAGE -> OdfImageContext(importFilter, token, attributes, widthDp, heightDp, frameName)
             OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
                 OdfDrawingContainerContext(importFilter, token)
             }
@@ -615,7 +616,8 @@ class OdfImageContext(
     token: OdfXmlToken,
     attributes: Map<String, String>,
     private val widthDp: Float,
-    private val heightDp: Float
+    private val heightDp: Float,
+    private val objectName: String? = null
 ) : SvXMLImportContext(importFilter, token) {
 
     private val href: String? = attributes["xlink:href"] ?: attributes["href"]
@@ -627,7 +629,8 @@ class OdfImageContext(
                 imagePath = href,
                 imageFile = imgFile,
                 widthDp = widthDp,
-                heightDp = heightDp
+                heightDp = heightDp,
+                name = objectName
             )
             importFilter.addElement(imageElement)
         }
