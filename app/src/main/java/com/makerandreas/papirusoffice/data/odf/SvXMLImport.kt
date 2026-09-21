@@ -1,8 +1,10 @@
 package com.makerandreas.papirusoffice.data.odf
 
 import android.content.Context
+import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
+import com.makerandreas.papirusoffice.data.ParagraphStyle
 import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
@@ -119,22 +121,20 @@ class SvXMLImport(
     }
 
     private fun parseHeadingLevelFromText(text: String): Int? {
-        val lower = text.lowercase(java.util.Locale.ROOT)
-        val isHeadingWord = lower.contains("heading") ||
-                lower.contains("judul") ||
-                lower.contains("title") ||
-                lower.contains("titre") ||
-                lower.contains("ueberschrift") ||
-                lower.contains("encabezado") ||
-                lower.contains("bab")
-        if (!isHeadingWord) return null
+        val level = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(text)
+        return level.takeIf { it > 0 }
+    }
 
-        val digit = Regex("""\d+""").find(lower)?.value?.toIntOrNull()
-        return when {
-            digit != null -> digit.coerceIn(1, 6)
-            lower.contains("title") || lower.contains("judul") -> 1
-            else -> 1
+    fun toDocumentStyles(): DocumentStyles {
+        val paragraphs = LinkedHashMap<String, ParagraphStyle>()
+        for (info in styleMap.values) {
+            if (info.family.isNotBlank() && !info.family.equals("paragraph", ignoreCase = true)) continue
+            paragraphs.putIfAbsent(
+                info.name,
+                ParagraphStyle(name = info.name, parentStyleName = info.parentName)
+            )
         }
+        return DocumentStyles(paragraphStyles = paragraphs)
     }
 
     /**
@@ -261,7 +261,8 @@ class SvXMLImport(
                 isPptx = false,
                 isParsingFailed = false,
                 failureReason = null,
-                pageCount = odpSlideCount
+                pageCount = odpSlideCount,
+                styles = toDocumentStyles()
             )
 
         } catch (e: Exception) {

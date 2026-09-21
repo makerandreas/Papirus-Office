@@ -323,8 +323,8 @@ class DocxDocumentParser(private val context: Context) {
         if (parsedDoc.isOdp) return@withContext officeParser.saveOdpDocument(file, parsedDoc)
         if (parsedDoc.isOdt) return@withContext officeParser.saveOdtDocument(file, parsedDoc)
         if (parsedDoc.isPptx) return@withContext officeParser.savePptxDocument(file, parsedDoc)
-        
-        return@withContext saveDocument(file, parsedDoc.plainText)
+
+        return@withContext saveDocxZip(file, generateDocxXmlFromElements(document.body.elements))
     }
 
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
@@ -534,6 +534,61 @@ class DocxDocumentParser(private val context: Context) {
         return@withContext success
     }
 
+    private suspend fun saveDocxZip(file: File, documentXml: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        val tempFile = File(context.cacheDir, "temp_save_" + file.name)
+        val success = try {
+            if (!file.exists() || file.length() == 0L) {
+                java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
+                    zout.putNextEntry(java.util.zip.ZipEntry("[Content_Types].xml"))
+                    zout.write(generateDocxContentTypesXml())
+                    zout.closeEntry()
+                    zout.putNextEntry(java.util.zip.ZipEntry("_rels/.rels"))
+                    zout.write(generateDocxRelsXml())
+                    zout.closeEntry()
+                    zout.putNextEntry(java.util.zip.ZipEntry("word/_rels/document.xml.rels"))
+                    zout.write(generateDocxDocumentRelsXml())
+                    zout.closeEntry()
+                    zout.putNextEntry(java.util.zip.ZipEntry("word/document.xml"))
+                    zout.write(documentXml)
+                    zout.closeEntry()
+                }
+            } else {
+                java.util.zip.ZipInputStream(file.inputStream()).use { zin ->
+                    java.util.zip.ZipOutputStream(tempFile.outputStream()).use { zout ->
+                        var entry = zin.nextEntry
+                        var foundTarget = false
+                        while (entry != null) {
+                            if (entry.name == "word/document.xml") {
+                                foundTarget = true
+                                zout.putNextEntry(java.util.zip.ZipEntry("word/document.xml"))
+                                zout.write(documentXml)
+                            } else {
+                                zout.putNextEntry(java.util.zip.ZipEntry(entry.name))
+                                zin.copyTo(zout)
+                            }
+                            zout.closeEntry()
+                            zin.closeEntry()
+                            entry = zin.nextEntry
+                        }
+                        if (!foundTarget) {
+                            zout.putNextEntry(java.util.zip.ZipEntry("word/document.xml"))
+                            zout.write(documentXml)
+                            zout.closeEntry()
+                        }
+                    }
+                }
+            }
+            tempFile.copyTo(file, overwrite = true)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        } finally {
+            if (tempFile.exists()) tempFile.delete()
+        }
+        return@withContext success
+    }
+
     private fun generateOdtManifestXml(): ByteArray {
         val xml = """<?xml version="1.0" encoding="UTF-8"?>
 <manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">
@@ -603,6 +658,78 @@ class DocxDocumentParser(private val context: Context) {
         sb.append("  </w:body>\n")
         sb.append("</w:document>")
         return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    fun generateDocxXmlFromElements(elements: List<OfficeElement>): ByteArray {
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        sb.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n")
+        sb.append("  <w:body>\n")
+        if (elements.isEmpty()) {
+            sb.append("    <w:p><w:r><w:t/></w:r></w:p>\n")
+        } else {
+            for (element in elements) {
+                writeDocxElement(sb, element)
+            }
+        }
+        sb.append("    <w:sectPr>\n")
+        sb.append("      <w:pgSz w:w=\"12240\" w:h=\"15840\"/>\n")
+        sb.append("      <w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n")
+        sb.append("    </w:sectPr>\n")
+        sb.append("  </w:body>\n")
+        sb.append("</w:document>")
+        return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    private fun writeDocxElement(sb: StringBuilder, element: OfficeElement) {
+        when (element) {
+            is OfficeHeading -> {
+                val level = (element.level - 1).coerceIn(0, 8)
+                val style = element.styleName ?: "Heading${element.level}"
+                sb.append("    <w:p>\n")
+                sb.append("      <w:pPr><w:pStyle w:val=\"${escapeXml(style)}\"/><w:outlineLvl w:val=\"$level\"/></w:pPr>\n")
+                sb.append("      <w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r>\n")
+                sb.append("    </w:p>\n")
+            }
+            is OfficeParagraph -> {
+                val style = element.styleName
+                sb.append("    <w:p>\n")
+                if (!style.isNullOrBlank()) {
+                    sb.append("      <w:pPr><w:pStyle w:val=\"${escapeXml(style)}\"/>")
+                    if (element.outlineLevel > 0) {
+                        sb.append("<w:outlineLvl w:val=\"${(element.outlineLevel - 1).coerceIn(0, 8)}\"/>")
+                    }
+                    sb.append("</w:pPr>\n")
+                }
+                sb.append("      <w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r>\n")
+                sb.append("    </w:p>\n")
+            }
+            is OfficeListItem -> {
+                sb.append("    <w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr></w:pPr>")
+                sb.append("<w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r></w:p>\n")
+            }
+            is OfficeTable -> {
+                sb.append("    <w:tbl>\n")
+                for (row in element.rows) {
+                    sb.append("      <w:tr>\n")
+                    for (cell in row.cells) {
+                        sb.append("        <w:tc><w:p><w:r><w:t xml:space=\"preserve\">${escapeXml(cell.text)}</w:t></w:r></w:p></w:tc>\n")
+                    }
+                    sb.append("      </w:tr>\n")
+                }
+                sb.append("    </w:tbl>\n")
+            }
+            is OfficeImage -> {
+                sb.append("    <w:p><w:r><w:t xml:space=\"preserve\">[Image: ${escapeXml(element.imagePath)}]</w:t></w:r></w:p>\n")
+            }
+            is OfficePageBreak -> {
+                sb.append("    <w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n")
+            }
+            is OfficeDocElement.ParagraphElement -> writeDocxElement(sb, element.paragraph)
+            is OfficeDocElement.TableElement -> writeDocxElement(sb, element.table)
+            is OfficeDocElement.ImageElement -> writeDocxElement(sb, element.image)
+            else -> { }
+        }
     }
 
     private fun generateOdtXml(text: String): ByteArray {

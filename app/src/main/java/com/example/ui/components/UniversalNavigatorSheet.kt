@@ -496,7 +496,7 @@ fun NavigatorSheetContent(
                     } else {
                         items(index.footnotes) { fn ->
                             LeafItemRow(
-                                name = "Footnote ${fn.label}",
+                                name = stringResource(R.string.navigator_footnote_item, fn.label),
                                 icon = Icons.AutoMirrored.Rounded.Notes,
                                 isSelected = navState.activeItemId == fn.id,
                                 onClick = { navEngine.goToFootnote(fn.id) }
@@ -556,7 +556,7 @@ fun NavigatorSheetContent(
                     } else {
                         items((1..navState.totalPages).toList()) { p ->
                             LeafItemRow(
-                                name = "Page $p",
+                                name = stringResource(R.string.navigator_page_item, p),
                                 icon = Icons.Rounded.Description,
                                 isSelected = navState.currentPage == p,
                                 onClick = { navEngine.goToPage(p) }
@@ -737,7 +737,7 @@ fun NavigatorSheetContent(
                         } else {
                             items(index.footnotes) { fn ->
                                 LeafItemRow(
-                                    name = "Footnote ${fn.label}",
+                                    name = stringResource(R.string.navigator_footnote_item, fn.label),
                                     icon = Icons.AutoMirrored.Rounded.Notes,
                                     isSelected = navState.activeItemId == fn.id,
                                     startPadding = 16.dp,
@@ -773,7 +773,7 @@ fun NavigatorSheetContent(
                         } else {
                             items((1..navState.totalPages).toList()) { p ->
                                 LeafItemRow(
-                                    name = "Page $p",
+                                    name = stringResource(R.string.navigator_page_item, p),
                                     icon = Icons.Rounded.Description,
                                     isSelected = navState.currentPage == p,
                                     startPadding = 16.dp,

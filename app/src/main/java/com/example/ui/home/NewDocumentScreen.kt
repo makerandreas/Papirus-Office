@@ -232,6 +232,7 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
+                        com.example.MainActivity.pendingNewDocument = true
                         com.example.MainActivity.openedFilePath = null
                         com.example.MainActivity.openedFileType = null
                         onNavigateToModule("Inky")

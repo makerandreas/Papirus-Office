@@ -35,7 +35,8 @@ sealed class OfficeDocumentElement {
         val imagePath: String,
         val imageFile: File? = null,
         val widthDp: Float = 0f,
-        val heightDp: Float = 0f
+        val heightDp: Float = 0f,
+        val name: String? = null
     ) : OfficeDocumentElement()
 
     data object PageBreak : OfficeDocumentElement()
@@ -71,7 +72,8 @@ data class OfficeParsedDocument(
     val isParsingFailed: Boolean = false,
     val failureReason: String? = null,
     val odtPackageData: OdtPackageData? = null,
-    val pageCount: Int = 0
+    val pageCount: Int = 0,
+    val styles: DocumentStyles = DocumentStyles()
 ) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier, XReplaceable {
     
     override val text: XText

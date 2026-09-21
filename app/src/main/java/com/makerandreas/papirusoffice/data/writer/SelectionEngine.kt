@@ -1,8 +1,6 @@
 package com.makerandreas.papirusoffice.data.writer
 
-import com.makerandreas.papirusoffice.data.DocumentBody
 import com.makerandreas.papirusoffice.data.OfficeDocument
-import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.toPlainText
 
 object SelectionEngine {
@@ -24,8 +22,7 @@ object SelectionEngine {
         val start = selection.min.coerceIn(0, fullText.length)
         val end = selection.max.coerceIn(0, fullText.length)
         val newText = if (start < end) fullText.removeRange(start, end) else fullText
-        val newElements = newText.split("\n\n").map { OfficeParagraph(text = it) }
-        return doc.copy(body = DocumentBody(elements = newElements), isModified = true)
+        return com.makerandreas.papirusoffice.data.DocumentTextMerger.mergeEditedText(doc, newText)
     }
 
     fun delete(text: String, selection: SelectionRange): String {
@@ -38,8 +35,7 @@ object SelectionEngine {
         val fullText = doc.toPlainText()
         val safeOffset = offset.coerceIn(0, fullText.length)
         val newText = fullText.substring(0, safeOffset) + insertedText + fullText.substring(safeOffset)
-        val newElements = newText.split("\n\n").map { OfficeParagraph(text = it) }
-        return doc.copy(body = DocumentBody(elements = newElements), isModified = true)
+        return com.makerandreas.papirusoffice.data.DocumentTextMerger.mergeEditedText(doc, newText)
     }
 
     fun insert(text: String, offset: Int, insertedText: String): String {

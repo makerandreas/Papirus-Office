@@ -1,0 +1,31 @@
+<resources>
+    <!-- Navigator category chrome follows the Android UI locale. Object
+         labels (Tabel1 / Table1) follow the document's originating language. -->
+    <string name="navigator_title">Navigator</string>
+    <string name="navigate_by_title">Navigasi menurut...</string>
+    <string name="navigate_by_all">Semua</string>
+    <string name="no_objects_to_navigate">Tidak ada objek untuk dinavigasi</string>
+    <string name="navigate_by_headings">Judul</string>
+    <string name="navigate_by_tables">Tabel</string>
+    <string name="navigate_by_images">Gambar</string>
+    <string name="navigate_by_bookmarks">Penanda</string>
+    <string name="navigate_by_comments">Komentar</string>
+    <string name="navigate_by_sections">Bagian</string>
+    <string name="navigate_by_frames">Bingkai</string>
+    <string name="navigate_by_fields">Bidang</string>
+    <string name="navigate_by_footnotes">Catatan kaki</string>
+    <string name="navigate_by_ole">Objek OLE</string>
+    <string name="navigate_by_drawing">Objek gambar</string>
+    <string name="navigate_by_page">Halaman</string>
+    <string name="navigate_by_reminder">Pengingat</string>
+    <string name="navigate_by_indexes">Indeks</string>
+    <string name="navigate_by_selection">Seleksi</string>
+    <string name="navigate_by_recency">Terbaru</string>
+    <string name="nav_previous">Sebelumnya</string>
+    <string name="nav_next">Berikutnya</string>
+    <string name="object_is_hidden">Objek ini tersembunyi</string>
+    <string name="open_navigation_bar">Buka bilah navigasi</string>
+    <string name="navigator_page_item">Halaman %1$d</string>
+    <string name="navigator_footnote_item">Catatan kaki %1$s</string>
+    <string name="navigator_hidden_label">Tersembunyi</string>
+</resources>
