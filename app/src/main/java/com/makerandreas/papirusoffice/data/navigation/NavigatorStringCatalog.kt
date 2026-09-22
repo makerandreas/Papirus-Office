@@ -111,6 +111,7 @@ object NavigatorStringCatalog {
     /**
      * Prefer document evidence (Judul / Tabel / Gambar) over the metadata default
      * of `en-US`, which many parsers leave untouched.
+     * Kept for legacy / \"Follow document\" mode — see [resolveNavigatorLocale].
      */
     fun detect(document: OfficeDocument): NavigatorLocalePack {
         val evidence = collectEvidence(document)
@@ -129,6 +130,26 @@ object NavigatorStringCatalog {
             if (fromMeta.languageTag == "id") return INDONESIAN
         }
         return ENGLISH
+    }
+
+    /**
+     * P2-2: Resolve Navigator locale pack according to user preference.
+     * - When [preferAppLocale] is true (default), the *app* language decides prefixes
+     *   (e.g. English app → \"Table1\", \"Image1\"), even if the document contains Indonesian
+     *   evidence like `Judul1`. Heading *recognition* remains locale-agnostic via
+     *   [headingLevelFromStyleName] which scans all packs.
+     * - When false, fall back to legacy [detect] (document evidence → metadata).
+     */
+    fun resolveNavigatorLocale(
+        document: OfficeDocument,
+        preferAppLocale: Boolean,
+        appLanguageTag: String?
+    ): NavigatorLocalePack {
+        return if (preferAppLocale) {
+            forLanguageTag(appLanguageTag ?: Locale.getDefault().language)
+        } else {
+            detect(document)
+        }
     }
 
     fun headingLevelFromStyleName(styleName: String?): Int {

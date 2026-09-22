@@ -65,7 +65,9 @@ data class NavigatorState(
  * hidden object checks, and next/previous iteration.
  */
 class NavigationEngine(
-    initialDocument: OfficeDocument = OfficeDocument()
+    initialDocument: OfficeDocument = OfficeDocument(),
+    preferAppLocale: Boolean = true,
+    appLanguageTag: String? = null
 ) {
     private val foldStatesMap = mutableMapOf<String, Boolean>()
     private val objectVisibilityMap = mutableMapOf<String, VisibilityState>()
@@ -73,7 +75,9 @@ class NavigationEngine(
     private val indexEngine = DocumentIndexEngine(
         document = initialDocument,
         headingFoldStates = foldStatesMap,
-        objectVisibilities = objectVisibilityMap
+        objectVisibilities = objectVisibilityMap,
+        preferAppLocale = preferAppLocale,
+        appLanguageTag = appLanguageTag
     )
 
     private val _state = MutableStateFlow(
@@ -465,6 +469,18 @@ class NavigationEngine(
 
     fun clearNavSignal() {
         _state.value = _state.value.copy(navTargetSignal = null)
+    }
+
+    /** P2-2: Update Navigator language policy without recreating the engine. */
+    fun setNavigatorLocalePolicy(preferAppLocale: Boolean, appLanguageTag: String? = null) {
+        if (indexEngine.preferAppLocale != preferAppLocale || indexEngine.appLanguageTag != appLanguageTag) {
+            indexEngine.preferAppLocale = preferAppLocale
+            indexEngine.appLanguageTag = appLanguageTag
+            // Reindex with new locale so auto-names switch immediately
+            val updatedIndex = indexEngine.reindex()
+            val pagesCount = _state.value.totalPages
+            _state.value = _state.value.copy(index = updatedIndex, totalPages = pagesCount)
+        }
     }
 
     private fun emitNavSignal(

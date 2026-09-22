@@ -303,6 +303,11 @@ fun InkyModule(
     val navEngine = remember {
         currentSessionState?.navigationEngine ?: com.makerandreas.papirusoffice.data.navigation.NavigationEngine()
     }
+    // P2-2: Navigator follows app locale (English app → English Navigator) — wire DataStore toggle
+    LaunchedEffect(viewOptions.navigatorFollowAppLocale) {
+        val appTag = java.util.Locale.getDefault().language
+        navEngine.setNavigatorLocalePolicy(viewOptions.navigatorFollowAppLocale, appTag)
+    }
 
     var docBodyText by remember {
         mutableStateOf(
@@ -2031,39 +2036,20 @@ fun InkyModule(
                                     )
                                 }
 
-                                // 4. Undo (Edit Mode only) - Click for Undo, Long press for Actions to Undo Bottom Sheet
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    LongClickIconButton(
-                                        onClick = performUndo,
-                                        onLongClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch { flushPendingTyping(docBodyText.text) }
-                                            previousInkySubpage = activeInkySubpage
-                                            activeInkySubpage = "actions_to_undo"
-                                            showBottomBar = true
-                                        },
-                                        enabled = isUndoEnabled,
-                                        modifier = Modifier.testTag("btn_top_app_bar_undo")
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo")
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch { flushPendingTyping(docBodyText.text) }
-                                            previousInkySubpage = activeInkySubpage
-                                            activeInkySubpage = "actions_to_undo"
-                                            showBottomBar = true
-                                        },
-                                        enabled = isUndoEnabled,
-                                        modifier = Modifier.size(28.dp).testTag("btn_undo_history")
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = "Undo history",
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                // 4. Undo (Edit Mode only) - Click for Undo, Long press for Actions to Undo Bottom Sheet (unified affordance like Redo)
+                                LongClickIconButton(
+                                    onClick = performUndo,
+                                    onLongClick = {
+                                        customTextToolbar.hide()
+                                        coroutineScope.launch { flushPendingTyping(docBodyText.text) }
+                                        previousInkySubpage = activeInkySubpage
+                                        activeInkySubpage = "actions_to_undo"
+                                        showBottomBar = true
+                                    },
+                                    enabled = isUndoEnabled,
+                                    modifier = Modifier.testTag("btn_top_app_bar_undo")
+                                ) {
+                                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo (long press for history)")
                                 }
                             }
 
@@ -2248,12 +2234,13 @@ fun InkyModule(
                 }
             }
 
-            // --- MAIN DOCUMENT WORKSPACE CANVAS ---
+            // --- MAIN DOCUMENT WORKSPACE CANVAS (viewportCoordinates wired for elongated Viewer status bar) ---
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .background(docBgColor),
+                    .background(docBgColor)
+                    .onGloballyPositioned { viewportCoordinates = it },
                 contentAlignment = Alignment.TopCenter
             ) {
                 Column(
@@ -2438,8 +2425,28 @@ fun InkyModule(
                 }
             }
 
-            // --- Status Bar Bawah (ONLY visible in Edit Mode) ---
-            if (isEditMode) {
+            // --- Status Bar Bawah — elongated unified (P1-1): Viewer + Editor share tonal bar ---
+            // Elongated = full-width tonal bar pinned between canvas and toolbar hub, visible in both Viewer & Editor.
+            // Viewer: Page x–x of y (range) + word/char; Editor: Page x of y + word/char + zoom.
+            // Range is viewport-aware: continuous scroll shows current + next page when > ~0.85 page heights visible.
+            run {
+                val charCount = docBodyText.text.length
+                val viewerPageEnd = remember(isEditMode, currentDocPage, totalDocPages, viewportCoordinates, density) {
+                    derivedStateOf {
+                        if (!isEditMode && totalDocPages > 1 && currentDocPage < totalDocPages) {
+                            val viewportH = viewportCoordinates?.size?.height?.toFloat()
+                            val pageHpx = 1056f * density
+                            val looksContinuous = viewportH == null || viewportH > pageHpx * 0.85f
+                            if (looksContinuous) (currentDocPage + 1).coerceAtMost(totalDocPages) else currentDocPage
+                        } else currentDocPage
+                    }
+                }.value
+                val pageText = if (!isEditMode && viewerPageEnd > currentDocPage) {
+                    stringResource(R.string.viewer_status_page_range, currentDocPage, viewerPageEnd, totalDocPages)
+                } else {
+                    stringResource(R.string.viewer_status_page_single, currentDocPage, totalDocPages)
+                }
+                val wordsCharsText = stringResource(R.string.viewer_status_words_chars, wordCount, charCount)
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     tonalElevation = 2.dp,
@@ -2452,7 +2459,7 @@ fun InkyModule(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 1. Page Counter (Left)
+                        // 1. Page Counter (Left) — clickable Go to Page
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
@@ -2471,59 +2478,50 @@ fun InkyModule(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Page $currentDocPage of $totalDocPages",
+                                text = pageText,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium
                             )
                         }
 
-                        // 2. Words and Character Counter (Middle)
+                        // 2. Words and Character Counter (Middle / elongated center)
                         Text(
-                            text = "$wordCount words, ${docBodyText.text.length} chars",
+                            text = wordsCharsText,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 4.dp)
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
 
-                        // 3. Zoom Control (Right)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    zoomScale = (zoomScale - 0.1f).coerceAtLeast(0.25f)
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Remove,
-                                    contentDescription = "Zoom Out",
-                                    modifier = Modifier.size(16.dp)
+                        // 3. Zoom Control (Right) — Editor only; Viewer keeps spacer for symmetry
+                        if (isEditMode) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = { zoomScale = (zoomScale - 0.1f).coerceAtLeast(0.25f) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Rounded.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(16.dp))
+                                }
+                                Text(
+                                    text = "${(zoomScale * 100).toInt()}%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .clickable { zoomScale = 1.0f }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
+                                IconButton(
+                                    onClick = { zoomScale = (zoomScale + 0.1f).coerceAtMost(4.0f) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Zoom In", modifier = Modifier.size(16.dp))
+                                }
                             }
-                            Text(
-                                text = "${(zoomScale * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .clickable {
-                                        zoomScale = 1.0f
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                            IconButton(
-                                onClick = {
-                                    zoomScale = (zoomScale + 0.1f).coerceAtMost(4.0f)
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Add,
-                                    contentDescription = "Zoom In",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                        } else {
+                            // Viewer elongated balance — no zoom; keep 32dp spacer so page/word counts stay elongated centered
+                            Spacer(modifier = Modifier.width(32.dp))
                         }
                     }
                 }
@@ -3011,7 +3009,7 @@ fun InkyModule(
                                         }
                                     }
 
-                                    // Persistent undo/redo/close
+                                    // Persistent undo/redo/close — unified affordance (single icon, long-press for history)
                                     if (activeInkySubpage != "actions_to_undo" && activeInkySubpage != "actions_to_redo") {
                                         LongClickIconButton(
                                             enabled = isUndoEnabled,
@@ -3025,24 +3023,7 @@ fun InkyModule(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                                contentDescription = "Undo",
-                                                tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                            )
-                                        }
-                                        IconButton(
-                                            enabled = isUndoEnabled,
-                                            onClick = {
-                                                customTextToolbar.hide()
-                                                coroutineScope.launch { flushPendingTyping(docBodyText.text) }
-                                                previousInkySubpage = activeInkySubpage
-                                                activeInkySubpage = "actions_to_undo"
-                                            },
-                                            modifier = Modifier.size(28.dp).testTag("btn_undo_history_subpage")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.KeyboardArrowDown,
-                                                contentDescription = "Undo history",
-                                                modifier = Modifier.size(16.dp),
+                                                contentDescription = "Undo (long press for history)",
                                                 tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
                                         }
@@ -3058,7 +3039,7 @@ fun InkyModule(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.Redo,
-                                                contentDescription = "Redo",
+                                                contentDescription = "Redo (long press for history)",
                                                 tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
                                         }
@@ -3128,7 +3109,7 @@ fun InkyModule(
                                         .background(borderStrokeColor.copy(alpha = 0.3f))
                                 )
 
-                                // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close)
+                                // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close) — unified long-press affordance
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -3145,24 +3126,7 @@ fun InkyModule(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                            contentDescription = "Undo",
-                                            tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                                        )
-                                    }
-                                    IconButton(
-                                        enabled = isUndoEnabled,
-                                        onClick = {
-                                            customTextToolbar.hide()
-                                            coroutineScope.launch { flushPendingTyping(docBodyText.text) }
-                                            previousInkySubpage = activeInkySubpage
-                                            activeInkySubpage = "actions_to_undo"
-                                        },
-                                        modifier = Modifier.size(28.dp).testTag("btn_undo_history_ribbon")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                                            contentDescription = "Undo history",
-                                            modifier = Modifier.size(16.dp),
+                                            contentDescription = "Undo (long press for history)",
                                             tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
@@ -3178,7 +3142,7 @@ fun InkyModule(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Redo,
-                                            contentDescription = "Redo",
+                                            contentDescription = "Redo (long press for history)",
                                             tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }

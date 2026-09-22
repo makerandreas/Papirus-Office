@@ -932,13 +932,17 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
-                            // Images
+                            // Images — P0-3: lower-cased fallback so Pictures/ vs pictures/ still resolves
                             nameLower == "draw:image" -> {
                                 val href = parser.getAttributeValue(null, "href")
                                     ?: parser.getAttributeValue("http://www.w3.org/1999/xlink", "href")
                                 if (!href.isNullOrBlank()) {
                                     val imgName = href.substringAfterLast("/")
+                                    val hrefLower = href.lowercase(Locale.ROOT)
+                                    val nameLower2 = imgName.lowercase(Locale.ROOT)
                                     val imgFile = extractedImages[imgName] ?: extractedImages[href]
+                                        ?: extractedImages[nameLower2] ?: extractedImages[hrefLower]
+                                        ?: extractedImages.values.firstOrNull { it.name.equals(imgName, ignoreCase = true) }
                                     elements.add(
                                         OfficeDocumentElement.ImageElement(
                                             imagePath = href,
@@ -962,7 +966,12 @@ class OfficeDocumentParser(private val context: Context) {
                                 if (!embedId.isNullOrBlank()) {
                                     val target = docxRelsMap[embedId] ?: ""
                                     val imgName = target.substringAfterLast("/").ifBlank { embedId }
+                                    val targetLower = target.lowercase(Locale.ROOT)
+                                    val nameLower2 = imgName.lowercase(Locale.ROOT)
+                                    val embedLower = embedId.lowercase(Locale.ROOT)
                                     val imgFile = extractedImages[imgName] ?: extractedImages[target] ?: extractedImages[embedId]
+                                        ?: extractedImages[nameLower2] ?: extractedImages[targetLower] ?: extractedImages[embedLower]
+                                        ?: extractedImages.values.firstOrNull { it.name.equals(imgName, ignoreCase = true) }
                                     elements.add(
                                         OfficeDocumentElement.ImageElement(
                                             imagePath = target.ifBlank { embedId },
