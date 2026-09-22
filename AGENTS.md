@@ -19,6 +19,7 @@ Default static accent colors for Android 11 and below (devices without dynamic c
 ---
 
 ## 🎛️ Key UI Terminologies & Ecosystem
+> This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
 
 ### 1. FCT (Floating Contextual Toolbar)
 A smart contextual menu (`com.example.ui.components.PapirusTextToolbar`) anchored dynamically above/below the active cursor or text selection in the document viewport:
@@ -29,7 +30,7 @@ A smart contextual menu (`com.example.ui.components.PapirusTextToolbar`) anchore
   - *Character Mode*: Character Style, Character Options.
   - *Paragraph Mode*: Paragraph Style, Paragraph Options.
   - *Synonyms Mode*: Contextual thesaurus/dictionary suggestions for selected words.
-  - *AI Options Mode*: Gemini AI integration (Generate Text, Proofread, Translate, Tone Rewrite: *Lucu*, *Profesional*, *Akademis*, *Naratif*).
+  - *AI Options Mode*: Gemini AI integration (Generate Text, Proofread, Translate, Tone Rewrite: *Funny*, *Professional*, *Academic*, *Narrative*).
 
 ### 2. Toolbar Hub
 A horizontally scrollable quick-action formatting bar docked immediately above the virtual keyboard (or viewport bottom in edit mode):
@@ -63,6 +64,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 ---
 
 ## 📱 Application Screens
+> This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
 
 1. **Start Screen (Start Center)**:
    - **Recents**: Chronological document list with preview thumbnail, timestamp, size, pinned status, and module badge.
@@ -86,6 +88,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 ---
 
 ## 🏛️ Papirus Engine & Architecture
+> This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
 
 - **Papirus Engine (`com.makerandreas.papirusoffice.data`)**:
   - Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
@@ -121,6 +124,9 @@ Files in `/tests` are reference sample files for analyzing, development referenc
 
 ## Strings for localization
 When necessary, translate all strings to `en_US` and add to `strings.xml`
+
+## Notice on JNI
+If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
 <!-- antislop:start -->
 ## antislop
