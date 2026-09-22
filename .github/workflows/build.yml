@@ -38,6 +38,8 @@ jobs:
   build:
     name: Build (SemVer & Nightly)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
 
@@ -86,6 +88,55 @@ jobs:
           echo "Calculated Version Name: $VERSION_NAME"
           echo "Calculated Version Code: $VERSION_CODE"
 
+      - name: Prepare nightly release notes (P2-1 — timestamp body)
+        if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
+        run: |
+          DATE_UTC=$(date -u +'%Y-%m-%d %H:%M UTC')
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          cat > /tmp/nightly_body.md <<EOF
+          ### Papirus Office — Nightly Build
+          **Version:** \`$APP_VERSION_NAME\` · **Build #${{ github.run_number }}** · **Date:** $DATE_UTC
+          Commit \`$COMMIT_SHORT\` (\`${{ github.sha }}\`) on \`${{ github.ref_name }}\` · workflow run \`${{ github.run_id }}\`
+
+          Debug APKs for **arm64-v8a** + **armeabi-v7a** only — universal and x86_64 builds are purged (no native libs for that ABI, see \`app/build.gradle.kts\` splits).
+
+          #### Install
+          Download the APK matching your device ABI and install. Nightly auto-replaces the previous \`nightly\` tag — old universal/x86_64 assets are deleted by the purge step below.
+
+          _Generated: $DATE_UTC — next run 02:00 UTC daily._
+          EOF
+          echo "NIGHTLY_BODY_PATH=/tmp/nightly_body.md" >> $GITHUB_ENV
+          cat /tmp/nightly_body.md
+
+      - name: Purge stale nightly assets (P2-1 — remove universal/x86_64)
+        if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          echo "Inspecting existing nightly release assets..."
+          gh release view nightly --json assets --jq '.assets[].name' 2>/dev/null > /tmp/existing_assets.txt || true
+          if [ -s /tmp/existing_assets.txt ]; then
+            echo "Existing assets:"
+            cat /tmp/existing_assets.txt
+            while IFS= read -r asset; do
+              if echo "$asset" | grep -qiE 'universal|x86_64|x86-64|x86'; then
+                echo "→ Purging stale $asset (universal/x86 not in splits)"
+                gh release delete-asset nightly "$asset" --yes || true
+              fi
+            done < /tmp/existing_assets.txt
+            # Also remove previous arm APKs so upload overwrites cleanly
+            while IFS= read -r asset; do
+              if echo "$asset" | grep -qE 'arm64-v8a|armeabi-v7a'; then
+                echo "→ Removing previous $asset for clean overwrite"
+                gh release delete-asset nightly "$asset" --yes || true
+              fi
+            done < /tmp/existing_assets.txt
+          else
+            echo "No existing nightly assets (first run or tag absent)."
+          fi
+          set -e
+
       - name: Decode Keystore and Google Services from Base64
         run: |
           # Mengubah teks Base64 dari Secrets kembali menjadi file biner .jks (jika secret tersedia)
@@ -127,14 +178,17 @@ jobs:
           GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
           GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
-      # Upload HANYA app-debug.apk untuk nightly/commit push
+      # Upload HANYA app-debug.apk untuk nightly/commit push (P2-1 — body + timestamp + purge)
       - name: Drop Papirus Nightly Release (Debug APK Only)
         if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           tag_name: "nightly"
           prerelease: true
-          name: "Papirus Office Nightly Build"
+          name: "Papirus Office Nightly Build ${{ env.APP_VERSION_NAME }}"
+          body_path: /tmp/nightly_body.md
+          fail_on_unmatched_files: false
+          generate_release_notes: false
           files: |
             app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
             app/build/outputs/apk/debug/app-armeabi-v7a-debug.apk

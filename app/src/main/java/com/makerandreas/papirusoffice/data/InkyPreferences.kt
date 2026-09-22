@@ -29,7 +29,9 @@ data class InkyViewOptions(
     val includeSubLevelsFold: Boolean = true,
     val enableSmoothScrolling: Boolean = true,
     val zoomMode: ZoomMode = ZoomMode.HUNDRED,
-    val customZoomPercent: Int = 100
+    val customZoomPercent: Int = 100,
+    // P2-2: Navigator language policy — true = follow app locale (English app → English Navigator), false = follow document evidence (legacy)
+    val navigatorFollowAppLocale: Boolean = true
 )
 
 val Context.inkyDataStore: DataStore<Preferences> by preferencesDataStore(name = "inky_preferences")
@@ -51,6 +53,7 @@ class InkyPreferencesRepository(private val context: Context) {
         val KEY_ENABLE_SMOOTH_SCROLLING = booleanPreferencesKey("enable_smooth_scrolling")
         val KEY_ZOOM_MODE = stringPreferencesKey("zoom_mode")
         val KEY_CUSTOM_ZOOM_PERCENT = intPreferencesKey("custom_zoom_percent")
+        val KEY_NAVIGATOR_FOLLOW_APP = booleanPreferencesKey("navigator_follow_app_locale")
     }
 
     val viewOptionsFlow: Flow<InkyViewOptions> = context.inkyDataStore.data
@@ -74,7 +77,8 @@ class InkyPreferencesRepository(private val context: Context) {
                 } catch (e: Exception) {
                     ZoomMode.HUNDRED
                 },
-                customZoomPercent = preferences[KEY_CUSTOM_ZOOM_PERCENT] ?: 100
+                customZoomPercent = preferences[KEY_CUSTOM_ZOOM_PERCENT] ?: 100,
+                navigatorFollowAppLocale = preferences[KEY_NAVIGATOR_FOLLOW_APP] ?: true
             )
         }
 
@@ -136,5 +140,9 @@ class InkyPreferencesRepository(private val context: Context) {
 
     suspend fun updateCustomZoomPercent(percent: Int) {
         context.inkyDataStore.edit { preferences -> preferences[KEY_CUSTOM_ZOOM_PERCENT] = percent }
+    }
+
+    suspend fun updateNavigatorFollowAppLocale(followApp: Boolean) {
+        context.inkyDataStore.edit { preferences -> preferences[KEY_NAVIGATOR_FOLLOW_APP] = followApp }
     }
 }

@@ -157,6 +157,10 @@
     <string name="status_unsaved">Unsaved changes</string>
     <string name="status_saving">Saving...</string>
     <string name="status_save_failed">Save failed</string>
+    <!-- Viewer elongated status bar (P1-1) — en_US master; translate via values-id etc. -->
+    <string name="viewer_status_page_single">Page %1$d of %2$d</string>
+    <string name="viewer_status_page_range">Page %1$d–%2$d of %3$d</string>
+    <string name="viewer_status_words_chars">%1$d words, %2$d chars</string>
 
     <!-- Full-page Loading Popup & Saving Dialog -->
     <string name="discard">Discard</string>

@@ -91,15 +91,22 @@ class NavigatorStringCatalogTest {
             ),
             resources = OfficeResources(objects = listOf(""))
         )
+        // P2-2: default = follow app locale (en on CI) → English auto-names, but Judul1 still indexed as heading
         val index = DocumentIndexEngine(doc).reindex()
         val headings = flattenHeadings(index.headings)
         assertEquals(1, headings.size)
         assertEquals("Pendahuluan", headings[0].title)
         assertEquals(1, headings[0].outlineLevel)
-        assertEquals("Tabel1", index.tables[0].tableName)
-        assertEquals("Gambar1", index.images[0].imageName)
-        assertEquals("Bentuk1", index.shapes[0].shapeName)
-        assertEquals("Objek1", index.oleObjects[0].oleName)
+        assertEquals("Table1", index.tables[0].tableName)
+        assertEquals("Image1", index.images[0].imageName)
+        assertEquals("Shape1", index.shapes[0].shapeName)
+        assertEquals("Object1", index.oleObjects[0].oleName)
+        // Legacy \"Follow document\" mode still yields Indonesian via evidence when explicitly requested
+        val legacyIndex = DocumentIndexEngine(doc, preferAppLocale = false).reindex()
+        assertEquals("Tabel1", legacyIndex.tables[0].tableName)
+        assertEquals("Gambar1", legacyIndex.images[0].imageName)
+        assertEquals("Bentuk1", legacyIndex.shapes[0].shapeName)
+        assertEquals("Objek1", legacyIndex.oleObjects[0].oleName)
     }
 
     @Test
@@ -143,11 +150,23 @@ class NavigatorStringCatalogTest {
                 )
             )
         )
+        // detect (document-evidence mode) still maps id-ID → id pack
         assertEquals("id", NavigatorStringCatalog.detect(doc).languageTag)
-        val index = DocumentIndexEngine(doc).reindex()
-        assertEquals("Judul 2", flattenHeadings(index.headings)[0].title)
-        assertEquals("Tabel1", index.tables[0].tableName)
-        assertEquals("Gambar1", index.images[0].imageName)
+        // Default follow-app (en on CI) → English auto-names even when doc language is id
+        val indexAppEn = DocumentIndexEngine(doc).reindex()
+        assertEquals("Heading 2", flattenHeadings(indexAppEn.headings)[0].title)
+        assertEquals("Table1", indexAppEn.tables[0].tableName)
+        assertEquals("Image1", indexAppEn.images[0].imageName)
+        // When app locale is Indonesian, auto-names are Indonesian
+        val indexAppId = DocumentIndexEngine(doc, appLanguageTag = "id").reindex()
+        assertEquals("Judul 2", flattenHeadings(indexAppId.headings)[0].title)
+        assertEquals("Tabel1", indexAppId.tables[0].tableName)
+        assertEquals("Gambar1", indexAppId.images[0].imageName)
+        // Legacy follow-document mode also yields Indonesian via detect
+        val legacyIndex = DocumentIndexEngine(doc, preferAppLocale = false).reindex()
+        assertEquals("Judul 2", flattenHeadings(legacyIndex.headings)[0].title)
+        assertEquals("Tabel1", legacyIndex.tables[0].tableName)
+        assertEquals("Gambar1", legacyIndex.images[0].imageName)
     }
 
     @Test

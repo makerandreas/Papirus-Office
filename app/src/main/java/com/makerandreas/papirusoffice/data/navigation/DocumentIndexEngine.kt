@@ -24,7 +24,11 @@ class DocumentIndexEngine(
     var document: OfficeDocument = OfficeDocument(),
     var headingFoldStates: Map<String, Boolean> = emptyMap(),
     var objectVisibilities: Map<String, VisibilityState> = emptyMap(),
-    var layoutPageMap: Map<Int, Int> = emptyMap()
+    var layoutPageMap: Map<Int, Int> = emptyMap(),
+    /** P2-2: When true (default), Navigator prefixes follow the app locale — e.g. English app shows \"Table1\" even for an Indonesian `Judul1` document. Recognition via [NavigatorStringCatalog.headingLevelFromStyleName] stays agnostic. */
+    var preferAppLocale: Boolean = true,
+    /** Override tag for tests / DataStore-driven setting; null → Locale.getDefault().language */
+    var appLanguageTag: String? = null
 ) : XBookmarksSupplier,
     XTextTablesSupplier,
     XTextGraphicObjectsSupplier,
@@ -73,7 +77,7 @@ class DocumentIndexEngine(
         var shapeCounter = 1
 
         val rawElements = flattenDocumentElements(document)
-        val locale = NavigatorStringCatalog.detect(document)
+        val locale = NavigatorStringCatalog.resolveNavigatorLocale(document, preferAppLocale, appLanguageTag)
 
         fun pageFor(elemIndex: Int): Int = layoutPageMap[elemIndex] ?: currentPages
         fun storedOrAuto(stored: String?, kind: NavigatorObjectKind, index: Int): String {

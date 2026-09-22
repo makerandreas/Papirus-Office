@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.ai.GeminiAiService
 import com.example.ui.theme.ThemeSettings
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.res.stringResource
 import com.example.R
@@ -452,10 +453,13 @@ fun PapirusOfficeOptionsScreen(
                                 )
                             }
                             "appearance" -> {
-                                DynamicColorSettingCard(
-                                    context = context,
-                                    onDynamicColorChange = onDynamicColorChange
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    DynamicColorSettingCard(
+                                        context = context,
+                                        onDynamicColorChange = onDynamicColorChange
+                                    )
+                                    NavigatorLanguageSettingCard(context = context)
+                                }
                             }
                             "security" -> {
                                 SecuritySettingCard(context = context)
@@ -809,6 +813,54 @@ private fun SecuritySettingCard(context: Context) {
                         Toast.makeText(context, "Macro warning updated", Toast.LENGTH_SHORT).show()
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavigatorLanguageSettingCard(context: Context) {
+    val prefs = remember { com.makerandreas.papirusoffice.data.InkyPreferencesRepository(context) }
+    val viewOptions by prefs.viewOptionsFlow.collectAsState(initial = com.makerandreas.papirusoffice.data.InkyViewOptions())
+    val scope = rememberCoroutineScope()
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Navigator Language",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Choose whether Navigator labels (Table, Image…) follow the app language or the document language. Headings like Judul1 are always recognized.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            // Segmented control: Follow app language vs Follow document
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                val options = listOf(true to "App language", false to "Document")
+                options.forEachIndexed { index, (followApp, label) ->
+                    SegmentedButton(
+                        selected = viewOptions.navigatorFollowAppLocale == followApp,
+                        onClick = {
+                            scope.launch { prefs.updateNavigatorFollowAppLocale(followApp) }
+                            Toast.makeText(
+                                context,
+                                if (followApp) "Navigator: Follow app language" else "Navigator: Follow document language",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
+                    ) {
+                        Text(label, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
         }
     }

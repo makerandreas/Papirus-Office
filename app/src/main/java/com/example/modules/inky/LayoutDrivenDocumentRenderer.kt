@@ -325,9 +325,13 @@ private fun RenderImage(
     extractedImages: Map<String, File>,
     zoomScale: Float
 ) {
+    val lower = imagePath.lowercase(java.util.Locale.ROOT)
+    val fileNameLower = imagePath.substringAfterLast('/').lowercase(java.util.Locale.ROOT)
     val resolved = imageFile?.takeIf { it.exists() }
         ?: extractedImages[imagePath]
+        ?: extractedImages[lower]
         ?: extractedImages[imagePath.substringAfterLast('/')]
+        ?: extractedImages[fileNameLower]
         ?: extractedImages.values.firstOrNull { it.name.equals(imagePath.substringAfterLast('/'), ignoreCase = true) }
     Box(
         modifier = Modifier
