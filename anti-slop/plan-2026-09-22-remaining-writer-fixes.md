@@ -1,6 +1,7 @@
 # Papirus Office: Plan for the remaining audit-003 items (P0-1, P0-2, P1-3, P1-4)
 
-**Date:** 2026-09-22 (pre-change gate for the four open items; no code mutated in this pass)
+**Date:** 2026-09-22 (pre-change gate for the four open items)
+**Status:** PR A (P0-2) is up as #7 on `arena/01a0c97e-papirus-office`, CI green (Unit Tests + Build, run 35742199462); it also carries the D3 unit-scale fix, D4 engine injection, and the first half of D1 (card aspect from page box). The D2 `contains("b")` bold bug stays deferred into PR C unless a hotfix is requested. PR B (P0-1 + P1-3, hyphenation default-off) and PR C (P1-4) follow #7 review/merge. Approved calls on record: 3-PR order; `partitionTextToPages` kept as test stub in PR B; hyphenation wired in PR B, default off; antislop applied during (Mode 1).
 **Branch:** `arena/01a0c97e-papirus-office`
 **Depends on:** `anti-slop/audit-003-2026-09-22.md`, merged PR #5 (CI + `OdtSampleHeadingTest`), merged PR #6 (P1-1, P1-2, P2-1, P2-2, P0-3)
 **Constraint:** no JDK in this sandbox (verified: `java` not found). All compile/test evidence comes from CI through `gh` (GitHub API approach, per `AGENTS.md` JNI notice).
