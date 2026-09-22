@@ -597,17 +597,11 @@ class OdfFrameContext(
         }
     }
 
+    // Frames and the page box share one length scale (layout units at
+    // 96/inch) so declared image sizes compare against page width correctly.
     private fun parseDimensionToDp(dimStr: String?): Float {
         if (dimStr.isNullOrBlank()) return 100f
-        val clean = dimStr.lowercase(Locale.ROOT).trim()
-        val num = clean.replace(Regex("[^0-9.]"), "").toFloatOrNull() ?: 100f
-        return when {
-            clean.endsWith("in") -> num * 160f
-            clean.endsWith("cm") -> num * 37.795f
-            clean.endsWith("mm") -> num * 3.7795f
-            clean.endsWith("pt") -> num * 1.333f
-            else -> num
-        }
+        return com.makerandreas.papirusoffice.data.util.OdfLength.toLayoutUnits(dimStr, fallback = 100f)
     }
 }
 

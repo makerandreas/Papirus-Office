@@ -90,7 +90,18 @@ object StyleResolver {
 // PHASE 7: Layout Engine & Incremental Layout
 // ==========================================
 
-class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeightDp: Float = 1056f) {
+/**
+ * Sole paginator for Viewer and Editor. Works in the PageStyleSpec unit space
+ * (layout units at 96/inch); the default spec reproduces the historical
+ * Letter box for documents that declare no page geometry.
+ */
+class LayoutEngine(private val pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK) {
+    private val pageWidthDp: Float = pageSpec.widthDp
+    private val pageHeightDp: Float = pageSpec.heightDp
+
+    // Vertical rhythm between stacked elements on the page flow.
+    private val elementGapDp: Float = 12f
+
     // Cache map for Incremental Layout: paragraph index to its paragraph layout
     private val paragraphLayoutCache = mutableMapOf<Int, ParagraphLayout>()
 
@@ -144,7 +155,7 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         var currentLineWidth = 0f
         var startCharOffset = 0
 
-        val maxLineWidth = (pageWidthDp - 80f).coerceAtLeast(120f)
+        val maxLineWidth = pageSpec.contentWidthDp
 
         for (word in words) {
             val spaceText = if (currentLineText.isNotEmpty()) " " else ""
@@ -197,9 +208,9 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
         val layout = ParagraphLayout(
             paragraphIndex = paragraphIndex,
             lines = lines,
-            width = pageWidthDp - 80f, // minus margin
+            width = maxLineWidth,
             height = max(totalHeight, getPaintTextSize() * 1.5f),
-            boundingBox = OfficeRect(0f, 0f, pageWidthDp - 80f, totalHeight)
+            boundingBox = OfficeRect(0f, 0f, maxLineWidth, totalHeight)
         )
 
         paragraphLayoutCache[paragraphIndex] = layout
@@ -223,16 +234,15 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
 
         val pages = mutableListOf<PageLayout>()
         var currentPageElements = mutableListOf<PageElementLayout>()
-        var currentY = 50f // top margin
-        val marginX = 40f
-        val maxUsableHeight = pageHeightDp - 60f // reserve space for headers/footers
+        var currentY = pageSpec.marginTopDp
+        val maxUsableHeight = pageSpec.contentBottomDp
         val elementPageIndex = mutableMapOf<Int, Int>()
 
         fun flushPage() {
             if (currentPageElements.isNotEmpty()) {
                 pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
                 currentPageElements = mutableListOf()
-                currentY = 50f
+                currentY = pageSpec.marginTopDp
             }
         }
 
@@ -242,20 +252,22 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
             }
         }
 
-        fun place(index: Int, element: OfficeElement, height: Float, width: Float = pageWidthDp - marginX * 2f, paragraphLayout: ParagraphLayout? = null) {
+        fun place(index: Int, element: OfficeElement, height: Float, width: Float = pageSpec.contentWidthDp, paragraphLayout: ParagraphLayout? = null) {
             val h = height.coerceAtLeast(8f)
             ensureRoom(h)
             val pageNumber = pages.size + 1
             elementPageIndex[index] = pageNumber
+            val left = pageSpec.marginStartDp
+            val placedWidth = width.coerceAtMost(pageSpec.contentWidthDp)
             currentPageElements.add(
                 PageElementLayout(
                     element = element,
                     paragraphLayout = paragraphLayout,
-                    bounds = OfficeRect(marginX, currentY, marginX + width, currentY + h),
+                    bounds = OfficeRect(left, currentY, left + placedWidth, currentY + h),
                     elementIndex = index
                 )
             )
-            currentY += h + 12f
+            currentY += h + elementGapDp
         }
 
         val rawElements = document.body.elements
@@ -311,12 +323,12 @@ class LayoutEngine(private val pageWidthDp: Float = 816f, private val pageHeight
                 }
                 is OfficeImage -> {
                     val imgHeight = if (element.heightDp > 0) element.heightDp else 180f
-                    val imgWidth = if (element.widthDp > 0) element.widthDp else (pageWidthDp - marginX * 2f)
+                    val imgWidth = if (element.widthDp > 0) element.widthDp else pageSpec.contentWidthDp
                     place(index, element, imgHeight, imgWidth)
                 }
                 is OfficeDocElement.ImageElement -> {
                     val imgHeight = if (element.image.heightDp > 0) element.image.heightDp else 180f
-                    val imgWidth = if (element.image.widthDp > 0) element.image.widthDp else (pageWidthDp - marginX * 2f)
+                    val imgWidth = if (element.image.widthDp > 0) element.image.widthDp else pageSpec.contentWidthDp
                     place(index, element, imgHeight, imgWidth)
                 }
                 else -> {
