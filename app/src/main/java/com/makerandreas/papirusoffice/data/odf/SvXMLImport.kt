@@ -4,8 +4,10 @@ import android.content.Context
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
+import com.makerandreas.papirusoffice.data.PageStyleSpec
 import com.makerandreas.papirusoffice.data.ParagraphStyle
 import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
+import com.makerandreas.papirusoffice.data.util.OdfLength
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
@@ -52,6 +54,10 @@ class SvXMLImport(
     private val contextStack = ArrayDeque<SvXMLImportContext>()
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
     private val styleMap = mutableMapOf<String, OdfStyleInfo>()
+    private val pageLayouts = LinkedHashMap<String, PageStyleSpec>()
+    private var pageSpecFromDefaultStyle: PageStyleSpec? = null
+    private var standardPageLayoutName: String? = null
+    private var firstMasterPageLayoutName: String? = null
 
     val elements: List<OfficeDocumentElement> get() = parsedElements
 
@@ -61,6 +67,8 @@ class SvXMLImport(
 
     fun parseOdfStyles(xml: String?) {
         if (xml.isNullOrBlank()) return
+        var pendingPageLayoutName: String? = null
+        var capturingDefaultPageStyle = false
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -70,25 +78,57 @@ class SvXMLImport(
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 if (eventType == XmlPullParser.START_TAG) {
                     val rawTagName = parser.name ?: ""
-                    if (rawTagName == "style" || rawTagName.endsWith(":style")) {
-                        val attrs = attrIndex(parser)
-                        val name = attrs["name"]
-                        val family = attrs["family"] ?: "paragraph"
-                        val parent = attrs["parent-style-name"]
-                        val disp = attrs["display-name"]
-                        val outline = attrs["default-outline-level"]
+                    val localName = rawTagName.substringAfterLast(':')
+                    // Attribute maps are built only for the handful of style-bearing
+                    // tags; content.xml would otherwise pay this cost per element.
+                    val attrs = when (localName) {
+                        "style", "page-layout", "default-style", "page-layout-properties", "master-page" -> attrIndex(parser)
+                        else -> emptyMap()
+                    }
+                    when (localName) {
+                        "style" -> {
+                            val name = attrs["name"]
+                            val family = attrs["family"] ?: "paragraph"
+                            val parent = attrs["parent-style-name"]
+                            val disp = attrs["display-name"]
+                            val outline = attrs["default-outline-level"]
 
-                        if (!name.isNullOrBlank()) {
-                            val info = OdfStyleInfo(
-                                name = name,
-                                family = family,
-                                parentName = parent,
-                                displayName = disp,
-                                outlineLevel = outline?.toIntOrNull()
-                            )
-                            styleMap[name] = info
-                            styleMap[name.lowercase(Locale.ROOT)] = info
+                            if (!name.isNullOrBlank()) {
+                                val info = OdfStyleInfo(
+                                    name = name,
+                                    family = family,
+                                    parentName = parent,
+                                    displayName = disp,
+                                    outlineLevel = outline?.toIntOrNull()
+                                )
+                                styleMap[name] = info
+                                styleMap[name.lowercase(Locale.ROOT)] = info
+                            }
                         }
+                        "page-layout" -> pendingPageLayoutName = attrs["name"]?.takeIf { it.isNotBlank() }
+                        "default-style" -> capturingDefaultPageStyle = attrs["family"].equals("page", ignoreCase = true)
+                        "page-layout-properties" -> {
+                            val spec = buildPageLayoutSpec(attrs)
+                            val pendingName = pendingPageLayoutName
+                            when {
+                                spec != null && pendingName != null -> pageLayouts[pendingName] = spec.copy(name = pendingName)
+                                spec != null && capturingDefaultPageStyle -> pageSpecFromDefaultStyle = spec
+                            }
+                        }
+                        "master-page" -> {
+                            val layoutName = attrs["page-layout-name"]?.takeIf { it.isNotBlank() }
+                            if (layoutName != null) {
+                                if (firstMasterPageLayoutName == null) firstMasterPageLayoutName = layoutName
+                                if (attrs["name"].equals("Standard", ignoreCase = true)) {
+                                    standardPageLayoutName = layoutName
+                                }
+                            }
+                        }
+                    }
+                } else if (eventType == XmlPullParser.END_TAG) {
+                    when ((parser.name ?: "").substringAfterLast(':')) {
+                        "page-layout" -> pendingPageLayoutName = null
+                        "default-style" -> capturingDefaultPageStyle = false
                     }
                 }
                 eventType = parser.next()
@@ -96,6 +136,27 @@ class SvXMLImport(
         } catch (e: Exception) {
             // graceful fallback
         }
+    }
+
+    // ODF page lengths are absolute (Part 1 §2.4). When print-orientation
+    // declares landscape but the box is still portrait, only the box is
+    // swapped; LibreOffice writes pre-swapped dimensions, so margins stay as
+    // authored and this is the rare corrective path.
+    private fun buildPageLayoutSpec(attrs: Map<String, String>): PageStyleSpec? {
+        val width = OdfLength.toLayoutUnits(attrs["page-width"])
+        val height = OdfLength.toLayoutUnits(attrs["page-height"])
+        if (width <= 0f || height <= 0f) return null
+        val landscape = attrs["print-orientation"].equals("landscape", ignoreCase = true)
+        val swap = landscape && width < height
+        return PageStyleSpec(
+            widthDp = if (swap) height else width,
+            heightDp = if (swap) width else height,
+            marginTopDp = OdfLength.toLayoutUnits(attrs["margin-top"]),
+            marginBottomDp = OdfLength.toLayoutUnits(attrs["margin-bottom"]),
+            marginStartDp = OdfLength.toLayoutUnits(attrs["margin-left"]),
+            marginEndDp = OdfLength.toLayoutUnits(attrs["margin-right"]),
+            landscape = landscape
+        )
     }
 
     fun resolveHeadingLevel(styleName: String?): Int? {
@@ -140,7 +201,15 @@ class SvXMLImport(
                 ParagraphStyle(name = info.name, parentStyleName = info.parentName)
             )
         }
-        return DocumentStyles(paragraphStyles = paragraphs)
+        val defaultPage = (standardPageLayoutName ?: firstMasterPageLayoutName)
+            ?.let { pageLayouts[it] }
+            ?: pageLayouts.values.firstOrNull()
+            ?: pageSpecFromDefaultStyle
+        return DocumentStyles(
+            paragraphStyles = paragraphs,
+            pageStyles = pageLayouts.toMap(),
+            defaultPageStyle = defaultPage
+        )
     }
 
     /**
@@ -157,6 +226,10 @@ class SvXMLImport(
         parsedElements.clear()
         contextStack.clear()
         styleMap.clear()
+        pageLayouts.clear()
+        pageSpecFromDefaultStyle = null
+        standardPageLayoutName = null
+        firstMasterPageLayoutName = null
 
         // Preload style hierarchies from styles.xml and content.xml automatic-styles
         if (!stylesXmlContent.isNullOrBlank()) {

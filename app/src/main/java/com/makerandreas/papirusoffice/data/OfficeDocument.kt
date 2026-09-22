@@ -201,7 +201,9 @@ data class OfficeRect(
 // ==========================================
 data class DocumentStyles(
     val paragraphStyles: Map<String, ParagraphStyle> = emptyMap(),
-    val characterStyles: Map<String, CharacterStyle> = emptyMap()
+    val characterStyles: Map<String, CharacterStyle> = emptyMap(),
+    val pageStyles: Map<String, PageStyleSpec> = emptyMap(),
+    val defaultPageStyle: PageStyleSpec? = null
 )
 
 data class ParagraphStyle(
@@ -226,6 +228,35 @@ data class CharacterStyle(
     val fontFamily: String? = null,
     val parentStyleName: String? = null
 )
+
+/**
+ * Page box (size + margins) declared by the document: ODF
+ * `style:page-layout`/`fo:margin-*`, or OOXML `w:pgSz`/`w:pgMar`. Values are
+ * layout units at 96 per inch, the space LayoutEngine paginates in. The
+ * fallback mirrors the engine's historical Letter box (50 top, 60 bottom,
+ * 40 side) so documents declaring no geometry paginate as before.
+ */
+data class PageStyleSpec(
+    val name: String = "fallback",
+    val widthDp: Float = 816f,
+    val heightDp: Float = 1056f,
+    val marginTopDp: Float = 50f,
+    val marginBottomDp: Float = 60f,
+    val marginStartDp: Float = 40f,
+    val marginEndDp: Float = 40f,
+    val landscape: Boolean = false
+) {
+    val contentWidthDp: Float
+        get() = (widthDp - marginStartDp - marginEndDp).coerceAtLeast(MIN_CONTENT_DIMENSION_DP)
+
+    val contentBottomDp: Float
+        get() = (heightDp - marginBottomDp).coerceAtLeast(marginTopDp + MIN_CONTENT_DIMENSION_DP)
+
+    companion object {
+        const val MIN_CONTENT_DIMENSION_DP = 120f
+        val FALLBACK = PageStyleSpec()
+    }
+}
 
 // ==========================================
 // LAYER 5: Resource Manager

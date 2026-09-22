@@ -503,7 +503,11 @@ fun InkyModule(
 
     val outlineEngine = remember { com.makerandreas.papirusoffice.data.OutlineEngineImpl() }
     val reminderManager = remember { com.makerandreas.papirusoffice.data.ReminderManager() }
-    val layoutEngine = remember { com.makerandreas.papirusoffice.data.LayoutEngine() }
+    val documentPageSpec = remember(currentSessionState?.document) {
+        currentSessionState?.document?.styles?.defaultPageStyle
+            ?: com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK
+    }
+    val layoutEngine = remember(documentPageSpec) { com.makerandreas.papirusoffice.data.LayoutEngine(documentPageSpec) }
 
     val activeLayoutDocument = remember(currentSessionState?.document, docBodyText.text, docTitle) {
         val base = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -2264,6 +2268,7 @@ fun InkyModule(
                             showTables = true,
                             layoutResult = documentLayout,
                             extractedImages = docxImages,
+                            pageSpec = documentPageSpec,
                             textColor = textPrimaryColor,
                             modifier = Modifier.fillMaxWidth()
                         )

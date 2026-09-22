@@ -35,11 +35,12 @@ fun LayoutDrivenDocumentRenderer(
     showTables: Boolean = true,
     layoutResult: DocumentLayoutResult? = null,
     extractedImages: Map<String, File> = emptyMap(),
+    pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK,
     textColor: Color = Color.Black,
     modifier: Modifier = Modifier
 ) {
     var layoutTrigger by remember { mutableStateOf(0) }
-    val layoutEngine = remember { LayoutEngine() }
+    val layoutEngine = remember(pageSpec) { LayoutEngine(pageSpec) }
     val computed = remember(document, layoutTrigger, showImages, showTables, enableOutlineFolding, layoutResult) {
         layoutResult ?: layoutEngine.performLayout(
             document = document,
@@ -70,10 +71,19 @@ fun LayoutDrivenDocumentRenderer(
         }
 
         computed.pages.forEachIndexed { pageIdx, page ->
+            // Page card aspect follows the laid-out page box; the historical
+            // 320x452 card is kept while pages sit at the Letter fallback.
+            val cardWidthDp = 320f * zoomScale
+            val isFallbackBox = page.widthDp == PageStyleSpec.FALLBACK.widthDp &&
+                page.heightDp == PageStyleSpec.FALLBACK.heightDp
+            val cardHeightDp = when {
+                page.widthDp <= 0f || page.heightDp <= 0f || isFallbackBox -> 452f * zoomScale
+                else -> cardWidthDp * (page.heightDp / page.widthDp)
+            }
             Box(
                 modifier = Modifier
-                    .width((320 * zoomScale).dp)
-                    .height((452 * zoomScale).dp)
+                    .width(cardWidthDp.dp)
+                    .height(cardHeightDp.dp)
                     .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
                     .background(Color.White)

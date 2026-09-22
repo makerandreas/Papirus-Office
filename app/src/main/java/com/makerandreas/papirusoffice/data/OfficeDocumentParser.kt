@@ -135,6 +135,43 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
+    /**
+     * Page box for the last <w:sectPr> in WordprocessingML. OOXML measures in
+     * twips at 1440 per inch; converted to the LayoutEngine unit space of
+     * 96/inch. Word applies 1in margins when <w:pgMar> is absent. Returns
+     * null when no page size is declared, keeping the Letter fallback.
+     */
+    private fun extractDocxPageStyleSpec(documentXml: String): PageStyleSpec? {
+        val lastSection = Regex("<w:sectPr\\b[^>]*>.*?</w:sectPr>", RegexOption.DOT_MATCHES_ALL)
+            .findAll(documentXml).lastOrNull()?.value ?: return null
+        val pgSz = Regex("<w:pgSz\\b[^>]*/?>").find(lastSection)?.value ?: return null
+        val widthTwips = Regex("w:w=\"(\\d+)\"").find(pgSz)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        val heightTwips = Regex("w:h=\"(\\d+)\"").find(pgSz)?.groupValues?.get(1)?.toIntOrNull() ?: return null
+        val landscape = Regex("w:orient=\"landscape\"", RegexOption.IGNORE_CASE).containsMatchIn(pgSz)
+        val widthUnits = com.makerandreas.papirusoffice.data.util.OdfLength.twipsToLayoutUnits(widthTwips)
+        val heightUnits = com.makerandreas.papirusoffice.data.util.OdfLength.twipsToLayoutUnits(heightTwips)
+        val swap = landscape && widthUnits < heightUnits
+
+        val pgMar = Regex("<w:pgMar\\b[^>]*/?>").find(lastSection)?.value
+        fun margin(name: String): Float {
+            val twips = pgMar
+                ?.let { Regex("w:$name=\"(-?\\d+)\"").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                ?: 1440
+            return com.makerandreas.papirusoffice.data.util.OdfLength.twipsToLayoutUnits(twips)
+        }
+
+        return PageStyleSpec(
+            name = "docx-sectPr",
+            widthDp = if (swap) heightUnits else widthUnits,
+            heightDp = if (swap) widthUnits else heightUnits,
+            marginTopDp = margin("top"),
+            marginBottomDp = margin("bottom"),
+            marginStartDp = margin("left"),
+            marginEndDp = margin("right"),
+            landscape = landscape
+        )
+    }
+
     private fun extractOdtStylesXml(file: File): String? {
         if (!file.exists() || (!file.name.endsWith(".odt", ignoreCase = true) && !file.name.endsWith(".ott", ignoreCase = true))) return null
         try {
@@ -1139,7 +1176,8 @@ class OfficeDocumentParser(private val context: Context) {
                         name = meta.name,
                         parentStyleName = meta.basedOn
                     )
-                }
+                },
+                defaultPageStyle = extractDocxPageStyleSpec(xmlContent)
             )
         } else DocumentStyles()
         val parsedDoc = OfficeParsedDocument(
