@@ -16,11 +16,8 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
-      PR_NUMBER: ${{ github.event.number }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -45,7 +42,7 @@ jobs:
             set +o pipefail
             echo "Gradle failed with exit $code (temporary debug step)"
             free -m | head -3 | while IFS= read -r line; do echo "::error::MEM $line"; done
-            (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory|oom" | tail -5 | while IFS= read -r line; do
+            (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory" | tail -3 | cut -c1-1800 | while IFS= read -r line; do
               echo "::error::OOM $line"
             done
             echo "::error::GRADLE_EXIT=$code"
@@ -55,18 +52,11 @@ jobs:
               echo "=== ERRORS ==="
               grep -n -B3 -A15 -E "^e: |error:|FAILED|What went wrong|^Caused by" /tmp/gradle_test.log | head -250
             } > /tmp/diag_test.txt
-            base64 -w0 /tmp/diag_test.txt | fold -w 40000 | while IFS= read -r chunk; do
-              echo "::error::DIAG $chunk"
+            n=0
+            base64 -w0 /tmp/diag_test.txt | fold -w 1800 | while IFS= read -r chunk; do
+              n=$((n + 1))
+              echo "::error::DIAG-$n $chunk"
             done
-            if [ -n "$GITHUB_TOKEN" ] && [ -n "$PR_NUMBER" ]; then
-              head -c 20000 /tmp/diag_test.txt > /tmp/diag_post.txt
-              jq -n --rawfile f /tmp/diag_post.txt \
-                '{body: ("Unit Tests gradle diagnostic (temporary debug step, will be removed):\n```\n" + $f + "\n```")}' > /tmp/diag_payload.json
-              curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                --data @/tmp/diag_payload.json \
-                "https://api.github.com/repos/makerandreas/Papirus-Office/issues/$PR_NUMBER/comments" || true
-            fi
             exit 1
           fi
 
@@ -197,7 +187,7 @@ jobs:
             set +o pipefail
             echo "Gradle failed with exit $code (temporary debug step)"
             free -m | head -3 | while IFS= read -r line; do echo "::error::MEM $line"; done
-            (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory|oom" | tail -5 | while IFS= read -r line; do
+            (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory" | tail -3 | cut -c1-1800 | while IFS= read -r line; do
               echo "::error::OOM $line"
             done
             echo "::error::GRADLE_EXIT=$code"
@@ -207,8 +197,10 @@ jobs:
               echo "=== ERRORS ==="
               grep -n -B3 -A15 -E "^e: |error:|FAILED|What went wrong|^Caused by" /tmp/gradle_build.log | head -250
             } > /tmp/diag_build.txt
-            base64 -w0 /tmp/diag_build.txt | fold -w 40000 | while IFS= read -r chunk; do
-              echo "::error::DIAG $chunk"
+            n=0
+            base64 -w0 /tmp/diag_build.txt | fold -w 1800 | while IFS= read -r chunk; do
+              n=$((n + 1))
+              echo "::error::DIAG-$n $chunk"
             done
             exit 1
           fi
