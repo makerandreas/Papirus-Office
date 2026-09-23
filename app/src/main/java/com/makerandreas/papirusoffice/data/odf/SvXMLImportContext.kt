@@ -293,15 +293,13 @@ class OdfSpanContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         val text = spanTextBuilder.toString()
-        val isBold = styleName.contains("bold", ignoreCase = true) || styleName.contains("b", ignoreCase = true)
-        val isItalic = styleName.contains("italic", ignoreCase = true) || styleName.contains("i", ignoreCase = true)
-        val isUnderline = styleName.contains("underline", ignoreCase = true) || styleName.contains("u", ignoreCase = true)
-        
+        val format = importFilter.resolveSpanFormatting(styleName)
         val run = TextRun(
             text = text,
-            isBold = isBold,
-            isItalic = isItalic,
-            isUnderline = isUnderline
+            isBold = format.isBold,
+            isItalic = format.isItalic,
+            isUnderline = format.isUnderline,
+            styleName = styleName.takeIf { it.isNotBlank() }
         )
         onSpanParsed(text, run)
     }

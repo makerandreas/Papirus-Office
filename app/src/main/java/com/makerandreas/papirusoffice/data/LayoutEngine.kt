@@ -63,7 +63,7 @@ object StyleResolver {
         val style = styles.paragraphStyles[styleName]
         if (style != null) return style
 
-        // Fallback cascades — heading tokens cover Heading / Judul / Titre / …
+        // 24/20/16 only if the named style is absent. Mapped file sizes win.
         val headingLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleName)
         return when {
             headingLevel == 1 -> ParagraphStyle(styleName, fontSizeSp = 24f, isBold = true)

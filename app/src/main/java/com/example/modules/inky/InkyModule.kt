@@ -643,6 +643,54 @@ fun InkyModule(
     // Text formatting state
     var activeFontFamily by remember { mutableStateOf("Liberation Serif") }
     var activeFontSize by remember { mutableStateOf(12) }
+
+    LaunchedEffect(docBodyText.selection, activeLayoutDocument) {
+        val elements = activeLayoutDocument.body.elements
+        if (elements.isEmpty()) return@LaunchedEffect
+        val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
+        val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
+        val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
+        val element = hit?.let { elements.getOrNull(it.elementIndex) }
+            ?: elements.getOrNull(layoutCursor.elementIndex)
+        val paragraph = when (element) {
+            is com.makerandreas.papirusoffice.data.OfficeParagraph -> element
+            is com.makerandreas.papirusoffice.data.OfficeHeading -> com.makerandreas.papirusoffice.data.OfficeParagraph(
+                text = element.text,
+                styleName = element.styleName ?: "Heading ${element.level}",
+                runs = element.runs
+            )
+            is com.makerandreas.papirusoffice.data.OfficeListItem -> com.makerandreas.papirusoffice.data.OfficeParagraph(
+                text = element.text,
+                runs = element.runs
+            )
+            is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> element.paragraph
+            else -> null
+        } ?: return@LaunchedEffect
+        val styles = activeLayoutDocument.styles
+        val base = com.makerandreas.papirusoffice.data.StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
+        val localOffset = if (hit != null) {
+            (caret - hit.start).coerceIn(0, paragraph.text.length)
+        } else {
+            layoutCursor.offset.coerceIn(0, paragraph.text.length)
+        }
+        var pos = 0
+        var run: com.makerandreas.papirusoffice.data.OfficeTextRun? = null
+        for (candidate in paragraph.runs) {
+            val end = pos + candidate.text.length
+            if (localOffset < end || (localOffset == paragraph.text.length && end == paragraph.text.length)) {
+                run = candidate
+                break
+            }
+            pos = end
+        }
+        val resolved = if (run != null) {
+            com.makerandreas.papirusoffice.data.OfficeRuns.mergeRun(run, base, styles)
+        } else {
+            base
+        }
+        resolved.fontFamily?.takeIf { it.isNotBlank() }?.let { activeFontFamily = it }
+        activeFontSize = kotlin.math.round(resolved.fontSizeSp).toInt().coerceIn(1, 1638)
+    }
     var isBold by remember { mutableStateOf(false) }
     var isItalic by remember { mutableStateOf(false) }
     var isUnderline by remember { mutableStateOf(false) }
