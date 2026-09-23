@@ -1,5 +1,7 @@
 package com.makerandreas.papirusoffice.data
 
+import androidx.compose.ui.text.TextRange
+
 /**
  * Window of the flat editor string owned by one textual document element.
  * [start] is inclusive, [end] is exclusive, both offsets into the global
@@ -44,5 +46,12 @@ object DocumentTextWindows {
     fun elementForOffset(windows: Map<Int, DocumentTextWindow>, offset: Int): DocumentTextWindow? {
         return windows.values.firstOrNull { offset >= it.start && offset <= it.end }
             ?: windows.values.lastOrNull()
+    }
+
+    /** Maps a window-local selection onto the global edit string (used by Viewer selection sync). */
+    fun toGlobalSelection(window: DocumentTextWindow, local: TextRange): TextRange {
+        val start = (local.start + window.start).coerceIn(window.start, window.end)
+        val end = (local.end + window.start).coerceIn(window.start, window.end)
+        return TextRange(minOf(start, end), maxOf(start, end))
     }
 }

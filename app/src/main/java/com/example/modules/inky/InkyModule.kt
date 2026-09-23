@@ -2208,6 +2208,8 @@ fun InkyModule(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (!isEditMode) {
+                        // Viewer shares the Editor's global model read-only:
+                        // selection lands in docBodyText so the FCT acts on it.
                         LayoutDrivenDocumentRenderer(
                             document = activeLayoutDocument,
                             zoomScale = zoomScale,
@@ -2222,6 +2224,8 @@ fun InkyModule(
                             extractedImages = docxImages,
                             pageSpec = documentPageSpec,
                             textColor = textPrimaryColor,
+                            editorValue = docBodyText,
+                            onViewerSelectionChange = { docBodyText = docBodyText.copy(selection = it) },
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {

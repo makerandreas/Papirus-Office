@@ -51,6 +51,9 @@ fun LayoutDrivenDocumentRenderer(
     textColor: Color = Color.Black,
     editorValue: TextFieldValue? = null,
     onEditorValueChange: ((TextFieldValue) -> Unit)? = null,
+    // Viewer mode reuses editorValue read-only; selection changes from the
+    // read-only fields are mapped back through the element windows.
+    onViewerSelectionChange: ((TextRange) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var layoutTrigger by remember { mutableStateOf(0) }
@@ -65,8 +68,9 @@ fun LayoutDrivenDocumentRenderer(
     }
 
     val editable = isEditMode && editorValue != null && onEditorValueChange != null
-    val textWindows = remember(document.body.elements, editorValue?.text, editable) {
-        if (editable) DocumentTextWindows.compute(document.body.elements, editorValue!!.text) else emptyMap()
+    val selectable = !isEditMode && editorValue != null && onViewerSelectionChange != null
+    val textWindows = remember(document.body.elements, editorValue?.text, editable, selectable) {
+        if (editable || selectable) DocumentTextWindows.compute(document.body.elements, editorValue!!.text) else emptyMap()
     }
     val focusRequesters = remember { HashMap<Int, FocusRequester>() }
     var focusedElement by remember { mutableStateOf(-1) }
@@ -160,6 +164,7 @@ fun LayoutDrivenDocumentRenderer(
                             editableWindow = textWindows[elemLayout.elementIndex],
                             editorValue = editorValue,
                             onEditorValueChange = onEditorValueChange,
+                            onViewerSelectionChange = onViewerSelectionChange,
                             focusRequester = focusRequesters.getOrPut(elemLayout.elementIndex) { FocusRequester() },
                             onFieldFocused = { focusedElement = elemLayout.elementIndex }
                         )
@@ -194,6 +199,7 @@ private fun RenderLaidOutElement(
     editableWindow: DocumentTextWindow?,
     editorValue: TextFieldValue?,
     onEditorValueChange: ((TextFieldValue) -> Unit)?,
+    onViewerSelectionChange: ((TextRange) -> Unit)?,
     focusRequester: FocusRequester,
     onFieldFocused: () -> Unit
 ) {
@@ -208,11 +214,13 @@ private fun RenderLaidOutElement(
     // their "Heading N" name so display and pagination share one style source.
     @Composable
     fun TextOrField(paragraph: OfficeParagraph, leadingPrefix: String? = null) {
-        if (editableWindow != null && editorValue != null && onEditorValueChange != null) {
-            ParagraphEditField(
-                window = editableWindow,
-                globalValue = editorValue,
-                onGlobalChange = onEditorValueChange,
+        val window = editableWindow
+        val value = editorValue
+        when {
+            window != null && value != null && onEditorValueChange != null -> ParagraphEditField(
+                window = window,
+                globalValue = value,
+                onGlobalChange = onEditorValueChange!!,
                 paragraph = paragraph,
                 styles = styles,
                 leadingPrefix = leadingPrefix,
@@ -221,8 +229,17 @@ private fun RenderLaidOutElement(
                 focusRequester = focusRequester,
                 onFocused = onFieldFocused
             )
-        } else {
-            ParagraphText(
+            window != null && value != null && onViewerSelectionChange != null -> ParagraphSelectField(
+                window = window,
+                globalValue = value,
+                onSelectionChange = onViewerSelectionChange!!,
+                paragraph = paragraph,
+                styles = styles,
+                leadingPrefix = leadingPrefix,
+                zoomScale = zoomScale,
+                textColor = textColor
+            )
+            else -> ParagraphText(
                 paragraph = paragraph,
                 leadingPrefix = leadingPrefix,
                 styles = styles,
@@ -355,6 +372,75 @@ private fun ParagraphEditField(
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .testTag("doc_body_editor_element_${window.elementIndex}")
+        )
+    }
+}
+
+/**
+ * Read-only field for Viewer mode. Selection is reported through
+ * [onSelectionChange] as a range in the global edit string, so the FCT
+ * (copy, select all, character and paragraph modes) works on the same model
+ * the Editor uses. Text edits are ignored by design.
+ */
+@Composable
+private fun ParagraphSelectField(
+    window: DocumentTextWindow,
+    globalValue: TextFieldValue,
+    onSelectionChange: (TextRange) -> Unit,
+    paragraph: OfficeParagraph,
+    styles: DocumentStyles,
+    leadingPrefix: String?,
+    zoomScale: Float,
+    textColor: Color
+) {
+    val resolved = remember(paragraph.styleName, styles) {
+        OfficeRuns.baseStyle(paragraph, styles)
+    }
+    val sizeSp = resolved.fontSizeSp
+    val windowParagraph = remember(window.text, paragraph.styleName, paragraph.alignment, paragraph.runs) {
+        paragraph.copy(text = window.text)
+    }
+    val annotated = remember(windowParagraph, styles, zoomScale, textColor) {
+        OfficeRuns.toAnnotatedString(windowParagraph, styles, zoomScale, textColor)
+    }
+
+    val selStart = (globalValue.selection.start - window.start).coerceIn(0, window.text.length)
+    val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
+    val localValue = TextFieldValue(
+        text = annotated,
+        selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd))
+    )
+
+    Row(modifier = Modifier.fillMaxWidth()) {
+        if (leadingPrefix != null) {
+            Text(
+                text = leadingPrefix,
+                fontSize = (sizeSp * zoomScale).sp,
+                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                color = textColor,
+                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
+            )
+        }
+        BasicTextField(
+            value = localValue,
+            onValueChange = { newLocal ->
+                if (newLocal.text == window.text) {
+                    onSelectionChange(DocumentTextWindows.toGlobalSelection(window, newLocal.selection))
+                }
+            },
+            enabled = true,
+            readOnly = true,
+            textStyle = TextStyle(
+                color = textColor,
+                fontSize = (sizeSp * zoomScale).sp,
+                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
+                textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .weight(1f)
+                .testTag("doc_body_viewer_element_${window.elementIndex}")
         )
     }
 }
