@@ -5,16 +5,25 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +31,12 @@ import com.example.ui.components.DocxEmbeddedImage
 import com.makerandreas.papirusoffice.data.*
 import java.io.File
 
+/**
+ * Single page-stack renderer for Viewer and Editor. Viewer mode draws the
+ * laid-out pages read-only; Editor mode swaps each textual element for a
+ * field whose value is a window into the one global edit string (see
+ * [DocumentTextWindows]), so both modes always agree on page count.
+ */
 @Composable
 fun LayoutDrivenDocumentRenderer(
     document: OfficeDocument,
@@ -37,6 +52,8 @@ fun LayoutDrivenDocumentRenderer(
     extractedImages: Map<String, File> = emptyMap(),
     pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK,
     textColor: Color = Color.Black,
+    editorValue: TextFieldValue? = null,
+    onEditorValueChange: ((TextFieldValue) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var layoutTrigger by remember { mutableStateOf(0) }
@@ -48,6 +65,22 @@ fun LayoutDrivenDocumentRenderer(
             showImages = showImages,
             showTables = showTables
         )
+    }
+
+    val editable = isEditMode && editorValue != null && onEditorValueChange != null
+    val textWindows = remember(document.body.elements, editorValue?.text, editable) {
+        if (editable) DocumentTextWindows.compute(document.body.elements, editorValue!!.text) else emptyMap()
+    }
+    val focusRequesters = remember { HashMap<Int, FocusRequester>() }
+    var focusedElement by remember { mutableStateOf(-1) }
+    if (editable) {
+        val focusTarget = DocumentTextWindows.elementForOffset(textWindows, editorValue!!.selection.min)
+        LaunchedEffect(focusTarget?.elementIndex, textWindows) {
+            val targetIndex = focusTarget?.elementIndex ?: return@LaunchedEffect
+            if (targetIndex != focusedElement) {
+                focusRequesters[targetIndex]?.requestFocus()
+            }
+        }
     }
 
     Column(
@@ -87,23 +120,31 @@ fun LayoutDrivenDocumentRenderer(
                     .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(4.dp))
                     .background(Color.White)
-                    .pointerInput(page) {
-                        detectTapGestures { offset ->
-                            val virtualX = offset.x / zoomScale
-                            val virtualY = offset.y / zoomScale + (pageIdx * page.heightDp)
-                            val hitResult = layoutEngine.hitTest(virtualX, virtualY, computed.pages)
-                            if (hitResult != null) {
-                                onCursorChange(
-                                    DocumentCursor(
-                                        elementIndex = hitResult.elementIndex,
-                                        paragraphIndex = hitResult.paragraphIndex,
-                                        runIndex = hitResult.lineIndex,
-                                        offset = hitResult.characterOffset
-                                    )
-                                )
+                    .then(
+                        // Edit-mode taps belong to the element fields; the
+                        // hit-test tap wiring is Viewer-only.
+                        if (editable) {
+                            Modifier
+                        } else {
+                            Modifier.pointerInput(page) {
+                                detectTapGestures { offset ->
+                                    val virtualX = offset.x / zoomScale
+                                    val virtualY = offset.y / zoomScale + (pageIdx * page.heightDp)
+                                    val hitResult = layoutEngine.hitTest(virtualX, virtualY, computed.pages)
+                                    if (hitResult != null) {
+                                        onCursorChange(
+                                            DocumentCursor(
+                                                elementIndex = hitResult.elementIndex,
+                                                paragraphIndex = hitResult.paragraphIndex,
+                                                runIndex = hitResult.lineIndex,
+                                                offset = hitResult.characterOffset
+                                            )
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
+                    )
                     .padding((24 * zoomScale).dp)
             ) {
                 Column(
@@ -113,13 +154,16 @@ fun LayoutDrivenDocumentRenderer(
                         RenderLaidOutElement(
                             elemLayout = elemLayout,
                             zoomScale = zoomScale,
-                            isEditMode = isEditMode,
-                            cursor = cursor,
                             enableOutlineFolding = enableOutlineFolding,
                             outlineEngine = outlineEngine,
                             extractedImages = extractedImages,
                             textColor = textColor,
-                            onToggleOutline = { layoutTrigger++ }
+                            onToggleOutline = { layoutTrigger++ },
+                            editableWindow = textWindows[elemLayout.elementIndex],
+                            editorValue = editorValue,
+                            onEditorValueChange = onEditorValueChange,
+                            focusRequester = focusRequesters.getOrPut(elemLayout.elementIndex) { FocusRequester() },
+                            onFieldFocused = { focusedElement = elemLayout.elementIndex }
                         )
                     }
                 }
@@ -143,82 +187,84 @@ fun LayoutDrivenDocumentRenderer(
 private fun RenderLaidOutElement(
     elemLayout: PageElementLayout,
     zoomScale: Float,
-    isEditMode: Boolean,
-    cursor: DocumentCursor,
     enableOutlineFolding: Boolean,
     outlineEngine: OutlineEngine?,
     extractedImages: Map<String, File>,
     textColor: Color,
-    onToggleOutline: () -> Unit
+    onToggleOutline: () -> Unit,
+    editableWindow: DocumentTextWindow?,
+    editorValue: TextFieldValue?,
+    onEditorValueChange: ((TextFieldValue) -> Unit)?,
+    focusRequester: FocusRequester,
+    onFieldFocused: () -> Unit
 ) {
     val element = elemLayout.element
-    when (element) {
-        is OfficeParagraph -> {
-            ParagraphText(
-                text = element.text,
-                styleName = element.styleName,
-                alignment = element.alignment,
+    val paragraphIndex = if (element is OfficeDocElement.ParagraphElement) {
+        elemLayout.paragraphLayout?.paragraphIndex
+    } else {
+        elemLayout.elementIndex
+    }
+
+    @Composable
+    fun TextOrField(
+        text: String,
+        styleName: String?,
+        alignment: String?,
+        leadingPrefix: String? = null,
+        forceHeading: Boolean = false,
+        headingLevel: Int = 1
+    ) {
+        if (editableWindow != null && editorValue != null && onEditorValueChange != null) {
+            ParagraphEditField(
+                window = editableWindow,
+                globalValue = editorValue,
+                onGlobalChange = onEditorValueChange,
+                styleName = styleName,
+                alignment = alignment,
+                leadingPrefix = leadingPrefix,
                 zoomScale = zoomScale,
-                isCurrent = cursor.paragraphIndex == elemLayout.elementIndex,
-                isEditMode = isEditMode,
-                cursor = cursor,
+                forceHeading = forceHeading,
+                headingLevel = headingLevel,
+                textColor = textColor,
+                focusRequester = focusRequester,
+                onFocused = onFieldFocused
+            )
+        } else {
+            ParagraphText(
+                text = if (leadingPrefix != null) leadingPrefix + text else text,
+                styleName = styleName,
+                alignment = alignment,
+                zoomScale = zoomScale,
                 enableOutlineFolding = enableOutlineFolding,
                 outlineEngine = outlineEngine,
-                paragraphIndex = elemLayout.elementIndex,
+                paragraphIndex = paragraphIndex,
                 textColor = textColor,
-                onToggleOutline = onToggleOutline
+                onToggleOutline = onToggleOutline,
+                forceHeading = forceHeading,
+                headingLevel = headingLevel
             )
         }
+    }
+
+    when (element) {
+        is OfficeParagraph -> {
+            TextOrField(element.text, element.styleName, element.alignment)
+        }
         is OfficeHeading -> {
-            ParagraphText(
+            TextOrField(
                 text = element.text,
                 styleName = element.styleName ?: "Heading ${element.level}",
                 alignment = null,
-                zoomScale = zoomScale,
-                isCurrent = cursor.paragraphIndex == elemLayout.elementIndex,
-                isEditMode = isEditMode,
-                cursor = cursor,
-                enableOutlineFolding = enableOutlineFolding,
-                outlineEngine = outlineEngine,
-                paragraphIndex = elemLayout.elementIndex,
-                textColor = textColor,
-                onToggleOutline = onToggleOutline,
                 forceHeading = true,
                 headingLevel = element.level
             )
         }
         is OfficeListItem -> {
-            ParagraphText(
-                text = "${element.bullet}${element.text}",
-                styleName = null,
-                alignment = null,
-                zoomScale = zoomScale,
-                isCurrent = cursor.paragraphIndex == elemLayout.elementIndex,
-                isEditMode = isEditMode,
-                cursor = cursor,
-                enableOutlineFolding = false,
-                outlineEngine = null,
-                paragraphIndex = elemLayout.elementIndex,
-                textColor = textColor,
-                onToggleOutline = onToggleOutline
-            )
+            TextOrField(text = element.text, styleName = null, alignment = null, leadingPrefix = element.bullet)
         }
         is OfficeDocElement.ParagraphElement -> {
             val p = element.paragraph
-            ParagraphText(
-                text = p.text,
-                styleName = p.styleName,
-                alignment = p.alignment,
-                zoomScale = zoomScale,
-                isCurrent = cursor.paragraphIndex == elemLayout.paragraphLayout?.paragraphIndex,
-                isEditMode = isEditMode,
-                cursor = cursor,
-                enableOutlineFolding = enableOutlineFolding,
-                outlineEngine = outlineEngine,
-                paragraphIndex = elemLayout.paragraphLayout?.paragraphIndex,
-                textColor = textColor,
-                onToggleOutline = onToggleOutline
-            )
+            TextOrField(p.text, p.styleName, p.alignment)
         }
         is OfficeTable -> {
             RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale)
@@ -238,14 +284,107 @@ private fun RenderLaidOutElement(
 }
 
 @Composable
+private fun ParagraphEditField(
+    window: DocumentTextWindow,
+    globalValue: TextFieldValue,
+    onGlobalChange: (TextFieldValue) -> Unit,
+    styleName: String?,
+    alignment: String?,
+    leadingPrefix: String?,
+    zoomScale: Float,
+    forceHeading: Boolean,
+    headingLevel: Int,
+    textColor: Color,
+    focusRequester: FocusRequester,
+    onFocused: () -> Unit
+) {
+    val isHeading = forceHeading || styleName?.contains("Heading", ignoreCase = true) == true ||
+        styleName?.contains("Judul", ignoreCase = true) == true
+    val sizeSp = paragraphTextSizeSp(isHeading, headingLevel)
+
+    val selStart = (globalValue.selection.start - window.start).coerceIn(0, window.text.length)
+    val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
+    val localValue = TextFieldValue(
+        text = window.text,
+        selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd)),
+        composition = globalValue.composition?.let {
+            TextRange(
+                (it.start - window.start).coerceIn(0, window.text.length),
+                (it.end - window.start).coerceIn(0, window.text.length)
+            )
+        }
+    )
+
+    Row(modifier = Modifier.fillMaxWidth()) {
+        if (leadingPrefix != null) {
+            Text(
+                text = leadingPrefix,
+                fontSize = (sizeSp * zoomScale).sp,
+                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                color = textColor,
+                fontFamily = FontFamily.Default
+            )
+        }
+        BasicTextField(
+            value = localValue,
+            onValueChange = { newLocal ->
+                val newGlobalText = DocumentTextWindows.applyLocalEdit(globalValue.text, window, newLocal.text)
+                val newSelStart = (newLocal.selection.start + window.start).coerceIn(0, newGlobalText.length)
+                val newSelEnd = (newLocal.selection.end + window.start).coerceIn(0, newGlobalText.length)
+                onGlobalChange(
+                    TextFieldValue(
+                        text = newGlobalText,
+                        selection = TextRange(newSelStart, newSelEnd),
+                        composition = newLocal.composition?.let {
+                            TextRange(it.start + window.start, it.end + window.start)
+                        }
+                    )
+                )
+            },
+            enabled = true,
+            readOnly = false,
+            textStyle = TextStyle(
+                color = textColor,
+                fontSize = (sizeSp * zoomScale).sp,
+                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                fontFamily = FontFamily.Default,
+                fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
+                textAlign = composeTextAlign(alignment)
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onFocusChanged { if (it.isFocused) onFocused() }
+                .testTag("doc_body_editor_element_${window.elementIndex}")
+        )
+    }
+}
+
+private fun paragraphTextSizeSp(isHeading: Boolean, headingLevel: Int): Float {
+    return when {
+        isHeading && headingLevel <= 1 -> 18f
+        isHeading && headingLevel == 2 -> 16f
+        isHeading -> 14f
+        else -> 13f
+    }
+}
+
+private fun composeTextAlign(alignment: String?): TextAlign {
+    return when (alignment) {
+        "Center" -> TextAlign.Center
+        "Right" -> TextAlign.Right
+        "Justify" -> TextAlign.Justify
+        else -> TextAlign.Left
+    }
+}
+
+@Composable
 private fun ParagraphText(
     text: String,
     styleName: String?,
     alignment: String?,
     zoomScale: Float,
-    isCurrent: Boolean,
-    isEditMode: Boolean,
-    cursor: DocumentCursor,
     enableOutlineFolding: Boolean,
     outlineEngine: OutlineEngine?,
     paragraphIndex: Int?,
@@ -267,33 +406,20 @@ private fun ParagraphText(
                 }
             )
         }
-    } else Modifier
-
-    val display = if (isCurrent && isEditMode) {
-        val offset = cursor.offset.coerceIn(0, text.length)
-        text.substring(0, offset) + "|" + text.substring(offset)
-    } else text
-
-    val sizeSp = when {
-        isHeading && headingLevel <= 1 -> 18f
-        isHeading && headingLevel == 2 -> 16f
-        isHeading -> 14f
-        else -> 13f
+    } else {
+        Modifier
     }
 
+    val sizeSp = paragraphTextSizeSp(isHeading, headingLevel)
+
     Text(
-        text = display,
+        text = text,
         fontSize = (sizeSp * zoomScale).sp,
         lineHeight = ((sizeSp + 5f) * zoomScale).sp,
         color = textColor,
         fontFamily = FontFamily.Default,
         fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
-        textAlign = when (alignment) {
-            "Center" -> TextAlign.Center
-            "Right" -> TextAlign.Right
-            "Justify" -> TextAlign.Justify
-            else -> TextAlign.Left
-        },
+        textAlign = composeTextAlign(alignment),
         modifier = Modifier.fillMaxWidth().then(headingModifier)
     )
 }
