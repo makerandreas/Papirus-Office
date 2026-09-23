@@ -15,7 +15,7 @@ import java.util.Locale
  * Maps paragraph runs and resolved styles onto the styled text both render
  * modes consume. Font sizes come from the same [StyleResolver] the
  * [LayoutEngine] paginates with, so displayed text and page breaks never
- * disagree on size (the card-transform half of audit-003 D1 is a follow-up).
+ * disagree on size.
  */
 object OfficeRuns {
 
@@ -26,8 +26,8 @@ object OfficeRuns {
     /**
      * Styled view of [paragraph] at display [scale] (zoom). Run spans only
      * apply while they exactly cover the text; after an edit the text
-     * changes before runs are resliced (owned by the merger update in PR C),
-     * so a mismatched run list degrades to the plain styled paragraph.
+     * changes before runs are resliced, so a mismatched run list degrades
+     * to the plain styled paragraph.
      */
     fun toAnnotatedString(
         paragraph: OfficeParagraph,
@@ -66,10 +66,9 @@ object OfficeRuns {
 
     /** Paragraph style a run displays with, layered over [base]. */
     fun mergeRun(run: OfficeTextRun, base: ParagraphStyle, styles: DocumentStyles): ParagraphStyle {
-        // A character style is authoritative only on a map hit; ODF import
-        // fills these in PR C, so absent entries inherit the paragraph base.
-        // Boolean defaults are "absent", so only positive char-style flags
-        // add to the run/paragraph flags.
+        // A character style is authoritative only on a map hit; absent
+        // entries inherit the paragraph base. Boolean defaults are "absent",
+        // so only positive char-style flags add to the run/paragraph flags.
         val charHit = styles.characterStyles[run.characterStyle ?: run.styleName]
         return ParagraphStyle(
             name = base.name,

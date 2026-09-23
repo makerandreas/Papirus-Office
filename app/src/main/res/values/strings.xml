@@ -251,7 +251,7 @@
 
     <!-- Writing Aids: hyphenation -->
     <string name="options_hyphenation_title">Hyphenation</string>
-    <string name="options_hyphenation_body">Break long words at line ends using the English hyphenation dictionary. Off by default to keep low memory devices fast.</string>
+    <string name="options_hyphenation_body">Break long words at line ends using the English hyphenation dictionary. Off by default to keep layout fast on low memory devices.</string>
     <string name="options_hyphenation_switch_title">Hyphenate long words</string>
     <string name="options_hyphenation_toast_on">Hyphenation on</string>
     <string name="options_hyphenation_toast_off">Hyphenation off</string>

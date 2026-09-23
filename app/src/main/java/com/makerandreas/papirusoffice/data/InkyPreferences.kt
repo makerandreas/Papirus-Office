@@ -32,8 +32,7 @@ data class InkyViewOptions(
     val customZoomPercent: Int = 100,
     // P2-2: Navigator language policy — true = follow app locale (English app → English Navigator), false = follow document evidence (legacy)
     val navigatorFollowAppLocale: Boolean = true,
-    // S6: dictionary hyphenation during pagination. Off by default so 3 GB
-    // devices pay no memory or CPU cost until the user opts in.
+    // Dictionary hyphenation during pagination, default off.
     val hyphenationEnabled: Boolean = false
 )
 

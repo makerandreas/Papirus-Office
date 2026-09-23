@@ -111,8 +111,7 @@ class OfficeRunsTest {
 
     @Test
     fun mismatchedRunsFallBackToPlainStyledText() {
-        // Edited text changes before runs are resliced (PR C merger update);
-        // rendering must not apply stale spans.
+        // Edited text diverges from stale runs; rendering must not apply them.
         val paragraph = OfficeParagraph(
             text = "edited text",
             runs = listOf(OfficeTextRun(text = "old", isBold = true))

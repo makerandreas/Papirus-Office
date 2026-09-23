@@ -377,10 +377,9 @@ private fun ParagraphEditField(
 }
 
 /**
- * Read-only field for Viewer mode. Selection is reported through
- * [onSelectionChange] as a range in the global edit string, so the FCT
- * (copy, select all, character and paragraph modes) works on the same model
- * the Editor uses. Text edits are ignored by design.
+ * Read-only field for Viewer mode. The value is this element's window into
+ * the shared global edit string, so a long-press selection lands in the same
+ * model the Editor and the floating text toolbar act on.
  */
 @Composable
 private fun ParagraphSelectField(

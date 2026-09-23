@@ -464,7 +464,7 @@ fun InkyModule(
             ?: com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK
     }
     val layoutEngine = remember(documentPageSpec, viewOptions.hyphenationEnabled) {
-        // Dictionary is only parsed while the user has opted in (S6).
+        // Dictionary is only parsed while the user has opted in.
         val hyphenator = if (viewOptions.hyphenationEnabled) {
             try {
                 com.makerandreas.papirusoffice.data.HyphenationEngine.loadDefault(context)
