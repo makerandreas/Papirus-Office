@@ -321,7 +321,7 @@ private fun ParagraphEditField(
     val selStart = (globalValue.selection.start - window.start).coerceIn(0, window.text.length)
     val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
     val localValue = TextFieldValue(
-        text = annotated,
+        annotatedString = annotated,
         selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd)),
         composition = globalValue.composition?.let {
             TextRange(
@@ -406,7 +406,7 @@ private fun ParagraphSelectField(
     val selStart = (globalValue.selection.start - window.start).coerceIn(0, window.text.length)
     val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
     val localValue = TextFieldValue(
-        text = annotated,
+        annotatedString = annotated,
         selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd))
     )
 

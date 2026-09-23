@@ -874,6 +874,10 @@ private fun HyphenationSettingCard(context: Context) {
     val prefs = remember { com.makerandreas.papirusoffice.data.InkyPreferencesRepository(context) }
     val viewOptions by prefs.viewOptionsFlow.collectAsState(initial = com.makerandreas.papirusoffice.data.InkyViewOptions())
     val scope = rememberCoroutineScope()
+    // stringResource is @Composable, so resolve both toast strings here
+    // instead of inside the non-composable onCheckedChange lambda.
+    val toastOn = stringResource(R.string.options_hyphenation_toast_on)
+    val toastOff = stringResource(R.string.options_hyphenation_toast_off)
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -909,9 +913,7 @@ private fun HyphenationSettingCard(context: Context) {
                         scope.launch { prefs.updateHyphenationEnabled(it) }
                         Toast.makeText(
                             context,
-                            stringResource(
-                                if (it) R.string.options_hyphenation_toast_on else R.string.options_hyphenation_toast_off
-                            ),
+                            if (it) toastOn else toastOff,
                             Toast.LENGTH_SHORT
                         ).show()
                     }

@@ -55,7 +55,7 @@ object OfficeRuns {
                 }
             }
             addStyle(
-                androidx.compose.ui.text.AnnotatedString.ParagraphStyle(
+                androidx.compose.ui.text.ParagraphStyle(
                     textAlign = composeTextAlign(paragraph.alignment ?: base.alignment)
                 ),
                 0,
