@@ -84,6 +84,9 @@ object DocumentTextMerger {
         }
     }
 
+    // The legacy wrapper arm is defensive: runtime import paths emit direct
+    // implementors. Full OfficeDocElement retirement is tracked in the plan.
+    @Suppress("DEPRECATION")
     private fun replaceText(element: OfficeElement, text: String): OfficeElement {
         return when (element) {
             is OfficeParagraph -> element.copy(text = text)

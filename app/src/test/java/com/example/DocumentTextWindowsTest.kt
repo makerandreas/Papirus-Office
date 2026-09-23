@@ -85,6 +85,25 @@ class DocumentTextWindowsTest {
         val rejoined = windows.values.joinToString("\n\n") { it.text }
         assertEquals(globalText, rejoined)
     }
+
+    @Test
+    fun localSelectionMapsIntoGlobalRangeWithClamping() {
+        val windows = DocumentTextWindows.compute(docWithStructure().body.elements, globalText)
+        val window = windows.getValue(4) // "Second" at 14..20
+
+        assertEquals(
+            androidx.compose.ui.text.TextRange(15, 18),
+            DocumentTextWindows.toGlobalSelection(window, androidx.compose.ui.text.TextRange(1, 4))
+        )
+        assertEquals(
+            androidx.compose.ui.text.TextRange(14, 20),
+            DocumentTextWindows.toGlobalSelection(window, androidx.compose.ui.text.TextRange(-5, 99))
+        )
+        assertEquals(
+            androidx.compose.ui.text.TextRange(16, 19),
+            DocumentTextWindows.toGlobalSelection(window, androidx.compose.ui.text.TextRange(5, 2))
+        )
+    }
 }
 
 class DocumentTextMergerEditTest {
