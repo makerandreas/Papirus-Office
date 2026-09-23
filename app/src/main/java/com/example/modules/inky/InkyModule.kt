@@ -98,50 +98,6 @@ fun android.content.Context.findActivity(): androidx.activity.ComponentActivity?
     return null
 }
 
-fun partitionTextToPages(
-    text: String,
-    charsPerLine: Int = 75,
-    defaultLinesPerPage: Int = 46,
-    targetPageCount: Int? = null
-): List<String> {
-    val rawText = text
-    if (rawText.isEmpty()) return listOf("")
-    
-    // Split by explicit page breaks if present
-    val explicitBreakRegex = Regex("""(?:\r?\n)*(?:---|===)?\s*(?:Page\s+\d+\s*\()?Page\s*Break\)?\s*(?:---|===)?(?:\r?\n)*|\u000C""", RegexOption.IGNORE_CASE)
-    val explicitChunks = rawText.split(explicitBreakRegex)
-    
-    val pages = mutableListOf<String>()
-    explicitChunks.forEach { chunk ->
-        val rawParagraphs = chunk.split("\n")
-        var currentPageLines = mutableListOf<String>()
-        var currentLinesCount = 0
-        
-        val effectiveLinesPerPage = if (targetPageCount != null && targetPageCount > 0) {
-            val totalApproxLines = rawParagraphs.sumOf { maxOf(1, (it.length + charsPerLine - 1) / charsPerLine) }
-            maxOf(20, (totalApproxLines + targetPageCount - 1) / targetPageCount)
-        } else {
-            defaultLinesPerPage
-        }
-        
-        rawParagraphs.forEach { paragraph ->
-            val approxLinesInParagraph = maxOf(1, (paragraph.length + charsPerLine - 1) / charsPerLine)
-            if (currentLinesCount + approxLinesInParagraph > effectiveLinesPerPage && currentPageLines.isNotEmpty()) {
-                pages.add(currentPageLines.joinToString("\n").trim())
-                currentPageLines = mutableListOf()
-                currentLinesCount = 0
-            }
-            currentPageLines.add(paragraph)
-            currentLinesCount += approxLinesInParagraph
-        }
-        if (currentPageLines.isNotEmpty()) {
-            pages.add(currentPageLines.joinToString("\n").trim())
-        }
-    }
-    
-    return if (pages.isEmpty()) listOf(rawText) else pages
-}
-
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun InkyModule(
@@ -529,10 +485,6 @@ fun InkyModule(
     // Set Reminder Dialog state
     var showSetReminderDialog by remember { mutableStateOf(false) }
     var reminderNoteText by remember { mutableStateOf("") }
-
-    val pagesList = remember(docBodyText.text) {
-        partitionTextToPages(docBodyText.text)
-    }
 
     val totalDocPages = remember(documentLayout) {
         documentLayout.pages.size.coerceAtLeast(1)
@@ -2273,118 +2225,36 @@ fun InkyModule(
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
-                        // Edit Mode: Render separated page paper sheets matching Viewer Mode structure
-                        if (!isWebView && pagesList.size > 1) {
-                            pagesList.forEachIndexed { pageIndex, pageContent ->
-                                Surface(
-                                    modifier = Modifier
-                                        .width((340 * zoomScale).dp)
-                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
-                                    color = pageBgColor,
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .padding((20 * zoomScale).dp)
-                                    ) {
-                                        if (pageIndex == 0 && docxImages.isNotEmpty()) {
-                                            val firstImg = docxImages.values.firstOrNull()
-                                            if (firstImg != null && firstImg.exists()) {
-                                                coil.compose.AsyncImage(
-                                                    model = firstImg,
-                                                    contentDescription = "Document Cover Image",
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .heightIn(max = (140 * zoomScale).dp)
-                                                        .padding(bottom = (12 * zoomScale).dp),
-                                                    contentScale = androidx.compose.ui.layout.ContentScale.Fit
-                                                )
-                                            }
-                                        }
-
-                                        var pageTextVal by remember(pageContent) {
-                                            mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(pageContent))
-                                        }
-                                        androidx.compose.foundation.text.BasicTextField(
-                                            value = pageTextVal,
-                                            onValueChange = { newPageVal ->
-                                                pageTextVal = newPageVal
-                                                val newPages = pagesList.toMutableList()
-                                                newPages[pageIndex] = newPageVal.text
-                                                val combined = newPages.joinToString("\n\n")
-                                                if (combined != docBodyText.text) {
-                                                    isSaved = false
-                                                    docBodyText = docBodyText.copy(text = combined)
-                                                    triggerAutosave()
-                                                }
-                                            },
-                                            enabled = true,
-                                            readOnly = false,
-                                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                                color = textPrimaryColor,
-                                                fontSize = (activeFontSize * zoomScale).sp,
-                                                fontFamily = when (activeFontFamily.lowercase()) {
-                                                    "serif", "times new roman" -> FontFamily.Serif
-                                                    "sans-serif", "roboto", "arial" -> FontFamily.SansSerif
-                                                    "monospace", "courier" -> FontFamily.Monospace
-                                                    else -> FontFamily.Default
-                                                },
-                                                fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal,
-                                                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
-                                                textDecoration = buildList {
-                                                    if (isUnderline) add(androidx.compose.ui.text.style.TextDecoration.Underline)
-                                                    if (isStrikethrough) add(androidx.compose.ui.text.style.TextDecoration.LineThrough)
-                                                }.fold(androidx.compose.ui.text.style.TextDecoration.None) { acc, dec -> acc + dec },
-                                                textAlign = textAlignment
-                                            ),
-                                            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .defaultMinSize(minHeight = (420 * zoomScale).dp)
-                                                .testTag("doc_body_editor_page_$pageIndex")
-                                        )
-
-                                        Spacer(modifier = Modifier.weight(1f))
-
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = (8 * zoomScale).dp),
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                text = "${pageIndex + 1} / $totalDocPages",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = (10 * zoomScale).sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                            )
-                                        }
-                                    }
-                                }
-                                if (pageIndex < pagesList.size - 1) {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                }
-                            }
+                        // Edit Mode renders the same layout-driven page stack as
+                        // Viewer Mode, so both modes share one pagination source.
+                        if (!isWebView) {
+                            LayoutDrivenDocumentRenderer(
+                                document = activeLayoutDocument,
+                                zoomScale = zoomScale,
+                                isEditMode = true,
+                                cursor = layoutCursor,
+                                onCursorChange = { layoutCursor = it },
+                                outlineEngine = outlineEngine,
+                                enableOutlineFolding = true,
+                                showImages = true,
+                                showTables = true,
+                                layoutResult = documentLayout,
+                                extractedImages = docxImages,
+                                pageSpec = documentPageSpec,
+                                textColor = textPrimaryColor,
+                                editorValue = docBodyText,
+                                onEditorValueChange = handleTextValueChange,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         } else {
-                            // Single sheet for Web View or single-page documents
+                            // Web View keeps one flowing sheet under the global edit value
                             Surface(
-                                modifier = if (isWebView) {
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 8.dp)
-                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                                        .shadow(elevation = 2.dp, shape = RoundedCornerShape(4.dp))
-                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                } else {
-                                    Modifier
-                                        .width((340 * zoomScale).dp)
-                                        .defaultMinSize(minHeight = (480 * zoomScale).dp)
-                                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(4.dp))
-                                        .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp))
-                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp)
+                                    .defaultMinSize(minHeight = (480 * zoomScale).dp)
+                                    .shadow(elevation = 2.dp, shape = RoundedCornerShape(4.dp))
+                                    .border(1.dp, borderStrokeColor, RoundedCornerShape(4.dp)),
                                 color = pageBgColor,
                                 shape = RoundedCornerShape(4.dp)
                             ) {
