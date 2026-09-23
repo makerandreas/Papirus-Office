@@ -37,8 +37,9 @@ jobs:
           set +e
           ./gradlew testDebugUnitTest 2>&1 | tee /tmp/gradle_test.log
           code=$?
-          set -e
           if [ $code -ne 0 ]; then
+            set +e
+            set +o pipefail
             echo "Gradle failed with exit $code (temporary debug step)"
             free -m | head -3 | while IFS= read -r line; do echo "::error::MEM $line"; done
             (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory|oom" | tail -5 | while IFS= read -r line; do
@@ -173,8 +174,9 @@ jobs:
           set +e
           ./gradlew assembleDebug 2>&1 | tee /tmp/gradle_build.log
           code=$?
-          set -e
           if [ $code -ne 0 ]; then
+            set +e
+            set +o pipefail
             echo "Gradle failed with exit $code (temporary debug step)"
             free -m | head -3 | while IFS= read -r line; do echo "::error::MEM $line"; done
             (dmesg 2>/dev/null || cat /var/log/syslog 2>/dev/null) | grep -iE "killed process|out of memory|oom" | tail -5 | while IFS= read -r line; do
