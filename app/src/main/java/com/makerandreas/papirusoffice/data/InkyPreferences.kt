@@ -31,7 +31,9 @@ data class InkyViewOptions(
     val zoomMode: ZoomMode = ZoomMode.HUNDRED,
     val customZoomPercent: Int = 100,
     // P2-2: Navigator language policy — true = follow app locale (English app → English Navigator), false = follow document evidence (legacy)
-    val navigatorFollowAppLocale: Boolean = true
+    val navigatorFollowAppLocale: Boolean = true,
+    // Dictionary hyphenation during pagination, default off.
+    val hyphenationEnabled: Boolean = false
 )
 
 val Context.inkyDataStore: DataStore<Preferences> by preferencesDataStore(name = "inky_preferences")
@@ -54,6 +56,7 @@ class InkyPreferencesRepository(private val context: Context) {
         val KEY_ZOOM_MODE = stringPreferencesKey("zoom_mode")
         val KEY_CUSTOM_ZOOM_PERCENT = intPreferencesKey("custom_zoom_percent")
         val KEY_NAVIGATOR_FOLLOW_APP = booleanPreferencesKey("navigator_follow_app_locale")
+        val KEY_HYPHENATION_ENABLED = booleanPreferencesKey("hyphenation_enabled")
     }
 
     val viewOptionsFlow: Flow<InkyViewOptions> = context.inkyDataStore.data
@@ -78,7 +81,8 @@ class InkyPreferencesRepository(private val context: Context) {
                     ZoomMode.HUNDRED
                 },
                 customZoomPercent = preferences[KEY_CUSTOM_ZOOM_PERCENT] ?: 100,
-                navigatorFollowAppLocale = preferences[KEY_NAVIGATOR_FOLLOW_APP] ?: true
+                navigatorFollowAppLocale = preferences[KEY_NAVIGATOR_FOLLOW_APP] ?: true,
+                hyphenationEnabled = preferences[KEY_HYPHENATION_ENABLED] ?: false
             )
         }
 
@@ -144,5 +148,9 @@ class InkyPreferencesRepository(private val context: Context) {
 
     suspend fun updateNavigatorFollowAppLocale(followApp: Boolean) {
         context.inkyDataStore.edit { preferences -> preferences[KEY_NAVIGATOR_FOLLOW_APP] = followApp }
+    }
+
+    suspend fun updateHyphenationEnabled(enabled: Boolean) {
+        context.inkyDataStore.edit { preferences -> preferences[KEY_HYPHENATION_ENABLED] = enabled }
     }
 }

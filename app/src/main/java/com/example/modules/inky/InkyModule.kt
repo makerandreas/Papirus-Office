@@ -463,7 +463,17 @@ fun InkyModule(
         currentSessionState?.document?.styles?.defaultPageStyle
             ?: com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK
     }
-    val layoutEngine = remember(documentPageSpec) { com.makerandreas.papirusoffice.data.LayoutEngine(documentPageSpec) }
+    val layoutEngine = remember(documentPageSpec, viewOptions.hyphenationEnabled) {
+        // Dictionary is only parsed while the user has opted in.
+        val hyphenator = if (viewOptions.hyphenationEnabled) {
+            try {
+                com.makerandreas.papirusoffice.data.HyphenationEngine.loadDefault(context)
+            } catch (e: Exception) {
+                null
+            }
+        } else null
+        com.makerandreas.papirusoffice.data.LayoutEngine(documentPageSpec, hyphenator = hyphenator)
+    }
 
     val activeLayoutDocument = remember(currentSessionState?.document, docBodyText.text, docTitle) {
         val base = currentSessionState?.document ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -2208,6 +2218,8 @@ fun InkyModule(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (!isEditMode) {
+                        // Viewer shares the Editor's global model read-only:
+                        // selection lands in docBodyText so the FCT acts on it.
                         LayoutDrivenDocumentRenderer(
                             document = activeLayoutDocument,
                             zoomScale = zoomScale,
@@ -2222,6 +2234,8 @@ fun InkyModule(
                             extractedImages = docxImages,
                             pageSpec = documentPageSpec,
                             textColor = textPrimaryColor,
+                            editorValue = docBodyText,
+                            onViewerSelectionChange = { docBodyText = docBodyText.copy(selection = it) },
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {

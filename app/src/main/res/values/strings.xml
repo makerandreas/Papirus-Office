@@ -249,6 +249,13 @@
     <string name="navigator_footnote_item">Footnote %1$s</string>
     <string name="navigator_hidden_label">Hidden</string>
 
+    <!-- Writing Aids: hyphenation -->
+    <string name="options_hyphenation_title">Hyphenation</string>
+    <string name="options_hyphenation_body">Break long words at line ends using the English hyphenation dictionary. Off by default to keep layout fast on low memory devices.</string>
+    <string name="options_hyphenation_switch_title">Hyphenate long words</string>
+    <string name="options_hyphenation_toast_on">Hyphenation on</string>
+    <string name="options_hyphenation_toast_off">Hyphenation off</string>
+
     <!-- Undo and Redo Actions Sheet -->
     <string name="actionsToUndoTitle">Actions to Undo</string>
     <string name="actionsToRedoTitle">Actions to Redo</string>

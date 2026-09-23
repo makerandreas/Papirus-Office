@@ -3,14 +3,13 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.LayoutEngine
-import com.makerandreas.papirusoffice.data.OfficeDocElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import com.makerandreas.papirusoffice.data.OfficeImage
 import com.makerandreas.papirusoffice.data.PageStyleSpec
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -74,18 +73,32 @@ class Sample5UnifiedPaginationTest {
     }
 
     @Test
+    fun layoutIsDeterministicAcrossConsecutiveRuns() {
+        // Guards the shared pagination source: the same parsed document must
+        // always yield the same page split, whatever render mode consumed it.
+        val parsed = parseOfficeDoc("Sample-5.odt")
+        val officeDoc = parsed.toOfficeDocument()
+        val spec = officeDoc.styles.defaultPageStyle ?: PageStyleSpec.FALLBACK
+
+        val first = LayoutEngine(spec).performLayout(officeDoc)
+        val second = LayoutEngine(spec).performLayout(officeDoc)
+
+        assertEquals(first.pages.size, second.pages.size)
+        assertEquals(first.pages.map { it.elements.size }, second.pages.map { it.elements.size })
+    }
+
+    @Test
     fun sample5ImagesSurviveParseIntoLayoutElements() {
         val parsed = parseOfficeDoc("Sample-5.odt")
         val officeDoc = parsed.toOfficeDocument()
-        val images = officeDoc.body.elements.filter {
-            it is OfficeImage || it is OfficeDocElement.ImageElement
-        }
+        // Runtime import emits direct OfficeImage implementors (no legacy wrappers).
+        val images = officeDoc.body.elements.filterIsInstance<OfficeImage>()
         assertTrue("Sample-5.odt must expose image elements to the shared element loop", images.isNotEmpty())
 
         val layout = LayoutEngine(officeDoc.styles.defaultPageStyle ?: PageStyleSpec.FALLBACK)
             .performLayout(officeDoc)
         val laidOutImages = layout.pages.flatMap { it.elements }.count {
-            it.element is OfficeImage || it.element is OfficeDocElement.ImageElement
+            it.element is OfficeImage
         }
         assertTrue("images must be placed on pages, not dropped by pagination", laidOutImages > 0)
         assertTrue(
