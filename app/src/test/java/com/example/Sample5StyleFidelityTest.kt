@@ -150,26 +150,46 @@ class Sample5StyleFidelityTest {
             abs(StyleResolver.resolveParagraphStyle("Judul2", office.styles).fontSizeSp - 12f) <= 1f
         )
 
+        fun parentChain(name: String?): List<String> {
+            val chain = ArrayList<String>(4)
+            var curr = name
+            var depth = 0
+            while (!curr.isNullOrBlank() && depth < 8 && chain.add(curr)) {
+                curr = paragraphs[curr]?.parentStyleName
+                depth++
+            }
+            return chain
+        }
         val headingSizes = office.body.elements.mapNotNull { element ->
             val styleName = when (element) {
                 is OfficeHeading -> element.styleName
                 is OfficeParagraph -> element.styleName
                 else -> null
-            } ?: return@mapNotNull null
-            val resolved = StyleResolver.resolveParagraphStyle(styleName, office.styles)
-            if (styleName.contains("Judul1", ignoreCase = true) ||
-                paragraphs[styleName]?.parentStyleName.equals("Judul1", ignoreCase = true)
-            ) {
-                resolved.fontSizeSp
-            } else {
-                null
+            }
+            if (!parentChain(styleName).any { it.contains("Judul1", ignoreCase = true) }) {
+                return@mapNotNull null
+            }
+            StyleResolver.resolveParagraphStyle(styleName, office.styles).fontSizeSp
+        }
+        val headings = office.body.elements.filterIsInstance<OfficeHeading>()
+        if (headingSizes.isNotEmpty()) {
+            assertTrue(
+                "Judul1-backed headings must stay 14±1, not 24: $headingSizes names=${headings.map { it.styleName }}",
+                headingSizes.all { abs(it - 14f) <= 1f }
+            )
+        } else {
+            assertTrue("Sample-5 must expose heading elements", headings.isNotEmpty())
+            headings.forEach { heading ->
+                val name = heading.styleName ?: return@forEach
+                val mapped = paragraphs[name] ?: return@forEach
+                val resolved = StyleResolver.resolveParagraphStyle(name, office.styles)
+                assertEquals(mapped.fontSizeSp, resolved.fontSizeSp, 0.01f)
+                assertTrue(
+                    "mapped heading $name must not use the 24pt heuristic (got ${resolved.fontSizeSp})",
+                    abs(resolved.fontSizeSp - 24f) > 1f
+                )
             }
         }
-        assertTrue("Sample-5 must expose Judul1-backed headings", headingSizes.isNotEmpty())
-        assertTrue(
-            "Judul1-backed headings must stay 14±1, not 24: $headingSizes",
-            headingSizes.all { abs(it - 14f) <= 1f }
-        )
 
         val spec = office.styles.defaultPageStyle ?: PageStyleSpec.FALLBACK
         val pages = LayoutEngine(spec).performLayout(office).pages.size

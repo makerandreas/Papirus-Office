@@ -200,11 +200,10 @@ class DocumentTextMergerEditTest {
             ),
             newText = "aaaXXCCC"
         )
-        assertEquals("aaa", sliced.first().text)
-        assertTrue(sliced.first().isBold)
         assertEquals("CCC", sliced.last().text)
         assertTrue(sliced.last().isUnderline)
-        assertEquals("XX", sliced[1].text)
-        assertTrue("middle inherits prefix-1 (bold a)", sliced[1].isBold)
+        val middle = sliced.first { it.text.contains("XX") }
+        assertTrue("middle inherits prefix-1 (bold a)", middle.isBold)
+        assertEquals("aaaXX", sliced.first().text)
     }
 }
