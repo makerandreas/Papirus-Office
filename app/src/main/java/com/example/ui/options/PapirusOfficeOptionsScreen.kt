@@ -464,6 +464,9 @@ fun PapirusOfficeOptionsScreen(
                             "security" -> {
                                 SecuritySettingCard(context = context)
                             }
+                            "writing_aids" -> {
+                                HyphenationSettingCard(context = context)
+                            }
                             "inky_view" -> {
                                 InkyViewSettingsSubpage(
                                     activeSubSubpage = activeSubSubpage,
@@ -861,6 +864,58 @@ private fun NavigatorLanguageSettingCard(context: Context) {
                         Text(label, style = MaterialTheme.typography.labelMedium)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HyphenationSettingCard(context: Context) {
+    val prefs = remember { com.makerandreas.papirusoffice.data.InkyPreferencesRepository(context) }
+    val viewOptions by prefs.viewOptionsFlow.collectAsState(initial = com.makerandreas.papirusoffice.data.InkyViewOptions())
+    val scope = rememberCoroutineScope()
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.options_hyphenation_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.options_hyphenation_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = stringResource(R.string.options_hyphenation_switch_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Switch(
+                    checked = viewOptions.hyphenationEnabled,
+                    onCheckedChange = {
+                        scope.launch { prefs.updateHyphenationEnabled(it) }
+                        Toast.makeText(
+                            context,
+                            stringResource(
+                                if (it) R.string.options_hyphenation_toast_on else R.string.options_hyphenation_toast_off
+                            ),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                )
             }
         }
     }

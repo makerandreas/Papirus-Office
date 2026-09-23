@@ -93,9 +93,13 @@ object StyleResolver {
 /**
  * Sole paginator for Viewer and Editor. Works in the PageStyleSpec unit space
  * (layout units at 96/inch); the default spec reproduces the historical
- * Letter box for documents that declare no page geometry.
+ * Letter box for documents that declare no page geometry. [hyphenator] is
+ * null by default, which keeps the historical word-only wrapping.
  */
-class LayoutEngine(private val pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK) {
+class LayoutEngine(
+    private val pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK,
+    private val hyphenator: HyphenationEngine? = null
+) {
     private val pageWidthDp: Float = pageSpec.widthDp
     private val pageHeightDp: Float = pageSpec.heightDp
 
@@ -157,30 +161,87 @@ class LayoutEngine(private val pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK)
 
         val maxLineWidth = pageSpec.contentWidthDp
 
-        for (word in words) {
-            val spaceText = if (currentLineText.isNotEmpty()) " " else ""
-            val testWord = spaceText + word
-            val wordWidth = measureTextWidth(testWord)
+        for (w in words) {
+            var word = w
+            while (true) {
+                val spaceText = if (currentLineText.isNotEmpty()) " " else ""
+                val testWord = spaceText + word
+                val wordWidth = measureTextWidth(testWord)
+                val overflows = currentLineWidth + wordWidth > maxLineWidth
 
-            if (currentLineWidth + wordWidth > maxLineWidth && currentLineText.isNotEmpty()) {
-                val lineStr = currentLineText.toString()
-                lines.add(
-                    LineLayout(
-                        text = lineStr,
-                        runs = paragraph.runs,
-                        width = currentLineWidth,
-                        height = getPaintTextSize() * 1.2f,
-                        baseline = getPaintTextSize(),
-                        startOffset = startCharOffset,
-                        endOffset = startCharOffset + lineStr.length
+                if (overflows && currentLineText.isNotEmpty()) {
+                    // A word that does not fit: try a dictionary break before
+                    // pushing it whole onto the next line (off by default).
+                    var broke = false
+                    if (hyphenator != null) {
+                        val spaceWidth = measureTextWidth(spaceText)
+                        val remaining = (maxLineWidth - currentLineWidth - spaceWidth).coerceAtLeast(0f)
+                        val breakAt = hyphenator.firstFittingBreak(word, remaining, ::measureTextWidth)
+                        if (breakAt != null) {
+                            val head = word.substring(0, breakAt)
+                            val lineStr = currentLineText.toString() + spaceText + head
+                            lines.add(
+                                LineLayout(
+                                    text = lineStr,
+                                    runs = paragraph.runs,
+                                    width = currentLineWidth + spaceWidth + measureTextWidth(head),
+                                    height = getPaintTextSize() * 1.2f,
+                                    baseline = getPaintTextSize(),
+                                    startOffset = startCharOffset,
+                                    endOffset = startCharOffset + lineStr.length
+                                )
+                            )
+                            startCharOffset += lineStr.length + 1
+                            word = word.substring(breakAt)
+                            currentLineText = StringBuilder()
+                            currentLineWidth = 0f
+                            broke = true
+                        }
+                    }
+                    if (broke) {
+                        if (word.isEmpty()) break
+                        continue
+                    }
+                    val lineStr = currentLineText.toString()
+                    lines.add(
+                        LineLayout(
+                            text = lineStr,
+                            runs = paragraph.runs,
+                            width = currentLineWidth,
+                            height = getPaintTextSize() * 1.2f,
+                            baseline = getPaintTextSize(),
+                            startOffset = startCharOffset,
+                            endOffset = startCharOffset + lineStr.length
+                        )
                     )
-                )
-                startCharOffset += lineStr.length + 1
-                currentLineText = StringBuilder(word)
-                currentLineWidth = measureTextWidth(word)
-            } else {
+                    startCharOffset += lineStr.length + 1
+                    currentLineText = StringBuilder(word)
+                    currentLineWidth = measureTextWidth(word)
+                    break
+                }
+                if (overflows && currentLineText.isEmpty() && hyphenator != null) {
+                    val breakAt = hyphenator.firstFittingBreak(word, maxLineWidth, ::measureTextWidth)
+                    if (breakAt != null && breakAt < word.length) {
+                        val head = word.substring(0, breakAt)
+                        lines.add(
+                            LineLayout(
+                                text = head,
+                                runs = paragraph.runs,
+                                width = measureTextWidth(head),
+                                height = getPaintTextSize() * 1.2f,
+                                baseline = getPaintTextSize(),
+                                startOffset = startCharOffset,
+                                endOffset = startCharOffset + head.length
+                            )
+                        )
+                        startCharOffset += head.length
+                        word = word.substring(breakAt)
+                        continue
+                    }
+                }
                 currentLineText.append(testWord)
                 currentLineWidth += wordWidth
+                break
             }
         }
 
