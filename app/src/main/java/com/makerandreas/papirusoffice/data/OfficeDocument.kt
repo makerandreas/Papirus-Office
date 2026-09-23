@@ -220,7 +220,7 @@ data class ParagraphStyle(
 
 data class CharacterStyle(
     val name: String,
-    val fontSizeSp: Float = 12f,
+    val fontSizeSp: Float? = null,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
     val isUnderline: Boolean = false,
@@ -343,6 +343,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     runs = elem.runs.map { run ->
                         OfficeTextRun(
                             text = run.text,
+                            characterStyle = run.styleName,
+                            styleName = run.styleName,
                             isBold = run.isBold,
                             isItalic = run.isItalic,
                             isUnderline = run.isUnderline
@@ -355,7 +357,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     text = elem.text,
                     level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
-                    runs = listOf(OfficeTextRun(text = elem.text, isBold = true))
+                    runs = emptyList()
                 )
             }
             is OfficeDocumentElement.ListItem -> {

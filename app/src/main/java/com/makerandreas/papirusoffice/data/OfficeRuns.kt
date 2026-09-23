@@ -72,7 +72,7 @@ object OfficeRuns {
         val charHit = styles.characterStyles[run.characterStyle ?: run.styleName]
         return ParagraphStyle(
             name = base.name,
-            fontSizeSp = base.fontSizeSp,
+            fontSizeSp = charHit?.fontSizeSp ?: base.fontSizeSp,
             isBold = charHit?.isBold == true || run.isBold || base.isBold,
             isItalic = charHit?.isItalic == true || run.isItalic || base.isItalic,
             isUnderline = charHit?.isUnderline == true || run.isUnderline || base.isUnderline,

@@ -13,6 +13,7 @@ import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.OfficeTable
 import com.makerandreas.papirusoffice.data.OfficeTableCell
 import com.makerandreas.papirusoffice.data.OfficeTableRow
+import com.makerandreas.papirusoffice.data.OfficeTextRun
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -154,5 +155,56 @@ class DocumentTextMergerEditTest {
         val paragraphs = merged.body.elements.filterIsInstance<OfficeParagraph>().map { it.text }
         assertTrue(paragraphs.containsAll(listOf("J", "K")))
         assertEquals("H", merged.body.elements.filterIsInstance<OfficeHeading>().single().text)
+    }
+
+    @Test
+    fun emptyRunsStayEmptyAfterEdit() {
+        val doc = OfficeDocument(
+            body = DocumentBody(listOf(OfficeParagraph(text = "Hello")))
+        )
+        val merged = DocumentTextMerger.mergeEditedText(doc, "Hello world")
+        val para = merged.body.elements.filterIsInstance<OfficeParagraph>().single()
+        assertEquals("Hello world", para.text)
+        assertTrue(para.runs.isEmpty())
+    }
+
+    @Test
+    fun middleInsertInheritsRunAtPrefixMinusOne() {
+        val doc = OfficeDocument(
+            body = DocumentBody(
+                listOf(
+                    OfficeParagraph(
+                        text = "Hello World",
+                        runs = listOf(
+                            OfficeTextRun(text = "Hello", isBold = true),
+                            OfficeTextRun(text = " World")
+                        )
+                    )
+                )
+            )
+        )
+        val merged = DocumentTextMerger.mergeEditedText(doc, "Hellox World")
+        val runs = merged.body.elements.filterIsInstance<OfficeParagraph>().single().runs
+        assertTrue("inserted x must inherit the bold prefix run: $runs", runs.any { it.text.contains("x") && it.isBold })
+        assertTrue("World suffix stays unbold: $runs", runs.any { it.text.contains("World") && !it.isBold })
+    }
+
+    @Test
+    fun prefixAndSuffixRunsSurviveAnInteriorEdit() {
+        val sliced = DocumentTextMerger.resliceRuns(
+            oldText = "aaaBBBCCC",
+            oldRuns = listOf(
+                OfficeTextRun(text = "aaa", isBold = true),
+                OfficeTextRun(text = "BBB", isItalic = true),
+                OfficeTextRun(text = "CCC", isUnderline = true)
+            ),
+            newText = "aaaXXCCC"
+        )
+        assertEquals("aaa", sliced.first().text)
+        assertTrue(sliced.first().isBold)
+        assertEquals("CCC", sliced.last().text)
+        assertTrue(sliced.last().isUnderline)
+        assertEquals("XX", sliced[1].text)
+        assertTrue("middle inherits prefix-1 (bold a)", sliced[1].isBold)
     }
 }

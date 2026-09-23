@@ -55,7 +55,8 @@ data class TextRun(
     val text: String,
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
-    val isUnderline: Boolean = false
+    val isUnderline: Boolean = false,
+    val styleName: String? = null
 )
 
 data class OfficeParsedDocument(

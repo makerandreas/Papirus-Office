@@ -123,6 +123,42 @@ class OfficeRunsTest {
     }
 
     @Test
+    fun characterStyleSizeOverlaysParagraphSize() {
+        val styles = DocumentStyles(
+            paragraphStyles = mapOf("Body" to ParagraphStyle("Body", fontSizeSp = 12f)),
+            characterStyles = mapOf("Big" to CharacterStyle("Big", fontSizeSp = 20f))
+        )
+        val paragraph = OfficeParagraph(
+            text = "ab",
+            styleName = "Body",
+            runs = listOf(
+                OfficeTextRun(text = "a"),
+                OfficeTextRun(text = "b", characterStyle = "Big")
+            )
+        )
+        val annotated = OfficeRuns.toAnnotatedString(paragraph, styles, 1f, black)
+        val bigSpan = annotated.spanStyles.last { it.start == 1 }
+        assertEquals(20.sp, bigSpan.item.fontSize)
+    }
+
+    @Test
+    fun nullCharacterSizeKeepsParagraphSize() {
+        val styles = DocumentStyles(
+            paragraphStyles = mapOf("Body" to ParagraphStyle("Body", fontSizeSp = 16f)),
+            characterStyles = mapOf("Emph" to CharacterStyle("Emph", isBold = true))
+        )
+        val paragraph = OfficeParagraph(
+            text = "hi",
+            styleName = "Body",
+            runs = listOf(OfficeTextRun(text = "hi", characterStyle = "Emph"))
+        )
+        val annotated = OfficeRuns.toAnnotatedString(paragraph, styles, 1f, black)
+        val runSpan = annotated.spanStyles.last()
+        assertEquals(16.sp, runSpan.item.fontSize)
+        assertEquals(FontWeight.Bold, runSpan.item.fontWeight)
+    }
+
+    @Test
     fun fontFamilyMappingCoversKnownFamilies() {
         assertEquals(FontFamily.Serif, OfficeRuns.fontFamilyFor("Liberation Serif"))
         assertEquals(FontFamily.Serif, OfficeRuns.fontFamilyFor("Times New Roman"))
