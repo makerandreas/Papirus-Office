@@ -33,34 +33,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest --continue
-
-      - name: Annotate failed unit tests
-        if: failure()
-        run: |
-          python3 - <<'PY'
-          import os, glob, xml.etree.ElementTree as ET
-          reports = glob.glob("app/build/test-results/**/TEST-*.xml", recursive=True)
-          if not reports:
-              print("::error::No TEST-*.xml reports under app/build/test-results")
-          for path in reports:
-              try:
-                  root = ET.parse(path).getroot()
-              except Exception as e:
-                  print(f"::error::Could not parse {path}: {e}")
-                  continue
-              for case in root.iter("testcase"):
-                  for child in list(case):
-                      if child.tag not in ("failure", "error"):
-                          continue
-                      cls = case.attrib.get("classname", "")
-                      name = case.attrib.get("name", "")
-                      msg = (child.attrib.get("message") or "").replace("\n", " ")[:400]
-                      print(f"::error title={cls}.{name}::{msg}")
-                      text = (child.text or "")[:800]
-                      if text:
-                          print(text)
-          PY
+          ./gradlew testDebugUnitTest
 
   build:
     name: Build (SemVer & Nightly)
