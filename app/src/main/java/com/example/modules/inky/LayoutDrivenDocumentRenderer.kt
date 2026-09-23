@@ -21,10 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.DocxEmbeddedImage
@@ -154,6 +151,7 @@ fun LayoutDrivenDocumentRenderer(
                         RenderLaidOutElement(
                             elemLayout = elemLayout,
                             zoomScale = zoomScale,
+                            styles = document.styles,
                             enableOutlineFolding = enableOutlineFolding,
                             outlineEngine = outlineEngine,
                             extractedImages = extractedImages,
@@ -187,6 +185,7 @@ fun LayoutDrivenDocumentRenderer(
 private fun RenderLaidOutElement(
     elemLayout: PageElementLayout,
     zoomScale: Float,
+    styles: DocumentStyles,
     enableOutlineFolding: Boolean,
     outlineEngine: OutlineEngine?,
     extractedImages: Map<String, File>,
@@ -205,66 +204,59 @@ private fun RenderLaidOutElement(
         elemLayout.elementIndex
     }
 
+    // One synthesized paragraph per textual element: headings resolve through
+    // their "Heading N" name so display and pagination share one style source.
     @Composable
-    fun TextOrField(
-        text: String,
-        styleName: String?,
-        alignment: String?,
-        leadingPrefix: String? = null,
-        forceHeading: Boolean = false,
-        headingLevel: Int = 1
-    ) {
+    fun TextOrField(paragraph: OfficeParagraph, leadingPrefix: String? = null) {
         if (editableWindow != null && editorValue != null && onEditorValueChange != null) {
             ParagraphEditField(
                 window = editableWindow,
                 globalValue = editorValue,
                 onGlobalChange = onEditorValueChange,
-                styleName = styleName,
-                alignment = alignment,
+                paragraph = paragraph,
+                styles = styles,
                 leadingPrefix = leadingPrefix,
                 zoomScale = zoomScale,
-                forceHeading = forceHeading,
-                headingLevel = headingLevel,
                 textColor = textColor,
                 focusRequester = focusRequester,
                 onFocused = onFieldFocused
             )
         } else {
             ParagraphText(
-                text = if (leadingPrefix != null) leadingPrefix + text else text,
-                styleName = styleName,
-                alignment = alignment,
+                paragraph = paragraph,
+                leadingPrefix = leadingPrefix,
+                styles = styles,
                 zoomScale = zoomScale,
                 enableOutlineFolding = enableOutlineFolding,
                 outlineEngine = outlineEngine,
                 paragraphIndex = paragraphIndex,
                 textColor = textColor,
-                onToggleOutline = onToggleOutline,
-                forceHeading = forceHeading,
-                headingLevel = headingLevel
+                onToggleOutline = onToggleOutline
             )
         }
     }
 
     when (element) {
         is OfficeParagraph -> {
-            TextOrField(element.text, element.styleName, element.alignment)
+            TextOrField(element)
         }
         is OfficeHeading -> {
             TextOrField(
-                text = element.text,
-                styleName = element.styleName ?: "Heading ${element.level}",
-                alignment = null,
-                forceHeading = true,
-                headingLevel = element.level
+                OfficeParagraph(
+                    text = element.text,
+                    styleName = element.styleName ?: "Heading ${element.level}",
+                    runs = element.runs
+                )
             )
         }
         is OfficeListItem -> {
-            TextOrField(text = element.text, styleName = null, alignment = null, leadingPrefix = element.bullet)
+            TextOrField(
+                OfficeParagraph(text = element.text, runs = element.runs),
+                leadingPrefix = element.bullet
+            )
         }
         is OfficeDocElement.ParagraphElement -> {
-            val p = element.paragraph
-            TextOrField(p.text, p.styleName, p.alignment)
+            TextOrField(element.paragraph)
         }
         is OfficeTable -> {
             RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale)
@@ -288,24 +280,31 @@ private fun ParagraphEditField(
     window: DocumentTextWindow,
     globalValue: TextFieldValue,
     onGlobalChange: (TextFieldValue) -> Unit,
-    styleName: String?,
-    alignment: String?,
+    paragraph: OfficeParagraph,
+    styles: DocumentStyles,
     leadingPrefix: String?,
     zoomScale: Float,
-    forceHeading: Boolean,
-    headingLevel: Int,
     textColor: Color,
     focusRequester: FocusRequester,
     onFocused: () -> Unit
 ) {
-    val isHeading = forceHeading || styleName?.contains("Heading", ignoreCase = true) == true ||
-        styleName?.contains("Judul", ignoreCase = true) == true
-    val sizeSp = paragraphTextSizeSp(isHeading, headingLevel)
+    val resolved = remember(paragraph.styleName, styles) {
+        OfficeRuns.baseStyle(paragraph, styles)
+    }
+    val sizeSp = resolved.fontSizeSp
+    // Window-scoped view of the paragraph; the field shows window.text so the
+    // runs are resliced lazily from the window's block on each re-merge.
+    val windowParagraph = remember(window.text, paragraph.styleName, paragraph.alignment, paragraph.runs) {
+        paragraph.copy(text = window.text)
+    }
+    val annotated = remember(windowParagraph, styles, zoomScale, textColor) {
+        OfficeRuns.toAnnotatedString(windowParagraph, styles, zoomScale, textColor)
+    }
 
     val selStart = (globalValue.selection.start - window.start).coerceIn(0, window.text.length)
     val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
     val localValue = TextFieldValue(
-        text = window.text,
+        text = annotated,
         selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd)),
         composition = globalValue.composition?.let {
             TextRange(
@@ -322,7 +321,7 @@ private fun ParagraphEditField(
                 fontSize = (sizeSp * zoomScale).sp,
                 lineHeight = ((sizeSp + 5f) * zoomScale).sp,
                 color = textColor,
-                fontFamily = FontFamily.Default
+                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
             )
         }
         BasicTextField(
@@ -347,9 +346,8 @@ private fun ParagraphEditField(
                 color = textColor,
                 fontSize = (sizeSp * zoomScale).sp,
                 lineHeight = ((sizeSp + 5f) * zoomScale).sp,
-                fontFamily = FontFamily.Default,
-                fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
-                textAlign = composeTextAlign(alignment)
+                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
+                textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
@@ -361,42 +359,22 @@ private fun ParagraphEditField(
     }
 }
 
-private fun paragraphTextSizeSp(isHeading: Boolean, headingLevel: Int): Float {
-    return when {
-        isHeading && headingLevel <= 1 -> 18f
-        isHeading && headingLevel == 2 -> 16f
-        isHeading -> 14f
-        else -> 13f
-    }
-}
-
-private fun composeTextAlign(alignment: String?): TextAlign {
-    return when (alignment) {
-        "Center" -> TextAlign.Center
-        "Right" -> TextAlign.Right
-        "Justify" -> TextAlign.Justify
-        else -> TextAlign.Left
-    }
-}
-
 @Composable
 private fun ParagraphText(
-    text: String,
-    styleName: String?,
-    alignment: String?,
+    paragraph: OfficeParagraph,
+    leadingPrefix: String?,
+    styles: DocumentStyles,
     zoomScale: Float,
     enableOutlineFolding: Boolean,
     outlineEngine: OutlineEngine?,
     paragraphIndex: Int?,
     textColor: Color,
-    onToggleOutline: () -> Unit,
-    forceHeading: Boolean = false,
-    headingLevel: Int = 1
+    onToggleOutline: () -> Unit
 ) {
-    val isHeading = forceHeading || styleName?.contains("Heading", ignoreCase = true) == true ||
-        styleName?.contains("Judul", ignoreCase = true) == true
+    val isHeading = paragraph.styleName?.contains("Heading", ignoreCase = true) == true ||
+        paragraph.styleName?.contains("Judul", ignoreCase = true) == true
     val headingModifier = if (isHeading && enableOutlineFolding && outlineEngine != null) {
-        Modifier.pointerInput(text) {
+        Modifier.pointerInput(paragraph.text) {
             detectTapGestures(
                 onDoubleTap = {
                     if (paragraphIndex != null) {
@@ -410,16 +388,22 @@ private fun ParagraphText(
         Modifier
     }
 
-    val sizeSp = paragraphTextSizeSp(isHeading, headingLevel)
+    val displayParagraph = if (leadingPrefix != null) paragraph.copy(text = leadingPrefix + paragraph.text) else paragraph
+    val resolved = remember(displayParagraph.styleName, styles) {
+        OfficeRuns.baseStyle(displayParagraph, styles)
+    }
+    val sizeSp = resolved.fontSizeSp
+    val annotated = remember(displayParagraph, styles, zoomScale, textColor) {
+        OfficeRuns.toAnnotatedString(displayParagraph, styles, zoomScale, textColor)
+    }
 
     Text(
-        text = text,
+        text = annotated,
         fontSize = (sizeSp * zoomScale).sp,
         lineHeight = ((sizeSp + 5f) * zoomScale).sp,
         color = textColor,
-        fontFamily = FontFamily.Default,
-        fontWeight = if (isHeading) FontWeight.Bold else FontWeight.Normal,
-        textAlign = composeTextAlign(alignment),
+        fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
+        textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment),
         modifier = Modifier.fillMaxWidth().then(headingModifier)
     )
 }
