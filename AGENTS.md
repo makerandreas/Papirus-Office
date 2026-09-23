@@ -6,7 +6,7 @@
 
 > *Note on Naming*: The project was initially conceived under the codename **LibreDroid Office**. To ensure trademark safety and prevent trademark conflicts with LibreOffice and The Document Foundation, the production name **Papirus Office** is adopted.
 
-For complete deep architectural documentation, consult `PROJECT_CONTEXT.md` and `DESIGN.md`.
+For complete deep architectural documentation, consult `PROJECT_CONTEXT.md` and `DESIGN.md`. For early concepts that shapes the app this day, see `CONCEPT.md`.
 
 ### Suite Modules & Color Conventions
 Default static accent colors for Android 11 and below (devices without dynamic color / Material You support):
