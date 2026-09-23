@@ -16,8 +16,11 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+      PR_NUMBER: ${{ github.event.number }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -46,9 +49,24 @@ jobs:
               echo "::error::OOM $line"
             done
             echo "::error::GRADLE_EXIT=$code"
-            tail -40 /tmp/gradle_test.log | while IFS= read -r line; do
-              echo "::error::GRADLE $line"
+            {
+              echo "=== TAIL-60 ==="
+              tail -60 /tmp/gradle_test.log
+              echo "=== ERRORS ==="
+              grep -n -B3 -A15 -E "^e: |error:|FAILED|What went wrong|^Caused by" /tmp/gradle_test.log | head -250
+            } > /tmp/diag_test.txt
+            base64 -w0 /tmp/diag_test.txt | fold -w 40000 | while IFS= read -r chunk; do
+              echo "::error::DIAG $chunk"
             done
+            if [ -n "$GITHUB_TOKEN" ] && [ -n "$PR_NUMBER" ]; then
+              head -c 20000 /tmp/diag_test.txt > /tmp/diag_post.txt
+              jq -n --rawfile f /tmp/diag_post.txt \
+                '{body: ("Unit Tests gradle diagnostic (temporary debug step, will be removed):\n```\n" + $f + "\n```")}' > /tmp/diag_payload.json
+              curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                --data @/tmp/diag_payload.json \
+                "https://api.github.com/repos/makerandreas/Papirus-Office/issues/$PR_NUMBER/comments" || true
+            fi
             exit 1
           fi
 
@@ -183,8 +201,14 @@ jobs:
               echo "::error::OOM $line"
             done
             echo "::error::GRADLE_EXIT=$code"
-            tail -40 /tmp/gradle_build.log | while IFS= read -r line; do
-              echo "::error::GRADLE $line"
+            {
+              echo "=== TAIL-60 ==="
+              tail -60 /tmp/gradle_build.log
+              echo "=== ERRORS ==="
+              grep -n -B3 -A15 -E "^e: |error:|FAILED|What went wrong|^Caused by" /tmp/gradle_build.log | head -250
+            } > /tmp/diag_build.txt
+            base64 -w0 /tmp/diag_build.txt | fold -w 40000 | while IFS= read -r chunk; do
+              echo "::error::DIAG $chunk"
             done
             exit 1
           fi
