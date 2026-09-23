@@ -33,7 +33,19 @@ jobs:
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest
+          set -o pipefail
+          if ! ./gradlew testDebugUnitTest 2>&1 | tee /tmp/gradle_test.log; then
+            echo "Gradle failed; dumping targeted tail as annotations (temporary debug step)"
+            grep -E "^e: |^w: .*(deprecat|Unresolved)|error:|FAILED|What went wrong|^Caused by|^Execution failed|> Task" /tmp/gradle_test.log | grep -vE "SKIPPED|UP-TO-DATE|FROM-CACHE" | head -60 | while IFS= read -r line; do
+              echo "::error::GRADLE $line"
+            done
+            echo "::error::GRADLE_TAIL_BEGIN"
+            tail -15 /tmp/gradle_test.log | while IFS= read -r line; do
+              echo "::error::GRADLE $line"
+            done
+            echo "::error::GRADLE_TAIL_END"
+            exit 1
+          fi
 
   build:
     name: Build (SemVer & Nightly)
@@ -153,7 +165,19 @@ jobs:
         if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          set -o pipefail
+          if ! ./gradlew assembleDebug 2>&1 | tee /tmp/gradle_build.log; then
+            echo "Gradle failed; dumping targeted tail as annotations (temporary debug step)"
+            grep -E "^e: |^w: .*(deprecat|Unresolved)|error:|FAILED|What went wrong|^Caused by|^Execution failed|> Task" /tmp/gradle_build.log | grep -vE "SKIPPED|UP-TO-DATE|FROM-CACHE" | head -60 | while IFS= read -r line; do
+              echo "::error::GRADLE $line"
+            done
+            echo "::error::GRADLE_TAIL_BEGIN"
+            tail -15 /tmp/gradle_build.log | while IFS= read -r line; do
+              echo "::error::GRADLE $line"
+            done
+            echo "::error::GRADLE_TAIL_END"
+            exit 1
+          fi
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
