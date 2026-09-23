@@ -17,9 +17,9 @@ class HyphenationLayoutTest {
 
     @Test
     fun hyphenationSplitsOverflowingWordIntoLines() {
-        // Pattern of 23 x's (within the 32-letter scan window) with a break
-        // point every two letters.
-        val pattern = buildString { repeat(11) { append("x2") }; append("x") }
+        // Dictionary pattern for a run of x's with a break after every letter
+        // (the leading dot is mandatory for parse to accept the line).
+        val pattern = "." + buildString { repeat(11) { append("x2") }; append("x") }
         val engine = HyphenationEngine.parse(listOf(pattern))
         val doc = OfficeDocument(
             body = DocumentBody(listOf(OfficeParagraph(text = "x".repeat(95))))
