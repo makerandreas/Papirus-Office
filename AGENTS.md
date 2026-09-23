@@ -102,7 +102,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 ---
 
 ## Reference Material 
-### `/sources`
+### `/docs/html`
 All document format specifications, standards, and schema definitions placed in `/sources` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
 - **ODF v1.4 Standards**:
   - `Part 1: Introduction` (architecture, conformance, namespaces, references)
@@ -116,8 +116,8 @@ All document format specifications, standards, and schema definitions placed in 
 ### `app/src/main/libs`
 Pre-built native `.so` libraries per ABI (`arm64-v8a`, `armeabi-v7a`) from the official LibreOffice Viewer for Android. Never assume a native capability without checking `LokitEngine.isNativeAvailable`.
 
-### `sdk-references`
-When necessary, consult all SDK examples in `/sdk-references` directory.
+### `sdk-references` and `app/src/main/sdk-examples`
+When necessary, consult all SDK examples in `/sdk-references` and `app/src/main/sdk-examples` directory.
 
 ## Test Sample Files (`/tests`)
 Files in `/tests` are reference sample files for analyzing, development references, regression testing, and compatibility verification across LibreOffice, Microsoft Word, and Papirus Office.

@@ -55,6 +55,19 @@ Notes:
 - The wizard needs file-write access for step 5 (the pointer block), and nothing else; the user approves once. It never needs network access.
 - The pointer block is the source of truth for which skills are installed. To add or remove a skill later, update the block to match (add or remove the file and its line).
 
+### Already installed, and the user asks how to update
+
+antislop never updates itself, and nothing announces a new release. Answer from the route the user installed with, and say which route you are assuming when you cannot tell:
+
+- **The installer** (`npx antislop-ai`): run it again, answer as before, and pick **Overwrite them**. It prints the version already on disk next to the version it carries, so nothing has to be compared by hand. *Keep what is there* installs nothing.
+- **The skills directory** (`npx skills add miqdadbadjuber/anti-slop`): run the same command again.
+- **A plugin door** (Claude Code, Antigravity, Codex, Cursor, Kimi Code): each agent has its own update command. `GUIDE.md` in the repo lists them one by one.
+- **This file alone**: download it again and replace the copy.
+
+The folder this skill sits in holds a `VERSION` file naming the release it came from, unless it was installed before that file shipped. The current release is on the repo's releases page.
+
+Skills load when a session starts, so the session asking the question keeps the old rules either way. Say so, and tell the user to start a new one.
+
 ---
 
 ## Two Usage Modes
@@ -240,6 +253,7 @@ These rules protect honesty, function, and accessibility. Breaking any of them i
 - **FORBIDDEN**: em dash character (`—`) in any text
 - Use comma (`,`), period (`.`), colon (`:`), or parentheses `()` instead
 - Text must feel natural and human
+- **Scope**: the ban governs text the agent writes. A user's own writing sample is a direction, not agent copy, so a sample that uses em dashes goes through R-37's conflict protocol: name the character, name the rule, ask. Never keep or cut them silently.
 - **Carve-out**: documentation of this rule is exempt: the numbered section headings in this file (`R-XX — Title` rules and `C-1` to `C-5` principles), the em dash example in Part 1, the rule's own definition, any Delivery Gate item that quotes it, and the `Em Dashes` section in the copywriting skill (`skills/antislop-copywriting/SKILL.md`). These are documentation structure, not UI text.
 
 #### R-03 — Mobile Responsiveness
@@ -373,7 +387,7 @@ If an element genuinely cannot have a destination yet, remove it instead of ship
 - If no direction exists AND the user cannot be asked, the output MUST be labeled *"draft without direction"* AND use the honest default dials **ENERGY 1 / RHYTHM 1 / MOTION 1** (see Part 3). Never silently fall back to a neutral, sterile default
 - **FORBIDDEN**: designing without direction and silently falling into a neutral, sterile default
 - Style direction is the product owner's identity, not a slop pattern; this filter only applies on top of it
-- If `DESIGN.md` itself asks for a named slop pattern, do not silently follow it and do not silently override it: name the element, name the rule it collides with, and ask the owner to keep it or drop it
+- If `DESIGN.md`, or any direction the owner supplies (a brand guide, a writing sample), asks for a named slop pattern, do not silently follow it and do not silently override it: name the element, name the rule it collides with, and ask the owner to keep it or drop it
 - Ask only about a named pattern, never about a stylistic choice the direction is entitled to make: a bold palette or an unusual typeface is identity, not slop
 - Record the answer in one line: if the owner keeps it, proceed and note the override; if they drop it, apply the rule
 - A design built without direction is a draft, not a shippable result
@@ -611,7 +625,7 @@ The gate has four blocks: Hard Gate (absolute), Purpose-Gate (technique + writte
 
 Before declaring the design done, answer every question below. All answers must be **no**:
 
-- [ ] Is there an em dash (`—`) anywhere in the text, outside the R-02 carve-out? *(R-02)*
+- [ ] Is there an em dash (`—`) anywhere in the text, outside the R-02 carve-out and any voice sample the owner approved under R-37? *(R-02)*
 - [ ] Is there any horizontal overflow, text escaping its container, or broken layout on mobile? *(R-03)*
 - [ ] Are there any statistics without a real source (10K+ Users, 99.9% Uptime, etc.)? *(R-17)*
 - [ ] Are there any fictional testimonials (AI avatars, random names or job titles)? *(R-18)*

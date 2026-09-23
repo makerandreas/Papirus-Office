@@ -236,7 +236,7 @@ Dial: ENERGY 2 / RHYTHM 1 / MOTION 3
 
 ## Personality & Character
 - **Personality**: *Modern office suite*.
-- **Karakter**: Utilitarian, structured, precise, professional, productive, and clean, free from excessive ornamentation that distracts from the document's work-related focus.
+- **Character**: Utilitarian, structured, precise, professional, productive, and clean, free from excessive ornamentation that distracts from the document's work-related focus.
 
 ---
 
