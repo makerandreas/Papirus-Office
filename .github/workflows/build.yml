@@ -33,26 +33,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          set -o pipefail
-          set +e
-          ./gradlew testDebugUnitTest 2>&1 | tee /tmp/gradle_test.log
-          code=$?
-          if [ $code -ne 0 ]; then
-            set +o pipefail
-            echo "::error::GRADLE_EXIT=$code"
-            {
-              echo "=== TAIL-60 ==="
-              tail -60 /tmp/gradle_test.log
-              echo "=== ERRORS ==="
-              grep -n -B3 -A15 -E "^e: |error:|FAILED|What went wrong|^Caused by|Tests .* failed" /tmp/gradle_test.log | head -250
-            } > /tmp/diag_test.txt
-            n=0
-            base64 -w0 /tmp/diag_test.txt | fold -w 1800 | while IFS= read -r chunk; do
-              n=$((n + 1))
-              echo "::error::DIAG-$n $chunk"
-            done
-            exit 1
-          fi
+          ./gradlew testDebugUnitTest
 
   build:
     name: Build (SemVer & Nightly)
