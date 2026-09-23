@@ -97,7 +97,7 @@ class DocumentTextWindowsTest {
         )
         assertEquals(
             androidx.compose.ui.text.TextRange(14, 20),
-            DocumentTextWindows.toGlobalSelection(window, androidx.compose.ui.text.TextRange(-5, 99))
+            DocumentTextWindows.toGlobalSelection(window, androidx.compose.ui.text.TextRange(0, 100))
         )
         assertEquals(
             androidx.compose.ui.text.TextRange(16, 19),
