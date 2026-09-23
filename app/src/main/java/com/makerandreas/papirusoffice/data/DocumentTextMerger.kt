@@ -27,17 +27,19 @@ object DocumentTextMerger {
             when {
                 isStructural(element) -> result.add(element)
                 isTextual(element) -> {
-                    val block = if (blocks.isNotEmpty()) blocks.removeAt(0) else textualText(element)
+                    // Edited text is authoritative: elements past the edited
+                    // block count clear instead of resurrecting stale text.
+                    val block = if (blocks.isNotEmpty()) blocks.removeAt(0) else ""
                     result.add(replaceText(element, block))
                 }
                 else -> result.add(element)
             }
         }
 
+        // Trailing blocks are typed content too (e.g. Enter at document end);
+        // dropping blank ones would orphan the caret's target paragraph.
         for (extra in blocks) {
-            if (extra.isNotBlank()) {
-                result.add(OfficeParagraph(text = extra))
-            }
+            result.add(OfficeParagraph(text = extra))
         }
 
         return document.copy(
@@ -72,23 +74,13 @@ object DocumentTextMerger {
         }
     }
 
-    private fun isTextual(element: OfficeElement): Boolean {
+    fun isTextual(element: OfficeElement): Boolean {
         return when (element) {
             is OfficeParagraph,
             is OfficeHeading,
             is OfficeListItem,
             is OfficeDocElement.ParagraphElement -> true
             else -> false
-        }
-    }
-
-    private fun textualText(element: OfficeElement): String {
-        return when (element) {
-            is OfficeParagraph -> element.text
-            is OfficeHeading -> element.text
-            is OfficeListItem -> element.text
-            is OfficeDocElement.ParagraphElement -> element.paragraph.text
-            else -> ""
         }
     }
 
