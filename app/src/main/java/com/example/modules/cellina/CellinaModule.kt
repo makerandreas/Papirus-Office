@@ -1562,7 +1562,7 @@ fun CellinaModule(
                                                 isFrozenPane = !isFrozenPane
                                                 Toast.makeText(
                                                     context,
-                                                    if (isFrozenPane) context.getString(R.string.toast_frozen_pane_at_col_row, activeCellCol, activeCellRow) else R.string.toast_unfrozen_panes,
+                                                    if (isFrozenPane) context.getString(R.string.toast_frozen_pane_at_col_row, activeCellCol, activeCellRow) else context.getString(R.string.toast_unfrozen_panes),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             },
