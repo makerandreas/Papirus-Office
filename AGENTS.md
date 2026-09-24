@@ -128,6 +128,11 @@ When necessary, translate all strings to `en_US` and add to `strings.xml`
 ## Notice on JNI
 If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
+## Handling `build.yml`
+- Before creating a new build, execute a deletion of all old assets in the `nightly` tag, delete **all** old release with its tag (`gh release delete nightly --yes --cleanup-tag`) and forcing push tag `nightly` to active SHA commit (`${{ github-sha }}`)
+- Add `target_commitish: ${{ github-sha }}` and `mske_latest: false` on the `Drop Papirus Nightly Release` step to freshly make new release with current timestamp, tag exactly pointed to current commit, and all old files are not retained again.
+- Make sure to rewrite description of the releae by stritcly following `antislop.md` rules. 
+
 <!-- antislop:start -->
 ## antislop
 For UI, copy, people, mobile layout, or code comments work, read `antislop.md` (core) and then the skill for the task:
