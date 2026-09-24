@@ -1,7 +1,8 @@
-# Papirus Office Writer — Fix Strategy, Split into Five PRs
+# Papirus Office Writer — Fix Strategy, Plans 4 to 9 (was PRs D to I)
 
 **Date:** 2026-09-24
-**Input:** `anti-slop/audit-005-2026-09-24.md` (finding list F-01 … F-20, observations O-01 … O-06)
+**Input:** `anti-slop/audit-005-2026-09-24.md` (findings F-01 … F-20, observations O-01 … O-06) and `anti-slop/audit-006-2026-09-24.md` (screenshot findings F-21 … F-31, compliance sweep)
+**Numbering:** this document holds **plans 4 to 9**; it was written as PRs D to I and the letters are kept in parentheses for traceability. Sub-item IDs (`D-1`, `E-EN-2`, `F-3`, `G-1`, `H-4` …) are unchanged, so `letter-n` reads as `plan-n item` (D-1 = Plan 4 item 1, E-2 = Plan 5 item 2, F-3 = Plan 6 item 3, G-1 = Plan 7 item 1, H-4 = Plan 8 item 4). The index is `anti-slop/plan-01-master-index.md`.
 **Baseline:** post-PR-C nightly, `main` d1105ce (PRs #7 A, #8 B1, #9 B2, #10 C)
 **Deliverable of this document:** an ordered, reviewable PR split with scope, root causes closed, files, tests, acceptance criteria, and risk. It changes no code by itself.
 
@@ -9,7 +10,7 @@
 
 ---
 
-## 0. Why five PRs and not one
+## Why six plans and not one
 
 The findings are not one bug. They sit in four independent layers that can each be verified on its own:
 
@@ -20,11 +21,11 @@ The findings are not one bug. They sit in four independent layers that can each 
 | **Structure, ODF** | TOC, BAB/2.1 numbering, tables, heading runs, hyperlink text | `SvXMLImport.kt`, `SvXMLImportContext.kt`, `OdfXmlToken.kt`, `OfficeDocument.kt` |
 | **Structure, OOXML** | heading sizes, run formatting, numbering, table grid, sections | `OfficeDocumentParser.kt` (DOCX branch), `DocxDocumentParser.kt`, `StyleResolver` |
 
-Fixing chrome inside the measurement PR, or measurement inside the OOXML PR, would make both unreviewable: the first touches pixels, the second touches the page model, the third and fourth touch file-format parsing. The five PRs below follow the layers and the dependency order **D → E → F → G → H**, with D‖F and G‖(independent parts of F) parallelisable.
+Fixing chrome inside the measurement plan, or measurement inside the OOXML plan, would make both unreviewable: the first touches pixels, the second touches the page model, the third and fourth touch file-format parsing. The six plans below follow the layers and the dependency order **4 → 5 → 6 → 7 → 8 → 9**, with 4‖6 and 7‖(independent parts of 8) parallelisable.
 
 ---
 
-## 1. Shared enablers (land inside PR E, used by F/G/H)
+## Shared enablers (land inside Plan 5, used by Plans 6-8)
 
 These are the seams every later PR plugs into. They belong in E because E is the first PR that needs them.
 
@@ -36,7 +37,7 @@ These are the seams every later PR plugs into. They belong in E because E is the
 
 ---
 
-## 2. PR D — Viewer/Editor chrome and input fixes
+## Plan 4 — Viewer/Editor chrome and input fixes (was PR D)
 
 **Goal:** the app stops *looking* broken before we touch the document engine. Ship first, it is the fastest win and the lowest risk.
 **Closes:** F-01, F-02, F-03, F-04, F-05, F-06.
@@ -69,7 +70,7 @@ Low. The only behavioural trade is removing the Viewer FAB (a UX decision the au
 
 ---
 
-## 3. PR E — Layout metrics and pagination (the page-count PR)
+## Plan 5 — Layout metrics and pagination (was PR E, the page-count plan)
 
 **Goal:** one honest measurement of text, one honest page model. This is the PR that moves 65/88 pages toward 21.
 **Closes:** the page-count half of the user's finding 6, F-10's paragraph metrics, the table-height part of F-11, plus enables F-18.
@@ -103,7 +104,7 @@ Medium-high: this is the first change that makes pagination *correct* rather tha
 
 ---
 
-## 4. PR F — Image pipeline and load performance
+## Plan 6 — Image pipeline and load performance (was PR F)
 
 **Goal:** images appear immediately, at the right size, and stay there.
 **Closes:** F-07, F-18, the "never load" half of finding 5.
@@ -115,7 +116,7 @@ Medium-high: this is the first change that makes pagination *correct* rather tha
 2. **F-2 · Media store instead of `cacheDir`.** Extract into `filesDir/media/<sha256(path:len:mtime)>/` with a small manifest (name → size, hash), an LRU cap (`ZipSafe.MAX_IMAGE_BYTES` already bounds single files), and a **self-heal** path: if a referenced file is missing at render time (cache trim, cleanup worker), re-extract that one entry from the source package instead of printing `[Image]`. This is the fix for "sometimes the image never loads".
 3. **F-3 · Decode without a blank frame.** `DocxEmbeddedImage` gets explicit `size()` from the resolved extent, `ContentScale.Fit`, a low-cost placeholder, and `crossfade(false)`; pre-decode the first pages' images on a background dispatcher while the document is being laid out.
 4. **F-4 · Honest loading progress.** Delete `delay(500)+delay(500)+delay(400)` from `runDocumentLoading`; drive `loadingProgressStatus` from real stages (zip open → styles → body → media → layout). Target: Recents open shows text in one frame after the parse, images within one frame after decode (no ≥500 ms blank).
-5. **F-5 · Save-path guard (O-01, minimal).** Until PR I exists, the DOCX/ODT save must refuse to run when the model contains images it cannot serialise, or must copy original media entries through unchanged. A silent `[Image: path]` replacement is data loss; make it an explicit, logged failure the user sees.
+5. **F-5 · Save-path guard (O-01, minimal).** Until Plan 9 exists, the DOCX/ODT save must refuse to run when the model contains images it cannot serialise, or must copy original media entries through unchanged. A silent `[Image: path]` replacement is data loss; make it an explicit, logged failure the user sees.
 
 ### Files
 `data/DocxImageExtractor.kt` (→ `MediaStore`), `data/OfficeDocumentParser.kt` (extent capture, DOCX and ODF), `data/DocxDocumentParser.kt` (delete the dead `parseDocxFile`/`imageExtents` plumbing), `data/OfficeDocument.kt` (`OfficeImage` units), `data/LayoutEngine.kt` (reserve declared size), `modules/inky/LayoutDrivenDocumentRenderer.kt` (`RenderImage`), `ui/components/DocxEmbeddedImage.kt`, `modules/inky/InkyModule.kt` (loading sequence, save guard, drop dead `docxExtents` state).
@@ -133,7 +134,7 @@ Low-medium (Coil behaviour varies with device; the self-heal path is the importa
 
 ---
 
-## 5. PR G — ODF structural fidelity
+## Plan 7 — ODF structural fidelity (was PR G)
 
 **Goal:** Sample-6.odt reads like the Writer Guide document it is: numbered headings, real lists, a table with correct columns, a TOC, and hyperlinks that keep their text.
 **Closes:** F-08 (font identity), F-09, F-11, F-12, F-13, F-14, F-15, O-03, O-04, O-05.
@@ -165,7 +166,7 @@ Medium. Numbering is the one place where the model must be general (ODF `num-for
 
 ---
 
-## 6. PR H — OOXML structural fidelity
+## Plan 8 — OOXML structural fidelity (was PR H)
 
 **Goal:** close the DOCX fidelity gap that makes the user say the format is "far from perfect" for exactly the right reason: it is proprietary, so our parser must be more careful, not less.
 **Closes:** F-16, F-17, F-19, F-20 and the DOCX half of F-10/F-11.
@@ -199,24 +200,24 @@ Medium-high (biggest parser surface). Mitigation: keep the new reader side-by-si
 
 ---
 
-## 7. PR I (planned, not scheduled here) — save round-trip integrity
+## Plan 9 (planned, not scheduled here) — save round-trip integrity (was PR I)
 
-O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` regenerates `word/document.xml` and downgrades images to `"[Image: path]"` text; the ODT side regenerates `content.xml` with a reduced element set, while copying every other zip entry unchanged. Until a format-correct writer exists, a save can silently destroy content. The minimal guard ships **inside PR F** (refuse instead of degrade); the full writer (styles, numbering, tables, images, TOC) is a separate PR to plan after G/H, together with F-2's `OfficeDocElement` retirement.
+O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` regenerates `word/document.xml` and downgrades images to `"[Image: path]"` text; the ODT side regenerates `content.xml` with a reduced element set, while copying every other zip entry unchanged. Until a format-correct writer exists, a save can silently destroy content. The minimal guard ships **inside Plan 6** (refuse instead of degrade); the full writer (styles, numbering, tables, images, TOC) is a separate PR to plan after G/H, together with F-2's `OfficeDocElement` retirement.
 
 ---
 
-## 8. Sequencing, parallelism, verification
+## Appendix A — Sequencing, parallelism, verification
 
 | Order | PR | Parallel with | Gate to enter the next |
 |---|---|---|---|
-| 1 | **D** chrome & input | F (image pipeline) | device checklist for findings 1–5, 7; Delivery Gate PASS |
-| 2 | **E** metrics & pagination | — (touches every test window) | Sample-5 `15..21`, Sample-6 `15..26`, caret/selection suites green |
-| 3 | **F** images & performance | D | Recents open: no blank frame, media self-heal proven |
-| 4 | **G** ODF structure | H's style-reader scaffolding (different files) | Sample-6.odt fidelity checklist; hyperlink text-count test |
-| 5 | **H** OOXML structure | tail of G | Sample-6.docx fidelity checklist; both-format convergence |
-| 6 | **I** save integrity | — | round-trip test: open → save → reopen preserves text, styles, tables, images |
+| 1 | **Plan 4** chrome & input | **Plan 6** (image pipeline) | device checklist for findings 1–5, 7; Delivery Gate PASS |
+| 2 | **Plan 5** metrics & pagination | — (touches every test window) | Sample-5 `15..21`, Sample-6 `15..26`, caret/selection suites green |
+| 3 | **Plan 6** images & performance | **Plan 4** | Recents open: no blank frame, media self-heal proven |
+| 4 | **Plan 7** ODF structure | **Plan 8** style-reader scaffolding (different files) | Sample-6.odt fidelity checklist; hyperlink text-count test |
+| 5 | **Plan 8** OOXML structure | tail of **Plan 7** | Sample-6.docx fidelity checklist; both-format convergence |
+| 6 | **Plan 9** save integrity | — | round-trip test: open → save → reopen preserves text, styles, tables, images |
 
-**Verification protocol (per `AGENTS.md`).** No local JDK exists in this environment: every PR is verified through GitHub Actions (`gh run list -L 5`, `gh run watch`), with the unit-test job green before review and the nightly build green before the user retests. Manual device verification uses `docs/InkyC1Checklist.md`; its run has been deliberately postponed and should resume after **PR D** (chrome/input items), then again after **E** (zoom, caret, selection, session restore: page 15 at 170 %), and after **G/H** (save compatibility).
+**Verification protocol (per `AGENTS.md`).** No local JDK exists in this environment: every PR is verified through GitHub Actions (`gh run list -L 5`, `gh run watch`), with the unit-test job green before review and the nightly build green before the user retests. Manual device verification uses `docs/InkyC1Checklist.md`; its run has been deliberately postponed and should resume after **Plan 4** (chrome/input items), then again after **E** (zoom, caret, selection, session restore: page 15 at 170 %), and after **G/H** (save compatibility).
 
 **Test matrix every PR must keep green**
 
@@ -231,7 +232,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 
 ---
 
-## 9. What these PRs deliberately do **not** do
+## Appendix B — What these plans deliberately do not do
 
 * No new third-party dependency (no XML/zip library): `ZipSafe` + XmlPullParser + stdlib stay (`AGENTS.md`).
 * No UI copy outside `values/strings.xml`; no Indonesian strings in the app layer (audit-003 P2-2).
@@ -242,10 +243,10 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 
 ---
 
-## 10. Definition of done for the whole effort
+## Appendix C — Definition of done
 
-1. Sample-6 renders in Papirus within ±20 % of the M365 page count first, ±10 % after PR I, with every fidelity item from the user's list resolved or explicitly deferred with a reason.
+1. Sample-6 renders in Papirus within ±20 % of the M365 page count first, ±10 % after Plan 9, with every fidelity item from the user's list resolved or explicitly deferred with a reason.
 2. Sample-1…5 keep their heading, navigation, pagination and image behaviour (windows tightened, never loosened silently).
-3. `docs/InkyC1Checklist.md` runs end-to-end on device after PR D and PR E, with results recorded in the next audit file.
+3. `docs/InkyC1Checklist.md` runs end-to-end on device after Plan 4 and Plan 5, with results recorded in the next audit file.
 4. Every UI-touching PR carries an `antislop` Delivery Gate PASS with evidence, and `DESIGN.md` tokens are respected (module accent, 48 dp targets, tonal elevation only, no unbranded colours).
 5. Each PR body states which findings (F-xx) it closes and which it defers, so the audit stays the single source of truth.
