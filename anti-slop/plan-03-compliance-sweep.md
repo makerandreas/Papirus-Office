@@ -92,3 +92,22 @@ These are recorded here so the sweep is complete; the code fixes belong to Plans
 * **Documentation:** 3.28-3.31 — diffs against the cited files.
 
 **Size:** medium; 3.1-3.4 are mechanical and can land as one PR, 3.5-3.12 as a second (UI), 3.13-3.27 follow their owning plans, 3.28-3.31 as a docs-only PR.
+
+---
+
+## 8. Implementation record (PR 12 = plan 3A, branch `arena/01a0d161-papirus-office`)
+
+What landed for items 3.1-3.4 and 3.8, per the roadmap's PR 12 scope. CI is the compile evidence (no local JDK).
+
+| Item | State | Notes |
+|---|---|---|
+| 3.1 `contentDescription` literals | done | 226 named-arg literals moved to `values/strings.xml` as `cd_*` resources; `stringResource(...)` at every site (all were `Icon` params in composable scope; no semantics blocks existed) |
+| 3.2 `Toast` literals | done | 282 literal toasts moved: non-parameterised ones use the `R.string` `makeText` overload, parameterised ones `context.getString(res, args)` with `%1$s`-style positional placeholders (argument order preserved through renumbered placeholders) |
+| 3.3 Indonesian copy | done | `Draft Dokumen Baru` → `Untitled Document`; save-root `Inky_Dokumen.*` → `Untitled.*`; the font-size and paste-special toasts, the settings-reset popup, the Drive button and the `Ubah Ukuran Font` label/description all became en_US resources; the simulated `documentLoad` diagnostics entry now says `Untitled.odt`. `values-in` keeps exactly its 27 keys |
+| 3.4 em dashes | done | the SMTP-simulation toast, the two email-transcript `addLog` lines and the engine status label use colon/comma instead; the `strings.xml` comment stays (documentation, named here per the plan) |
+| 3.8 stub markers | done | `TODO(plan-6/7/8)` on the four toast-only hub tools, `TODO(plan-3B)` on the unimplemented ribbon decks, `TODO(unassigned)` on the Drive placeholder |
+| guard | done | `SourceHygieneGuardTest` (plain JUnit, runs in `testDebugUnitTest`): comment-masked scan of `app/src/main/java` failing on literal toast messages, literal `contentDescription`s, raw `Color.Gray/DarkGray/LightGray` above the recorded per-file allowances, em dashes in string literals, and resurrected 3.3 literals; self-test proves all five rules fire on synthetic offenders and stay silent on commented-out code and format-arg quotes |
+
+**Carve-out recorded:** 44 raw grey sites across 14 files sit in the guard's allowance map at PR-12 counts (plan 3B's token sweep burns them down; the HomeSubpages picker palette counts as document colours per 3.11).
+
+**Sweep method note:** the extraction was scripted (paren-aware argument parsing, interpolated literals converted to positional format args, duplicate templates deduped against the existing 283 keys); every transformation was verified by a guard port before commit. 3.5-3.7, 3.9-3.12, 3.28 remain for PRs 13-14; 3.13-3.27 stay with their owning fidelity plans.

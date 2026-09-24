@@ -27,7 +27,7 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 |---|---|---|---|---|---|
 | **1** | **Master index and working guide** (this file) | — | — | here | **active** |
 | **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
-| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` | scheduled as PRs 12-14 (see the roadmap) |
+| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` | 3A in review (PR 12); 3B/3C scheduled as PRs 13-14 |
 | **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
 | **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5 | scheduled as PRs 15-16 |
 | **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | scheduled as PR 17 |
