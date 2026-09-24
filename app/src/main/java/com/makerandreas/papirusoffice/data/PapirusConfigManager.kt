@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
 import android.widget.Toast
+import com.example.R
 import java.io.File
 
 /**
@@ -379,7 +380,7 @@ object PapirusConfigManager {
         if (isPending) {
             // Clear flag
             optionsPrefs.edit().putBoolean(KEY_RESET_SUCCESS_PENDING, false).apply()
-            val message = "Pengaturan aplikasi sukses direset."
+            val message = context.getString(R.string.settings_reset_success)
             onShowPopup(message)
         }
     }

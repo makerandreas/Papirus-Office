@@ -19,6 +19,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.R
 
 /**
  * BroadcastReceiver for handling system-level crash notification actions:
@@ -91,9 +92,9 @@ class CrashNotificationReceiver : BroadcastReceiver() {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clip = ClipData.newPlainText("Papirus Crash Stacktrace", stackTrace)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(context, "Stacktrace copied to clipboard!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, R.string.toast_stacktrace_copied_to_clipboard, Toast.LENGTH_LONG).show()
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Failed to copy stacktrace: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_failed_to_copy_stacktrace_e_message, e.message), Toast.LENGTH_SHORT).show()
                 }
             }
             ACTION_SAVE_STACKTRACE -> {
@@ -101,9 +102,9 @@ class CrashNotificationReceiver : BroadcastReceiver() {
                     val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                     val fileName = "Papirus_Crash_Report_$timeStamp.txt"
                     val savedLocation = saveCrashReport(context, fileName, stackTrace)
-                    Toast.makeText(context, "Saved crash report to:\n$savedLocation", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.toast_saved_crash_report_to_n_savedlocation, savedLocation), Toast.LENGTH_LONG).show()
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Failed to save crash log: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_failed_to_save_crash_log_e_message, e.message), Toast.LENGTH_SHORT).show()
                 }
             }
             ACTION_SHARE_STACKTRACE -> {
@@ -119,7 +120,7 @@ class CrashNotificationReceiver : BroadcastReceiver() {
                     }
                     context.startActivity(chooserIntent)
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Failed to share crash report: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_failed_to_share_crash_report_e_message, e.message), Toast.LENGTH_SHORT).show()
                 }
             }
         }

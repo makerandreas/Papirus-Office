@@ -136,7 +136,7 @@ object PapirusEmailEngine {
             addLog("SIMULATION aborted: host, account and recipient are required.")
             return@withContext false
         }
-        addLog("SIMULATION START — no network connection is opened and no email is sent.")
+        addLog("SIMULATION START: no network connection is opened and no email is sent.")
         addLog("Initializing MailServiceProvider instance...")
         addLog("Target host: $host:$port | Encryption: ${if (sslEnabled) "SSL/TLS" else "Plaintext/Insecure"}")
 
@@ -205,7 +205,7 @@ object PapirusEmailEngine {
             addLog("Disconnecting client safely. 221 Goodbye.")
             service.disconnect()
 
-            addLog("SIMULATION COMPLETE — transcript only, no email was actually sent.")
+            addLog("SIMULATION COMPLETE: transcript only, no email was actually sent.")
             true
         } catch (e: Exception) {
             addLog("SMTP Connection crashed: ${e.localizedMessage}")
