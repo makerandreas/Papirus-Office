@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
 
 // Data class to store drawn lines
 data class LinePath(
@@ -80,20 +81,20 @@ fun PagellaModule(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 IconButton(onClick = { onBack() }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                 }
                 IconButton(
                     onClick = { if (currentPage > 1) currentPage-- },
                     enabled = currentPage > 1
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "Previous Page")
+                    Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = stringResource(R.string.cd_previous_page))
                 }
                 Text("Page $currentPage / $totalPages", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 IconButton(
                     onClick = { if (currentPage < totalPages) currentPage++ },
                     enabled = currentPage < totalPages
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "Next Page")
+                    Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = stringResource(R.string.cd_next_page))
                 }
             }
 
@@ -103,11 +104,11 @@ fun PagellaModule(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 IconButton(onClick = { if (zoomLevel > 50) zoomLevel -= 25 }) {
-                    Icon(Icons.Default.ZoomOut, contentDescription = "Zoom Out")
+                    Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.cd_zoom_out))
                 }
                 Text("$zoomLevel%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 IconButton(onClick = { if (zoomLevel < 300) zoomLevel += 25 }) {
-                    Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In")
+                    Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.cd_zoom_in))
                 }
             }
 
@@ -119,17 +120,17 @@ fun PagellaModule(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Gesture,
-                        contentDescription = "Toggle Ink drawing Annotations",
+                        contentDescription = stringResource(R.string.cd_toggle_ink_drawing_annotations),
                         tint = if (isInkMode) MaterialTheme.colorScheme.primary else Color.Gray
                     )
                 }
 
                 if (isInkMode) {
                     IconButton(onClick = { paths.clear() }) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "Clear ink drawings", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.cd_clear_ink_drawings), tint = MaterialTheme.colorScheme.error)
                     }
                     IconButton(onClick = { onPdfAction("Exported ink annotations to annotated_${currentPage}.png") }) {
-                        Icon(Icons.Default.SaveAlt, contentDescription = "Export drawings as PNG", tint = MaterialTheme.colorScheme.tertiary)
+                        Icon(Icons.Default.SaveAlt, contentDescription = stringResource(R.string.cd_export_drawings_as_png), tint = MaterialTheme.colorScheme.tertiary)
                     }
                 }
             }

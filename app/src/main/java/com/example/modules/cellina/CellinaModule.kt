@@ -199,7 +199,7 @@ fun CellinaModule(
                 isSaving = false
                 isSaved = true
                 saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -219,7 +219,7 @@ fun CellinaModule(
             } else {
                 isSaved = true
                 saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
                 onSuccess?.invoke()
             }
         }
@@ -293,27 +293,27 @@ fun CellinaModule(
                                 onBack()
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = {
-                            Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_uploading_to_google_drive, Toast.LENGTH_SHORT).show()
                         }) {
-                            Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = stringResource(R.string.cd_upload_to_drive))
                         }
                         IconButton(onClick = { 
                             isWebView = !isWebView
-                            Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, if (isWebView) R.string.toast_mobile_view_active else R.string.toast_normal_view_active, Toast.LENGTH_SHORT).show()
                         }) {
                             Icon(
                                 imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                contentDescription = "Document View Mode"
+                                contentDescription = stringResource(R.string.cd_document_view_mode)
                             )
                         }
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                             }
                             DropdownMenu(
                                 expanded = showMoreMenu,
@@ -323,9 +323,9 @@ fun CellinaModule(
                                     text = { Text("Export to PDF") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_exporting_to_pdf, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
+                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = stringResource(R.string.cd_pdf)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Save as...") },
@@ -333,7 +333,7 @@ fun CellinaModule(
                                         showMoreMenu = false
                                         showSaveAsDialog = true
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
+                                    leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = stringResource(R.string.cd_save_as)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Simulate Save Error") },
@@ -341,15 +341,15 @@ fun CellinaModule(
                                         showMoreMenu = false
                                         performSave(true)
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = stringResource(R.string.cd_simulate_error), tint = MaterialTheme.colorScheme.error) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Print") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Printing document...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_printing_document, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                 )
                             }
                         }
@@ -364,30 +364,30 @@ fun CellinaModule(
                     title = { /* Headline & Subtitle removed in Edit Mode */ },
                     navigationIcon = {
                         IconButton(onClick = { isEditMode = false }) {
-                            Icon(Icons.Default.Check, contentDescription = "Exit Edit Mode", tint = moduleColor)
+                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.cd_exit_edit_mode), tint = moduleColor)
                         }
                     },
                     actions = {
                         IconButton(onClick = {
-                            Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_uploading_to_google_drive, Toast.LENGTH_SHORT).show()
                         }) {
-                            Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = stringResource(R.string.cd_upload_to_drive))
                         }
                         IconButton(onClick = {
                             isWebView = !isWebView
-                            Toast.makeText(context, if (isWebView) "Mobile View" else "Normal View", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, if (isWebView) R.string.toast_mobile_view else R.string.toast_normal_view, Toast.LENGTH_SHORT).show()
                         }) {
                             Icon(
                                 imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                contentDescription = "Document View Mode"
+                                contentDescription = stringResource(R.string.cd_document_view_mode)
                             )
                         }
                         IconButton(onClick = { handleSaveCommand() }) {
-                            Icon(Icons.Rounded.Save, contentDescription = "Save")
+                            Icon(Icons.Rounded.Save, contentDescription = stringResource(R.string.cd_save))
                         }
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                             }
                             DropdownMenu(
                                 expanded = showMoreMenu,
@@ -399,7 +399,7 @@ fun CellinaModule(
                                         showMoreMenu = false
                                         handleSaveCommand()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
+                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = stringResource(R.string.cd_save)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Simulate Save Error") },
@@ -407,23 +407,23 @@ fun CellinaModule(
                                         showMoreMenu = false
                                         performSave(true)
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = stringResource(R.string.cd_simulate_error), tint = MaterialTheme.colorScheme.error) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Export to PDF") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_exporting_to_pdf, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
+                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = stringResource(R.string.cd_pdf)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Print") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Connecting printer...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_connecting_printer, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                 )
                             }
                         }
@@ -549,7 +549,7 @@ fun CellinaModule(
 
                     Icon(
                         imageVector = Icons.Default.Functions,
-                        contentDescription = "Formula Icon",
+                        contentDescription = stringResource(R.string.cd_formula_icon),
                         tint = moduleColor
                     )
                     OutlinedTextField(
@@ -591,7 +591,7 @@ fun CellinaModule(
                             },
                             modifier = Modifier.testTag("btn_prev_cell")
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Cell")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_previous_cell))
                         }
                         IconButton(
                             onClick = {
@@ -603,7 +603,7 @@ fun CellinaModule(
                             },
                             modifier = Modifier.testTag("btn_next_cell")
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Cell")
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.cd_next_cell))
                         }
                     }
 
@@ -762,7 +762,7 @@ fun CellinaModule(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.ViewAgenda,
-                                contentDescription = "Open Standard Bottom Sheet",
+                                contentDescription = stringResource(R.string.cd_open_standard_bottom_sheet),
                                 tint = moduleColor
                             )
                         }
@@ -797,7 +797,7 @@ fun CellinaModule(
                                 onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.cd_zoom_out), modifier = Modifier.size(12.dp))
                             }
                             Text(
                                 text = "${(zoomScale * 100).toInt()}%",
@@ -808,7 +808,7 @@ fun CellinaModule(
                                 onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_zoom_in), modifier = Modifier.size(12.dp))
                             }
                         }
                     }
@@ -887,14 +887,14 @@ fun CellinaModule(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconButton(onClick = { Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
+                            IconButton(onClick = { Toast.makeText(context, R.string.toast_undo_performed, Toast.LENGTH_SHORT).show() }) {
+                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = stringResource(R.string.cd_undo), tint = moduleColor)
                             }
-                            IconButton(onClick = { Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
+                            IconButton(onClick = { Toast.makeText(context, R.string.toast_redo_performed, Toast.LENGTH_SHORT).show() }) {
+                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = stringResource(R.string.cd_redo), tint = moduleColor)
                             }
                             IconButton(onClick = { showBottomBar = false }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Close Standard Bottom Sheet", tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close_standard_bottom_sheet), tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
@@ -933,14 +933,14 @@ fun CellinaModule(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Sheet Protected with password (XProtectable)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_sheet_protected_with_password_xprotectable, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Protect Sheet")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Renamed Active Sheet (XNamed)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_renamed_active_sheet_xnamed, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -955,7 +955,7 @@ fun CellinaModule(
                                     ) {
                                         FilterChip(
                                             selected = true,
-                                            onClick = { Toast.makeText(context, "IsIterationEnabled toggled", Toast.LENGTH_SHORT).show() },
+                                            onClick = { Toast.makeText(context, R.string.toast_isiterationenabled_toggled, Toast.LENGTH_SHORT).show() },
                                             label = { Text("IsIterationEnabled") },
                                             leadingIcon = { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                         )
@@ -976,20 +976,20 @@ fun CellinaModule(
                                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        IconButton(onClick = { Toast.makeText(context, "Bold toggled", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
+                                        IconButton(onClick = { Toast.makeText(context, R.string.toast_bold_toggled, Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatBold, contentDescription = stringResource(R.string.cd_bold))
                                         }
-                                        IconButton(onClick = { Toast.makeText(context, "Italic toggled", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
+                                        IconButton(onClick = { Toast.makeText(context, R.string.toast_italic_toggled, Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatItalic, contentDescription = stringResource(R.string.cd_italic))
                                         }
-                                        IconButton(onClick = { Toast.makeText(context, "Background color applied", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.FormatColorFill, contentDescription = "Fill Color", tint = moduleColor)
+                                        IconButton(onClick = { Toast.makeText(context, R.string.toast_background_color_applied, Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatColorFill, contentDescription = stringResource(R.string.cd_fill_color), tint = moduleColor)
                                         }
-                                        IconButton(onClick = { Toast.makeText(context, "Text color changed", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.FormatColorText, contentDescription = "Text Color")
+                                        IconButton(onClick = { Toast.makeText(context, R.string.toast_text_color_changed, Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.FormatColorText, contentDescription = stringResource(R.string.cd_text_color))
                                         }
-                                        IconButton(onClick = { Toast.makeText(context, "Border added", Toast.LENGTH_SHORT).show() }) {
-                                            Icon(Icons.Rounded.BorderAll, contentDescription = "Borders")
+                                        IconButton(onClick = { Toast.makeText(context, R.string.toast_border_added, Toast.LENGTH_SHORT).show() }) {
+                                            Icon(Icons.Rounded.BorderAll, contentDescription = stringResource(R.string.cd_borders))
                                         }
                                     }
                                     HorizontalDivider()
@@ -1009,7 +1009,7 @@ fun CellinaModule(
                                                                 cellValues[k] = String.format("%.2f", v / 1.95583)
                                                             }
                                                         }
-                                                        Toast.makeText(context, "Converted DM to EUR (Factor 1.95583)", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, R.string.toast_converted_dm_to_eur_factor_1_95583, Toast.LENGTH_SHORT).show()
                                                     }
                                                     currencySymbol = curr
                                                 },
@@ -1033,18 +1033,18 @@ fun CellinaModule(
                                     ) {
                                         OutlinedButton(onClick = {
                                             val newSheet = "Sheet${sheets.size + 1}"
-                                            Toast.makeText(context, "Inserted $newSheet", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_inserted_newsheet, newSheet), Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Sheet")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Row above row $activeCellRow", Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, context.getString(R.string.toast_inserted_row_above_row_activecellrow, activeCellRow), Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.TableRows, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Row")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Column at ${columnsLabels.getOrNull(activeCellCol - 1)}", Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, context.getString(R.string.toast_inserted_column_at_columnslabels_getornull, columnsLabels.getOrNull(activeCellCol - 1)), Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Column")
@@ -1062,13 +1062,13 @@ fun CellinaModule(
                                             cellValues["B2"] = "95"
                                             cellValues["A3"] = "Bob"
                                             cellValues["B3"] = "88"
-                                            Toast.makeText(context, "Inserted 2D Array (setArray)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_inserted_2d_array_setarray, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.DataArray, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Data Array")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, "Inserted Image (XDrawPageSupplier)", Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, R.string.toast_inserted_image_xdrawpagesupplier, Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Image")
@@ -1081,14 +1081,14 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Get Cell Type & Value (getVal, getNum, getTypeString)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_get_cell_type_value_getval_getnum_gettypestring, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Get Cell Val/Type")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Extract Array, Row, Col (getArray, getRow, getCol)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_extract_array_row_col_getarray_getrow_getcol, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.TableRows, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1100,14 +1100,14 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Query Content Cells (SheetRangesQuery)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_query_content_cells_sheetrangesquery, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Query Content")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Find Used Area (SheetCellCursor)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_find_used_area_sheetcellcursor, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1121,14 +1121,14 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Created & Applied Cell Style (XStyle, Info.getStyleContainer)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_created_applied_cell_style_xstyle_info, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Style, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Create & Apply Style")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Added Table Borders (TableBorder2, BorderLine2)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_added_table_borders_tableborder2_borderline2, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.BorderAll, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1142,21 +1142,21 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Rows frozen & Window Split (XViewFreezable)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_rows_frozen_window_split_xviewfreezable, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Splitscreen, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Freeze & Split")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Calculated using GeneralFunction.SUM", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_calculated_using_generalfunction_sum, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Functions, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("General Function")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Shifted and Inserted Cells (XCellRangeMovement)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_shifted_and_inserted_cells_xcellrangemovement, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.ViewArray, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1170,21 +1170,21 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Sorted cells (XSortable)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_sorted_cells_xsortable, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Sort Data")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Generated data series (XCellSeries)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_generated_data_series_xcellseries, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Generate Series")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Added Annotations and Borders (XSheetAnnotations)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_added_annotations_and_borders_xsheetannotations, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1198,14 +1198,14 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Added XModifyListener", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_added_xmodifylistener, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Notifications, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Listen for Edits")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Added XSelectionChangeListener", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_added_xselectionchangelistener, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.TouchApp, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1219,21 +1219,21 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Iterative Search (XSearchable findFirst/findNext)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_iterative_search_xsearchable_findfirst_findnext, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Search Iterative")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Find All Matches (XSearchable.findAll)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_find_all_matches_xsearchable_findall, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.FindInPage, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Find All")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Replace All Matches (XReplaceable.replaceAll)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_replace_all_matches_xreplaceable_replaceall, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.FindReplace, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1247,28 +1247,28 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Executed XFunctionAccess (500+ Functions: SUM, AVERAGE, XLOOKUP, GEMINI)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_executed_xfunctionaccess_500_functions_sum_average, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Functions, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Call Functions")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Created Pivot Table (XDataPilotTables & DataPilotDescriptor)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_created_pivot_table_xdatapilottables, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Pivot Tables")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Goal Seek (XGoalSeek: target 4 -> input 16)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_goal_seek_xgoalseek_target_4_input_16, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.TrackChanges, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Goal Seek")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Solver (Lpsolve, CoinMP, SCO, DEPS): P=143x+60y -> Max 6315.625", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_solver_lpsolve_coinmp_sco_deps_p_143x_60y_max_6315, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Calculate, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1282,21 +1282,21 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Created TableChart via XTableCharts.addNewByName", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_created_tablechart_via_xtablecharts_addnewbyname, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.InsertChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("TableChart")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Chart2 Template: Column / Stacked / 3D / Percent", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_chart2_template_column_stacked_3d_percent, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Chart Templates")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "Chart2 Elements: XDiagram wall/floor/legend & XDataSeries labels", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_chart2_elements_xdiagram_wall_floor_legend, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.Palette, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1310,28 +1310,28 @@ fun CellinaModule(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "colChart: Title, X/Y Axis Titles (Rotated 90°)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_colchart_title_x_y_axis_titles_rotated_90, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Single Column")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "multColChart: Multi-series Column Chart with Legend", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_multcolchart_multi_series_column_chart_with_legend, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Multiple Columns")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "3D Column: ThreeDColumnDeep / Flat (Cylinder, Pyramid, Cone)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_3d_column_threedcolumndeep_flat_cylinder_pyramid, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.Rounded.ViewInAr, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("3D Column Shapes")
                                         }
                                         OutlinedButton(onClick = { 
-                                            Toast.makeText(context, "colLineChart: ColumnWithLine Template (ColumnChartType + LineChartType)", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, R.string.toast_collinechart_columnwithline_template, Toast.LENGTH_SHORT).show() 
                                         }) {
                                             Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1346,7 +1346,7 @@ fun CellinaModule(
                                      ) {
                                          OutlinedButton(onClick = { 
                                              bridge.insertBarChart(0, "A2:B8", "Sneakers Sold this Month", "Brand", "Number Sold")
-                                             Toast.makeText(context, "barChart: Swapped axes, vertical X-axis rotated 90°", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_barchart_swapped_axes_vertical_x_axis_rotated_90, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.BarChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1354,7 +1354,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertPieChart(0, "E2:F8", "Top 5 States", "No. of Schools", is3D = true, rotationHorizontal = 0, rotationVertical = -45)
-                                             Toast.makeText(context, "pie3DChart: ThreeDPie template, subtitle, rotated -45°, bold white labels", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_pie3dchart_threedpie_template_subtitle_rotated_45, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.PieChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1362,7 +1362,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertDonutChart(0, "A44:C50", "Annual Expenditure", "Expenditure/Student", "GDP %")
-                                             Toast.makeText(context, "donutChart: Donut template showing multi-ring dataset", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_donutchart_donut_template_showing_multi_ring_dataset, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.DonutLarge, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1370,7 +1370,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertAreaChart(0, "E45:G50", "Enrollment Trends", "StackedArea")
-                                             Toast.makeText(context, "areaChart: Area / StackedArea / PercentStackedArea", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_areachart_area_stackedarea_percentstackedarea, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.AreaChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1378,7 +1378,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertLineChart(0, "E27:G39", "Expenditure Per Pupil", "LineSymbol", showDataLabels = false)
-                                             Toast.makeText(context, "linesChart: LineSymbol template with DP_NONE labels", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_lineschart_linesymbol_template_with_dp_none_labels, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1393,7 +1393,7 @@ fun CellinaModule(
                                      ) {
                                          OutlinedButton(onClick = { 
                                              bridge.insertBubbleChart(0, "H63:J93", "World Data", "GDP per Capita", "Life Expectancy", categoryLabelsRange = "K64:K93", transparency = 50)
-                                             Toast.makeText(context, "labeledBubbleChart: 50% transparency, category labels (Country)", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_labeledbubblechart_50_transparency_category_labels, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.BubbleChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1401,7 +1401,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertNetChart(0, "A56:D63", "No of Calls per Day", template = com.makerandreas.papirusoffice.data.framework.Chart2Templates.NET_LINE, reverseAxisClockwise = true)
-                                             Toast.makeText(context, "netChart: Radar/Spider web chart with clockwise day orientation", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_netchart_radar_spider_web_chart_with_clockwise_day, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.Radar, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1409,7 +1409,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.insertStockChart(0, "A86:F104", "Happy Systems (HASY)", template = com.makerandreas.papirusoffice.data.framework.Chart2Templates.STOCK_VOLUME_OPEN_LOW_HIGH_CLOSE, y2Min = 83.0, y2Max = 103.0)
-                                             Toast.makeText(context, "happyStockChart: CandleSticks (Green/Red), Y2-axis range ($83-$103), 3-day interval", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_happystockchart_candlesticks_green_red_y2_axis, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.Rounded.CandlestickChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1417,7 +1417,7 @@ fun CellinaModule(
                                          }
                                          OutlinedButton(onClick = { 
                                              bridge.addStockLine("StockChart1", "J141", "J142:J146", lineColorHex = 0xFFFF0000)
-                                             Toast.makeText(context, "addStockLine: Added Pork Bellies line graph series to Stock Chart", Toast.LENGTH_SHORT).show() 
+                                             Toast.makeText(context, R.string.toast_addstockline_added_pork_bellies_line_graph_series, Toast.LENGTH_SHORT).show() 
                                          }) {
                                              Icon(Icons.AutoMirrored.Rounded.ShowChart, contentDescription = null, modifier = Modifier.size(16.dp))
                                              Spacer(modifier = Modifier.width(4.dp))
@@ -1435,7 +1435,7 @@ fun CellinaModule(
                                                 selected = selectedChartType == cType,
                                                 onClick = {
                                                     selectedChartType = cType
-                                                    Toast.makeText(context, "Changed chart to $cType", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.toast_changed_chart_to_ctype, cType), Toast.LENGTH_SHORT).show()
                                                 },
                                                 label = { Text(cType.removeSuffix("Diagram")) }
                                             )
@@ -1490,7 +1490,7 @@ fun CellinaModule(
                                         }
                                         OutlinedButton(onClick = {
                                             formulaText = "={=A10:C12}"
-                                            Toast.makeText(context, "Inserted Array Formula XArrayFormulaRange", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, R.string.toast_inserted_array_formula_xarrayformularange, Toast.LENGTH_SHORT).show()
                                         }) {
                                             Text("Array Formula")
                                         }
@@ -1517,12 +1517,12 @@ fun CellinaModule(
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("DataPilot Pivot Table")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, "Applied AutoFilter XSheetFilterable", Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, R.string.toast_applied_autofilter_xsheetfilterable, Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.FilterList, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("AutoFilter")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, "Sorted range ascending (TableSortField)", Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, R.string.toast_sorted_range_ascending_tablesortfield, Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Sort A-Z")
@@ -1536,7 +1536,7 @@ fun CellinaModule(
                                                 selected = currentScenarioName == scen,
                                                 onClick = {
                                                     currentScenarioName = scen
-                                                    Toast.makeText(context, "Switched to Scenario: $scen", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.toast_switched_to_scenario_scen, scen), Toast.LENGTH_SHORT).show()
                                                 },
                                                 label = { Text(scen) }
                                             )
@@ -1560,7 +1560,11 @@ fun CellinaModule(
                                             selected = isFrozenPane,
                                             onClick = {
                                                 isFrozenPane = !isFrozenPane
-                                                Toast.makeText(context, if (isFrozenPane) "Frozen pane at Col $activeCellCol, Row $activeCellRow" else "Unfrozen panes", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(
+                                                    context,
+                                                    if (isFrozenPane) context.getString(R.string.toast_frozen_pane_at_col_row, activeCellCol, activeCellRow) else R.string.toast_unfrozen_panes,
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             },
                                             label = { Text("Freeze Panes (freezeAtPosition)") },
                                             leadingIcon = { Icon(Icons.Rounded.AcUnit, contentDescription = null, modifier = Modifier.size(16.dp)) }
@@ -1578,10 +1582,10 @@ fun CellinaModule(
                                     ) {
                                         Text("Zoom Level: ${(zoomScale * 100).toInt()}%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                                         IconButton(onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f }) {
-                                            Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = "Zoom Out")
+                                            Icon(Icons.Rounded.RemoveCircleOutline, contentDescription = stringResource(R.string.cd_zoom_out))
                                         }
                                         IconButton(onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f }) {
-                                            Icon(Icons.Rounded.AddCircleOutline, contentDescription = "Zoom In")
+                                            Icon(Icons.Rounded.AddCircleOutline, contentDescription = stringResource(R.string.cd_zoom_in))
                                         }
                                         OutlinedButton(onClick = { zoomScale = 1.0f }) {
                                             Text("Reset Zoom")
@@ -1612,7 +1616,7 @@ fun CellinaModule(
                 onClick = { 
                     isEditMode = true
                 },
-                icon = { Icon(Icons.Default.Edit, contentDescription = "Edit") },
+                icon = { Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit)) },
                 text = { Text("Edit Spreadsheet") },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -1797,7 +1801,7 @@ fun CellinaModule(
                         onClick = {
                             cellValues["A5"] = "Pivot Summary"
                             cellValues["B5"] = "96700"
-                            Toast.makeText(context, "DataPilot Pivot Table created ($aggFunc on $rowDim x $colDim)!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_datapilot_pivot_table_created_aggfunc_on_rowdim_x, aggFunc, rowDim, colDim), Toast.LENGTH_SHORT).show()
                             showDataPilotDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
@@ -1872,7 +1876,7 @@ fun CellinaModule(
                             addInResultText = "$res"
                             val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
                             cellValues[activeCellKey] = "$res"
-                            Toast.makeText(context, "$selectedAddInFunc returned $res", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_selectedaddinfunc_returned_res, selectedAddInFunc, res), Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
                     ) {
@@ -1894,7 +1898,7 @@ fun CellinaModule(
                 onInsertFormToDoc = { formSchema ->
                     val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
                     cellValues[activeCellKey] = "[Form: ${formSchema.title}]"
-                    Toast.makeText(context, "Inserted form reference into $activeCellKey", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_inserted_form_reference_into_activecellkey, activeCellKey), Toast.LENGTH_SHORT).show()
                 }
             )
         }
