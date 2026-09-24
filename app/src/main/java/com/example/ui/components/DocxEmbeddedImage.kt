@@ -10,6 +10,7 @@ import coil.compose.AsyncImage
 import com.makerandreas.papirusoffice.data.util.OpenXmlUnits
 import java.io.File
 import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @Composable
 fun DocxEmbeddedImage(

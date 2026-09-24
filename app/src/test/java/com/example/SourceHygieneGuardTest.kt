@@ -241,7 +241,7 @@ class SourceHygieneGuardTest {
         return parts
     }
 
-    private val contentDescriptionLiteral = Regex("""contentDescription\s*=\s*\"""")
+    private val contentDescriptionLiteral = Regex("contentDescription\\s*=\\s*\"")
     private val rawGrey = Regex("""Color\.(Gray|DarkGray|LightGray)\b""")
 
     /** Index ranges of every string literal (plain or raw) in comment-masked source. */
@@ -319,7 +319,7 @@ class SourceHygieneGuardTest {
         File(main, "Dirty.kt").writeText(
             """
             fun demo(context: android.content.Context, count: Int) {
-                Toast.makeText(context, "Interpolated $count", 0).show()
+                Toast.makeText(context, "Interpolated ${'$'}count", 0).show()
                 Icon(Icons.Default.Add, contentDescription = "Add")
                 val c = Color.DarkGray
                 val note = "first — second"

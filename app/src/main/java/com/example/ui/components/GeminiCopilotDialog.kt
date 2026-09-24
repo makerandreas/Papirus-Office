@@ -32,6 +32,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.core.ai.GeminiAiService
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
