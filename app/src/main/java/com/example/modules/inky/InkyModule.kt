@@ -70,6 +70,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
@@ -653,12 +655,33 @@ fun InkyModule(
     var activeFontFamily by remember { mutableStateOf("Liberation Serif") }
     var activeFontSize by remember { mutableStateOf(12) }
 
-    LaunchedEffect(docBodyText.selection, activeLayoutDocument) {
+    // Status bar "section or object information" (WG Ch.1 Table 1). Filled by
+    // the caret-to-element pass below, which is the one place that already maps
+    // the caret onto a body element; a second mapping here would be a second
+    // source of truth. Only facts the model can prove are shown: a heading's
+    // level and text (resolved by the Navigator index, which is also the only
+    // resolver that follows style parents, so Sample-5's paragraph-styled
+    // headings count), the element kind for tables and list items, and the
+    // hyphen placeholder elsewhere. Table row/column, section names and image
+    // geometry are not guessed: they arrive with plans 19/21.
+    var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
         val elements = activeLayoutDocument.body.elements
-        if (elements.isEmpty()) return@LaunchedEffect
+        if (elements.isEmpty()) {
+            statusBarObjectInfo = null
+            return@LaunchedEffect
+        }
         val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
         val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
         val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
+        val caretElementIndex = hit?.elementIndex ?: layoutCursor.elementIndex
+        statusBarObjectInfo = resolveStatusBarObjectInfo(
+            context = context,
+            caretElementIndex = caretElementIndex,
+            elements = elements,
+            headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings)
+        )
         val element = hit?.let { elements.getOrNull(it.elementIndex) }
             ?: elements.getOrNull(layoutCursor.elementIndex)
         val paragraph = when (element) {
@@ -731,7 +754,6 @@ fun InkyModule(
 
     // Bottom Bar (Ribbon & sub-decks) States
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
-    var activeRibbonTab by remember { mutableStateOf("Home") } // File, Home, Insert, Layout, References, Mailings, Review, View
     var showRibbonTabMenu by remember { mutableStateOf(false) }
     var activeInkySubpage by remember { mutableStateOf("") }
     var previousInkySubpage by remember { mutableStateOf("") }
@@ -1808,7 +1830,6 @@ fun InkyModule(
     val docBgColor = if (isDarkDocument) Color(0xFF181A1B) else Color(0xFFD0D5DD)
     val pageBgColor = if (isDarkDocument) Color(0xFF242627) else Color.White
     val textPrimaryColor = if (isDarkDocument) Color(0xFFE8E6E3) else fontColor
-    val textSecondaryColor = if (isDarkDocument) Color(0xFFA8A6A3) else Color.DarkGray
     val textAccentColor = if (isDarkDocument) Color(0xFF60A5FA) else Color(0xFF2563EB)
     val borderStrokeColor = if (isDarkDocument) Color(0xFF3C3F41) else Color(0xFFE2E8F0)
 
@@ -2455,7 +2476,10 @@ fun InkyModule(
                             .height(48.dp)
                             .padding(horizontal = 4.dp)
                     ) {
-                        // 1. Page counter (leading): opens Go to Page.
+                        // 1. Page counter (leading): opens Go to Page. Geometry
+                        // untouched: the WG object-information field shares the
+                        // centre slot below instead of widening this one, so the
+                        // 320 dp bar keeps the three-slot layout plan 2 signed off.
                         Row(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -2483,10 +2507,17 @@ fun InkyModule(
                             )
                         }
 
-                        // 2. Words and characters: centred on the bar, not on the
-                        // leftover space between the other two slots.
+                        // 2. Centre slot: words and characters, or the WG
+                        // "section or object information" while the caret sits
+                        // in a structural element. The two share one slot for
+                        // the 320 dp reason above, and the swap has the guide's
+                        // own precedent: the selection count "will temporarily
+                        // replace the document total count" in the same field.
+                        // The count is deferred, never lost: the info only
+                        // appears while the caret is inside a heading, table or
+                        // list item.
                         Text(
-                            text = wordsCharsText,
+                            text = statusBarObjectInfo ?: wordsCharsText,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Normal,
                             modifier = Modifier
@@ -2787,32 +2818,52 @@ fun InkyModule(
                                 Icon(Icons.AutoMirrored.Rounded.FormatIndentDecrease, contentDescription = stringResource(R.string.cd_decrease_indent))
                             }
 
-                            // 13. Add image. TODO(plan-6): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 13. Add image. Disabled look (38 % tint) + the reason
+                            // in the contentDescription, and a press that names the
+                            // plan holding the real insertion path. TODO(plan-6).
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_image_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_image_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = stringResource(R.string.cd_add_image))
+                                Icon(
+                                    Icons.Rounded.AddPhotoAlternate,
+                                    contentDescription = stringResource(R.string.cd_add_image),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 14. Add table. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 14. Add table. TODO(plan-7): real insertion path.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_table_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_table_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.GridOn, contentDescription = stringResource(R.string.cd_add_table))
+                                Icon(
+                                    Icons.Rounded.GridOn,
+                                    contentDescription = stringResource(R.string.cd_add_table),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 15. Add link. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 15. Add link. TODO(plan-7): real hyperlink path once
+                            // the ODF/DOCX link text survives parsing (G-3/H-4).
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_link_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_link_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.cd_add_link))
+                                Icon(
+                                    Icons.Rounded.Link,
+                                    contentDescription = stringResource(R.string.cd_add_link),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 16. Add comment. TODO(plan-8): real comment model; visible disabled state in plan 3B (R-26).
+                            // 16. Add comment. TODO(plan-8): real comment model;
+                            // none exists, so the tool can only say so.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_comment_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_comment_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.Comment, contentDescription = stringResource(R.string.cd_add_comment))
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.Comment,
+                                    contentDescription = stringResource(R.string.cd_add_comment),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
                         }
 
@@ -2933,12 +2984,19 @@ fun InkyModule(
                                 canRedo = canRedo
                             )
                         } else {
-                        val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
-                        val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
+                        // The strip and the pager both read WriterRibbonModel, so
+                        // they cannot disagree about which tab owns which deck
+                        // (plan 3B 3.6). The pager pages are the tabs that have
+                        // content, in strip order; the strip shows every tab.
+                        val ribbonTabs = WriterRibbonTab.entries
+                        val ribbonDecks = WriterRibbonTab.withDecks
+                        val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(
+                            initialPage = WriterRibbonTab.pageOf(WriterRibbonTab.HOME).coerceAtLeast(0),
+                            pageCount = { ribbonDecks.size }
+                        )
                         val ribbonTabScrollState = rememberScrollState()
-                        
+
                         LaunchedEffect(ribbonPagerState.currentPage) {
-                            activeRibbonTab = ribbonTabs[ribbonPagerState.currentPage]
                             ribbonTabScrollState.animateScrollTo((ribbonPagerState.currentPage * 75).dp.value.toInt())
                         }
                         if (activeInkySubpage.isNotEmpty()) {
@@ -3103,7 +3161,9 @@ fun InkyModule(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // 1. Baris tab (scrollable)
+                                // 1. Tab row (scrollable). Every tab is visible;
+                                // the ones without a deck are dimmed and say so
+                                // on press instead of opening an empty page.
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
@@ -3111,8 +3171,18 @@ fun InkyModule(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    ribbonTabs.forEachIndexed { index, tab ->
-                                        val isSelected = ribbonPagerState.currentPage == index
+                                    ribbonTabs.forEach { tab ->
+                                        val isImplemented = tab.isImplemented
+                                        val isSelected =
+                                            ribbonDecks.getOrNull(ribbonPagerState.currentPage) == tab
+                                        // Hoisted out of the semantics lambda: that
+                                        // lambda is not composable, so stringResource
+                                        // cannot run inside it.
+                                        val unavailableReason = if (isImplemented) {
+                                            null
+                                        } else {
+                                            stringResource(R.string.cd_ribbon_tab_unavailable, tab.label)
+                                        }
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(16.dp))
@@ -3120,19 +3190,38 @@ fun InkyModule(
                                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer
                                                     else Color.Transparent
                                                 )
+                                                .then(
+                                                    Modifier.semantics {
+                                                        if (unavailableReason != null) contentDescription = unavailableReason
+                                                    }
+                                                )
                                                 .clickable {
-                                                    coroutineScope.launch { ribbonPagerState.animateScrollToPage(index) }
-                                                    activeRibbonTab = tab
+                                                    val page = WriterRibbonTab.pageOf(tab)
+                                                    if (page >= 0) {
+                                                        coroutineScope.launch { ribbonPagerState.animateScrollToPage(page) }
+                                                    } else {
+                                                        // Honest note instead of a silent deck
+                                                        // (R-26): the tab stays put and explains
+                                                        // why it cannot open.
+                                                        Toast.makeText(
+                                                            context,
+                                                            context.getString(R.string.toast_ribbon_tab_unavailable, tab.label),
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
                                                 }
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = tab,
+                                                text = tab.label,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                color = when {
+                                                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    isImplemented -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                                }
                                             )
                                         }
                                     }
@@ -3279,8 +3368,11 @@ fun InkyModule(
                                      state = ribbonPagerState,
                                      modifier = Modifier.fillMaxSize()
                                  ) { page ->
-                                     val currentTabName = ribbonTabs[page]
-                                     if (currentTabName == "File") {
+                                     // The pager hosts only the tabs that own a
+                                     // deck; a tab without one never reaches here
+                                     // (it raises the honest note in the strip).
+                                     val currentTab = ribbonDecks[page]
+                                     if (currentTab.deck == WriterRibbonDeck.FILE) {
                                          Column(
                                              modifier = Modifier
                                                  .fillMaxSize()
@@ -3340,7 +3432,7 @@ fun InkyModule(
                                                  }
                                              )
                                          }
-                                     } else if (currentTabName == "Home") {
+                                     } else if (currentTab.deck == WriterRibbonDeck.HOME) {
                                          Column(
                                              modifier = Modifier
                                                  .fillMaxSize()
@@ -3372,15 +3464,19 @@ fun InkyModule(
                                              )
                                          }
                                      } else {
+                                         // Unreachable by construction: the pager
+                                         // pages are WriterRibbonTab.withDecks, which
+                                         // holds only tabs whose deck is File or Home.
+                                         // Kept as an honest fallback rather than a
+                                         // fabricated deck if that ever stops holding.
                                          Box(
                                              modifier = Modifier
                                                  .fillMaxSize()
                                                  .padding(16.dp),
                                              contentAlignment = Alignment.Center
                                          ) {
-                                             // TODO(plan-3B): tab set rebuilt from CONCEPT.md; unimplemented tabs render disabled with an accessible reason.
                                              Text(
-                                                 text = "$currentTabName options will be implemented soon.",
+                                                 text = stringResource(R.string.toast_ribbon_tab_unavailable, currentTab.label),
                                                  style = MaterialTheme.typography.bodyMedium,
                                                  color = MaterialTheme.colorScheme.onSurfaceVariant
                                              )
@@ -3410,7 +3506,11 @@ fun InkyModule(
             title = { Text("Modular Equation Composer") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("In-app mathematical formulas are written in LaTeX and compiled natively to MathML (ODF) or OMML (OOXML).", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        "In-app mathematical formulas are written in LaTeX and compiled natively to MathML (ODF) or OMML (OOXML).",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     OutlinedTextField(
                         value = equationInput,
                         onValueChange = { equationInput = it },
@@ -3422,7 +3522,7 @@ fun InkyModule(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(80.dp)
-                            .background(Color.LightGray.copy(alpha = 0.2f))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
                             .padding(8.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
@@ -4945,3 +5045,34 @@ fun LongClickIconButton(
     }
 }
 
+
+/**
+ * WG Ch.1 status-bar "section or object information" (Table 1): the facts the
+ * model can already prove about the element holding the caret, or null when it
+ * can prove none of them. Headings are resolved by the Navigator index rather
+ * than re-derived here, because that index is the one resolver that walks
+ * paragraph style parents; table and list-item rows show the element kind
+ * only, since the caret-to-element mapping stops at the element and row/column
+ * precision does not exist yet (plans 19/21).
+ */
+private fun resolveStatusBarObjectInfo(
+    context: android.content.Context,
+    caretElementIndex: Int,
+    elements: List<com.makerandreas.papirusoffice.data.OfficeElement>,
+    headings: List<com.makerandreas.papirusoffice.data.navigation.HeadingNode>
+): String? {
+    val element = elements.getOrNull(caretElementIndex) ?: return null
+    val heading = headings.firstOrNull { it.elementIndex == caretElementIndex }
+    return when {
+        heading != null -> context.getString(
+            R.string.statusbar_object_heading,
+            heading.outlineLevel,
+            heading.title
+        )
+        element is com.makerandreas.papirusoffice.data.OfficeTable ->
+            context.getString(R.string.statusbar_object_table)
+        element is com.makerandreas.papirusoffice.data.OfficeListItem ->
+            context.getString(R.string.statusbar_object_list_item)
+        else -> null
+    }
+}
