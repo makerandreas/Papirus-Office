@@ -36,7 +36,7 @@ enum class WriterRibbonTab(val label: String, val deck: WriterRibbonDeck?) {
 
     companion object {
         /** Tabs that own a deck, in strip order: the pager's page list. */
-        val withDecks: List<WriterRibbonTab> = entries.filter { it.isImplemented }
+        val withDecks: List<WriterRibbonTab> = WriterRibbonTab.entries.filter { it.isImplemented }
 
         /** Page index for [tab], or -1 when the tab has no deck to show. */
         fun pageOf(tab: WriterRibbonTab): Int = withDecks.indexOf(tab)

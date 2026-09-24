@@ -33,7 +33,22 @@ jobs:
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest
+          set +e
+          ./gradlew testDebugUnitTest 2>&1 | tee /tmp/ci.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit $status
+
+      - name: CI diagnostics (temporary)
+        if: failure()
+        run: |
+          for f in /tmp/ci.log; do
+            [ -f "$f" ] || continue
+            grep -m 6 -E '^e: ' "$f" || true
+            grep -m 4 -E '> Task .* FAILED|^[A-Za-z0-9_.]+Test > .* FAILED|expected:|What went wrong' "$f" || true
+          done | head -10 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
 
   build:
     name: Build (SemVer & Nightly)
@@ -156,7 +171,11 @@ jobs:
         if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          set +e
+          ./gradlew assembleDebug 2>&1 | tee /tmp/ci.log
+          status=${PIPESTATUS[0]}
+          set -e
+          exit $status
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
