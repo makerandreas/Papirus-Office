@@ -303,7 +303,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.cd_change_font_size), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.change_font_size), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = onShowFontSizeDialog
         )
@@ -1527,7 +1527,7 @@ fun FontSizeDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Ubah Ukuran Font",
+                    text = stringResource(R.string.change_font_size),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )

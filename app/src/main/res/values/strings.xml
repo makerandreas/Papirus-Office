@@ -346,7 +346,7 @@
     <string name="cd_paste">Paste</string>
     <string name="cd_paste_options">Paste Options</string>
     <string name="cd_select_font">Select Font</string>
-    <string name="cd_change_font_size">Change Font Size</string>
+    <string name="change_font_size">Change Font Size</string>
     <string name="cd_underline">Underline</string>
     <string name="cd_underline_options">Underline Options</string>
     <string name="cd_change_capitalization_options">Change Capitalization Options</string>
