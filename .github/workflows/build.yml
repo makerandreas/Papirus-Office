@@ -33,14 +33,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest 2>&1 | tee /tmp/ut.log
-          exit ${PIPESTATUS[0]}
-      - name: Emit failure diagnostics (temporary, removed after the failure is read)
-        if: failure()
-        run: |
-          grep -E "^e: |error: |FAILED|AssertionError|Unresolved reference" /tmp/ut.log | head -40 | while IFS= read -r line; do
-            echo "::error::${line:0:400}"
-          done
+          ./gradlew testDebugUnitTest
 
   build:
     name: Build (SemVer & Nightly)
