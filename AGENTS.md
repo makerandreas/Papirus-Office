@@ -103,7 +103,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 
 ## Reference Material 
 ### `/docs/html`
-All document format specifications, standards, and schema definitions placed in `/sources` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
+All document format specifications, standards, and schema definitions placed in `/docs/html` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
 - **ODF v1.4 Standards**:
   - `Part 1: Introduction` (architecture, conformance, namespaces, references)
   - `Part 2: Packages` (ZIP container, `mimetype`, `META-INF/manifest.xml`, encryption, signatures)
