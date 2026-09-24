@@ -147,7 +147,7 @@
 
     <!-- Save Failure Popup Dialog -->
     <string name="save_failed_title">Document Save Failed</string>
-    <string name="save_failed_msg">An error occurred while attempting to save "%1$s". Your latest changes could not be saved to disk.</string>
+    <string name="save_failed_msg">An error occurred while attempting to save \"%1$s\". Your latest changes could not be saved to disk.</string>
     <string name="btn_retry">Retry</string>
     <string name="btn_return_editor">Return to Editor</string>
     <string name="btn_exit_without_saving">Exit Without Saving</string>
@@ -200,7 +200,7 @@
 
     <!-- Document Open Failure & Detailed Progress Status Strings -->
     <string name="doc_open_failed_title">Failed to Open Document</string>
-    <string name="doc_open_failed_msg">The document "%1$s" could not be opened because it contains invalid or corrupted XML structure.</string>
+    <string name="doc_open_failed_msg">The document \"%1$s\" could not be opened because it contains invalid or corrupted XML structure.</string>
     <string name="btn_ok">OK</string>
     <string name="btn_view_logs">View Logs</string>
     <string name="loading_status_initial">Loading document...</string>
