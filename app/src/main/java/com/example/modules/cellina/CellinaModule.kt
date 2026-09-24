@@ -43,7 +43,6 @@ import com.example.ui.components.SavingProgressPopupDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 // The sheet preview is a simulated spreadsheet on a pinned light board
 // (0xFFF1F5F9) with pinned white cells, so its grid fills and hairlines are
 // document colours, not chrome: they keep their Material-2014 values as
@@ -51,6 +50,7 @@ import kotlinx.coroutines.launch
 private val SheetGridFill = Color(0xFFCCCCCC)
 private val SheetGridLine = Color(0xFF888888)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CellinaModule(
     isTablet: Boolean,

@@ -53,7 +53,6 @@ data class SlideItem(
     var chartImagePath: String? = null
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 // The slideshow canvas is pinned black and the editing preview is pinned
 // white, so slide text and furniture are document colours, not chrome: they
 // keep their Material-2014 values as explicit ARGB and stay legible whatever
@@ -62,6 +61,7 @@ private val SlideOnDark = Color(0xFFCCCCCC)
 private val SlideInkMuted = Color(0xFF444444)
 private val SlideInkSubtle = Color(0xFF888888)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SlidiaModule(
     isTablet: Boolean,

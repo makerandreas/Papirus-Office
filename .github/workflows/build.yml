@@ -42,11 +42,13 @@ jobs:
       - name: CI diagnostics (temporary)
         if: failure()
         run: |
-          for f in /tmp/ci.log; do
-            [ -f "$f" ] || continue
-            grep -m 6 -E '^e: ' "$f" || true
-            grep -m 4 -E '> Task .* FAILED|^[A-Za-z0-9_.]+Test > .* FAILED|expected:|What went wrong' "$f" || true
-          done | head -10 | while IFS= read -r line; do
+          f=/tmp/ci.log
+          [ -f "$f" ] || exit 0
+          echo "::error::kotlin error lines: $(grep -c -E '^e: ' "$f")"
+          grep -E '^e: ' "$f" | sed -E 's#^e: file:///[^/]*/##' | awk -F: '{k=$1; if(!(k in seen)){seen[k]=1; print}}' | head -7 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+          grep -m 2 -E '> Task .* FAILED|Test > .* FAILED|expected:|What went wrong' "$f" | while IFS= read -r line; do
             echo "::error::$line"
           done
 
