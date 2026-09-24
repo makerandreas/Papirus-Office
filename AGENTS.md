@@ -39,15 +39,13 @@ A horizontally scrollable quick-action formatting bar docked immediately above t
 
 ### 3. Standard Bottom Sheet (40% Screen Height Deck)
 A persistent Material 3 Expressive bottom sheet with a 40% screen height constraint:
-- **Ribbon Deck**: Tabbed desktop-class office ribbon with 8 standard tabs:
-  - *File*: Save, Save As, Export PDF, Print, Share, Document Properties.
-  - *Home*: Clipboard, Font formatting, Paragraph alignment/spacing, Styles gallery.
-  - *Insert*: Image, Table, Shape, Page Break, Header/Footer, Bookmark, Hyperlink.
-  - *Layout*: Margins, Page Orientation, Paper Size, Columns, Watermark.
-  - *References*: Table of Contents, Footnotes, Endnotes, Citations.
-  - *Mailings*: Mail merge fields, envelope and label formatting.
-  - *Review*: Spellcheck, Word Count, Track Changes, Comment management.
-  - *View*: Viewer vs Editor mode toggle, Zoom levels, Non-printing characters, Rulers.
+- **Ribbon Deck**: Tabbed desktop-class office ribbon with 6 standard tabs: File, Home, Insert, Layout, Review, View. References and Mailings are not part of the Writer set in `CONCEPT.md` and are not declared. Only File and Home own a deck today; the other four render in a disabled tone and say plainly that the deck is not in this build (plan-03 §0) instead of opening an empty page:
+  - *File*: Save, Save As, Export PDF, Print, Share, Document Properties. (implemented)
+  - *Home*: Clipboard, Font formatting, Paragraph alignment/spacing, Styles gallery. (implemented)
+  - *Insert*: Image, Table, Shape, Page Break, Header/Footer, Bookmark, Hyperlink. (declared, not yet implemented)
+  - *Layout*: Margins, Page Orientation, Paper Size, Columns, Watermark. (declared, not yet implemented)
+  - *Review*: Spellcheck, Word Count, Track Changes, Comment management. (declared, not yet implemented)
+  - *View*: Viewer vs Editor mode toggle, Zoom levels, Non-printing characters, Rulers. (declared, not yet implemented)
 - **Navigator Deck**: Document outline tree displaying Headings, Tables, Frames, Images, Bookmarks, Sections, Hyperlinks, Comments, and Footnotes for instant jumping.
 - **Navigate By Deck**: Quick navigation stepper to browse forward/backward through specific elements (Heading, Page, Table, Graphic, Bookmark).
 - **Formatting Subpages & Dialogs**:
@@ -69,7 +67,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 1. **Start Screen (Start Center)**:
    - **Recents**: Chronological document list with preview thumbnail, timestamp, size, pinned status, and module badge.
    - **Files**: Device file system explorer, folder traversal, sorting, SAF system picker.
-   - **Google Drive**: Cloud storage integration, account sync, online document access.
+   - **Google Drive**: Placeholder only, not yet implemented. There is no OAuth, file listing, upload or download; the screen says so and a press raises a "this is a placeholder" notice rather than faking a connection.
    - **Filter Chips**: All, Inky (Writer), Cellina (Calc), Slidia (Impress), Pagella (PDF).
 2. **Create New Screen**:
    - Template selection (Blank Document, Resume, Letter, Invoice, Report, Agenda) and direct module creation.
