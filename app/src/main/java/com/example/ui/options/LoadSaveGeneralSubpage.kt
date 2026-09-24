@@ -533,7 +533,7 @@ fun LoadSaveGeneralSubpage(
                         autoRecoveryInterval = validMinutes
                         PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_interval", validMinutes)
                         showIntervalDialog = false
-                        Toast.makeText(context, "Auto Recovery set to every $validMinutes minutes", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_auto_recovery_set_to_every_validminutes_minutes, validMinutes), Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Text(stringResource(R.string.save))
@@ -619,7 +619,7 @@ fun SubSettingComplexSubpageRow(
         ) {
             Icon(
                 imageVector = Icons.Rounded.ChevronRight,
-                contentDescription = "Open subpage",
+                contentDescription = stringResource(R.string.cd_open_subpage),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )

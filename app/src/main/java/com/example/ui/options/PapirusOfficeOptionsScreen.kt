@@ -242,7 +242,7 @@ fun PapirusOfficeOptionsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.cd_back),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -307,7 +307,7 @@ fun PapirusOfficeOptionsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
-                                    contentDescription = "More Options",
+                                    contentDescription = stringResource(R.string.cd_more_options),
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -388,7 +388,7 @@ fun PapirusOfficeOptionsScreen(
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Clear search")
+                                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_clear_search))
                                     }
                                 }
                             },
@@ -739,7 +739,7 @@ private fun DynamicColorSettingCard(
                             themeMode = key
                             ThemeSettings.setThemeMode(context, key)
                             onDynamicColorChange?.invoke(isDynamicEnabled)
-                            Toast.makeText(context, "Theme set to $label", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_theme_set_to_label, label), Toast.LENGTH_SHORT).show()
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
                     ) {
@@ -774,7 +774,7 @@ private fun DynamicColorSettingCard(
                         isDynamicEnabled = isChecked
                         ThemeSettings.setDynamicColorEnabled(context, isChecked)
                         onDynamicColorChange?.invoke(isChecked)
-                        Toast.makeText(context, "Dynamic Color ${if (isChecked) "Enabled" else "Disabled"}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (isChecked) R.string.toast_dynamic_color_enabled else R.string.toast_dynamic_color_disabled, Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -813,7 +813,7 @@ private fun SecuritySettingCard(context: Context) {
                     checked = macroProtection,
                     onCheckedChange = {
                         macroProtection = it
-                        Toast.makeText(context, "Macro warning updated", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_macro_warning_updated, Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -855,7 +855,7 @@ private fun NavigatorLanguageSettingCard(context: Context) {
                             scope.launch { prefs.updateNavigatorFollowAppLocale(followApp) }
                             Toast.makeText(
                                 context,
-                                if (followApp) "Navigator: Follow app language" else "Navigator: Follow document language",
+                                if (followApp) R.string.toast_navigator_follow_app_language else R.string.toast_navigator_follow_document_language,
                                 Toast.LENGTH_SHORT
                             ).show()
                         },
