@@ -165,6 +165,14 @@ fun InkyModule(
     var bodyTextLayoutResult by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     var bodyTextFieldCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     var viewportCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
+    // Width the page must fit into. 100 % zoom means "page width fills this",
+    // so the status-bar figure and the page box always agree.
+    var viewportWidthDp by remember { mutableStateOf(0f) }
+
+    // The screen cannot own the page stack's FocusRequesters; the renderer
+    // registers its handlers here so the keyboard button and the sheet-close
+    // path can focus a real field before asking the IME to appear.
+    val rendererFocusBridge = remember { RendererFocusBridge() }
 
     @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     val isKeyboardVisible = androidx.compose.foundation.layout.WindowInsets.isImeVisible
@@ -259,7 +267,7 @@ fun InkyModule(
     val navEngine = remember {
         currentSessionState?.navigationEngine ?: com.makerandreas.papirusoffice.data.navigation.NavigationEngine()
     }
-    // P2-2: Navigator follows app locale (English app → English Navigator) — wire DataStore toggle
+    // P2-2: Navigator follows app locale (English app -> English Navigator); wire DataStore toggle
     LaunchedEffect(viewOptions.navigatorFollowAppLocale) {
         val appTag = java.util.Locale.getDefault().language
         navEngine.setNavigatorLocalePolicy(viewOptions.navigatorFollowAppLocale, appTag)
@@ -1265,6 +1273,13 @@ fun InkyModule(
             keyboardController?.hide()
             focusManager.clearFocus(force = true)
         } else {
+            // Closing a sheet used to leave the editor with no focused field, so
+            // neither the keyboard button nor a tap could raise the IME again.
+            // Restore what was there before the sheet opened.
+            if (wasKeyboardOpenBeforeBottomSheet) {
+                rendererFocusBridge.requestFirstEditable()
+                keyboardController?.show()
+            }
             wasKeyboardOpenBeforeBottomSheet = false
             // Reset subpage states when closing
             activeInkySubpage = ""
@@ -2248,13 +2263,22 @@ fun InkyModule(
                 }
             }
 
+            // Page box width at 100 % zoom: the viewport minus the gutter on each
+            // side, so the sheet reads as paper rather than as a bleeding card.
+            // The geometry comes from the renderer, not from a second guess here.
+            val pageFitWidthDp = (viewportWidthDp - PageStackMetrics.GUTTER_DP * 2f).coerceAtLeast(0f)
+
             // --- MAIN DOCUMENT WORKSPACE CANVAS (viewportCoordinates wired for elongated Viewer status bar) ---
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .background(docBgColor)
-                    .onGloballyPositioned { viewportCoordinates = it },
+                    .onGloballyPositioned { coordinates ->
+                        viewportCoordinates = coordinates
+                        val widthDp = coordinates.size.width / density
+                        if (widthDp != viewportWidthDp) viewportWidthDp = widthDp
+                    },
                 contentAlignment = Alignment.TopCenter
             ) {
                 Column(
@@ -2284,6 +2308,10 @@ fun InkyModule(
                             textColor = textPrimaryColor,
                             editorValue = docBodyText,
                             onViewerSelectionChange = { docBodyText = docBodyText.copy(selection = it) },
+                            onViewerToolbarRequest = { rect ->
+                                if (rect != null) customTextToolbar.show(rect) else customTextToolbar.hide()
+                            },
+                            viewportWidthDp = pageFitWidthDp,
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else {
@@ -2306,6 +2334,8 @@ fun InkyModule(
                                 textColor = textPrimaryColor,
                                 editorValue = docBodyText,
                                 onEditorValueChange = handleTextValueChange,
+                                viewportWidthDp = pageFitWidthDp,
+                                focusBridge = rendererFocusBridge,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         } else {
@@ -2362,18 +2392,42 @@ fun InkyModule(
                 }
             }
 
-            // --- Status Bar Bawah — elongated unified (P1-1): Viewer + Editor share tonal bar ---
+            // --- Status Bar Bawah (bottom): elongated unified (P1-1), Viewer + Editor share one tonal bar ---
             // Elongated = full-width tonal bar pinned between canvas and toolbar hub, visible in both Viewer & Editor.
             // Viewer: Page x–x of y (range) + word/char; Editor: Page x of y + word/char + zoom.
             // Range is viewport-aware: continuous scroll shows current + next page when > ~0.85 page heights visible.
             run {
                 val charCount = docBodyText.text.length
-                val viewerPageEnd = remember(isEditMode, currentDocPage, totalDocPages, viewportCoordinates, density) {
+                val viewerPageEnd = remember(
+                    isEditMode, currentDocPage, totalDocPages, viewportCoordinates,
+                    documentPageSpec, viewportWidthDp, zoomScale, density
+                ) {
                     derivedStateOf {
                         if (!isEditMode && totalDocPages > 1 && currentDocPage < totalDocPages) {
-                            val viewportH = viewportCoordinates?.size?.height?.toFloat()
-                            val pageHpx = 1056f * density
-                            val looksContinuous = viewportH == null || viewportH > pageHpx * 0.85f
+                            // Height of one sheet as actually drawn, at the same
+                            // fit-to-width scale the renderer uses. A hardcoded
+                            // 1056 dp page would describe paper nobody sees.
+                            val fitScale = if (viewportWidthDp > 0f) {
+                                pageFitWidthDp / PageStackMetrics.BASE_CARD_WIDTH_DP * zoomScale
+                            } else {
+                                1f
+                            }
+                            // Mirror the renderer's rule: the fallback sheet keeps
+                            // the historical 320x452 card, declared page sizes keep
+                            // their own ratio.
+                            val isFallbackBox =
+                                documentPageSpec.widthDp == com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK.widthDp &&
+                                    documentPageSpec.heightDp == com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK.heightDp
+                            val declaredRatio = if (
+                                isFallbackBox || documentPageSpec.widthDp <= 0f || documentPageSpec.heightDp <= 0f
+                            ) {
+                                PageStackMetrics.FALLBACK_CARD_HEIGHT_DP / PageStackMetrics.BASE_CARD_WIDTH_DP
+                            } else {
+                                documentPageSpec.heightDp / documentPageSpec.widthDp
+                            }
+                            val pageHeightDp = PageStackMetrics.BASE_CARD_WIDTH_DP * fitScale * declaredRatio
+                            val viewportH = viewportCoordinates?.size?.height?.toFloat()?.div(density)
+                            val looksContinuous = viewportH == null || viewportH > pageHeightDp * 0.85f
                             if (looksContinuous) (currentDocPage + 1).coerceAtMost(totalDocPages) else currentDocPage
                         } else currentDocPage
                     }
@@ -2384,32 +2438,38 @@ fun InkyModule(
                     stringResource(R.string.viewer_status_page_single, currentDocPage, totalDocPages)
                 }
                 val wordsCharsText = stringResource(R.string.viewer_status_words_chars, wordCount, charCount)
+                // P1-1 status bar, rebuilt in Plan 2: the counter is centred on
+                // the screen itself (Box overlay, not a SpaceBetween row), so it
+                // stays centred whatever the page label or the trailing action
+                // measures. Every control here is a 48 dp touch target.
+                var showZoomMenu by remember { mutableStateOf(false) }
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     tonalElevation = 2.dp,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
                 ) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .height(48.dp)
+                            .padding(horizontal = 4.dp)
                     ) {
-                        // 1. Page Counter (Left) — clickable Go to Page
+                        // 1. Page counter (leading): opens Go to Page.
                         Row(
                             modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .height(48.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
                                     targetPageText = currentDocPage.toString()
                                     showGoToPageDialog = true
                                 }
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                                .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 Icons.Rounded.Description,
-                                contentDescription = "Pages",
+                                contentDescription = stringResource(R.string.inky_status_pages),
                                 modifier = Modifier.size(16.dp),
                                 tint = MaterialTheme.colorScheme.primary
                             )
@@ -2417,48 +2477,82 @@ fun InkyModule(
                             Text(
                                 text = pageText,
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1
                             )
                         }
 
-                        // 2. Words and Character Counter (Middle / elongated center)
+                        // 2. Words and characters: centred on the bar, not on the
+                        // leftover space between the other two slots.
                         Text(
                             text = wordsCharsText,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Normal,
-                            modifier = Modifier.padding(horizontal = 4.dp),
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .widthIn(max = 200.dp)
+                                .padding(horizontal = 4.dp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        // 3. Zoom Control (Right) — Editor only; Viewer keeps spacer for symmetry
+                        // 3. Trailing action: zoom (Editor) or Edit (Viewer).
                         if (isEditMode) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = { zoomScale = (zoomScale - 0.1f).coerceAtLeast(0.25f) },
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Icon(imageVector = Icons.Rounded.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(16.dp))
-                                }
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showZoomMenu = true },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Text(
-                                    text = "${(zoomScale * 100).toInt()}%",
+                                    text = stringResource(R.string.inky_status_zoom_percent, (zoomScale * 100).roundToInt()),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .clickable { zoomScale = 1.0f }
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                IconButton(
-                                    onClick = { zoomScale = (zoomScale + 0.1f).coerceAtMost(4.0f) },
-                                    modifier = Modifier.size(32.dp)
+                                DropdownMenu(
+                                    expanded = showZoomMenu,
+                                    onDismissRequest = { showZoomMenu = false }
                                 ) {
-                                    Icon(imageVector = Icons.Rounded.Add, contentDescription = "Zoom In", modifier = Modifier.size(16.dp))
+                                    listOf(50, 100, 150, 200, 300).forEach { percent ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(stringResource(R.string.inky_status_zoom_percent, percent))
+                                            },
+                                            onClick = {
+                                                zoomScale = percent / 100f
+                                                showZoomMenu = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         } else {
-                            // Viewer elongated balance — no zoom; keep 32dp spacer so page/word counts stay elongated centered
-                            Spacer(modifier = Modifier.width(32.dp))
+                            // Viewer: the page-stack Edit affordance lives here now
+                            // (it used to be a FAB floating over this bar), so the
+                            // bar is never covered and nothing overlaps a tap target.
+                            IconButton(
+                                onClick = {
+                                    if (!docBodyText.selection.collapsed) {
+                                        docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
+                                    }
+                                    customTextToolbar.hide()
+                                    isEditMode = true
+                                    showBottomBar = false
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .size(48.dp)
+                                    .testTag("fab_open_edit_mode")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Edit,
+                                    contentDescription = stringResource(R.string.inky_status_open_edit_mode),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
@@ -2753,20 +2847,26 @@ fun InkyModule(
                                 Icon(Icons.AutoMirrored.Rounded.KeyboardTab, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
                             }
 
-                            // b. Toggle Keyboard
+                            // b. Toggle Keyboard: focuses a real page field first
+                            // (through the renderer bridge) and only then asks for
+                            // the IME; showing the keyboard without a focused editor
+                            // is what made this button look dead after a sheet.
                             IconButton(
                                 onClick = {
                                     if (isKeyboardVisible) {
                                         keyboardController?.hide()
                                     } else {
-                                        try {
+                                        // Web View owns a single flow field instead
+                                        // of the page stack, so it keeps its own
+                                        // requester; the bridge handles the rest.
+                                        if (!rendererFocusBridge.requestFirstEditable() && isWebView) {
                                             focusRequester.requestFocus()
-                                        } catch (e: Exception) {}
+                                        }
                                         keyboardController?.show()
                                     }
                                 }
                             ) {
-                                Icon(Icons.Rounded.Keyboard, contentDescription = "Toggle Keyboard", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.Rounded.Keyboard, contentDescription = stringResource(R.string.inky_hub_toggle_keyboard), tint = MaterialTheme.colorScheme.primary)
                             }
 
                             // c. Open Standard Bottom Sheet
@@ -2946,7 +3046,7 @@ fun InkyModule(
                                         }
                                     }
 
-                                    // Persistent undo/redo/close — unified affordance (single icon, long-press for history)
+                                    // Persistent undo/redo/close: unified affordance (single icon, long-press for history)
                                     if (activeInkySubpage != "actions_to_undo" && activeInkySubpage != "actions_to_redo") {
                                         LongClickIconButton(
                                             enabled = isUndoEnabled,
@@ -3046,7 +3146,7 @@ fun InkyModule(
                                         .background(borderStrokeColor.copy(alpha = 0.3f))
                                 )
 
-                                // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close) — unified long-press affordance
+                                // 2. Trailing icons (3 persistent buttons: Undo, Redo, Close): unified long-press affordance
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -4165,37 +4265,9 @@ fun InkyModule(
         )
     }
 
-    // --- FLOATING ACTION BUTTON FOR VIEWER MODE ---
-    if (!isEditMode) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.BottomEnd
-        ) {
-            FloatingActionButton(
-                onClick = {
-                    if (!docBodyText.selection.collapsed) {
-                        docBodyText = docBodyText.copy(selection = androidx.compose.ui.text.TextRange(0))
-                    }
-                    customTextToolbar.hide()
-                    isEditMode = true
-                    showBottomBar = false
-                    Toast.makeText(context, "Edit Mode Active", Toast.LENGTH_SHORT).show()
-                },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .size(56.dp)
-                    .testTag("fab_open_edit_mode")
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Edit,
-                    contentDescription = "Open Edit Mode"
-                )
-            }
-        }
-    }
+    // The Viewer Edit affordance is the trailing action of the unified status
+    // bar. The FAB that used to float here covered that bar and duplicated an
+    // action the bar already offers, so it was removed instead of re-positioned.
 }
 }
 
