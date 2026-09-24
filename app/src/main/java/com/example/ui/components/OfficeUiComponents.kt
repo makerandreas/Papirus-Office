@@ -126,7 +126,7 @@ fun FindAndReplaceBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Exit Find")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_exit_find))
             }
             Column(modifier = Modifier.weight(1f)) {
                 TextField(
@@ -154,7 +154,7 @@ fun FindAndReplaceBar(
                 )
             }
             IconButton(onClick = { onReplace(findQuery, replaceQuery) }) {
-                Icon(Icons.Default.FindReplace, contentDescription = "Replace")
+                Icon(Icons.Default.FindReplace, contentDescription = stringResource(R.string.cd_replace))
             }
         }
     } else {
@@ -189,7 +189,7 @@ fun FindAndReplaceBar(
                 Text("Replace All")
             }
             IconButton(onClick = onClose) {
-                Icon(Icons.Default.Close, contentDescription = "Close Find")
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close_find))
             }
         }
     }
@@ -219,7 +219,7 @@ fun OfficeDialogSheet(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -265,7 +265,7 @@ fun OfficeSidebar(
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Default.Close, contentDescription = "Close Sidebar")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close_sidebar))
                     }
                 }
             }

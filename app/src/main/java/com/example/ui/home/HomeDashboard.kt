@@ -443,7 +443,7 @@ fun HomeDashboard(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.Menu,
-                                    contentDescription = "Main Menu"
+                                    contentDescription = stringResource(R.string.cd_main_menu)
                                 )
                             }
                         },
@@ -455,7 +455,7 @@ fun HomeDashboard(
                                 ) {
                                     Icon(
                                         imageVector = if (isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                                        contentDescription = "Search"
+                                        contentDescription = stringResource(R.string.cd_search)
                                     )
                                 }
                             }
@@ -479,7 +479,7 @@ fun HomeDashboard(
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
+                                        Icon(Icons.Rounded.Clear, contentDescription = stringResource(R.string.cd_clear_search))
                                     }
                                 }
                             },
@@ -503,7 +503,7 @@ fun HomeDashboard(
                         onClick = {
                             coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         },
-                        icon = { Icon(Icons.Rounded.AccessTime, contentDescription = "Recents tab") },
+                        icon = { Icon(Icons.Rounded.AccessTime, contentDescription = stringResource(R.string.cd_recents_tab)) },
                         label = { Text("Recents") }
                     )
                     NavigationBarItem(
@@ -511,7 +511,7 @@ fun HomeDashboard(
                         onClick = {
                             coroutineScope.launch { pagerState.animateScrollToPage(1) }
                         },
-                        icon = { Icon(Icons.Rounded.Folder, contentDescription = "Files tab") },
+                        icon = { Icon(Icons.Rounded.Folder, contentDescription = stringResource(R.string.cd_files_tab)) },
                         label = { Text("Files") }
                     )
                     NavigationBarItem(
@@ -522,7 +522,7 @@ fun HomeDashboard(
                         icon = {
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(R.drawable.ic_google_drive),
-                                contentDescription = "Google Drive tab",
+                                contentDescription = stringResource(R.string.cd_google_drive_tab),
                                 tint = Color.Unspecified,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -921,7 +921,7 @@ fun HomeDashboard(
 
                                 Image(
                                     painter = painterResource(id = iconRes),
-                                    contentDescription = "${file.fileType} Document",
+                                    contentDescription = stringResource(R.string.cd_file_filetype_document, file.fileType),
                                     contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                                     modifier = Modifier.size(width = 32.dp, height = 40.dp)
                                 )
@@ -964,7 +964,7 @@ fun HomeDashboard(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Rounded.MoreVert,
-                                            contentDescription = "More Options for ${file.name}",
+                                            contentDescription = stringResource(R.string.cd_more_options_for_file_name, file.name),
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(24.dp)
                                         )
@@ -1028,7 +1028,7 @@ fun HomeDashboard(
                                                 if (!File(file.path).exists()) {
                                                     showFileNotFoundDialog = true
                                                 } else {
-                                                    Toast.makeText(context, "Exported $displayNameWithSuffix to PDF", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_pdf, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
@@ -1041,7 +1041,7 @@ fun HomeDashboard(
                                                     if (!File(file.path).exists()) {
                                                         showFileNotFoundDialog = true
                                                     } else {
-                                                        Toast.makeText(context, "Exported $displayNameWithSuffix to ePub", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_epub, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             )
@@ -1198,7 +1198,7 @@ fun ShortcutCard(
                 Text(path, fontSize = 10.sp, color = MaterialTheme.colorScheme.outline, fontFamily = FontFamily.Monospace)
             }
 
-            Icon(Icons.Rounded.ChevronRight, contentDescription = "Browse folder", tint = MaterialTheme.colorScheme.outline)
+            Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_browse_folder), tint = MaterialTheme.colorScheme.outline)
         }
     }
 }
@@ -1262,15 +1262,16 @@ fun GoogleDriveSubPage() {
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // TODO(unassigned): real Drive integration is not scheduled; this screen stays an honest placeholder (R-26).
             Button(
                 onClick = {
-                    Toast.makeText(context, "Cloud sync is a placeholder and will be configured in the next development cycle.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, R.string.toast_cloud_sync_is_a_placeholder_and_will_be_configured, Toast.LENGTH_LONG).show()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Rounded.CloudQueue, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Hubungkan Akun Google")
+                Text(stringResource(R.string.btn_connect_google_account))
             }
         }
     }

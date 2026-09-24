@@ -26,7 +26,7 @@ object LokitEngine {
         get() = if (isNativeAvailable) {
             "Native LOKit library loaded"
         } else {
-            "Simulated (pure Kotlin engine — no native library)"
+            "Simulated (pure Kotlin engine, no native library)"
         }
 
     /**

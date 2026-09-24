@@ -46,7 +46,7 @@ fun WelcomeScreen(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_papirus_foreground),
-                    contentDescription = "Papirus Office App Icon",
+                    contentDescription = stringResource(R.string.cd_papirus_office_app_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(80.dp)
                 )

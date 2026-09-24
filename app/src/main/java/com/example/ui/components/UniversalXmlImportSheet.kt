@@ -31,6 +31,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.PapirusXmlEngine
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,7 +117,7 @@ fun UniversalXmlImportSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Rounded.Code,
-                                    contentDescription = "XML Import Icon",
+                                    contentDescription = stringResource(R.string.cd_xml_import_icon),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -141,7 +143,7 @@ fun UniversalXmlImportSheet(
                             .minimumInteractiveComponentSize()
                             .testTag("close_xml_import_button")
                     ) {
-                        Icon(imageVector = Icons.Rounded.Close, contentDescription = "Close XML import dialog")
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close_xml_import_dialog))
                     }
                 }
 
@@ -201,7 +203,7 @@ fun UniversalXmlImportSheet(
                                 sdkCodeContent = sdkCodeContent,
                                 onCopyClick = {
                                     clipboardManager.setText(AnnotatedString(sdkCodeContent))
-                                    Toast.makeText(context, "SDK Java code copied!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_sdk_java_code_copied, Toast.LENGTH_SHORT).show()
                                 }
                             )
                             4 -> HelpAndOptimizationTab()
@@ -362,9 +364,9 @@ private fun FiltersAndCliTab(onRefreshLogs: () -> Unit) {
                             val success = PapirusXmlEngine.simulateInfilter(cliFilename, cliFilterName)
                             onRefreshLogs()
                             if (success) {
-                                Toast.makeText(context, "Command Executed: Document opened!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_command_executed_document_opened, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Execution failed.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_execution_failed, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -410,9 +412,9 @@ private fun FiltersAndCliTab(onRefreshLogs: () -> Unit) {
                             onRefreshLogs()
                             if (output != null) {
                                 convertedOutput = output
-                                Toast.makeText(context, "Export output saved!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_export_output_saved, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Unsupported export.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_unsupported_export, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -540,9 +542,9 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                                 domResult = PapirusXmlEngine.parseCompaniesDom()
                                 mapped2DResult = null
                                 onRefreshLogs()
-                                Toast.makeText(context, "DOM parsed company structures!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_dom_parsed_company_structures, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Please select 'company.xml' first for executive structure.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_please_select_company_xml_first_for_executive, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -558,9 +560,9 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                                 mapped2DResult = PapirusXmlEngine.parsePaymentsTo2D()
                                 domResult = emptyList()
                                 onRefreshLogs()
-                                Toast.makeText(context, "Mapped payment rows to grid!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_mapped_payment_rows_to_grid, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Please select 'pay.xml' first for tabular payments data.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_please_select_pay_xml_first_for_tabular_payments, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -639,7 +641,7 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                         onClick = {
                             labeledStringOutput = PapirusXmlEngine.extractXmlAsLabeledStrings(xmlContent)
                             onRefreshLogs()
-                            Toast.makeText(context, "XML stripped to labeled lines!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_xml_stripped_to_labeled_lines, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -653,9 +655,9 @@ private fun DomAndLabeledTab(onRefreshLogs: () -> Unit) {
                             if (labeledStringOutput.isNotEmpty()) {
                                 alignedSpreadsheetTable = PapirusXmlEngine.tokenizeLabeledStringToTable(labeledStringOutput)
                                 onRefreshLogs()
-                                Toast.makeText(context, "Tokenized into aligned spreadsheet cells!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_tokenized_into_aligned_spreadsheet_cells, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Please extract labeled strings first.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_please_extract_labeled_strings_first, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -780,7 +782,7 @@ private fun JaxbTab(onRefreshLogs: () -> Unit) {
                                 val res = PapirusXmlEngine.simulateUnmarshallPay()
                                 paymentObjects = res.payments
                                 onRefreshLogs()
-                                Toast.makeText(context, "Unmarshalled payments!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_unmarshalled_payments, Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -826,7 +828,7 @@ private fun JaxbTab(onRefreshLogs: () -> Unit) {
                                 val res = PapirusXmlEngine.simulateUnmarshallClubs()
                                 associationsList = res.associations
                                 onRefreshLogs()
-                                Toast.makeText(context, "Unmarshalled associations!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_unmarshalled_associations, Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -1016,7 +1018,7 @@ private fun SdkExamplesTab(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy Example Code")
+                        Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.cd_copy_example_code))
                     }
                 }
             }

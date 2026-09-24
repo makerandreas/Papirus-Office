@@ -26,15 +26,15 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 | # | Plan | Closes | Depends on | Detail | Status |
 |---|---|---|---|---|---|
 | **1** | **Master index and working guide** (this file) | — | — | here | **active** |
-| **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | ready to start |
-| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` | ready to start (parallel with 2) |
-| **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | detailed |
-| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5 | detailed |
-| **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | detailed |
-| **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7 | detailed |
-| **8** | **OOXML structural fidelity** (was PR H) | F-16…F-20, F-26, F-27, DOCX halves of F-10/F-11 | Plans 5, 7 | same file, § Plan 8 | detailed |
-| **9** | **Save round-trip integrity** (was PR I) | O-01, the "non-destructive package preservation" rule, the writer findings in `audit-006` §3 | Plans 6, 7, 8 | same file, § Plan 9 | scoped, not scheduled |
-| **10** | **Font engine + UI design language** | old PR D (bundled Typeface and substitution) and old PR E (Font Style UI, SAF/user fonts, curated Google Fonts), plus the `DESIGN.md` / m3.material.io review | Plans 5, 7, 8 | `plan-10-font-engine-and-design-language.md` | parked by decision |
+| **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
+| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` | 3A in review (PR 12); 3B/3C scheduled as PRs 13-14 |
+| **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
+| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5 | scheduled as PRs 15-16 |
+| **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | scheduled as PR 17 |
+| **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7 | scheduled as PRs 18-19 |
+| **8** | **OOXML structural fidelity** (was PR H) | F-16…F-20, F-26, F-27, DOCX halves of F-10/F-11 | Plans 5, 7 | same file, § Plan 8 | scheduled as PRs 20-21 |
+| **9** | **Save round-trip integrity** (was PR I) | O-01, the "non-destructive package preservation" rule, the writer findings in `audit-006` §3 | Plans 6, 7, 8 | same file, § Plan 9 | scheduled as PR 22 (its own pre-change gate first) |
+| **10** | **Font engine + UI design language** | old PR D (bundled Typeface and substitution) and old PR E (Font Style UI, SAF/user fonts, curated Google Fonts), plus the `DESIGN.md` / m3.material.io review | Plans 5, 7, 8 | `plan-10-font-engine-and-design-language.md` | parked by decision; B1 lands early via roadmap PR 14 |
 
 Plans 2 and 3 are the ones the user asked to start with. Plans 4-9 keep the letters D-I in parentheses and in sub-item IDs (`D-1`, `E-EN-2`, `G-1` …), which read as `plan-n item`: D = 4, E = 5, F = 6, G = 7, H = 8, I = 9.
 
@@ -132,8 +132,10 @@ Every plan's PR must hold these, or it is not ready:
 ## 6. Working agreement for Plan 1
 
 * **Deliverable:** this file. Its acceptance is completeness: every Chapter 1 section has an owner (§3, including the three items no fidelity plan owns), every checklist section is mapped to the plan that makes it pass (§4), and every finding has a home. The `Closes` column in §2 covers the full set: F-01…F-06 → 2/4, F-07 → 6, F-08/F-09 → 7 and 10, F-10/F-21/F-24/F-25/F-28 → 5, F-11…F-15/F-23 → 7, F-16…F-20/F-26/F-27 → 8, F-22/F-29/F-30/F-31 → 2, O-01 → 9, O-02 → 5 and 8, O-03…O-05 → 7.
+* **Execution schedule:** the PR-by-PR order for everything above lives in `anti-slop/plan-2026-09-24-remaining-pr-roadmap.md` (PRs 12-22), which also records the 2026-09-24 decisions (staged page windows, display-the-bundled-faces, TOC snapshot, save refusal). This file keeps the mapping and the numbers; the roadmap keeps the order.
+
 * **Update rule:** when a plan lands, update its status here and add one line to the plan's own file recording what actually shipped versus what was written. Numbers in this file are the ones the other documents cite, so corrections happen here first.
 * **Next actions after this file:**
-  1. Plan 2, commits 1-2 (remove the per-page counter; rebuild the status bar with three slots and the Edit action) — smallest visible win, unblocks checklist items 5, 8, 9.
-  2. Plan 3, the two mechanical guards (a grep test for hard-coded strings and a lint step for `contentDescription`) so every later plan lands against them rather than behind them.
-  3. Then Plan 5 with its per-page element dump, because the empty-page mechanism (F-25) is still an open question that only a trace can answer.
+  1. ~~Plan 2, commits 1-2~~ **done**: PR #11 merged the whole plan (its commits 1-2 became the renderer and status-bar commits of PR #11).
+  2. ~~Plan 3, the two mechanical guards~~ **scheduled as roadmap PR 12**, which lands the sweep and the guard together so every later plan runs against them.
+  3. ~~Then Plan 5 with its per-page element dump~~ **scheduled as roadmap PR 15** (dump first, metrics seams second, transform third), exactly because the empty-page mechanism (F-25) is still an open question that only a trace can answer.

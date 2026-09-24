@@ -111,7 +111,7 @@ fun NewDocumentScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = "Back to Home Dashboard"
+                                contentDescription = stringResource(R.string.cd_back_to_home_dashboard)
                             )
                         }
                     },
@@ -149,7 +149,7 @@ fun NewDocumentScreen(
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear search")
+                                    Icon(Icons.Rounded.Clear, contentDescription = stringResource(R.string.cd_clear_search))
                                 }
                             }
                         },
@@ -174,7 +174,7 @@ fun NewDocumentScreen(
                         coroutineScope.launch { pagerState.animateScrollToPage(0) }
                         isSearchActive = false
                     },
-                    icon = { Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = "Create New Document Tab") },
+                    icon = { Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = stringResource(R.string.cd_create_new_document_tab)) },
                     label = { Text(stringResource(R.string.tab_create_new)) },
                     modifier = Modifier.testTag("tab_create_new")
                 )
@@ -183,7 +183,7 @@ fun NewDocumentScreen(
                     onClick = { 
                         coroutineScope.launch { pagerState.animateScrollToPage(1) }
                     },
-                    icon = { Icon(Icons.Rounded.DashboardCustomize, contentDescription = "Create from Template Tab") },
+                    icon = { Icon(Icons.Rounded.DashboardCustomize, contentDescription = stringResource(R.string.cd_create_from_template_tab)) },
                     label = { Text(stringResource(R.string.tab_from_template)) },
                     modifier = Modifier.testTag("tab_from_template")
                 )
@@ -245,7 +245,7 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_inky_logo),
-                        contentDescription = "Inky Document",
+                        contentDescription = stringResource(R.string.cd_inky_document),
                         modifier = Modifier.size(52.dp)
                     )
 
@@ -292,7 +292,7 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_cellina_logo),
-                        contentDescription = "Cellina Spreadsheet",
+                        contentDescription = stringResource(R.string.cd_cellina_spreadsheet),
                         modifier = Modifier.size(52.dp)
                     )
 
@@ -339,7 +339,7 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_slidia_logo),
-                        contentDescription = "Slidia Presentation",
+                        contentDescription = stringResource(R.string.cd_slidia_presentation),
                         modifier = Modifier.size(52.dp)
                     )
 
@@ -386,7 +386,7 @@ fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_pagella_logo),
-                        contentDescription = "Pagella PDF Document",
+                        contentDescription = stringResource(R.string.cd_pagella_pdf_document),
                         modifier = Modifier.size(52.dp)
                     )
 
@@ -675,7 +675,7 @@ fun CreateFromTemplateView(
                                         // Already downloaded, just open it
                                         val filePath = downloadedFilesMap[template.name]
                                         if (filePath == null) {
-                                            Toast.makeText(context, "Template file is missing, please re-download.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, R.string.toast_template_file_is_missing_please_re_download, Toast.LENGTH_SHORT).show()
                                             return@launch
                                         }
                                         com.example.MainActivity.openedFilePath = filePath
@@ -687,7 +687,7 @@ fun CreateFromTemplateView(
                                         onNavigateToModule(com.example.MainActivity.openedFileType ?: "Inky")
                                     } else {
                                         // Start downloading
-                                        Toast.makeText(context, "Downloading template: ${template.name}...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, context.getString(R.string.toast_downloading_template_template_name, template.name), Toast.LENGTH_SHORT).show()
                                         downloadProgressMap = downloadProgressMap + (template.name to 0f)
                                         val file = TemplateManager.downloadTemplate(context, template) { prog ->
                                             downloadProgressMap = downloadProgressMap + (template.name to prog)
@@ -695,7 +695,7 @@ fun CreateFromTemplateView(
                                         if (file != null) {
                                             downloadProgressMap = downloadProgressMap + (template.name to 1.0f)
                                             downloadedFilesMap = downloadedFilesMap + (template.name to file.absolutePath)
-                                            Toast.makeText(context, "Download complete! Opening...", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, R.string.toast_download_complete_opening, Toast.LENGTH_SHORT).show()
                                             
                                             com.example.MainActivity.openedFilePath = file.absolutePath
                                             com.example.MainActivity.openedFileType = when (template.type) {
@@ -706,7 +706,7 @@ fun CreateFromTemplateView(
                                             onNavigateToModule(com.example.MainActivity.openedFileType ?: "Inky")
                                         } else {
                                             downloadProgressMap = downloadProgressMap - template.name
-                                            Toast.makeText(context, "Download failed. Please check your connection.", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, R.string.toast_download_failed_please_check_your_connection, Toast.LENGTH_LONG).show()
                                         }
                                     }
                                 }
@@ -756,14 +756,14 @@ fun CreateFromTemplateView(
                                 } else if (isDownloaded) {
                                     Icon(
                                         imageVector = Icons.Rounded.CheckCircle,
-                                        contentDescription = "Downloaded successfully",
+                                        contentDescription = stringResource(R.string.cd_downloaded_successfully),
                                         tint = Color(0xFF10B981),
                                         modifier = Modifier.size(24.dp)
                                     )
                                 } else {
                                     Icon(
                                         imageVector = Icons.Rounded.Download,
-                                        contentDescription = "Download template",
+                                        contentDescription = stringResource(R.string.cd_download_template),
                                         tint = MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.size(24.dp)
                                     )

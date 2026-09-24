@@ -34,6 +34,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,7 +118,7 @@ fun UniversalOdfSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Rounded.Code,
-                                    contentDescription = "ODF Icon",
+                                    contentDescription = stringResource(R.string.cd_odf_icon),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -142,7 +144,7 @@ fun UniversalOdfSheet(
                             .minimumInteractiveComponentSize()
                             .testTag("close_odf_sheet_button")
                     ) {
-                        Icon(imageVector = Icons.Rounded.Close, contentDescription = "Close ODF dialog")
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close_odf_dialog))
                     }
                 }
 
@@ -209,7 +211,7 @@ fun UniversalOdfSheet(
                                 sdkCodeContent = sdkCodeContent,
                                 onCopyClick = {
                                     clipboardManager.setText(AnnotatedString(sdkCodeContent))
-                                    Toast.makeText(context, "SDK ODF Java code copied!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_sdk_odf_java_code_copied, Toast.LENGTH_SHORT).show()
                                 }
                             )
                             5 -> HelpAndOptimizationTab()
@@ -330,7 +332,7 @@ private fun MetadataTab(onRefreshLogs: () -> Unit) {
                             descField = props.description
                             secretField = props.secretValue
                             onRefreshLogs()
-                            Toast.makeText(context, "Queried latest document properties!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_queried_latest_document_properties, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -353,7 +355,7 @@ private fun MetadataTab(onRefreshLogs: () -> Unit) {
                             PapirusOdfEngine.updateDocProperties(updated)
                             props = updated
                             onRefreshLogs()
-                            Toast.makeText(context, "Saved metadata properties into meta.xml!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_saved_metadata_properties_into_meta_xml, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
@@ -483,7 +485,7 @@ private fun ZipUnpackTab(onRefreshLogs: () -> Unit) {
                     onClick = {
                         val outputName = PapirusOdfEngine.simulateUnzipFile(selectedDoc, selectedEntryToExtract)
                         onRefreshLogs()
-                        Toast.makeText(context, "Unzipped & Extracted entry saved as: $outputName", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.toast_unzipped_extracted_entry_saved_as_outputname, outputName), Toast.LENGTH_LONG).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
@@ -583,7 +585,7 @@ private fun DocCreationTab(onRefreshLogs: () -> Unit) {
                                 val list = textListItemsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                                 val result = PapirusOdfEngine.simulateMakeTextDoc(textTitle, includeTextLogo, list)
                                 onRefreshLogs()
-                                Toast.makeText(context, "Generated and saved $result!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_generated_and_saved_result, result), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -618,7 +620,7 @@ private fun DocCreationTab(onRefreshLogs: () -> Unit) {
                                 val mult = rowMathMultiplier.toDoubleOrNull() ?: 2.0
                                 val result = PapirusOdfEngine.simulateMakeSheet(start, mult)
                                 onRefreshLogs()
-                                Toast.makeText(context, "Generated and saved $result!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_generated_and_saved_result, result), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
@@ -653,7 +655,7 @@ private fun DocCreationTab(onRefreshLogs: () -> Unit) {
                                 val bullets = presentationBulletsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                                 val result = PapirusOdfEngine.simulateMakeSlides(presentationTitle, bullets)
                                 onRefreshLogs()
-                                Toast.makeText(context, "Generated presentation $result!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_generated_presentation_result, result), Toast.LENGTH_SHORT).show()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
@@ -707,7 +709,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     onClick = {
                         val result = PapirusOdfEngine.simulateSlideRearrange()
                         onRefreshLogs()
-                        Toast.makeText(context, "Successfully shuffeled slides in $result!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_successfully_shuffeled_slides_in_result, result), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -725,7 +727,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     onClick = {
                         val result = PapirusOdfEngine.simulateCombineTexts()
                         onRefreshLogs()
-                        Toast.makeText(context, "Saved merged ODT: $result", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_saved_merged_odt_result, result), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
@@ -744,7 +746,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     onClick = {
                         val result = PapirusOdfEngine.simulateCombineSheets()
                         onRefreshLogs()
-                        Toast.makeText(context, "Saved combined workbook: $result", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_saved_combined_workbook_result, result), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
@@ -763,7 +765,7 @@ private fun ConcatenateTab(onRefreshLogs: () -> Unit) {
                     onClick = {
                         val result = PapirusOdfEngine.simulateCombineDecks()
                         onRefreshLogs()
-                        Toast.makeText(context, "Saved combined presentations: $result", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_saved_combined_presentations_result, result), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
@@ -857,7 +859,7 @@ private fun SdkExamplesTab(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Icon(Icons.Rounded.ContentCopy, contentDescription = "Copy Example Code")
+                        Icon(Icons.Rounded.ContentCopy, contentDescription = stringResource(R.string.cd_copy_example_code))
                     }
                 }
             }
@@ -988,7 +990,7 @@ private fun TerminalLogs(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.DeleteSweep,
-                    contentDescription = "Clear logs",
+                    contentDescription = stringResource(R.string.cd_clear_logs),
                     tint = Color.LightGray,
                     modifier = Modifier.size(16.dp)
                 )

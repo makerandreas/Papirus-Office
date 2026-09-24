@@ -35,6 +35,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.PapirusClipboardEngine
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,7 +117,7 @@ fun UniversalClipboardSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Rounded.ContentPaste,
-                                    contentDescription = "Clipboard Framework icon",
+                                    contentDescription = stringResource(R.string.cd_clipboard_framework_icon),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -141,7 +143,7 @@ fun UniversalClipboardSheet(
                             .minimumInteractiveComponentSize()
                             .testTag("close_clipboard_button")
                     ) {
-                        Icon(imageVector = Icons.Rounded.Close, contentDescription = "Close clipboard dialog")
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close_clipboard_dialog))
                     }
                 }
 
@@ -194,7 +196,7 @@ fun UniversalClipboardSheet(
                                 sdkCodeContent = sdkCodeContent,
                                 onCopyClick = {
                                     clipboardManager.setText(AnnotatedString(sdkCodeContent))
-                                    Toast.makeText(context, "SDK Java code copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_sdk_java_code_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                 }
                             )
                             3 -> HelpAndOptimizationTab()
@@ -291,7 +293,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                         onClick = {
                             val success = PapirusClipboardEngine.clipSetText(context, textInput)
                             onRefreshLogs()
-                            if (success) Toast.makeText(context, "Text set via Clip.java!", Toast.LENGTH_SHORT).show()
+                            if (success) Toast.makeText(context, R.string.toast_text_set_via_clip_java, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -307,7 +309,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                         onClick = {
                             val success = PapirusClipboardEngine.jClipSetText(context, textInput)
                             onRefreshLogs()
-                            if (success) Toast.makeText(context, "Text set via JClip.java!", Toast.LENGTH_SHORT).show()
+                            if (success) Toast.makeText(context, R.string.toast_text_set_via_jclip_java, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -330,7 +332,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                         if (text != null) {
                             retrievedText = text
                         } else {
-                            Toast.makeText(context, "Clipboard empty!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_clipboard_empty, Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier
@@ -385,7 +387,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Image(
                                 bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Test Bitmap",
+                                contentDescription = stringResource(R.string.cd_test_bitmap),
                                 modifier = Modifier
                                     .size(80.dp)
                                     .border(1.dp, MaterialTheme.colorScheme.outline)
@@ -401,7 +403,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                                 generatedBitmap?.let {
                                     val success = PapirusClipboardEngine.clipSetImage(context, it)
                                     onRefreshLogs()
-                                    if (success) Toast.makeText(context, "Image set via Clip.java!", Toast.LENGTH_SHORT).show()
+                                    if (success) Toast.makeText(context, R.string.toast_image_set_via_clip_java, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier
@@ -420,7 +422,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                                 if (bmp != null) {
                                     retrievedBitmap = bmp
                                 } else {
-                                    Toast.makeText(context, "No image found in clipboard!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_no_image_found_in_clipboard, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier
@@ -451,7 +453,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Image(
                                 bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Pasted image result",
+                                contentDescription = stringResource(R.string.cd_pasted_image_result),
                                 modifier = Modifier
                                     .size(100.dp)
                                     .border(1.dp, MaterialTheme.colorScheme.outline)
@@ -515,7 +517,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                         onClick = {
                             val success = PapirusClipboardEngine.jClipSetArray(context, sourceArray)
                             onRefreshLogs()
-                            if (success) Toast.makeText(context, "2D Array copied successfully!", Toast.LENGTH_SHORT).show()
+                            if (success) Toast.makeText(context, R.string.toast_2d_array_copied_successfully, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier
                             .weight(1f)
@@ -533,7 +535,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
                             if (array != null) {
                                 retrievedArray = array
                             } else {
-                                Toast.makeText(context, "No array found on clipboard!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_no_array_found_on_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier
@@ -674,7 +676,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             val sentence = PapirusClipboardEngine.simulateWriterCopy(context, writerStory, selectedSentenceIndex)
                             onRefreshLogs()
                             if (sentence != null) {
-                                Toast.makeText(context, "Sentence Copied!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_sentence_copied, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1.0f)
@@ -691,7 +693,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             if (clipboardText != null) {
                                 writerPastedSentence = clipboardText
                             } else {
-                                Toast.makeText(context, "Clipboard doesn't contain text!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_clipboard_doesn_t_contain_text, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1.0f),
@@ -743,7 +745,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                         onClick = {
                             val success = PapirusClipboardEngine.simulateCalcCopy(context, calcSourceGrid)
                             onRefreshLogs()
-                            if (success) Toast.makeText(context, "Calc Cell Range Copied!", Toast.LENGTH_SHORT).show()
+                            if (success) Toast.makeText(context, R.string.toast_calc_cell_range_copied, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1.0f)
                     ) {
@@ -759,7 +761,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             if (array != null) {
                                 calcPasteGrid = array
                             } else {
-                                Toast.makeText(context, "No 2D range on clipboard!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_no_2d_range_on_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1.0f),
@@ -833,7 +835,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             val success = PapirusClipboardEngine.simulateImpressCopy(context, selectedSlideName, bmp)
                             onRefreshLogs()
                             if (success) {
-                                Toast.makeText(context, "Slide copied successfully!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_slide_copied_successfully, Toast.LENGTH_SHORT).show()
                             }
                         }
                     },
@@ -900,7 +902,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             }
                             val success = PapirusClipboardEngine.simulateBaseCopy(context, targetBaseTable, dummyResults)
                             onRefreshLogs()
-                            if (success) Toast.makeText(context, "Base Table Copied!", Toast.LENGTH_SHORT).show()
+                            if (success) Toast.makeText(context, R.string.toast_base_table_copied, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.weight(1.0f)
                     ) {
@@ -916,7 +918,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
                             if (array != null) {
                                 queryResultsArray = array
                             } else {
-                                Toast.makeText(context, "No result set array on clipboard!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_no_result_set_array_on_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1.0f),
@@ -1034,7 +1036,7 @@ private fun SdkExamplesTab(
                     IconButton(onClick = onCopyClick, modifier = Modifier.size(32.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = "Copy code to clipboard",
+                            contentDescription = stringResource(R.string.cd_copy_code_to_clipboard),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
@@ -1163,7 +1165,7 @@ private fun TerminalLogs(
                         .size(24.dp)
                         .testTag("clear_logs_button")
                 ) {
-                    Icon(Icons.Rounded.Refresh, contentDescription = "Clear clipboard logs", tint = Color.Green)
+                    Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.cd_clear_clipboard_logs), tint = Color.Green)
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))

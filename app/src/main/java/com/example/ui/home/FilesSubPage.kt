@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import java.io.File
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import com.example.R
 
 class OpenDocumentWithUri : ActivityResultContract<Uri?, Uri?>() {
     override fun createIntent(context: Context, input: Uri?): Intent {
@@ -77,9 +78,9 @@ fun FilesSubPage(
                 com.example.MainActivity.openedFilePath = targetFile.absolutePath
                 com.example.MainActivity.openedFileType = fileType
                 onNavigateToModule(fileType)
-                Toast.makeText(context, "Opening $displayName...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_opening_displayname, displayName), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(context, "Error opening file: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_error_opening_file_e_message, e.message), Toast.LENGTH_SHORT).show()
             }
         }
     }

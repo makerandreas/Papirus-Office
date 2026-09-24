@@ -30,6 +30,8 @@ import com.makerandreas.papirusoffice.data.framework.Chart2Templates
 import com.makerandreas.papirusoffice.data.framework.ChartDataModel
 import com.makerandreas.papirusoffice.data.framework.ChartSeriesData
 import com.makerandreas.papirusoffice.data.framework.CrossModuleChartEngine
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 /**
  * Universal Chart Builder & Inspector (SDK Guide Ch. 33 "Using Charts in Other Documents")
@@ -107,7 +109,7 @@ fun UniversalChartSheet(
                         }
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 }
 
@@ -125,7 +127,7 @@ fun UniversalChartSheet(
                         previewBitmap?.let { bmp ->
                             Image(
                                 bitmap = bmp.asImageBitmap(),
-                                contentDescription = "Chart Preview",
+                                contentDescription = stringResource(R.string.cd_chart_preview),
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(8.dp)
@@ -198,7 +200,7 @@ fun UniversalChartSheet(
                         onClick = {
                             val success = engine.copyChartToClipboard(context, chartState)
                             if (success) {
-                                Toast.makeText(context, "Chart copied to UNO Clipboard! (.uno:Copy)", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_chart_copied_to_uno_clipboard_uno_copy, Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -213,9 +215,9 @@ fun UniversalChartSheet(
                             val clipboardChart = engine.activeClipboardChart
                             if (clipboardChart != null) {
                                 chartState = clipboardChart.copy()
-                                Toast.makeText(context, "Pasted chart from UNO Clipboard! (.uno:Paste)", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_pasted_chart_from_uno_clipboard_uno_paste, Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "No chart in clipboard", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_no_chart_in_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         }
                     ) {
@@ -229,7 +231,7 @@ fun UniversalChartSheet(
                         onClick = {
                             val file = engine.exportChartAsPng(context, chartState)
                             if (file != null) {
-                                Toast.makeText(context, "Saved PNG: ${file.name}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, context.getString(R.string.toast_saved_png_file_name, file.name), Toast.LENGTH_LONG).show()
                             }
                         }
                     ) {
@@ -244,7 +246,7 @@ fun UniversalChartSheet(
                     Button(
                         onClick = {
                             onInsertChart(chartState)
-                            Toast.makeText(context, "Embedded ${chartState.title} into $activeModuleName!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_embedded_chartstate_title_into_activemodulename, chartState.title, activeModuleName), Toast.LENGTH_SHORT).show()
                             onDismiss()
                         }
                     ) {

@@ -140,10 +140,10 @@ class MainActivity : ComponentActivity() {
                 // Track in recent files too
                 RecentFilesTracker.addFile(this, persisted.absolutePath, fileType)
 
-                Toast.makeText(this, "Opening: $displayName", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, this.getString(R.string.toast_opening_displayname_2, displayName), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 android.util.Log.e("MainActivity", "Failed to resolve incoming file", e)
-                Toast.makeText(this, "Failed to resolve file: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, this.getString(R.string.toast_failed_to_resolve_file_e_message, e.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -435,7 +435,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     "Cellina" -> CellinaModule(
                         isTablet = isTablet,
                         onFormulaSelected = { formula ->
-                            Toast.makeText(context, "Formula: $formula", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_formula_formula, formula), Toast.LENGTH_SHORT).show()
                         },
                         onBack = { currentWorkspace = "home" }
                     )

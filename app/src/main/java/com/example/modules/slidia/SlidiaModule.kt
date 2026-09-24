@@ -208,7 +208,7 @@ fun SlidiaModule(
                 isSaving = false
                 isSaved = true
                 saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -228,7 +228,7 @@ fun SlidiaModule(
             } else {
                 isSaved = true
                 saveFailed = false
-                Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
                 onSuccess?.invoke()
             }
         }
@@ -322,7 +322,7 @@ fun SlidiaModule(
                     enabled = activeSlideIndex > 0,
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Slide", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_previous_slide), tint = Color.White)
                 }
 
                 Text(
@@ -338,14 +338,14 @@ fun SlidiaModule(
                         enabled = activeSlideIndex < slides.size - 1,
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.cd_next_slide), tint = Color.White)
                     }
 
                     IconButton(
                         onClick = { isSlideShowMode = false },
                         colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Red.copy(alpha = 0.3f))
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Exit Slideshow", tint = Color.White)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_exit_slideshow), tint = Color.White)
                     }
                 }
             }
@@ -378,27 +378,27 @@ fun SlidiaModule(
                                 onBack()
                             }
                         }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = {
-                            Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_uploading_to_google_drive, Toast.LENGTH_SHORT).show()
                         }) {
-                            Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = stringResource(R.string.cd_upload_to_drive))
                         }
                         IconButton(onClick = {
                             isWebView = !isWebView
-                            Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, if (isWebView) R.string.toast_mobile_view_active else R.string.toast_normal_view_active, Toast.LENGTH_SHORT).show()
                         }) {
                             Icon(
                                 imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                contentDescription = "Document View Mode"
+                                contentDescription = stringResource(R.string.cd_document_view_mode)
                             )
                         }
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                             }
                             DropdownMenu(
                                 expanded = showMoreMenu,
@@ -408,9 +408,9 @@ fun SlidiaModule(
                                     text = { Text("Export to PDF") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_exporting_to_pdf, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
+                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = stringResource(R.string.cd_pdf)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Save as...") },
@@ -418,7 +418,7 @@ fun SlidiaModule(
                                         showMoreMenu = false
                                         showSaveAsDialog = true
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
+                                    leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = stringResource(R.string.cd_save_as)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Simulate Save Error") },
@@ -426,15 +426,15 @@ fun SlidiaModule(
                                         showMoreMenu = false
                                         performSave(true)
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = stringResource(R.string.cd_simulate_error), tint = MaterialTheme.colorScheme.error) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Print") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Printing presentation...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_printing_presentation, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                 )
                             }
                         }
@@ -449,30 +449,30 @@ fun SlidiaModule(
                     title = { /* Headline & Subtitle removed in Edit Mode */ },
                     navigationIcon = {
                         IconButton(onClick = { isEditMode = false }) {
-                            Icon(Icons.Default.Check, contentDescription = "Exit Edit Mode", tint = moduleColor)
+                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.cd_exit_edit_mode), tint = moduleColor)
                         }
                     },
                     actions = {
                         IconButton(onClick = {
-                            Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_uploading_to_google_drive, Toast.LENGTH_SHORT).show()
                         }) {
-                            Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
+                            Icon(Icons.Rounded.CloudUpload, contentDescription = stringResource(R.string.cd_upload_to_drive))
                         }
                         IconButton(onClick = {
                             isWebView = !isWebView
-                            Toast.makeText(context, if (isWebView) "Mobile View" else "Normal View", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, if (isWebView) R.string.toast_mobile_view else R.string.toast_normal_view, Toast.LENGTH_SHORT).show()
                         }) {
                             Icon(
                                 imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                contentDescription = "Document View Mode"
+                                contentDescription = stringResource(R.string.cd_document_view_mode)
                             )
                         }
                         IconButton(onClick = { handleSaveCommand() }) {
-                            Icon(Icons.Rounded.Save, contentDescription = "Save")
+                            Icon(Icons.Rounded.Save, contentDescription = stringResource(R.string.cd_save))
                         }
                         Box {
                             IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                             }
                             DropdownMenu(
                                 expanded = showMoreMenu,
@@ -484,7 +484,7 @@ fun SlidiaModule(
                                         showMoreMenu = false
                                         handleSaveCommand()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = "Save") }
+                                    leadingIcon = { Icon(Icons.Rounded.Save, contentDescription = stringResource(R.string.cd_save)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Simulate Save Error") },
@@ -492,23 +492,23 @@ fun SlidiaModule(
                                         showMoreMenu = false
                                         performSave(true)
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = "Simulate Error", tint = MaterialTheme.colorScheme.error) }
+                                    leadingIcon = { Icon(Icons.Rounded.ErrorOutline, contentDescription = stringResource(R.string.cd_simulate_error), tint = MaterialTheme.colorScheme.error) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Export to PDF") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Exporting to PDF...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_exporting_to_pdf, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "PDF") }
+                                    leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = stringResource(R.string.cd_pdf)) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Print") },
                                     onClick = {
                                         showMoreMenu = false
-                                        Toast.makeText(context, "Connecting printer...", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_connecting_printer, Toast.LENGTH_SHORT).show()
                                     },
-                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                    leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                 )
                             }
                         }
@@ -673,7 +673,7 @@ fun SlidiaModule(
                                                 enabled = index > 0,
                                                 modifier = Modifier.size(18.dp)
                                             ) {
-                                                Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up", modifier = Modifier.size(10.dp))
+                                                Icon(Icons.Default.ArrowUpward, contentDescription = stringResource(R.string.cd_move_up), modifier = Modifier.size(10.dp))
                                             }
                                             IconButton(
                                                 onClick = {
@@ -687,7 +687,7 @@ fun SlidiaModule(
                                                 enabled = index < slides.size - 1,
                                                 modifier = Modifier.size(18.dp)
                                             ) {
-                                                Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down", modifier = Modifier.size(10.dp))
+                                                Icon(Icons.Default.ArrowDownward, contentDescription = stringResource(R.string.cd_move_down), modifier = Modifier.size(10.dp))
                                             }
                                             IconButton(
                                                 onClick = {
@@ -697,7 +697,7 @@ fun SlidiaModule(
                                                 },
                                                 modifier = Modifier.size(18.dp)
                                             ) {
-                                                Icon(Icons.Default.ContentCopy, contentDescription = "Duplicate", modifier = Modifier.size(10.dp))
+                                                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.cd_duplicate), modifier = Modifier.size(10.dp))
                                             }
                                         }
                                     }
@@ -866,7 +866,7 @@ fun SlidiaModule(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.ViewAgenda,
-                                contentDescription = "Open Standard Bottom Sheet",
+                                contentDescription = stringResource(R.string.cd_open_standard_bottom_sheet),
                                 tint = moduleColor
                             )
                         }
@@ -901,7 +901,7 @@ fun SlidiaModule(
                                 onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Zoom Out", modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.cd_zoom_out), modifier = Modifier.size(12.dp))
                             }
                             Text(
                                 text = "${(zoomScale * 100).toInt()}%",
@@ -912,7 +912,7 @@ fun SlidiaModule(
                                 onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Zoom In", modifier = Modifier.size(12.dp))
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_zoom_in), modifier = Modifier.size(12.dp))
                             }
                         }
                     }
@@ -991,14 +991,14 @@ fun SlidiaModule(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconButton(onClick = { Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo", tint = moduleColor)
+                            IconButton(onClick = { Toast.makeText(context, R.string.toast_undo_performed, Toast.LENGTH_SHORT).show() }) {
+                                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = stringResource(R.string.cd_undo), tint = moduleColor)
                             }
-                            IconButton(onClick = { Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show() }) {
-                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = "Redo", tint = moduleColor)
+                            IconButton(onClick = { Toast.makeText(context, R.string.toast_redo_performed, Toast.LENGTH_SHORT).show() }) {
+                                Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = stringResource(R.string.cd_redo), tint = moduleColor)
                             }
                             IconButton(onClick = { showBottomBar = false }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Close Standard Bottom Sheet", tint = MaterialTheme.colorScheme.error)
+                                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close_standard_bottom_sheet), tint = MaterialTheme.colorScheme.error)
                             }
                         }
                     }
@@ -1058,7 +1058,7 @@ fun SlidiaModule(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = {
-                                            Toast.makeText(context, "Exported Slide ${activeSlideIndex + 1} as PNG image!", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, context.getString(R.string.toast_exported_slide_activeslideindex_1_as_png_image, activeSlideIndex + 1), Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1085,7 +1085,7 @@ fun SlidiaModule(
                                             val copy = activeSlide.copy(id = slides.size + 1, title = "${activeSlide.title} (Copy)")
                                             slides.add(activeSlideIndex + 1, copy)
                                             activeSlideIndex++
-                                            Toast.makeText(context, "Slide duplicated!", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, R.string.toast_slide_duplicated, Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1095,9 +1095,9 @@ fun SlidiaModule(
                                             if (slides.size > 1) {
                                                 slides.removeAt(activeSlideIndex)
                                                 if (activeSlideIndex >= slides.size) activeSlideIndex = slides.size - 1
-                                                Toast.makeText(context, "Slide deleted!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_slide_deleted, Toast.LENGTH_SHORT).show()
                                             } else {
-                                                Toast.makeText(context, "Cannot delete sole slide", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_cannot_delete_sole_slide, Toast.LENGTH_SHORT).show()
                                             }
                                         }, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
                                             Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1218,7 +1218,7 @@ fun SlidiaModule(
                                         }
                                     }
                                     Button(
-                                        onClick = { Toast.makeText(context, "Applied '$transitionEffect' transition to all slides!", Toast.LENGTH_SHORT).show() },
+                                        onClick = { Toast.makeText(context, context.getString(R.string.toast_applied_transitioneffect_transition_to_all_slides, transitionEffect), Toast.LENGTH_SHORT).show() },
                                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
                                     ) {
                                         Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1311,7 +1311,7 @@ fun SlidiaModule(
                 onClick = { 
                     isEditMode = true
                 },
-                icon = { Icon(Icons.Default.Edit, contentDescription = "Edit") },
+                icon = { Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit)) },
                 text = { Text("Edit Presentation") },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -1513,7 +1513,7 @@ fun SlidiaModule(
                                     slides.add(SlideItem(slides.size + 1, currentTitle, "Imported from notes", currentBullets.toList()))
                                 }
                                 activeSlideIndex = slides.size - 1
-                                Toast.makeText(context, "Slides built from notes!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_slides_built_from_notes, Toast.LENGTH_SHORT).show()
                             }
                             showImportNotesDialog = false
                             importedNotesText = ""
@@ -1554,7 +1554,7 @@ fun SlidiaModule(
                             val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                             val clip = android.content.ClipData.newPlainText("Presentation Text", extractedText)
                             clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                             showExtractTextDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
@@ -1586,7 +1586,7 @@ fun SlidiaModule(
                             slides.add(SlideItem(nextId, "Appended: Inspiration Template", "Design & Architecture", listOf("Modular widgets", "Custom palette", "Dynamic layouts")))
                             slides.add(SlideItem(nextId + 1, "Appended: Financial Summary", "Q3/Q4 Performance", listOf("Revenue Growth +24%", "Operating Expenses -8%", "Profit Margin +12%")))
                             activeSlideIndex = slides.size - 1
-                            Toast.makeText(context, "Appended 2 slides from external template!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_appended_2_slides_from_external_template, Toast.LENGTH_SHORT).show()
                             showAppendDeckDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
@@ -1623,7 +1623,7 @@ fun SlidiaModule(
                     Button(
                         onClick = {
                             slides.forEach { it.footerText = globalMasterFooterText }
-                            Toast.makeText(context, "Updated master page footer for all slides", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_updated_master_page_footer_for_all_slides, Toast.LENGTH_SHORT).show()
                             showMasterPageDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
@@ -1724,9 +1724,9 @@ fun SlidiaModule(
                                 activePlaylistIndices = parsed
                                 playlistCurrentIndex = 0
                                 isSlideShowMode = true
-                                Toast.makeText(context, "Custom Show '$customShowName' created with ${parsed.size} slides!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_custom_show_customshowname_created_with_parsed_size, parsed.size, customShowName), Toast.LENGTH_SHORT).show()
                             } else {
-                                Toast.makeText(context, "Invalid slide numbers", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_invalid_slide_numbers, Toast.LENGTH_SHORT).show()
                             }
                             showCustomShowDialog = false
                         },
@@ -1761,7 +1761,7 @@ fun SlidiaModule(
                         playlistCurrentIndex = 0
                     } else {
                         isAutoAdvancing = false
-                        Toast.makeText(context, "End of presentation", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_end_of_presentation, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -1782,7 +1782,7 @@ fun SlidiaModule(
                             } else if (isEndless) {
                                 playlistCurrentIndex = 0
                             } else {
-                                Toast.makeText(context, "End of presentation", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_end_of_presentation, Toast.LENGTH_SHORT).show()
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -1921,14 +1921,14 @@ fun SlidiaModule(
                                 },
                                 enabled = playlistCurrentIndex > 0
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Slide", tint = Color.White)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_previous_slide), tint = Color.White)
                             }
                             IconButton(
                                 onClick = { isAutoAdvancing = !isAutoAdvancing }
                             ) {
                                 Icon(
                                     imageVector = if (isAutoAdvancing || autoChange) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = "Play/Pause Auto Advance",
+                                    contentDescription = stringResource(R.string.cd_play_pause_auto_advance),
                                     tint = moduleColor
                                 )
                             }
@@ -1942,7 +1942,7 @@ fun SlidiaModule(
                                 },
                                 enabled = playlistCurrentIndex < totalInPlay - 1 || isEndless
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Slide", tint = Color.White)
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = stringResource(R.string.cd_next_slide), tint = Color.White)
                             }
                             Text(
                                 text = "Slide ${playlistCurrentIndex + 1} / $totalInPlay",
@@ -1973,12 +1973,12 @@ fun SlidiaModule(
                             IconButton(onClick = { usePenMode = !usePenMode }) {
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Toggle Laser Pen",
+                                    contentDescription = stringResource(R.string.cd_toggle_laser_pen),
                                     tint = if (usePenMode) Color.Red else Color.White
                                 )
                             }
                             IconButton(onClick = { isSlideShowMode = false }) {
-                                Icon(Icons.Default.Close, contentDescription = "Exit Slideshow", tint = Color.Red)
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_exit_slideshow), tint = Color.Red)
                             }
                         }
                     }

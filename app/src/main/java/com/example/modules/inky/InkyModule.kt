@@ -205,7 +205,8 @@ fun InkyModule(
         }
     }
 
-    var documentContentTitle by remember { mutableStateOf("Draft Dokumen Baru") }
+    val untitledDocumentTitle = stringResource(R.string.default_document_title)
+    var documentContentTitle by remember { mutableStateOf(untitledDocumentTitle) }
 
     val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
     var docxImages by remember { mutableStateOf<Map<String, java.io.File>>(emptyMap()) }
@@ -593,7 +594,7 @@ fun InkyModule(
     val lokitLogs = remember {
         mutableStateListOf(
             "LOKit Core: " + com.example.core.jni.LokitEngine.statusLabel,
-            com.example.core.jni.LokitEngine.tagLog("lok::Office::documentLoad(\"Inky_Dokumen.odt\")"),
+            com.example.core.jni.LokitEngine.tagLog("lok::Office::documentLoad(\"Untitled.odt\")"),
             com.example.core.jni.LokitEngine.tagLog("lok::Document::registerCallback(LOK_CALLBACK_INVALIDATE_TILES)")
         )
     }
@@ -841,7 +842,7 @@ fun InkyModule(
                         if (path != null) {
                             RecentFilesTracker.addFile(context, path, "Inky")
                         }
-                        Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
                     } else {
                         saveFailed = true
                         showSaveFailedDialog = true
@@ -909,7 +910,7 @@ fun InkyModule(
                             updateInkyMetadata(path, docTitle, docBodyText.text)
                             RecentFilesTracker.addFile(context, path, "Inky")
                         }
-                        Toast.makeText(context, "Document saved", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_document_saved, Toast.LENGTH_SHORT).show()
                         onSuccess?.invoke()
                     } else {
                         saveFailed = true
@@ -1042,7 +1043,7 @@ fun InkyModule(
                     pendingActionAfterSave?.invoke()
                     pendingActionAfterSave = null
                 } else {
-                    Toast.makeText(context, "Error saving document to uri", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, R.string.toast_error_saving_document_to_uri, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -1072,9 +1073,9 @@ fun InkyModule(
                 }
                 showSavingProgressPopup = false
                 if (actualSuccess) {
-                    Toast.makeText(context, "Document exported as PDF successfully!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, R.string.toast_document_exported_as_pdf_successfully, Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(context, "Failed to export PDF", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, R.string.toast_failed_to_export_pdf, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -1518,9 +1519,9 @@ fun InkyModule(
             val success = currentSessionState?.undoManager?.undo() ?: false
             if (success) {
                 triggerAutosave()
-                Toast.makeText(context, "Undo performed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_undo_performed, Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Nothing to Undo", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_nothing_to_undo, Toast.LENGTH_SHORT).show()
             }
         }
         addLokitLog("lok::Document::postWindow(event=UNDO)")
@@ -1533,9 +1534,9 @@ fun InkyModule(
             val success = currentSessionState?.undoManager?.redo() ?: false
             if (success) {
                 triggerAutosave()
-                Toast.makeText(context, "Redo performed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_redo_performed, Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Nothing to Redo", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_nothing_to_redo, Toast.LENGTH_SHORT).show()
             }
         }
         addLokitLog("lok::Document::postWindow(event=REDO)")
@@ -1547,7 +1548,7 @@ fun InkyModule(
             flushPendingTyping(docBodyText.text)
             currentSessionState?.undoManager?.undoTo(entry)
             triggerAutosave()
-            Toast.makeText(context, "Actions undone", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_actions_undone, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1557,7 +1558,7 @@ fun InkyModule(
             flushPendingTyping(docBodyText.text)
             currentSessionState?.undoManager?.redoTo(entry)
             triggerAutosave()
-            Toast.makeText(context, "Actions redone", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_actions_redone, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1993,9 +1994,9 @@ fun InkyModule(
                                 docBodyText = docBodyText.copy(
                                     selection = androidx.compose.ui.text.TextRange(index, index + query.length)
                                 )
-                                Toast.makeText(context, "Found match at character $index", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_found_match_at_character_index, index), Toast.LENGTH_SHORT).show()
                             } else if (query.isNotEmpty()) {
-                                Toast.makeText(context, "No match found", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_no_match_found, Toast.LENGTH_SHORT).show()
                             }
                         },
                         onReplace = { find, replace ->
@@ -2007,9 +2008,9 @@ fun InkyModule(
                                     selection = androidx.compose.ui.text.TextRange(0)
                                 )
                                 isSaved = false
-                                Toast.makeText(context, "Replaced successfully", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_replaced_successfully, Toast.LENGTH_SHORT).show()
                             } else if (find.isNotEmpty()) {
-                                Toast.makeText(context, "Nothing to replace", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_nothing_to_replace, Toast.LENGTH_SHORT).show()
                             }
                         },
                         onClose = {
@@ -2040,28 +2041,28 @@ fun InkyModule(
                         actions = {
                             // 1. Upload to Google Drive
                             IconButton(onClick = {
-                                Toast.makeText(context, "Uploading to Google Drive...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_uploading_to_google_drive, Toast.LENGTH_SHORT).show()
                                 addLokitLog("Upload to Drive triggered")
                             }) {
-                                Icon(Icons.Rounded.CloudUpload, contentDescription = "Upload to Drive")
+                                Icon(Icons.Rounded.CloudUpload, contentDescription = stringResource(R.string.cd_upload_to_drive))
                             }
 
                             // 2. Find in Page
                             IconButton(onClick = {
                                 showFindReplace = !showFindReplace
                             }) {
-                                Icon(Icons.Rounded.Search, contentDescription = "Find in Page")
+                                Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.cd_find_in_page))
                             }
 
                             if (isEditMode) {
                                 // 3. Mobile view (Edit Mode only)
                                 IconButton(onClick = {
                                     isWebView = !isWebView
-                                    Toast.makeText(context, if (isWebView) "Mobile View Active" else "Normal View Active", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, if (isWebView) R.string.toast_mobile_view_active else R.string.toast_normal_view_active, Toast.LENGTH_SHORT).show()
                                 }) {
                                     Icon(
                                         imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                        contentDescription = "Document View Mode"
+                                        contentDescription = stringResource(R.string.cd_document_view_mode)
                                     )
                                 }
 
@@ -2078,7 +2079,7 @@ fun InkyModule(
                                     enabled = isUndoEnabled,
                                     modifier = Modifier.testTag("btn_top_app_bar_undo")
                                 ) {
-                                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo (long press for history)")
+                                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = stringResource(R.string.cd_undo_long_press_for_history))
                                 }
                             }
 
@@ -2086,7 +2087,7 @@ fun InkyModule(
                             Box {
                                 var showMoreMenuInAppBar by remember { mutableStateOf(false) }
                                 IconButton(onClick = { showMoreMenuInAppBar = true }) {
-                                    Icon(Icons.Rounded.MoreVert, contentDescription = "More Options")
+                                    Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
                                 }
                                 DropdownMenu(
                                     expanded = showMoreMenuInAppBar,
@@ -2098,7 +2099,7 @@ fun InkyModule(
                                             text = { Text("Share as PDF") },
                                             onClick = {
                                                 showMoreMenuInAppBar = false
-                                                Toast.makeText(context, "Exporting and sharing as PDF...", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_exporting_and_sharing_as_pdf, Toast.LENGTH_SHORT).show()
                                                 coroutineScope.launch {
                                                     try {
                                                         val cleanName = docTitle.substringBeforeLast(".").replace(" ", "_")
@@ -2131,15 +2132,15 @@ fun InkyModule(
                                                             }
                                                             context.startActivity(chooserIntent)
                                                         } else {
-                                                            Toast.makeText(context, "Failed to generate PDF for sharing", Toast.LENGTH_SHORT).show()
+                                                            Toast.makeText(context, R.string.toast_failed_to_generate_pdf_for_sharing, Toast.LENGTH_SHORT).show()
                                                         }
                                                     } catch (e: Exception) {
                                                         e.printStackTrace()
-                                                        Toast.makeText(context, "Error sharing PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, context.getString(R.string.toast_error_sharing_pdf_e_message, e.message), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = "Share as PDF") }
+                                            leadingIcon = { Icon(Icons.Rounded.PictureAsPdf, contentDescription = stringResource(R.string.cd_share_as_pdf)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Save as...") },
@@ -2147,7 +2148,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 showSaveAsDialog = true
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = "Save As") }
+                                            leadingIcon = { Icon(Icons.Rounded.SaveAs, contentDescription = stringResource(R.string.cd_save_as)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
@@ -2155,7 +2156,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 isDarkDocument = !isDarkDocument
                                             },
-                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = stringResource(R.string.cd_toggle_theme)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Open navigation bar") },
@@ -2164,15 +2165,15 @@ fun InkyModule(
                                                 showBottomBar = true
                                                 bottomBarDeck = "navigator"
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = "Open navigation bar") }
+                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = stringResource(R.string.cd_open_navigation_bar)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Read aloud") },
                                             onClick = {
                                                 showMoreMenuInAppBar = false
-                                                Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_reading_document_aloud, Toast.LENGTH_SHORT).show()
                                             },
-                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = stringResource(R.string.cd_read_aloud)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Print") },
@@ -2180,7 +2181,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 showUniversalPrintSheet = true
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                         )
                                     } else {
                                         // Edit Mode Items: Share, Switch to Dark Mode, Read aloud, Open Navigation Bar, Print
@@ -2190,7 +2191,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 showUniversalEmailSheet = true
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = "Share") }
+                                            leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.cd_share)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text(if (isDarkDocument) "Light Document Mode" else "Dark Document Mode") },
@@ -2198,15 +2199,15 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 isDarkDocument = !isDarkDocument
                                             },
-                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = "Toggle Theme") }
+                                            leadingIcon = { Icon(if (isDarkDocument) Icons.Rounded.LightMode else Icons.Rounded.DarkMode, contentDescription = stringResource(R.string.cd_toggle_theme)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Read aloud") },
                                             onClick = {
                                                 showMoreMenuInAppBar = false
-                                                Toast.makeText(context, "Reading document aloud...", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_reading_document_aloud, Toast.LENGTH_SHORT).show()
                                             },
-                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Read aloud") }
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = stringResource(R.string.cd_read_aloud)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Open Navigation Bar") },
@@ -2215,7 +2216,7 @@ fun InkyModule(
                                                 showBottomBar = true
                                                 bottomBarDeck = "navigator"
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = "Open Navigation Bar") }
+                                            leadingIcon = { Icon(Icons.Rounded.Menu, contentDescription = stringResource(R.string.cd_open_navigation_bar_2)) }
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Print") },
@@ -2223,7 +2224,7 @@ fun InkyModule(
                                                 showMoreMenuInAppBar = false
                                                 showUniversalPrintSheet = true
                                             },
-                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = "Print") }
+                                            leadingIcon = { Icon(Icons.Rounded.Print, contentDescription = stringResource(R.string.cd_print)) }
                                         )
                                     }
                                 }
@@ -2611,7 +2612,7 @@ fun InkyModule(
                                 )
                                 Icon(
                                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                                    contentDescription = "Select Font Style",
+                                    contentDescription = stringResource(R.string.cd_select_font_style),
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2642,7 +2643,7 @@ fun InkyModule(
                                 )
                                 Icon(
                                     imageVector = Icons.Rounded.KeyboardArrowDown,
-                                    contentDescription = "Select Font Size",
+                                    contentDescription = stringResource(R.string.cd_select_font_size),
                                     modifier = Modifier.size(16.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -2658,7 +2659,7 @@ fun InkyModule(
                                     containerColor = if (isBold) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                             ) {
-                                Icon(Icons.Rounded.FormatBold, contentDescription = "Bold")
+                                Icon(Icons.Rounded.FormatBold, contentDescription = stringResource(R.string.cd_bold))
                             }
 
                             // 4. Italic
@@ -2671,7 +2672,7 @@ fun InkyModule(
                                     containerColor = if (isItalic) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                             ) {
-                                Icon(Icons.Rounded.FormatItalic, contentDescription = "Italic")
+                                Icon(Icons.Rounded.FormatItalic, contentDescription = stringResource(R.string.cd_italic))
                             }
 
                             // 5. Underline with Tap and Hold
@@ -2688,7 +2689,7 @@ fun InkyModule(
                             ) {
                                 Icon(
                                     imageVector = Icons.Rounded.FormatUnderlined,
-                                    contentDescription = "Underline",
+                                    contentDescription = stringResource(R.string.cd_underline),
                                     tint = if (isUnderline) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -2703,7 +2704,7 @@ fun InkyModule(
                                     containerColor = if (isStrikethrough) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                                 )
                             ) {
-                                Icon(Icons.Rounded.FormatStrikethrough, contentDescription = "Strikethrough")
+                                Icon(Icons.Rounded.FormatStrikethrough, contentDescription = stringResource(R.string.cd_strikethrough))
                             }
 
                             // 7. Highlight color
@@ -2714,7 +2715,7 @@ fun InkyModule(
                             }) {
                                 Icon(
                                     Icons.Rounded.BorderColor,
-                                    contentDescription = "Highlight Color",
+                                    contentDescription = stringResource(R.string.cd_highlight_color),
                                     tint = if (highlightColor != Color.Transparent) highlightColor else MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -2727,7 +2728,7 @@ fun InkyModule(
                             }) {
                                 Icon(
                                     Icons.Rounded.FormatColorText,
-                                    contentDescription = "Font Color",
+                                    contentDescription = stringResource(R.string.cd_font_color),
                                     tint = fontColor
                                 )
                             }
@@ -2738,7 +2739,7 @@ fun InkyModule(
                                 activeInkySubpage = "bulleted_list"
                                 openedFromExternalHub = true
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.FormatListBulleted, contentDescription = "Bulleted List")
+                                Icon(Icons.AutoMirrored.Rounded.FormatListBulleted, contentDescription = stringResource(R.string.cd_bulleted_list))
                             }
 
                             // 10. Create numbered list
@@ -2747,7 +2748,7 @@ fun InkyModule(
                                 activeInkySubpage = "numbered_list"
                                 openedFromExternalHub = true
                             }) {
-                                Icon(Icons.Rounded.FormatListNumbered, contentDescription = "Numbered List")
+                                Icon(Icons.Rounded.FormatListNumbered, contentDescription = stringResource(R.string.cd_numbered_list))
                             }
 
                             // 11. Increase indent
@@ -2763,7 +2764,7 @@ fun InkyModule(
                                 )
                                 triggerAutosave()
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.FormatIndentIncrease, contentDescription = "Increase Indent")
+                                Icon(Icons.AutoMirrored.Rounded.FormatIndentIncrease, contentDescription = stringResource(R.string.cd_increase_indent))
                             }
 
                             // 12. Decrease indent
@@ -2780,38 +2781,38 @@ fun InkyModule(
                                     )
                                     triggerAutosave()
                                 } else {
-                                    Toast.makeText(context, "Cannot decrease indent further", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_cannot_decrease_indent_further, Toast.LENGTH_SHORT).show()
                                 }
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.FormatIndentDecrease, contentDescription = "Decrease Indent")
+                                Icon(Icons.AutoMirrored.Rounded.FormatIndentDecrease, contentDescription = stringResource(R.string.cd_decrease_indent))
                             }
 
-                            // 13. Add image
+                            // 13. Add image. TODO(plan-6): real insertion path; visible disabled state in plan 3B (R-26).
                             IconButton(onClick = {
-                                Toast.makeText(context, "Add image selected", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_image_selected, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = "Add Image")
+                                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = stringResource(R.string.cd_add_image))
                             }
 
-                            // 14. Add table
+                            // 14. Add table. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
                             IconButton(onClick = {
-                                Toast.makeText(context, "Add table selected", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_table_selected, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.GridOn, contentDescription = "Add Table")
+                                Icon(Icons.Rounded.GridOn, contentDescription = stringResource(R.string.cd_add_table))
                             }
 
-                            // 15. Add link
+                            // 15. Add link. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
                             IconButton(onClick = {
-                                Toast.makeText(context, "Add link selected", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_link_selected, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.Link, contentDescription = "Add Link")
+                                Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.cd_add_link))
                             }
 
-                            // 16. Add comment
+                            // 16. Add comment. TODO(plan-8): real comment model; visible disabled state in plan 3B (R-26).
                             IconButton(onClick = {
-                                Toast.makeText(context, "Add comment selected", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_comment_selected, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.Comment, contentDescription = "Add Comment")
+                                Icon(Icons.AutoMirrored.Rounded.Comment, contentDescription = stringResource(R.string.cd_add_comment))
                             }
                         }
 
@@ -2844,7 +2845,7 @@ fun InkyModule(
                                     triggerAutosave()
                                 }
                             ) {
-                                Icon(Icons.AutoMirrored.Rounded.KeyboardTab, contentDescription = "Insert Tab", tint = MaterialTheme.colorScheme.primary)
+                                Icon(Icons.AutoMirrored.Rounded.KeyboardTab, contentDescription = stringResource(R.string.cd_insert_tab), tint = MaterialTheme.colorScheme.primary)
                             }
 
                             // b. Toggle Keyboard: focuses a real page field first
@@ -2879,7 +2880,7 @@ fun InkyModule(
                                 },
                                 colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             ) {
-                                Icon(Icons.Rounded.ViewAgenda, contentDescription = "Open Bottom Sheet", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Icon(Icons.Rounded.ViewAgenda, contentDescription = stringResource(R.string.cd_open_bottom_sheet), tint = MaterialTheme.colorScheme.onPrimaryContainer)
                             }
                         }
                     }
@@ -2975,7 +2976,7 @@ fun InkyModule(
                                         }) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                                contentDescription = "Back",
+                                                contentDescription = stringResource(R.string.cd_back),
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
                                         }
@@ -3023,7 +3024,7 @@ fun InkyModule(
                                         IconButton(onClick = { activeInkySubpage = "create_new_style" }) {
                                             Icon(
                                                 imageVector = Icons.Rounded.Add,
-                                                contentDescription = "Create New Style",
+                                                contentDescription = stringResource(R.string.cd_create_new_style),
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
                                         }
@@ -3036,11 +3037,11 @@ fun InkyModule(
 
                                     if (needsMoreOptions) {
                                         IconButton(onClick = {
-                                            Toast.makeText(context, "More Options will be developed soon", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, R.string.toast_more_options_will_be_developed_soon, Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(
                                                 imageVector = Icons.Rounded.MoreVert,
-                                                contentDescription = "More Options",
+                                                contentDescription = stringResource(R.string.cd_more_options),
                                                 tint = MaterialTheme.colorScheme.primary
                                             )
                                         }
@@ -3060,7 +3061,7 @@ fun InkyModule(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                                contentDescription = "Undo (long press for history)",
+                                                contentDescription = stringResource(R.string.cd_undo_long_press_for_history),
                                                 tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
                                         }
@@ -3076,7 +3077,7 @@ fun InkyModule(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Rounded.Redo,
-                                                contentDescription = "Redo (long press for history)",
+                                                contentDescription = stringResource(R.string.cd_redo_long_press_for_history),
                                                 tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                             )
                                         }
@@ -3087,7 +3088,7 @@ fun InkyModule(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Rounded.Close,
-                                            contentDescription = "Close Standard Bottom Sheet",
+                                            contentDescription = stringResource(R.string.cd_close_standard_bottom_sheet),
                                             tint = MaterialTheme.colorScheme.error
                                         )
                                     }
@@ -3163,7 +3164,7 @@ fun InkyModule(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Undo,
-                                            contentDescription = "Undo (long press for history)",
+                                            contentDescription = stringResource(R.string.cd_undo_long_press_for_history),
                                             tint = if (isUndoEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
@@ -3179,7 +3180,7 @@ fun InkyModule(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.Redo,
-                                            contentDescription = "Redo (long press for history)",
+                                            contentDescription = stringResource(R.string.cd_redo_long_press_for_history),
                                             tint = if (canRedo) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                         )
                                     }
@@ -3189,7 +3190,7 @@ fun InkyModule(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Rounded.Close,
-                                            contentDescription = "Close Standard Bottom Sheet",
+                                            contentDescription = stringResource(R.string.cd_close_standard_bottom_sheet),
                                             tint = MaterialTheme.colorScheme.error
                                         )
                                     }
@@ -3320,18 +3321,9 @@ fun InkyModule(
                                                              val dateFmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                                                              val createdStr = dateFmt.format(java.util.Date(meta.createdAt))
                                                              val modifiedStr = dateFmt.format(java.util.Date(meta.lastModifiedAt))
-                                                             Toast.makeText(
-                                                                 context,
-                                                                 "Document Properties (Room DB):\n" +
-                                                                 "File: ${meta.fileName} (${meta.fileType})\n" +
-                                                                 "Author: ${meta.author}\n" +
-                                                                 "Created: $createdStr\n" +
-                                                                 "Modified: $modifiedStr\n" +
-                                                                 "Words: ${meta.wordCount} | Chars: ${meta.characterCount} | Paragraphs: ${meta.paragraphCount}",
-                                                                 Toast.LENGTH_LONG
-                                                             ).show()
+                                                             Toast.makeText(context, context.getString(R.string.toast_document_properties_room_db_n_file_meta_filename, meta.fileName, meta.fileType, meta.author, meta.wordCount, meta.characterCount, meta.paragraphCount, createdStr, modifiedStr), Toast.LENGTH_LONG).show()
                                                          } else {
-                                                             Toast.makeText(context, "No metadata available for this document", Toast.LENGTH_SHORT).show()
+                                                             Toast.makeText(context, R.string.toast_no_metadata_available_for_this_document, Toast.LENGTH_SHORT).show()
                                                          }
                                                      }
                                                  },
@@ -3344,7 +3336,7 @@ fun InkyModule(
                                                  onExportPdf = {
                                                      showBottomBar = false
                                                      val baseName = docTitle.substringBeforeLast(".")
-                                                     savePdfLauncher.launch(if (baseName.isBlank()) "Inky_Dokumen.pdf" else "$baseName.pdf")
+                                                     savePdfLauncher.launch(if (baseName.isBlank()) context.getString(R.string.default_document_filename) + ".pdf" else "$baseName.pdf")
                                                  }
                                              )
                                          }
@@ -3386,6 +3378,7 @@ fun InkyModule(
                                                  .padding(16.dp),
                                              contentAlignment = Alignment.Center
                                          ) {
+                                             // TODO(plan-3B): tab set rebuilt from CONCEPT.md; unimplemented tabs render disabled with an accessible reason.
                                              Text(
                                                  text = "$currentTabName options will be implemented soon.",
                                                  style = MaterialTheme.typography.bodyMedium,
@@ -3441,7 +3434,7 @@ fun InkyModule(
                 Button(onClick = { 
                     triggerAutosave()
                     showEquationDialog = false
-                    Toast.makeText(context, "Formula inserted successfully!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, R.string.toast_formula_inserted_successfully, Toast.LENGTH_SHORT).show()
                 }) {
                     Text("Insert Equation")
                 }
@@ -3462,7 +3455,7 @@ fun InkyModule(
                 activeFontSize = size
                 showFontSizeDialog = false
                 triggerAutosave()
-                Toast.makeText(context, "Ukuran font diubah ke $size pt", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_font_size_changed, size), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3473,7 +3466,7 @@ fun InkyModule(
             onPasteSuccess = { format ->
                 showPasteSpecialDialog = false
                 triggerAutosave()
-                Toast.makeText(context, "Menempelkan sebagai $format", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_pasted_as, format), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3576,7 +3569,7 @@ fun InkyModule(
                         isParsingDoc = false
                         updateActiveSession(file, parseResult.parsedDocument)
                         RecentFilesTracker.addFile(context, filePath, fileType)
-                        Toast.makeText(context, "Opened ${file.name}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_opened_file_name, file.name), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -3631,23 +3624,23 @@ fun InkyModule(
             activeInkySubpage = "paragraph_styles"
         },
         onSectionOptionsClick = {
-            Toast.makeText(context, "Page Style (Section Options) opened", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_page_style_section_options_opened, Toast.LENGTH_SHORT).show()
         },
         onBulletsNumberingOptionsClick = {
             showBottomBar = true
             activeInkySubpage = "bulleted_list"
         },
         onSkipNumberingClick = {
-            Toast.makeText(context, "Skip numbering applied to paragraph", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_skip_numbering_applied_to_paragraph, Toast.LENGTH_SHORT).show()
         },
         onRemoveNumberingClick = {
-            Toast.makeText(context, "Numbering removed from paragraph", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_numbering_removed_from_paragraph, Toast.LENGTH_SHORT).show()
         },
         onRestartFromBeginningClick = {
-            Toast.makeText(context, "Numbering restarted from 1", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_numbering_restarted_from_1, Toast.LENGTH_SHORT).show()
         },
         onTabsSettingsClick = {
-            Toast.makeText(context, "Tab stop settings opened", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_tab_stop_settings_opened, Toast.LENGTH_SHORT).show()
         },
         onBorderSettingsClick = {
             showBottomBar = true
@@ -3664,7 +3657,7 @@ fun InkyModule(
                 val newText = docBodyText.text.replaceRange(start, end, synonym)
                 docBodyText = docBodyText.copy(text = newText, selection = androidx.compose.ui.text.TextRange(start + synonym.length))
             } else {
-                Toast.makeText(context, "Selected synonym: $synonym", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_selected_synonym_synonym, synonym), Toast.LENGTH_SHORT).show()
             }
         },
         onGenerateTextClick = {
@@ -3705,7 +3698,7 @@ fun InkyModule(
                     selection = androidx.compose.ui.text.TextRange(newText.length)
                 )
                 isSaved = false
-                Toast.makeText(context, "Text inserted from Gemini Copilot!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_text_inserted_from_gemini_copilot, Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3796,7 +3789,7 @@ fun InkyModule(
                         reminderManager.setReminder(cursorPara, cursorOffset, reminderNoteText)
                         reminderNoteText = ""
                         showSetReminderDialog = false
-                        Toast.makeText(context, "Reminder set at paragraph $cursorPara", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_reminder_set_at_paragraph_cursorpara, cursorPara), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.testTag("btn_save_reminder")
                 ) {
@@ -3919,7 +3912,7 @@ fun InkyModule(
                     }
                 currentSaveMimeType = mimeType
                 val baseName = docTitle.substringBeforeLast(".")
-                currentSaveDefaultFilename = if (baseName.isBlank()) "Inky_Dokumen$extension" else "$baseName$extension"
+                currentSaveDefaultFilename = if (baseName.isBlank()) context.getString(R.string.default_document_filename) + extension else "$baseName$extension"
                 showSaveAsDialog = false
                 saveDocumentLauncher.launch(currentSaveDefaultFilename)
             }
@@ -4092,10 +4085,10 @@ fun InkyModule(
                                                     downloadedFilePathState = file.absolutePath
                                                     com.example.MainActivity.openedFilePath = file.absolutePath
                                                     com.example.MainActivity.openedFileType = "Inky"
-                                                    Toast.makeText(context, "Template downloaded successfully!", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, R.string.toast_template_downloaded_successfully, Toast.LENGTH_SHORT).show()
                                                 } else {
                                                     activeDownloadProgress = null
-                                                    Toast.makeText(context, "Download failed. Please try again.", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, R.string.toast_download_failed_please_try_again, Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         }
@@ -4150,7 +4143,7 @@ fun InkyModule(
                                             } else if (downloadedFilePathState != null) {
                                                 Icon(
                                                     imageVector = Icons.Rounded.CheckCircle,
-                                                    contentDescription = "Downloaded",
+                                                    contentDescription = stringResource(R.string.cd_downloaded),
                                                     tint = Color(0xFF10B981),
                                                     modifier = Modifier.size(20.dp)
                                                 )
@@ -4338,7 +4331,7 @@ private fun FileSubpage(
             icon = Icons.Rounded.DoneAll,
             title = "Finalize"
         ) {
-            Toast.makeText(context, "Document finalized!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_document_finalized, Toast.LENGTH_SHORT).show()
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -4355,7 +4348,7 @@ private fun FileSubpage(
                 onPrintDocument()
             },
             item3 = Triple(Icons.AutoMirrored.Rounded.CallMerge, "Merge") {
-                Toast.makeText(context, "Print merge wizard...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_print_merge_wizard, Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -4375,7 +4368,7 @@ private fun FileSubpage(
             icon = Icons.Rounded.Image,
             title = "Compress all pictures"
         ) {
-            Toast.makeText(context, "All pictures compressed successfully (Saved 1.2 MB)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_all_pictures_compressed_successfully_saved_1_2_mb, Toast.LENGTH_SHORT).show()
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -4547,7 +4540,7 @@ fun OpenDocumentDialog(
                 RecentFilesTracker.addFile(context, persisted.absolutePath, fileType)
                 onFileSelected(persisted.absolutePath, fileType)
             } catch (e: Exception) {
-                Toast.makeText(context, "Error opening document: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_error_opening_document_e_message, e.message), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -4605,7 +4598,7 @@ fun OpenDocumentDialog(
                             )
                             if (activeTab != "Files") {
                                 IconButton(onClick = { isSearchActive = true }) {
-                                    Icon(Icons.Rounded.Search, contentDescription = "Search")
+                                    Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.cd_search))
                                 }
                             }
                         }
@@ -4829,7 +4822,7 @@ fun OpenDocumentDialog(
                                         Button(
                                             onClick = {
                                                 isGoogleDriveAuthorized = true
-                                                Toast.makeText(context, "Google OAuth2 authorization granted!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, R.string.toast_google_oauth2_authorization_granted, Toast.LENGTH_SHORT).show()
                                             }
                                         ) {
                                             Icon(Icons.Rounded.CloudQueue, contentDescription = null)
@@ -4913,7 +4906,7 @@ fun OpenDocumentDialog(
                                 openDocumentLauncher.launch(arrayOf("*/*"))
                             } else if (activeTab == "Google Drive") {
                                 selectedGoogleDriveFile?.let { driveFileName ->
-                                    Toast.makeText(context, "Opening cloud document $driveFileName...", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.toast_opening_cloud_document_drivefilename, driveFileName), Toast.LENGTH_SHORT).show()
                                     onDismissRequest()
                                 }
                             }

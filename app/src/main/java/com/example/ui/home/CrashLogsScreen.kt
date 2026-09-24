@@ -43,6 +43,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 data class CrashLog(
     val id: String,
@@ -93,9 +95,9 @@ fun CrashLogsScreen(
                     context.contentResolver.openOutputStream(it)?.use { outputStream ->
                         outputStream.write(textToSave.toByteArray())
                     }
-                    Toast.makeText(context, "Log saved successfully via SAF!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, R.string.toast_log_saved_successfully_via_saf, Toast.LENGTH_SHORT).show()
                 } catch (e: java.lang.Exception) {
-                    Toast.makeText(context, "Failed to save: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_failed_to_save_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -195,7 +197,7 @@ fun CrashLogsScreen(
     // Helper functions
     fun copyToClipboard(text: String) {
         clipboardManager.setText(AnnotatedString(text))
-        Toast.makeText(context, "Copied log content to clipboard", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_copied_log_content_to_clipboard, Toast.LENGTH_SHORT).show()
     }
 
     fun shareLogs(text: String, title: String) {
@@ -212,7 +214,7 @@ fun CrashLogsScreen(
             }
             context.startActivity(shareIntent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to share: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_failed_to_share_e_message, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -235,10 +237,10 @@ fun CrashLogsScreen(
                 }
                 crashLogFile.writeText(sb.toString())
             }
-            Toast.makeText(context, "Log deleted", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_log_deleted, Toast.LENGTH_SHORT).show()
             readLogsFromFile()
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to delete: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_failed_to_delete_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -248,9 +250,9 @@ fun CrashLogsScreen(
                 crashLogFile.delete()
             }
             initialLogs.clear()
-            Toast.makeText(context, "All logs deleted successfully", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_all_logs_deleted_successfully, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Toast.makeText(context, "Failed to delete logs: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_failed_to_delete_logs_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -267,11 +269,11 @@ fun CrashLogsScreen(
             errorSummary = sampleSummary,
             stackTrace = sampleStackTrace
         )
-        Toast.makeText(context, "System Crash Notification sent!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_system_crash_notification_sent, Toast.LENGTH_SHORT).show()
     }
 
     fun simulateNewCrash() {
-        Toast.makeText(context, "Crashing application now...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_crashing_application_now, Toast.LENGTH_SHORT).show()
         throw java.lang.RuntimeException("Real simulated crash via Expressive Debug Station!")
     }
 
@@ -306,7 +308,7 @@ fun CrashLogsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack, modifier = Modifier.testTag("btn_back_crash_logs")) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
@@ -315,7 +317,7 @@ fun CrashLogsScreen(
                         onClick = { testCrashNotification() },
                         colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
                     ) {
-                        Icon(Icons.Default.NotificationsActive, contentDescription = "Test System Crash Notification")
+                        Icon(Icons.Default.NotificationsActive, contentDescription = stringResource(R.string.cd_test_system_crash_notification))
                     }
                     // Save All action
                     IconButton(
@@ -325,7 +327,7 @@ fun CrashLogsScreen(
                         },
                         colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.Save, contentDescription = "Save All logs")
+                        Icon(Icons.Default.Save, contentDescription = stringResource(R.string.cd_save_all_logs))
                     }
                     // Share All action
                     IconButton(
@@ -334,7 +336,7 @@ fun CrashLogsScreen(
                             shareLogs(allLogsText, "Share Diagnostic Reports")
                         }
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share All logs")
+                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.cd_share_all_logs))
                     }
                     // Copy All action
                     IconButton(
@@ -343,14 +345,14 @@ fun CrashLogsScreen(
                             copyToClipboard(allLogsText)
                         }
                     ) {
-                        Icon(Icons.Default.ContentCopy, contentDescription = "Copy All logs")
+                        Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.cd_copy_all_logs))
                     }
                     // Delete All action
                     IconButton(
                         onClick = { deleteAllLogs() },
                         colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = "Clear all logs")
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_clear_all_logs))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -453,7 +455,7 @@ fun CrashLogsScreen(
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_clear))
                         }
                     }
                 },
@@ -642,7 +644,7 @@ fun CrashLogsScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.ContentCopy,
-                                            contentDescription = "Copy log",
+                                            contentDescription = stringResource(R.string.cd_copy_log),
                                             tint = Color(0xFF64748B),
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -653,7 +655,7 @@ fun CrashLogsScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Share,
-                                            contentDescription = "Share log",
+                                            contentDescription = stringResource(R.string.cd_share_log),
                                             tint = Color(0xFF64748B),
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -664,7 +666,7 @@ fun CrashLogsScreen(
                                     ) {
                                         Icon(
                                             Icons.Default.Delete,
-                                            contentDescription = "Delete log",
+                                            contentDescription = stringResource(R.string.cd_delete_log),
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(16.dp)
                                         )
@@ -707,7 +709,7 @@ fun CrashLogsScreen(
                         )
                     }
                     IconButton(onClick = { activeDetailLog = null }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close details")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close_details))
                     }
                 }
             },

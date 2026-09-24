@@ -60,7 +60,7 @@ fun AboutScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back to Start Screen"
+                            contentDescription = stringResource(R.string.cd_back_to_start_screen)
                         )
                     }
                 },
@@ -380,7 +380,7 @@ fun AboutIllustrationSection() {
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_papirus_foreground),
-                    contentDescription = "Papirus Office App Icon",
+                    contentDescription = stringResource(R.string.cd_papirus_office_app_icon),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(54.dp)
                 )

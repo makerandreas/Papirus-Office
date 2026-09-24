@@ -31,6 +31,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.core.ai.GeminiAiService
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,7 +86,7 @@ fun GeminiCopilotDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SmartToy,
-                                contentDescription = "Gemini",
+                                contentDescription = stringResource(R.string.cd_gemini),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -105,7 +107,7 @@ fun GeminiCopilotDialog(
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 }
 
@@ -157,7 +159,7 @@ fun GeminiCopilotDialog(
                             )
                         },
                         trailingIcon = {
-                            Icon(Icons.Default.Tune, contentDescription = "Switch Model", modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Tune, contentDescription = stringResource(R.string.cd_switch_model), modifier = Modifier.size(14.dp))
                         }
                     )
                 }
@@ -411,7 +413,7 @@ fun GeminiCopilotDialog(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = "Send",
+                            contentDescription = stringResource(R.string.cd_send),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }

@@ -28,6 +28,8 @@ import androidx.compose.ui.window.Dialog
 import com.makerandreas.papirusoffice.data.api.CloudDocument
 import com.makerandreas.papirusoffice.data.api.FirebaseCloudManager
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @Composable
 fun CloudSyncBar(
@@ -70,7 +72,7 @@ fun CloudSyncBar(
                 ) {
                     Icon(
                         imageVector = if (user != null) Icons.Default.CloudDone else Icons.Default.CloudOff,
-                        contentDescription = "Cloud Status",
+                        contentDescription = stringResource(R.string.cd_cloud_status),
                         tint = Color.White,
                         modifier = Modifier.size(18.dp)
                     )
@@ -108,7 +110,7 @@ fun CloudSyncBar(
                             scope.launch {
                                 val signedInUser = cloudManager.ensureSignedIn()
                                 if (signedInUser != null) {
-                                    Toast.makeText(context, "Signed in to Firebase Cloud!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_signed_in_to_firebase_cloud, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
@@ -131,16 +133,16 @@ fun CloudSyncBar(
                                 )
                                 val success = cloudManager.saveDocumentToCloud(cloudDoc)
                                 if (success) {
-                                    Toast.makeText(context, "Saved to Firebase Cloud & Drive!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_saved_to_firebase_cloud_drive, Toast.LENGTH_SHORT).show()
                                 } else {
-                                    Toast.makeText(context, "Save failed. Please check network connection.", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_save_failed_please_check_network_connection, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = "Cloud Save", modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.CloudUpload, contentDescription = stringResource(R.string.cd_cloud_save), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Save Cloud", fontSize = 11.sp)
                     }
@@ -151,7 +153,7 @@ fun CloudSyncBar(
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = "Cloud Load", modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.cd_cloud_load), modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Open Cloud", fontSize = 11.sp)
                     }
@@ -211,7 +213,7 @@ fun CloudDocumentLoadDialog(
                         fontWeight = FontWeight.Bold
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Close")
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 }
 
@@ -268,7 +270,7 @@ fun CloudDocumentLoadDialog(
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    Icon(Icons.Default.ChevronRight, contentDescription = "Open")
+                                    Icon(Icons.Default.ChevronRight, contentDescription = stringResource(R.string.cd_open))
                                 }
                             }
                         }

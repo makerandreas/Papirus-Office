@@ -37,6 +37,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 // ==========================================
 // M3 Expressive Shared UI Base Components
@@ -220,7 +222,7 @@ fun HomeSubpage(
             leadingIcon = {
                 Icon(
                     Icons.Rounded.ContentPaste,
-                    contentDescription = "Paste",
+                    contentDescription = stringResource(R.string.cd_paste),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
@@ -229,13 +231,13 @@ fun HomeSubpage(
                 IconButton(onClick = { onNavigateSubpage("paste_options") }) {
                     Icon(
                         Icons.Rounded.ChevronRight,
-                        contentDescription = "Paste Options",
+                        contentDescription = stringResource(R.string.cd_paste_options),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
             onClick = {
-                Toast.makeText(context, "Pasting text from clipboard...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_pasting_text_from_clipboard, Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -245,7 +247,7 @@ fun HomeSubpage(
                 ExpressiveActionCard(
                     icon = Icons.Rounded.ContentCut,
                     label = "Cut",
-                    onClick = { Toast.makeText(context, "Cut text", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_cut_text, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_cut_btn")
                 )
             },
@@ -253,7 +255,7 @@ fun HomeSubpage(
                 ExpressiveActionCard(
                     icon = Icons.Rounded.ContentCopy,
                     label = "Copy",
-                    onClick = { Toast.makeText(context, "Copied text", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_copied_text, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_copy_btn")
                 )
             },
@@ -261,7 +263,7 @@ fun HomeSubpage(
                 ExpressiveActionCard(
                     icon = Icons.Rounded.FormatPaint,
                     label = "Painter",
-                    onClick = { Toast.makeText(context, "Format Painter activated", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_format_painter_activated, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth().testTag("home_painter_btn")
                 )
             }
@@ -284,7 +286,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_font), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("font_style") }
         )
@@ -301,7 +303,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.Edit, contentDescription = "Ubah Ukuran Font", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.change_font_size), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = onShowFontSizeDialog
         )
@@ -348,7 +350,7 @@ fun HomeSubpage(
                             ) {
                                 Icon(
                                     Icons.Rounded.FormatUnderlined,
-                                    contentDescription = "Underline",
+                                    contentDescription = stringResource(R.string.cd_underline),
                                     tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -373,7 +375,7 @@ fun HomeSubpage(
                         ) {
                             Icon(
                                 Icons.Rounded.KeyboardArrowDown,
-                                contentDescription = "Underline Options",
+                                contentDescription = stringResource(R.string.cd_underline_options),
                                 tint = if (isUnderline) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -398,7 +400,7 @@ fun HomeSubpage(
                 ExpressiveActionCard(
                     icon = Icons.Rounded.Subscript,
                     label = "Subscript",
-                    onClick = { Toast.makeText(context, "Subscript applied", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_subscript_applied, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -406,7 +408,7 @@ fun HomeSubpage(
                 ExpressiveActionCard(
                     icon = Icons.Rounded.Superscript,
                     label = "Superscript",
-                    onClick = { Toast.makeText(context, "Superscript applied", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_superscript_applied, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -423,7 +425,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Capitalization Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_change_capitalization_options), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("change_capitalization") }
         )
@@ -440,7 +442,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_color), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("font_color") }
         )
@@ -457,7 +459,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_color), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("highlight_color") }
         )
@@ -477,7 +479,7 @@ fun HomeSubpage(
                 onItalicChange(false)
                 onUnderlineChange(false)
                 onStrikethroughChange(false)
-                Toast.makeText(context, "All formatting cleared!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_all_formatting_cleared, Toast.LENGTH_SHORT).show()
             }
         )
 
@@ -491,7 +493,7 @@ fun HomeSubpage(
                     modifier = Modifier.size(24.dp)
                 )
             },
-            onClick = { Toast.makeText(context, "Character Options will be available soon", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_character_options_will_be_available_soon, Toast.LENGTH_SHORT).show() }
         )
 
         HomeSectionDivider()
@@ -528,7 +530,7 @@ fun HomeSubpage(
                     ) {
                         Icon(
                             imageVector = icon,
-                            contentDescription = "Align ${align.toString()}",
+                            contentDescription = stringResource(R.string.cd_align_align_tostring, align.toString()),
                             tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(22.dp)
                         )
@@ -547,13 +549,13 @@ fun HomeSubpage(
             ExpressiveActionCard(
                 icon = Icons.AutoMirrored.Rounded.FormatIndentIncrease,
                 label = "Increase Indent",
-                onClick = { Toast.makeText(context, "Indent increased", Toast.LENGTH_SHORT).show() },
+                onClick = { Toast.makeText(context, R.string.toast_indent_increased, Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
             )
             ExpressiveActionCard(
                 icon = Icons.AutoMirrored.Rounded.FormatIndentDecrease,
                 label = "Decrease Indent",
-                onClick = { Toast.makeText(context, "Indent decreased", Toast.LENGTH_SHORT).show() },
+                onClick = { Toast.makeText(context, R.string.toast_indent_decreased, Toast.LENGTH_SHORT).show() },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -569,7 +571,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Change Spacing", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_change_spacing), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("line_spacing") }
         )
@@ -585,7 +587,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Bullets", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_bullets), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("bulleted_list") }
         )
@@ -601,7 +603,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Numbers", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_numbers), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("numbered_list") }
         )
@@ -617,7 +619,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Multilevel", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_multilevel), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("multilevel_list") }
         )
@@ -651,7 +653,7 @@ fun HomeSubpage(
                     modifier = Modifier.size(24.dp)
                 )
             },
-            onClick = { Toast.makeText(context, "Sorting document...", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_sorting_document, Toast.LENGTH_SHORT).show() }
         )
 
         M3ListItem(
@@ -684,7 +686,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Select Shading Color", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_select_shading_color), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("paragraph_shading") }
         )
@@ -700,7 +702,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Configure Border", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_configure_border), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("paragraph_border") }
         )
@@ -716,7 +718,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Drop Cap Options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_drop_cap_options), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("drop_cap") }
         )
@@ -731,7 +733,7 @@ fun HomeSubpage(
                     modifier = Modifier.size(24.dp)
                 )
             },
-            onClick = { Toast.makeText(context, "Paragraph Options opened", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_paragraph_options_opened, Toast.LENGTH_SHORT).show() }
         )
 
         HomeSectionDivider()
@@ -751,7 +753,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Inspector", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_open_inspector), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = onOpenInspector
         )
@@ -768,7 +770,7 @@ fun HomeSubpage(
                 )
             },
             trailingContent = {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Open Paragraph Styles", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_open_paragraph_styles), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             },
             onClick = { onNavigateSubpage("paragraph_styles") }
         )
@@ -783,7 +785,7 @@ fun HomeSubpage(
                     modifier = Modifier.size(24.dp)
                 )
             },
-            onClick = { Toast.makeText(context, "Paragraph Style Options will be available soon", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_paragraph_style_options_will_be_available_soon, Toast.LENGTH_SHORT).show() }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -803,19 +805,19 @@ fun PasteOptionsSubpage(context: Context, onShowPasteSpecial: () -> Unit) {
             headlineText = "Keep source formatting",
             supportingText = "Keep original style from the source",
             leadingIcon = { Icon(Icons.Rounded.Brush, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Pasted text with Keep Source Formatting", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_pasted_text_with_keep_source_formatting, Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Merge formatting",
             supportingText = "Merge source style with document style",
             leadingIcon = { Icon(Icons.AutoMirrored.Rounded.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Pasted text with Merge Formatting", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_pasted_text_with_merge_formatting, Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Paste unformatted text",
             supportingText = "Paste clean text without formatting",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Clean text pasted successfully", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_clean_text_pasted_successfully, Toast.LENGTH_SHORT).show() }
         )
 
         HomeSectionDivider()
@@ -887,7 +889,7 @@ fun FontStyleSubpage(
                                 if (isSelected) {
                                     Icon(
                                         Icons.Rounded.CheckCircle,
-                                        contentDescription = "Active",
+                                        contentDescription = stringResource(R.string.cd_active),
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -896,7 +898,7 @@ fun FontStyleSubpage(
                             onClick = {
                                 fontViewModel.selectFont(fontInfo.displayName)
                                 onFontSelected(fontInfo.displayName)
-                                Toast.makeText(context, "Font changed to ${fontInfo.displayName}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_font_changed_to_fontinfo_displayname, fontInfo.displayName), Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
@@ -930,7 +932,7 @@ fun UnderlineOptionsSubpage(
             headlineText = "Underline color",
             supportingText = "Choose underline color palette",
             leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = "Color", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+            trailingContent = { Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_color), tint = MaterialTheme.colorScheme.onSurfaceVariant) },
             onClick = onOpenColorPage
         )
 
@@ -943,7 +945,7 @@ fun UnderlineOptionsSubpage(
                 supportingText = "Apply this underline style",
                 leadingIcon = { Icon(Icons.Rounded.HorizontalRule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
-                    Toast.makeText(context, "Underline style $style applied", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_underline_style_style_applied, style), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -985,7 +987,7 @@ fun LineSpacingSubpage(
                 },
                 onClick = {
                     onSelectLineSpacing(factor)
-                    Toast.makeText(context, "Spacing $label (${"%.2f".format(factor)}x) applied", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_spacing_label_2f_format_factor_x_applied, "%.2f".format(factor), label), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1008,7 +1010,7 @@ fun BulletedListSubpage(context: Context) {
                 supportingText = "Apply this bullet style",
                 leadingIcon = { Icon(Icons.Rounded.RadioButtonChecked, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
-                    Toast.makeText(context, "Bulleted $variant applied successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_bulleted_variant_applied_successfully, variant), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1030,7 +1032,7 @@ fun NumberedListSubpage(context: Context) {
                 supportingText = "Use this numbering sequence",
                 leadingIcon = { Icon(Icons.Rounded.FormatListNumbered, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
-                    Toast.makeText(context, "Numbered $variant applied successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_numbered_variant_applied_successfully, variant), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1055,7 +1057,7 @@ fun MultilevelListSubpage(context: Context) {
                 supportingText = "Use this multilevel structure",
                 leadingIcon = { Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
                 onClick = {
-                    Toast.makeText(context, "Multilevel list $variant applied successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_multilevel_list_variant_applied_successfully, variant), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1071,7 +1073,7 @@ fun ParagraphBorderSubpage(context: Context) {
             headlineText = "No border",
             supportingText = "Remove all border lines",
             leadingIcon = { Icon(Icons.Rounded.BorderClear, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Border cleared", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_border_cleared, Toast.LENGTH_SHORT).show() }
         )
 
         HomeSectionDivider()
@@ -1082,7 +1084,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderTop,
                     label = "Top",
-                    onClick = { Toast.makeText(context, "Normal Top Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_normal_top_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -1090,7 +1092,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderBottom,
                     label = "Bottom",
-                    onClick = { Toast.makeText(context, "Normal Bottom Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_normal_bottom_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -1098,7 +1100,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderOuter,
                     label = "Sides",
-                    onClick = { Toast.makeText(context, "Normal Side Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_normal_side_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1110,7 +1112,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderTop,
                     label = "Thick Top",
-                    onClick = { Toast.makeText(context, "Thick Top Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_thick_top_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -1118,7 +1120,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderBottom,
                     label = "Thick Bot",
-                    onClick = { Toast.makeText(context, "Thick Bottom Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_thick_bottom_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -1126,7 +1128,7 @@ fun ParagraphBorderSubpage(context: Context) {
                 ExpressiveActionCard(
                     icon = Icons.Rounded.BorderOuter,
                     label = "Thick Box",
-                    onClick = { Toast.makeText(context, "Thick Outer Border", Toast.LENGTH_SHORT).show() },
+                    onClick = { Toast.makeText(context, R.string.toast_thick_outer_border, Toast.LENGTH_SHORT).show() },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1139,19 +1141,19 @@ fun ParagraphBorderSubpage(context: Context) {
             headlineText = "Box and grid",
             supportingText = "Apply complete box and grid borders",
             leadingIcon = { Icon(Icons.Rounded.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Box and Grid borders applied", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_box_and_grid_borders_applied, Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Box",
             supportingText = "Apply outer box border only",
             leadingIcon = { Icon(Icons.Rounded.CheckBoxOutlineBlank, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Outer Box border applied", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_outer_box_border_applied, Toast.LENGTH_SHORT).show() }
         )
         M3ListItem(
             headlineText = "Inside (Grid)",
             supportingText = "Inner grid lines only",
             leadingIcon = { Icon(Icons.Rounded.GridGoldenratio, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-            onClick = { Toast.makeText(context, "Inner Grid border applied", Toast.LENGTH_SHORT).show() }
+            onClick = { Toast.makeText(context, R.string.toast_inner_grid_border_applied, Toast.LENGTH_SHORT).show() }
         )
     }
 }
@@ -1180,19 +1182,19 @@ fun ParagraphStylesSubpage(
                         onClick = {
                             activeStyle = styleName
                             onApplyStyle(styleName)
-                            Toast.makeText(context, "Applied style $styleName", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.toast_applied_style_stylename, styleName), Toast.LENGTH_SHORT).show()
                         }
                     )
                 },
                 trailingContent = {
                     IconButton(onClick = { onNavigateStyleOptions(styleName) }) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Options for $styleName", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.cd_options_for_stylename, styleName), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 onClick = {
                     activeStyle = styleName
                     onApplyStyle(styleName)
-                    Toast.makeText(context, "Applied style $styleName", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_applied_style_stylename, styleName), Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -1219,7 +1221,7 @@ fun DropCapSubpage(
                     checked = dropCapEnabled,
                     onCheckedChange = {
                         onToggleDropCap(it)
-                        Toast.makeText(context, if (it) "Drop Cap enabled" else "Drop Cap disabled", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (it) R.string.toast_drop_cap_enabled else R.string.toast_drop_cap_disabled, Toast.LENGTH_SHORT).show()
                     }
                 )
             },
@@ -1240,13 +1242,13 @@ fun DropCapSubpage(
                             selected = isSelected,
                             onClick = {
                                 onSetDropCapLines(lines)
-                                Toast.makeText(context, "Drop Cap set to $lines lines", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_drop_cap_set_to_lines_lines, lines), Toast.LENGTH_SHORT).show()
                             }
                         )
                     },
                     onClick = {
                         onSetDropCapLines(lines)
-                        Toast.makeText(context, "Drop Cap set to $lines lines", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.toast_drop_cap_set_to_lines_lines, lines), Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -1267,7 +1269,7 @@ fun CreateNewStyleSubpage(
             supportingText = "Define new custom style parameters",
             leadingIcon = { Icon(Icons.Rounded.AddBox, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "New style created successfully", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_new_style_created_successfully, Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
@@ -1276,7 +1278,7 @@ fun CreateNewStyleSubpage(
             supportingText = "Save current text formatting as a style",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "New style from selected text saved successfully", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_new_style_from_selected_text_saved_successfully, Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
@@ -1297,7 +1299,7 @@ fun StyleOptionsSubpage(
             supportingText = "Modify style attributes",
             leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "Editing style $styleName...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_editing_style_stylename, styleName), Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
@@ -1306,7 +1308,7 @@ fun StyleOptionsSubpage(
             supportingText = "Redefine style matching active text selection",
             leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "Style $styleName updated", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_style_stylename_updated, styleName), Toast.LENGTH_SHORT).show()
                 onSuccess()
             }
         )
@@ -1316,7 +1318,7 @@ fun StyleOptionsSubpage(
                 supportingText = "Remove style permanently",
                 leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp)) },
                 onClick = {
-                    Toast.makeText(context, "Style $styleName deleted successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_style_stylename_deleted_successfully, styleName), Toast.LENGTH_SHORT).show()
                     onSuccess()
                 }
             )
@@ -1334,7 +1336,7 @@ fun ChangeCapitalizationSubpage(context: Context) {
             supportingText = "Capitalize first letter of selected text",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "First character capitalized", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_first_character_capitalized, Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
@@ -1342,7 +1344,7 @@ fun ChangeCapitalizationSubpage(context: Context) {
             supportingText = "Capitalize first letter of each sentence",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "First word capitalized", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_first_word_capitalized, Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
@@ -1350,7 +1352,7 @@ fun ChangeCapitalizationSubpage(context: Context) {
             supportingText = "Convert all characters to uppercase",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "ALL UPPERCASE", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_all_uppercase, Toast.LENGTH_SHORT).show()
             }
         )
         M3ListItem(
@@ -1358,7 +1360,7 @@ fun ChangeCapitalizationSubpage(context: Context) {
             supportingText = "Convert all characters to lowercase",
             leadingIcon = { Icon(Icons.Rounded.TextFields, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
             onClick = {
-                Toast.makeText(context, "all lowercase", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_all_lowercase, Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -1525,7 +1527,7 @@ fun FontSizeDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Ubah Ukuran Font",
+                    text = stringResource(R.string.change_font_size),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
