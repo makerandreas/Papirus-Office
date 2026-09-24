@@ -5,15 +5,25 @@
 **Evidence:** `anti-slop/audit-006-2026-09-24.md` §2 (project documents) and §3 (format specifications). Counts quoted there are reproducible greps.
 **Rule of the plan:** fix against the documents, not against taste. Each item cites the clause it violates and is done when the cited grep count reaches zero or the cited spec behaviour is demonstrated by a test.
 
+## 0. Decisions taken by the user (2026-09-24)
+
+These answered the open questions of `audit-005` §5 and `audit-006` §5. They are binding for every item below, so a fresh session does not have to ask again.
+
+| Question | Decision | Consequence for this plan |
+|---|---|---|
+| Localization policy | **en_US everywhere.** One language in the UI. | 3.1 and 3.2 move every literal into `values/strings.xml` in en_US. 3.3 replaces the hardcoded Indonesian copy with en_US resources instead of adding translations. `values-in/` keeps only the keys it already has; it is not extended, and no new string gets an Indonesian sibling. Document content (style names such as `Judul1`) is data and stays untouched. |
+| Ribbon tabs without an implementation | **Disabled tab plus an honest note on press** (options 2 and 3 of the question combined): the tab stays visible, renders in a disabled state, and a press tells the user plainly that the deck is not in this build. | 3.6. The tab *set* comes from `CONCEPT.md`, which lists the planned tabs for every module except Pagella. For Writer that list is File, Home, Insert, Layout, Review, View plus the conditional tabs (Drawing, Object, Picture, Table, Fontwork, Chart). `InkyModule.kt:2935` declares eight tabs, and two of them (`References`, `Mailings`) are **not** in `CONCEPT.md` at all, so the same item has to decide between renaming and dropping them while the list is rebuilt. |
+| Plan order | Merge Plan 2 before Plan 3; Plan 3 runs in a fresh session. | Plan 2 landed as PR #11. Nothing in this plan depends on it except the two items already paid down below. |
+
 ---
 
 ## 1. Localization (violates `AGENTS.md` "translate all strings to `en_US` and add to `strings.xml`")
 
 | # | Item | Current | Target |
 |---|---|---|---|
-| 3.1 | `contentDescription` literals | 231 repo-wide, 72 in `modules/inky` | every one moves to `strings.xml`; a lint rule or a CI grep in the unit-test job fails on new ones |
-| 3.2 | `Toast` literals | 316 toasts repo-wide, 57 in `InkyModule`, 49 with a literal | literals move to `strings.xml`; toasts that report a state change become M3 snackbars (see 3.5) |
-| 3.3 | Indonesian copy in user-visible strings | `InkyModule.kt:200` default title `Draft Dokumen Baru`; `:3247/:3822` default file names `Inky_Dokumen.*`; `PapirusConfigManager.kt:382` reset message; `HomeDashboard.kt:1273` button label | en_US master in `values/`, Indonesian in `values-in/`; document *content* (style names like `Judul1`) stays untouched because `NavigatorStringCatalog` treats it as data, which is correct |
+| 3.1 | `contentDescription` literals | 231 repo-wide, 72 in `modules/inky` | every one moves to `strings.xml` **in en_US only** (§0); a lint rule or a CI grep in the unit-test job fails on new ones |
+| 3.2 | `Toast` literals | 316 toasts repo-wide, 57 in `InkyModule`, 49 with a literal (counts are pre-Plan-2: the `"Edit Mode Active"` toast is already gone) | literals move to `strings.xml` **in en_US only** (§0); toasts that report a state change become M3 snackbars (see 3.5) |
+| 3.3 | Indonesian copy in user-visible strings | `InkyModule.kt:200` default title `Draft Dokumen Baru`; `:3247/:3822` default file names `Inky_Dokumen.*`; `PapirusConfigManager.kt:382` reset message; `HomeDashboard.kt:1273` button label; `InkyModule.kt:3440/:3451` (`Ukuran font diubah ke ...`, `Menempelkan sebagai ...`) | per §0: **replace with en_US copy in `values/`**, do not add `values-in` entries for them. Document *content* (style names like `Judul1`) stays untouched because `NavigatorStringCatalog` treats it as data, which is correct |
 
 Not in scope: the Indonesian strings that exist because a *document* uses them (Navigator recognition). That behaviour is deliberate (P2-2) and stays.
 
@@ -28,7 +38,7 @@ Not in scope: the Indonesian strings that exist because a *document* uses them (
 | # | Item | Current | Fix |
 |---|---|---|---|
 | 3.5 | Four Toolbar Hub tools do nothing | "Add image" and "Add table" toast only (`InkyModule.kt:2695-2704`); link and comment are the same | either implement (Plans 6/7 own the insertion paths) or mark the control with a visible "Coming in a later build" state; a bare toast that says the tool was "selected" is the exact anti-pattern R-26 names |
-| 3.6 | Six of eight ribbon tabs are empty | only `File` (`:3182`) and `Home` (`:3251`) have content | hide unimplemented tabs until their deck exists, **or** render an empty-state card ("This tab arrives with the Insert/Layout work") — user decision, see audit-006 §5.3 |
+| 3.6 | Six of eight ribbon tabs are empty | `InkyModule.kt:2935` declares `File, Home, Insert, Layout, References, Mailings, Review, View`; only `File` (`:3282`) and `Home` (`:3351`) have content, the rest fall through to a literal "$currentTabName options will be implemented soon." (`:3390`) while the tab still looks fully live | per §0: rebuild the list from `CONCEPT.md`, render the not-yet-implemented tabs **disabled** with an accessible reason, and have a press raise the honest note as a string resource. Also decide the fate of `References` and `Mailings`, which `CONCEPT.md` does not list for Writer |
 | 3.7 | Google Drive screen is a placeholder presented as a feature | `HomeDashboard.kt:1210-1276`; `AGENTS.md` and `PROJECT_CONTEXT.md` list it as an integrated screen | keep the honest placeholder, correct the wording in *both* documents to "placeholder, not yet implemented", and localize the button label |
 | 3.8 | Zero `TODO`/`FIXME` in `app/src/main/java` | all stubs are invisible in source | every intentional stub gets a labelled marker so the next sweep finds them |
 
@@ -36,8 +46,8 @@ Not in scope: the Indonesian strings that exist because a *document* uses them (
 
 | # | Item | Fix |
 |---|---|---|
-| 3.9 | 32 dp zoom targets (`InkyModule.kt:2439,2454`) | 48 dp touch target (visual size may stay smaller inside the box); `DESIGN.md:379` |
-| 3.10 | Chrome greys outside the token set and below contrast floor | replace `Color.DarkGray` cell text (≈2.3:1), `Color.Gray` counters (≈3.9:1) and the `0.5.dp Color.LightGray` borders with `onSurfaceVariant` / `outlineVariant`; keep the *page* white/black (that is paper, not chrome) |
+| 3.9 | 32 dp zoom targets (`InkyModule.kt:2439,2454` in the old bar) | **Inky done in Plan 2**: the -/+ pair is gone, the zoom control is one 48 dp target. Still open in the other modules: `CellinaModule.kt:800,811` (12 dp icons), `SlidiaModule.kt:904,915`, `PagellaModule.kt:106,110`. Target everywhere: 48 dp touch target, visual size may stay smaller inside the box; `DESIGN.md:379` |
+| 3.10 | Chrome greys outside the token set and below contrast floor | **page-stack part done in Plan 2**: table grid lines now use `outline`/`outlineVariant`, cell text uses the document text colour, `[Image]` uses `onSurfaceVariant`, and the `Color.Gray` page counters were deleted with the per-card marker. Remaining: the same pattern in `CellinaModule`, `SlidiaModule`, `PagellaModule` and `HomeDashboard`. Keep the *page* white/black (that is paper, not chrome) |
 | 3.11 | Colour picker uses Material 2014 hues (`HomeSubpages.kt:1394-1398`) | acceptable as document colours; if it is presented as an app palette, re-derive from the module accents |
 | 3.12 | `DESIGN.md` vs m3.material.io | review the four component families the screenshots exercise (bottom bar, FAB role, sheet deck, dialog header) against the current M3 guidance and record deviations in `DESIGN.md`. This is the design-language half of Plan 10 and can be done here as documentation only |
 

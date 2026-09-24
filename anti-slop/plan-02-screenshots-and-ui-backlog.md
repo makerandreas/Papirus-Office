@@ -99,4 +99,6 @@ What landed, per scope item. Everything below is code that a CI run has to compi
 
 **Also cleaned while the file was open:** the seven em dashes in `InkyModule.kt` comments are gone (R-02), and the Viewer page-stack file no longer contains a hardcoded user string (`[Image]`, `No pages to display`). The four *user-facing* em dashes of Plan 3 item 3.4 are untouched and still that item's job.
 
-**Still open after this plan:** the four audit-006 §5 questions (none of them block the code above), the `values-in` translations for the five new ids, and a device pass over the acceptance list in §5.
+**Still open after this plan:** the four audit-006 §5 questions (the three that gate Plan 3 are answered in `plan-03` §0), the `values-in` translations for the six new string ids are **cancelled** by the "en_US everywhere" decision, and a device pass over the acceptance list in §5 is still pending: the nightly release built from this PR (`app-arm64-v8a-debug.apk`) is the install for that pass.
+
+**Delivery:** PR #11 (merge commit on `main`), both CI jobs green: Unit Tests (compile + `Plan2ChromeTest` + the existing suite) and Build with the refreshed nightly. Nothing in this plan was verified on a device; §5 acceptance stays open until someone runs it.
