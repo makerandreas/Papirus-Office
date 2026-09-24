@@ -431,10 +431,11 @@
     <string name="cd_numbered_list">Numbered List</string>
     <string name="cd_increase_indent">Increase Indent</string>
     <string name="cd_decrease_indent">Decrease Indent</string>
-    <string name="cd_add_image">Add Image</string>
-    <string name="cd_add_table">Add Table</string>
-    <string name="cd_add_link">Add Link</string>
-    <string name="cd_add_comment">Add Comment</string>
+    <string name="cd_add_image">Add image: not available in this build</string>
+    <string name="cd_add_table">Add table: not available in this build</string>
+    <string name="cd_add_link">Add link: not available in this build</string>
+    <string name="cd_add_comment">Add comment: not available in this build</string>
+    <string name="cd_ribbon_tab_unavailable">%1$s: not available in this build</string>
     <string name="cd_insert_tab">Insert Tab</string>
     <string name="cd_open_bottom_sheet">Open Bottom Sheet</string>
     <string name="cd_back">Back</string>
@@ -463,10 +464,11 @@
     <string name="toast_error_sharing_pdf_e_message">Error sharing PDF: %1$s</string>
     <string name="toast_reading_document_aloud">Reading document aloud...</string>
     <string name="toast_cannot_decrease_indent_further">Cannot decrease indent further</string>
-    <string name="toast_add_image_selected">Add image selected</string>
-    <string name="toast_add_table_selected">Add table selected</string>
-    <string name="toast_add_link_selected">Add link selected</string>
-    <string name="toast_add_comment_selected">Add comment selected</string>
+    <string name="toast_add_image_unavailable">Image insertion arrives in a later build.</string>
+    <string name="toast_add_table_unavailable">Table insertion arrives in a later build.</string>
+    <string name="toast_add_link_unavailable">Link insertion arrives in a later build.</string>
+    <string name="toast_add_comment_unavailable">Comment insertion arrives in a later build.</string>
+    <string name="toast_ribbon_tab_unavailable">%1$s is not available in this build.</string>
     <string name="toast_more_options_will_be_developed_soon">More Options will be developed soon</string>
     <string name="toast_document_properties_room_db_n_file_meta_filename">Document Properties (Room DB):\n\" +
                                                                  \"File: %1$s (%2$s)\n\" +

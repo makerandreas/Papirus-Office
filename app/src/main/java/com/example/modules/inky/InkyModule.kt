@@ -18,6 +18,8 @@ import com.example.core.util.TemplateManager
 import com.example.ui.home.RecentFilesTracker
 import com.example.ui.home.ShortcutCard
 import com.example.ui.home.RecentsEmptyStateIllustration
+import androidx.compose.ui.platform.contentDescription
+import androidx.compose.ui.platform.semantics
 import androidx.compose.ui.res.stringResource
 import com.example.R
 
@@ -731,7 +733,6 @@ fun InkyModule(
 
     // Bottom Bar (Ribbon & sub-decks) States
     var bottomBarDeck by remember { mutableStateOf("ribbon") } // ribbon, font_color, font_size, font_family, highlight_color
-    var activeRibbonTab by remember { mutableStateOf("Home") } // File, Home, Insert, Layout, References, Mailings, Review, View
     var showRibbonTabMenu by remember { mutableStateOf(false) }
     var activeInkySubpage by remember { mutableStateOf("") }
     var previousInkySubpage by remember { mutableStateOf("") }
@@ -2787,32 +2788,52 @@ fun InkyModule(
                                 Icon(Icons.AutoMirrored.Rounded.FormatIndentDecrease, contentDescription = stringResource(R.string.cd_decrease_indent))
                             }
 
-                            // 13. Add image. TODO(plan-6): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 13. Add image. Visible disabled state (plan 3B, R-26);
+                            // TODO(plan-6): real insertion path replaces this.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_image_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_image_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = stringResource(R.string.cd_add_image))
+                                Icon(
+                                    Icons.Rounded.AddPhotoAlternate,
+                                    contentDescription = stringResource(R.string.cd_add_image),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 14. Add table. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 14. Add table. Visible disabled state (plan 3B, R-26);
+                            // TODO(plan-7): real insertion path replaces this.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_table_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_table_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.GridOn, contentDescription = stringResource(R.string.cd_add_table))
+                                Icon(
+                                    Icons.Rounded.GridOn,
+                                    contentDescription = stringResource(R.string.cd_add_table),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 15. Add link. TODO(plan-7): real insertion path; visible disabled state in plan 3B (R-26).
+                            // 15. Add link. Visible disabled state (plan 3B, R-26);
+                            // TODO(plan-7): real insertion path replaces this.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_link_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_link_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.Rounded.Link, contentDescription = stringResource(R.string.cd_add_link))
+                                Icon(
+                                    Icons.Rounded.Link,
+                                    contentDescription = stringResource(R.string.cd_add_link),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
 
-                            // 16. Add comment. TODO(plan-8): real comment model; visible disabled state in plan 3B (R-26).
+                            // 16. Add comment. Visible disabled state (plan 3B, R-26);
+                            // TODO(plan-8): real comment model replaces this.
                             IconButton(onClick = {
-                                Toast.makeText(context, R.string.toast_add_comment_selected, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_add_comment_unavailable, Toast.LENGTH_SHORT).show()
                             }) {
-                                Icon(Icons.AutoMirrored.Rounded.Comment, contentDescription = stringResource(R.string.cd_add_comment))
+                                Icon(
+                                    Icons.AutoMirrored.Rounded.Comment,
+                                    contentDescription = stringResource(R.string.cd_add_comment),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                )
                             }
                         }
 
@@ -2933,12 +2954,17 @@ fun InkyModule(
                                 canRedo = canRedo
                             )
                         } else {
-                        val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "References", "Mailings", "Review", "View")
-                        val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { ribbonTabs.size })
+                        // Tab set per CONCEPT.md for Writer (plan 3B): File, Home,
+                        // Insert, Layout, Review, View. Contextual tabs (Table,
+                        // Picture, Object, ...) appear once their selection
+                        // contexts exist. References/Mailings are not in the
+                        // CONCEPT.md Writer set and are dropped.
+                        val ribbonTabs = listOf("File", "Home", "Insert", "Layout", "Review", "View")
+                        val implementedRibbonTabs = setOf("File", "Home")
+                        val ribbonPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 1, pageCount = { implementedRibbonTabs.size })
                         val ribbonTabScrollState = rememberScrollState()
-                        
+
                         LaunchedEffect(ribbonPagerState.currentPage) {
-                            activeRibbonTab = ribbonTabs[ribbonPagerState.currentPage]
                             ribbonTabScrollState.animateScrollTo((ribbonPagerState.currentPage * 75).dp.value.toInt())
                         }
                         if (activeInkySubpage.isNotEmpty()) {
@@ -3103,7 +3129,7 @@ fun InkyModule(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                // 1. Baris tab (scrollable)
+                                // 1. Tab row (scrollable)
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
@@ -3112,7 +3138,8 @@ fun InkyModule(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     ribbonTabs.forEachIndexed { index, tab ->
-                                        val isSelected = ribbonPagerState.currentPage == index
+                                        val isImplemented = tab in implementedRibbonTabs
+                                        val isSelected = isImplemented && ribbonPagerState.currentPage == index
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(16.dp))
@@ -3120,9 +3147,19 @@ fun InkyModule(
                                                     if (isSelected) MaterialTheme.colorScheme.primaryContainer
                                                     else Color.Transparent
                                                 )
+                                                .semantics {
+                                                    if (!isImplemented) {
+                                                        contentDescription = stringResource(R.string.cd_ribbon_tab_unavailable, tab)
+                                                    }
+                                                }
                                                 .clickable {
-                                                    coroutineScope.launch { ribbonPagerState.animateScrollToPage(index) }
-                                                    activeRibbonTab = tab
+                                                    if (isImplemented) {
+                                                        coroutineScope.launch { ribbonPagerState.animateScrollToPage(index) }
+                                                    } else {
+                                                        // Honest note instead of a silent deck (R-26): the
+                                                        // tab stays where it is and explains itself.
+                                                        Toast.makeText(context, context.getString(R.string.toast_ribbon_tab_unavailable, tab), Toast.LENGTH_SHORT).show()
+                                                    }
                                                 }
                                                 .padding(horizontal = 14.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
@@ -3131,8 +3168,11 @@ fun InkyModule(
                                                 text = tab,
                                                 fontSize = 14.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                color = when {
+                                                    isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                    isImplemented -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                                }
                                             )
                                         }
                                     }
@@ -3279,6 +3319,10 @@ fun InkyModule(
                                      state = ribbonPagerState,
                                      modifier = Modifier.fillMaxSize()
                                  ) { page ->
+                                     // The pager hosts only the implemented tabs
+                                     // (File, Home); unimplemented tabs never
+                                     // navigate here (they raise the honest note
+                                     // in the tab strip).
                                      val currentTabName = ribbonTabs[page]
                                      if (currentTabName == "File") {
                                          Column(
@@ -3340,7 +3384,7 @@ fun InkyModule(
                                                  }
                                              )
                                          }
-                                     } else if (currentTabName == "Home") {
+                                     } else {
                                          Column(
                                              modifier = Modifier
                                                  .fillMaxSize()
@@ -3369,20 +3413,6 @@ fun InkyModule(
                                                  },
                                                  onShowFontSizeDialog = { showFontSizeDialog = true },
                                                  onOpenInspector = { showTextFormattingInspector = true }
-                                             )
-                                         }
-                                     } else {
-                                         Box(
-                                             modifier = Modifier
-                                                 .fillMaxSize()
-                                                 .padding(16.dp),
-                                             contentAlignment = Alignment.Center
-                                         ) {
-                                             // TODO(plan-3B): tab set rebuilt from CONCEPT.md; unimplemented tabs render disabled with an accessible reason.
-                                             Text(
-                                                 text = "$currentTabName options will be implemented soon.",
-                                                 style = MaterialTheme.typography.bodyMedium,
-                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                              )
                                          }
                                      }
