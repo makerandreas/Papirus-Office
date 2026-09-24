@@ -161,6 +161,13 @@
     <string name="viewer_status_page_single">Page %1$d of %2$d</string>
     <string name="viewer_status_page_range">Page %1$d–%2$d of %3$d</string>
     <string name="viewer_status_words_chars">%1$d words, %2$d chars</string>
+    <!-- Status bar controls (Plan 2) -->
+    <string name="inky_image_placeholder">[Image]</string>
+    <string name="inky_pages_empty">No pages to display</string>
+    <string name="inky_status_pages">Pages</string>
+    <string name="inky_status_zoom_percent">%1$d%%</string>
+    <string name="inky_status_open_edit_mode">Open Editor Mode</string>
+    <string name="inky_hub_toggle_keyboard">Toggle keyboard</string>
 
     <!-- Full-page Loading Popup & Saving Dialog -->
     <string name="discard">Discard</string>
