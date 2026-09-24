@@ -594,7 +594,7 @@ fun InkyModule(
     val lokitLogs = remember {
         mutableStateListOf(
             "LOKit Core: " + com.example.core.jni.LokitEngine.statusLabel,
-            com.example.core.jni.LokitEngine.tagLog("lok::Office::documentLoad(\"Inky_Dokumen.odt\")"),
+            com.example.core.jni.LokitEngine.tagLog("lok::Office::documentLoad(\"Untitled.odt\")"),
             com.example.core.jni.LokitEngine.tagLog("lok::Document::registerCallback(LOK_CALLBACK_INVALIDATE_TILES)")
         )
     }
