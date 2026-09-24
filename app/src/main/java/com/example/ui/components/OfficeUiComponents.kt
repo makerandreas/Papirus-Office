@@ -313,7 +313,7 @@ private fun VerticalSeparator() {
         modifier = Modifier
             .width(1.dp)
             .height(24.dp)
-            .background(Color.Gray.copy(alpha = 0.3f))
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     )
     Spacer(modifier = Modifier.width(4.dp))
 }
@@ -332,7 +332,7 @@ private fun FctSeparator() {
         modifier = Modifier
             .width(1.dp)
             .height(16.dp)
-            .background(Color.Gray.copy(alpha = 0.4f))
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     )
 }
 

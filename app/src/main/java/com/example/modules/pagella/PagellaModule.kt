@@ -35,6 +35,12 @@ data class LinePath(
     val color: Color
 )
 
+// The PDF preview is a paper card pinned white, so its body text and page
+// edge are document colours, not chrome: they keep their Material-2014 values
+// as explicit ARGB and stay legible whatever the app theme does (plan-03 3.11).
+private val PaperInkMuted = Color(0xFF444444)
+private val PaperEdge = Color(0xFF888888)
+
 @Composable
 fun PagellaModule(
     isTablet: Boolean,
@@ -122,7 +128,7 @@ fun PagellaModule(
                     Icon(
                         imageVector = Icons.Default.Gesture,
                         contentDescription = stringResource(R.string.cd_toggle_ink_drawing_annotations),
-                        tint = if (isInkMode) MaterialTheme.colorScheme.primary else Color.Gray
+                        tint = if (isInkMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -150,7 +156,7 @@ fun PagellaModule(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(0.5.dp, Color.Gray, MaterialTheme.shapes.medium)
+                    .border(0.5.dp, PaperEdge, MaterialTheme.shapes.medium)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     // PDF Document static content render helper
@@ -169,12 +175,12 @@ fun PagellaModule(
                         )
                         Text(
                             text = "This PDF document is rendered by the Pagella native layout renderer. JNI bridging handles the high-performance rasterization of lines, vectors, and font assets.",
-                            color = Color.DarkGray,
+                            color = PaperInkMuted,
                             lineHeight = 20.sp
                         )
                         Text(
                             text = "The stylus ink layer enables vector graphics to be annotated directly above text elements, which can be stored as PNG images inside ODF documents or exported as separate vector overlays.",
-                            color = Color.DarkGray,
+                            color = PaperInkMuted,
                             lineHeight = 20.sp
                         )
                     }

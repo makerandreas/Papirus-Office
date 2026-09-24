@@ -54,6 +54,14 @@ data class SlideItem(
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
+// The slideshow canvas is pinned black and the editing preview is pinned
+// white, so slide text and furniture are document colours, not chrome: they
+// keep their Material-2014 values as explicit ARGB and stay legible whatever
+// the app theme does (plan-03 3.11).
+private val SlideOnDark = Color(0xFFCCCCCC)
+private val SlideInkMuted = Color(0xFF444444)
+private val SlideInkSubtle = Color(0xFF888888)
+
 @Composable
 fun SlidiaModule(
     isTablet: Boolean,
@@ -302,7 +310,7 @@ fun SlidiaModule(
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = activeSlide.subtitle,
-                    color = Color.LightGray,
+                    color = SlideOnDark,
                     fontSize = 20.sp,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -776,7 +784,7 @@ fun SlidiaModule(
                                         text = activeSlide.subtitle,
                                         style = MaterialTheme.typography.bodyLarge,
                                         textAlign = TextAlign.Center,
-                                        color = Color.DarkGray
+                                        color = SlideInkMuted
                                     )
                                 }
 
@@ -811,7 +819,7 @@ fun SlidiaModule(
                                         Text(
                                             text = activeSlide.footerText,
                                             fontSize = 10.sp,
-                                            color = Color.Gray
+                                            color = SlideInkSubtle
                                         )
                                     }
                                     if (activeSlide.showSlideNumber) {
@@ -819,7 +827,7 @@ fun SlidiaModule(
                                             text = "${activeSlideIndex + 1}",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.Gray
+                                            color = SlideInkSubtle
                                         )
                                     }
                                 }
@@ -899,7 +907,7 @@ fun SlidiaModule(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.cd_zoom_out), modifier = Modifier.size(12.dp))
                             }
@@ -910,7 +918,7 @@ fun SlidiaModule(
                             )
                             IconButton(
                                 onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_zoom_in), modifier = Modifier.size(12.dp))
                             }
@@ -1828,7 +1836,7 @@ fun SlidiaModule(
                                             text = slide.subtitle,
                                             style = MaterialTheme.typography.titleMedium,
                                             textAlign = TextAlign.Center,
-                                            color = Color.DarkGray
+                                            color = SlideInkMuted
                                         )
                                     }
                                     if (slide.bullets.isNotEmpty()) {
@@ -1858,10 +1866,10 @@ fun SlidiaModule(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         if (slide.showFooter) {
-                                            Text(slide.footerText, fontSize = 12.sp, color = Color.Gray)
+                                            Text(slide.footerText, fontSize = 12.sp, color = SlideInkSubtle)
                                         }
                                         if (slide.showSlideNumber) {
-                                            Text("${currentSlideIdxInDeck + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                            Text("${currentSlideIdxInDeck + 1}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = SlideInkSubtle)
                                         }
                                     }
                                 }
@@ -1902,7 +1910,7 @@ fun SlidiaModule(
                         .align(Alignment.BottomCenter)
                         .padding(12.dp),
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.4f))
+                    border = BorderStroke(1.dp, SlideInkSubtle.copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier

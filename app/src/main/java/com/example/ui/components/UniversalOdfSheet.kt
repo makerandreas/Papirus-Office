@@ -36,6 +36,7 @@ import java.util.Locale
 import java.util.Date
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.ui.theme.TerminalPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -991,7 +992,7 @@ private fun TerminalLogs(
                 Icon(
                     imageVector = Icons.Rounded.DeleteSweep,
                     contentDescription = stringResource(R.string.cd_clear_logs),
-                    tint = Color.LightGray,
+                    tint = TerminalPalette.LINE,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -1001,7 +1002,7 @@ private fun TerminalLogs(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF181818))
+                .background(TerminalPalette.PANEL)
                 .padding(8.dp)
         ) {
             val scrollState = rememberScrollState()
@@ -1017,7 +1018,7 @@ private fun TerminalLogs(
                 if (liveLogs.isEmpty()) {
                     Text(
                         text = "Console quiet. Awaiting ODF Simple API tasks...",
-                        color = Color.Gray,
+                        color = TerminalPalette.QUIET,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace
                     )
