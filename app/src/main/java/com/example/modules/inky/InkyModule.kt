@@ -541,6 +541,34 @@ fun InkyModule(
         }
     }
 
+    // Status bar "section or object information" field (WG Ch.1, Table 1).
+    // Minimal honest version (plan 3B): the text-window mapping resolves the
+    // caret to an element, so only element-level facts are shown. Table
+    // row/col precision would be invented here, so it waits for the table
+    // geometry work (plans 7B/8B); sections, frames and indexes fill this
+    // slot once plans 19/21 parse them.
+    val statusBarObjectInfo by remember(docBodyText.selection, activeLayoutDocument) {
+        derivedStateOf {
+            val elements = activeLayoutDocument.body.elements
+            if (elements.isEmpty()) {
+                null
+            } else {
+                val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
+                val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
+                val element = com.makerandreas.papirusoffice.data.DocumentTextWindows
+                    .elementForOffset(windows, caret)
+                    ?.let { elements.getOrNull(it.elementIndex) }
+                when (element) {
+                    is com.makerandreas.papirusoffice.data.OfficeHeading ->
+                        context.getString(R.string.statusbar_object_heading, element.level, element.text)
+                    is com.makerandreas.papirusoffice.data.OfficeTable ->
+                        context.getString(R.string.statusbar_object_table)
+                    else -> null
+                }
+            }
+        }
+    }
+
     val documentNavigator = remember(scrollState, totalDocPages, viewOptions) {
         object : com.makerandreas.papirusoffice.data.DocumentNavigator {
             override fun goToPage(page: Int) {
@@ -2456,31 +2484,49 @@ fun InkyModule(
                             .height(48.dp)
                             .padding(horizontal = 4.dp)
                     ) {
-                        // 1. Page counter (leading): opens Go to Page.
+                        // 1. Leading: page counter (opens Go to Page) and the
+                        // object-information field (WG Ch.1 status bar).
                         Row(
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
-                                .height(48.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    targetPageText = currentDocPage.toString()
-                                    showGoToPageDialog = true
-                                }
-                                .padding(horizontal = 8.dp),
+                                .height(48.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Rounded.Description,
-                                contentDescription = stringResource(R.string.inky_status_pages),
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        targetPageText = currentDocPage.toString()
+                                        showGoToPageDialog = true
+                                    }
+                                    .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Description,
+                                    contentDescription = stringResource(R.string.inky_status_pages),
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = pageText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1
+                                )
+                            }
                             Text(
-                                text = pageText,
+                                text = statusBarObjectInfo ?: "-",
                                 style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1
+                                fontWeight = FontWeight.Normal,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp)
+                                    .widthIn(max = 110.dp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 

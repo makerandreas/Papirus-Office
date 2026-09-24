@@ -244,6 +244,13 @@
     <string name="navigate_by_ole">OLE objects</string>
     <string name="navigate_by_drawing">Drawing objects</string>
     <string name="navigate_by_page">Page</string>
+    <string name="navigate_by_hyperlinks">Hyperlinks</string>
+    <string name="navigator_none_in_document">No %1$s in this document.</string>
+    <string name="navigator_not_yet_available">Not yet available in this build.</string>
+    <string name="cd_collapse">Collapse</string>
+    <string name="cd_expand">Expand</string>
+    <string name="statusbar_object_heading">Heading %1$d: %2$s</string>
+    <string name="statusbar_object_table">Table</string>
     <string name="navigate_by_reminder">Reminder</string>
     <string name="navigate_by_indexes">Indexes</string>
     <string name="navigate_by_selection">Selection</string>

@@ -219,7 +219,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["headings"] == true) {
                     if (index.headings.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NoneInDocumentRow(stringResource(R.string.navigate_by_headings)) }
                     } else {
                         items(index.headings) { heading ->
                             HeadingTreeItem(
@@ -246,7 +246,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["tables"] == true) {
                     if (index.tables.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NoneInDocumentRow(stringResource(R.string.navigate_by_tables)) }
                     } else {
                         items(index.tables) { table ->
                             LeafItemRow(
@@ -265,37 +265,14 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 3. Text Frames
+                // 3. Text Frames. The parser does not index frames yet, so a
+                // header with a count would claim a number the app cannot see.
+                // TODO(plan-19): frame identity parsing makes this readable.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_frames),
-                        icon = Icons.Rounded.CropFree,
-                        count = index.frames.size,
-                        isExpanded = expandedCategories["frames"] == true,
-                        onToggleExpand = {
-                            expandedCategories["frames"] = !(expandedCategories["frames"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_frames),
+                        icon = Icons.Rounded.CropFree
                     )
-                }
-                if (expandedCategories["frames"] == true) {
-                    if (index.frames.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.frames) { frame ->
-                            LeafItemRow(
-                                name = frame.frameName,
-                                icon = Icons.Rounded.CropFree,
-                                isSelected = navState.activeItemId == frame.id,
-                                isHidden = frame.visibility == VisibilityState.HIDDEN,
-                                onClick = {
-                                    if (frame.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                    }
-                                    navEngine.goToFrame(frame.id)
-                                }
-                            )
-                        }
-                    }
                 }
 
                 // 4. Images
@@ -312,7 +289,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["images"] == true) {
                     if (index.images.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NoneInDocumentRow(stringResource(R.string.navigate_by_images)) }
                     } else {
                         items(index.images) { img ->
                             LeafItemRow(
@@ -331,211 +308,78 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 5. OLE Objects
+                // 4b. Hyperlinks (checklist item 7). Not parsed yet, so the
+                // category exists in the honest not-yet-readable shape.
+                // TODO(plan-18/20): hyperlink parsing fills this and adds the
+                // Navigate-By filter option.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_ole),
-                        icon = Icons.Rounded.Extension,
-                        count = index.oleObjects.size,
-                        isExpanded = expandedCategories["ole"] == true,
-                        onToggleExpand = {
-                            expandedCategories["ole"] = !(expandedCategories["ole"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_hyperlinks),
+                        icon = Icons.Rounded.Link
                     )
-                }
-                if (expandedCategories["ole"] == true) {
-                    if (index.oleObjects.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.oleObjects) { ole ->
-                            LeafItemRow(
-                                name = ole.oleName,
-                                icon = Icons.Rounded.Extension,
-                                isSelected = navState.activeItemId == ole.id,
-                                isHidden = ole.visibility == VisibilityState.HIDDEN,
-                                onClick = {
-                                    if (ole.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                    }
-                                    navEngine.goToOle(ole.id)
-                                }
-                            )
-                        }
-                    }
                 }
 
-                // 6. Bookmarks
+                // 5. OLE Objects. No OLE model exists yet.
+                // TODO(unassigned): OLE parsing makes this readable.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_bookmarks),
-                        icon = Icons.Rounded.Bookmark,
-                        count = index.bookmarks.size,
-                        isExpanded = expandedCategories["bookmarks"] == true,
-                        onToggleExpand = {
-                            expandedCategories["bookmarks"] = !(expandedCategories["bookmarks"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_ole),
+                        icon = Icons.Rounded.Extension
                     )
-                }
-                if (expandedCategories["bookmarks"] == true) {
-                    if (index.bookmarks.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.bookmarks) { bm ->
-                            LeafItemRow(
-                                name = bm.name,
-                                icon = Icons.Rounded.Bookmark,
-                                isSelected = navState.activeItemId == bm.id,
-                                onClick = { navEngine.goToBookmark(bm.id) }
-                            )
-                        }
-                    }
                 }
 
-                // 7. Comments
+                // 6. Bookmarks. Not parsed yet (tokens exist, unconsumed).
+                // TODO(plan-18/20): bookmark parsing fills this.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_comments),
-                        icon = Icons.AutoMirrored.Rounded.Comment,
-                        count = index.comments.size,
-                        isExpanded = expandedCategories["comments"] == true,
-                        onToggleExpand = {
-                            expandedCategories["comments"] = !(expandedCategories["comments"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_bookmarks),
+                        icon = Icons.Rounded.Bookmark
                     )
-                }
-                if (expandedCategories["comments"] == true) {
-                    if (index.comments.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.comments) { c ->
-                            LeafItemRow(
-                                name = "${c.author}: ${c.content}",
-                                icon = Icons.AutoMirrored.Rounded.Comment,
-                                isSelected = navState.activeItemId == c.id,
-                                onClick = { navEngine.goToComment(c.id) }
-                            )
-                        }
-                    }
                 }
 
-                // 8. Sections
+                // 7. Comments. No comment model exists yet.
+                // TODO(plan-8): comment model makes this readable.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_sections),
-                        icon = Icons.Rounded.ViewAgenda,
-                        count = index.sections.size,
-                        isExpanded = expandedCategories["sections"] == true,
-                        onToggleExpand = {
-                            expandedCategories["sections"] = !(expandedCategories["sections"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_comments),
+                        icon = Icons.AutoMirrored.Rounded.Comment
                     )
-                }
-                if (expandedCategories["sections"] == true) {
-                    if (index.sections.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.sections) { sec ->
-                            LeafItemRow(
-                                name = sec.sectionName,
-                                icon = Icons.Rounded.ViewAgenda,
-                                isSelected = navState.activeItemId == sec.id,
-                                isHidden = sec.visibility == VisibilityState.HIDDEN,
-                                onClick = {
-                                    if (sec.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                    }
-                                    navEngine.goToSection(sec.id)
-                                }
-                            )
-                        }
-                    }
                 }
 
-                // 9. Fields
+                // 8. Sections. ODT section identity / DOCX sectPr not parsed yet.
+                // TODO(plan-19/21): section parsing fills this.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_fields),
-                        icon = Icons.Rounded.TextFields,
-                        count = index.fields.size,
-                        isExpanded = expandedCategories["fields"] == true,
-                        onToggleExpand = {
-                            expandedCategories["fields"] = !(expandedCategories["fields"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_sections),
+                        icon = Icons.Rounded.ViewAgenda
                     )
-                }
-                if (expandedCategories["fields"] == true) {
-                    if (index.fields.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.fields) { f ->
-                            LeafItemRow(
-                                name = "${f.fieldType}: ${f.value}",
-                                icon = Icons.Rounded.TextFields,
-                                isSelected = navState.activeItemId == f.id,
-                                onClick = { navEngine.goToField(f.id) }
-                            )
-                        }
-                    }
                 }
 
-                // 10. Footnotes
+                // 9. Fields. Field instructions are not parsed yet.
+                // TODO(plan-21): field model fills this.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_footnotes),
-                        icon = Icons.AutoMirrored.Rounded.Notes,
-                        count = index.footnotes.size,
-                        isExpanded = expandedCategories["footnotes"] == true,
-                        onToggleExpand = {
-                            expandedCategories["footnotes"] = !(expandedCategories["footnotes"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_fields),
+                        icon = Icons.Rounded.TextFields
                     )
-                }
-                if (expandedCategories["footnotes"] == true) {
-                    if (index.footnotes.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.footnotes) { fn ->
-                            LeafItemRow(
-                                name = stringResource(R.string.navigator_footnote_item, fn.label),
-                                icon = Icons.AutoMirrored.Rounded.Notes,
-                                isSelected = navState.activeItemId == fn.id,
-                                onClick = { navEngine.goToFootnote(fn.id) }
-                            )
-                        }
-                    }
                 }
 
-                // 11. Shapes / Drawing Objects
+                // 10. Footnotes. No footnote model exists yet.
+                // TODO(unassigned): footnote parsing makes this readable.
                 item {
-                    CategoryHeaderRow(
-                        title = stringResource(R.string.navigate_by_drawing),
-                        icon = Icons.Rounded.Category,
-                        count = index.shapes.size,
-                        isExpanded = expandedCategories["shapes"] == true,
-                        onToggleExpand = {
-                            expandedCategories["shapes"] = !(expandedCategories["shapes"] ?: false)
-                        }
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_footnotes),
+                        icon = Icons.AutoMirrored.Rounded.Notes
                     )
                 }
-                if (expandedCategories["shapes"] == true) {
-                    if (index.shapes.isEmpty()) {
-                        item { EmptyCategoryRow() }
-                    } else {
-                        items(index.shapes) { sh ->
-                            LeafItemRow(
-                                name = sh.shapeName,
-                                icon = Icons.Rounded.Category,
-                                isSelected = navState.activeItemId == sh.id,
-                                isHidden = sh.visibility == VisibilityState.HIDDEN,
-                                onClick = {
-                                    if (sh.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                    }
-                                    navEngine.goToShape(sh.id)
-                                }
-                            )
-                        }
-                    }
+
+                // 11. Shapes / Drawing Objects. No shape model exists yet.
+                // TODO(unassigned): shape parsing makes this readable.
+                item {
+                    UnavailableCategoryRow(
+                        label = stringResource(R.string.navigate_by_drawing),
+                        icon = Icons.Rounded.Category
+                    )
                 }
 
                 // 12. Pages
@@ -552,7 +396,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["pages"] == true) {
                     if (navState.totalPages <= 0) {
-                        item { EmptyCategoryRow() }
+                        item { NoneInDocumentRow(stringResource(R.string.navigate_by_page)) }
                     } else {
                         items((1..navState.totalPages).toList()) { p ->
                             LeafItemRow(
@@ -569,7 +413,7 @@ fun NavigatorSheetContent(
                 when (navState.navigateBy) {
                     NavigateBy.HEADING -> {
                         if (index.headings.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NoneInDocumentRow(stringResource(R.string.navigate_by_headings)) }
                         } else {
                             items(index.headings) { heading ->
                                 HeadingTreeItem(
@@ -583,7 +427,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.TABLE -> {
                         if (index.tables.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NoneInDocumentRow(stringResource(R.string.navigate_by_tables)) }
                         } else {
                             items(index.tables) { table ->
                                 LeafItemRow(
@@ -602,30 +446,18 @@ fun NavigatorSheetContent(
                             }
                         }
                     }
+                    // TODO(plan-19): frame identity parsing makes this readable.
                     NavigateBy.FRAME -> {
-                        if (index.frames.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.frames) { frame ->
-                                LeafItemRow(
-                                    name = frame.frameName,
-                                    icon = Icons.Rounded.CropFree,
-                                    isSelected = navState.activeItemId == frame.id,
-                                    isHidden = frame.visibility == VisibilityState.HIDDEN,
-                                    startPadding = 16.dp,
-                                    onClick = {
-                                        if (frame.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                        }
-                                        navEngine.goToFrame(frame.id)
-                                    }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_frames),
+                                icon = Icons.Rounded.CropFree
+                            )
                         }
                     }
                     NavigateBy.IMAGE -> {
                         if (index.images.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NoneInDocumentRow(stringResource(R.string.navigate_by_images)) }
                         } else {
                             items(index.images) { img ->
                                 LeafItemRow(
@@ -644,132 +476,72 @@ fun NavigatorSheetContent(
                             }
                         }
                     }
+                    // TODO(unassigned): OLE parsing makes this readable.
                     NavigateBy.OLE -> {
-                        if (index.oleObjects.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.oleObjects) { ole ->
-                                LeafItemRow(
-                                    name = ole.oleName,
-                                    icon = Icons.Rounded.Extension,
-                                    isSelected = navState.activeItemId == ole.id,
-                                    isHidden = ole.visibility == VisibilityState.HIDDEN,
-                                    startPadding = 16.dp,
-                                    onClick = {
-                                        if (ole.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                        }
-                                        navEngine.goToOle(ole.id)
-                                    }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_ole),
+                                icon = Icons.Rounded.Extension
+                            )
                         }
                     }
+                    // TODO(plan-18/20): bookmark parsing makes this readable.
                     NavigateBy.BOOKMARK -> {
-                        if (index.bookmarks.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.bookmarks) { bm ->
-                                LeafItemRow(
-                                    name = bm.name,
-                                    icon = Icons.Rounded.Bookmark,
-                                    isSelected = navState.activeItemId == bm.id,
-                                    startPadding = 16.dp,
-                                    onClick = { navEngine.goToBookmark(bm.id) }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_bookmarks),
+                                icon = Icons.Rounded.Bookmark
+                            )
                         }
                     }
+                    // TODO(plan-8): comment model makes this readable.
                     NavigateBy.COMMENT -> {
-                        if (index.comments.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.comments) { c ->
-                                LeafItemRow(
-                                    name = "${c.author}: ${c.content}",
-                                    icon = Icons.AutoMirrored.Rounded.Comment,
-                                    isSelected = navState.activeItemId == c.id,
-                                    startPadding = 16.dp,
-                                    onClick = { navEngine.goToComment(c.id) }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_comments),
+                                icon = Icons.AutoMirrored.Rounded.Comment
+                            )
                         }
                     }
+                    // TODO(plan-19/21): section parsing makes this readable.
                     NavigateBy.SECTION -> {
-                        if (index.sections.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.sections) { sec ->
-                                LeafItemRow(
-                                    name = sec.sectionName,
-                                    icon = Icons.Rounded.ViewAgenda,
-                                    isSelected = navState.activeItemId == sec.id,
-                                    isHidden = sec.visibility == VisibilityState.HIDDEN,
-                                    startPadding = 16.dp,
-                                    onClick = {
-                                        if (sec.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                        }
-                                        navEngine.goToSection(sec.id)
-                                    }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_sections),
+                                icon = Icons.Rounded.ViewAgenda
+                            )
                         }
                     }
+                    // TODO(plan-21): field model makes this readable.
                     NavigateBy.FIELD -> {
-                        if (index.fields.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.fields) { f ->
-                                LeafItemRow(
-                                    name = "${f.fieldType}: ${f.value}",
-                                    icon = Icons.Rounded.TextFields,
-                                    isSelected = navState.activeItemId == f.id,
-                                    startPadding = 16.dp,
-                                    onClick = { navEngine.goToField(f.id) }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_fields),
+                                icon = Icons.Rounded.TextFields
+                            )
                         }
                     }
+                    // TODO(unassigned): footnote parsing makes this readable.
                     NavigateBy.FOOTNOTE -> {
-                        if (index.footnotes.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.footnotes) { fn ->
-                                LeafItemRow(
-                                    name = stringResource(R.string.navigator_footnote_item, fn.label),
-                                    icon = Icons.AutoMirrored.Rounded.Notes,
-                                    isSelected = navState.activeItemId == fn.id,
-                                    startPadding = 16.dp,
-                                    onClick = { navEngine.goToFootnote(fn.id) }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_footnotes),
+                                icon = Icons.AutoMirrored.Rounded.Notes
+                            )
                         }
                     }
+                    // TODO(unassigned): shape parsing makes this readable.
                     NavigateBy.DRAWING, NavigateBy.SHAPE -> {
-                        if (index.shapes.isEmpty()) {
-                            item { EmptyCategoryRow() }
-                        } else {
-                            items(index.shapes) { sh ->
-                                LeafItemRow(
-                                    name = sh.shapeName,
-                                    icon = Icons.Rounded.Category,
-                                    isSelected = navState.activeItemId == sh.id,
-                                    isHidden = sh.visibility == VisibilityState.HIDDEN,
-                                    startPadding = 16.dp,
-                                    onClick = {
-                                        if (sh.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                        }
-                                        navEngine.goToShape(sh.id)
-                                    }
-                                )
-                            }
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_drawing),
+                                icon = Icons.Rounded.Category
+                            )
                         }
                     }
                     NavigateBy.PAGE -> {
                         if (navState.totalPages <= 0) {
-                            item { EmptyCategoryRow() }
+                            item { NoneInDocumentRow(stringResource(R.string.navigate_by_page)) }
                         } else {
                             items((1..navState.totalPages).toList()) { p ->
                                 LeafItemRow(
@@ -797,6 +569,17 @@ fun NavigatorSheetContent(
                             }
                         }
                     }
+                    // TODO(plan-19): TOC/index snapshot makes this readable.
+                    NavigateBy.INDEX -> {
+                        item {
+                            UnavailableCategoryRow(
+                                label = stringResource(R.string.navigate_by_indexes),
+                                icon = Icons.AutoMirrored.Rounded.Toc
+                            )
+                        }
+                    }
+                    // Session-only targets (Selection, Recency): no document
+                    // content, so the generic message is accurate here.
                     else -> {
                         item { EmptyCategoryRow() }
                     }
@@ -982,7 +765,7 @@ private fun CategoryHeaderRow(
         ) {
             Icon(
                 imageVector = if (isExpanded) Icons.Rounded.Remove else Icons.Rounded.Add,
-                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                contentDescription = stringResource(if (isExpanded) R.string.cd_collapse else R.string.cd_expand),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)
             )
@@ -1050,7 +833,7 @@ private fun HeadingTreeItem(
                     ) {
                         Icon(
                             imageVector = if (node.collapsed) Icons.Rounded.Add else Icons.Rounded.Remove,
-                            contentDescription = if (node.collapsed) "Expand" else "Collapse",
+                            contentDescription = stringResource(if (node.collapsed) R.string.cd_expand else R.string.cd_collapse),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
@@ -1092,6 +875,60 @@ private fun HeadingTreeItem(
     }
 }
 
+// Empty-state rows (plan 3B, R-26). Two different facts, two different
+// messages: "no X in this document" is only true for classes the parser
+// fully reads; for classes the parser cannot read yet the honest state is
+// "not yet available", never a fabricated zero.
+@Composable
+private fun NoneInDocumentRow(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp, horizontal = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = stringResource(R.string.navigator_none_in_document, label),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun UnavailableCategoryRow(label: String, icon: ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp, horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+            modifier = Modifier.size(20.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            )
+            Text(
+                text = stringResource(R.string.navigator_not_yet_available),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+// Neutral fallback for session-only Navigate By targets (Selection, Recency)
+// that are not document content at all.
 @Composable
 private fun EmptyCategoryRow() {
     Box(
