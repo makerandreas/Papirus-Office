@@ -3,6 +3,9 @@
 **Date:** 2026-09-24
 **Input:** `anti-slop/audit-005-2026-09-24.md` (findings F-01 … F-20, observations O-01 … O-06) and `anti-slop/audit-006-2026-09-24.md` (screenshot findings F-21 … F-31, compliance sweep)
 **Numbering:** this document holds **plans 4 to 9**; it was written as PRs D to I and the letters are kept in parentheses for traceability. Sub-item IDs (`D-1`, `E-EN-2`, `F-3`, `G-1`, `H-4` …) are unchanged, so `letter-n` reads as `plan-n item` (D-1 = Plan 4 item 1, E-2 = Plan 5 item 2, F-3 = Plan 6 item 3, G-1 = Plan 7 item 1, H-4 = Plan 8 item 4). The index is `anti-slop/plan-01-master-index.md`.
+
+**Writer Guide reference:** how these plans serve WG 24.8 Chapter 1 and `docs/InkyC1Checklist.md` is mapped in `plan-01-master-index.md` §3 and §4; the short version is that Plan 5 carries the status-bar page count and the caret/layout guards, Plans 7 and 8 carry the Navigator's categories and the checklist's Save Compatibility item, and Plan 9 carries the lifecycle items.
+
 **Baseline:** post-PR-C nightly, `main` d1105ce (PRs #7 A, #8 B1, #9 B2, #10 C)
 **Deliverable of this document:** an ordered, reviewable PR split with scope, root causes closed, files, tests, acceptance criteria, and risk. It changes no code by itself.
 

@@ -3,6 +3,8 @@
 **Date:** 2026-09-24
 **Status:** ready to start. Lowest risk, highest visibility, unblocks the manual test loop for Plans 5-9.
 **Evidence:** `anti-slop/audit-006-2026-09-24.md` §1 (screenshot verification, F-21…F-31) and `anti-slop/audit-005-2026-09-24.md` (F-01…F-07).
+**Writer Guide reference:** the sections this plan makes reachable are §3.1 (Status bar, Rulers, Sidebar decks, Toolbars, Document views) and §3.3 (Go to Page, Navigator, outline folding, reminders) of the WG 24.8 Chapter 1 map in `plan-01-master-index.md` §3. Checklist sections unblocked: 5 (Selection), 8 (Reminder), 9 (Zoom), plus the dialogs of 1.
+
 **Note:** this plan is the same scope as Plan 4 in `plan-04-to-09-writer-fidelity.md`. It is listed separately here because it is the only plan the user asked to be able to start immediately, and because its acceptance is visual rather than structural.
 
 ---
