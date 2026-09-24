@@ -1,7 +1,9 @@
 # Papirus Office — PR Roadmap for the Remaining Plans
 
+> **SUPERSEDED (2026-09-24).** This is v1, written at baseline `e10f956` before PR #12 landed. The active execution schedule is now **`plan-2026-09-24-remaining-pr-roadmap-v2.md`** (baseline `55a9a97`), which re-verified every citation, corrected the Sample-2 TOC count, and added the Sample-6 DOCX heading-architecture findings (⚑ items). Where the two conflict, v2 wins. Keep this file as the pre-PR-12 record.
+
 **Date:** 2026-09-24
-**Status:** **active execution schedule.** It turns plans 3, 5, 6, 7, 8, 9 and parked plan 10 into an ordered PR sequence with scope, tests, acceptance and gates. It changes no code by itself. Plan 4 is **consumed** (its scope landed as PR #11); plan 1 stays the living index and is updated by this document.
+**Status:** **superseded by v2** (see banner). It turns plans 3, 5, 6, 7, 8, 9 and parked plan 10 into an ordered PR sequence with scope, tests, acceptance and gates. It changes no code by itself. Plan 4 is **consumed** (its scope landed as PR #11); plan 1 stays the living index and is updated by v2.
 **Baseline:** `main` `e10f956` (PR #11, Plan 2 chrome), branch convention `arena/<session>-papirus-office`, CI-verified only (no local JDK; `gh` is the build evidence channel).
 **Evidence base for this document:** every plan and audit in `anti-slop/` re-read this session; the cited code locations re-opened and re-verified in the working tree; all 12 files in `tests/inky` unpacked and re-inventoried (§2); WG 24.8 Chapter 1 and the Open XML SDK references re-checked online. Line numbers marked ✅ were verified on 2026-09-24 against `main` `e10f956`; older numbers in previous documents have drifted and are superseded by this file where they conflict.
 

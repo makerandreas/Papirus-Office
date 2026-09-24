@@ -27,7 +27,7 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 |---|---|---|---|---|---|
 | **1** | **Master index and working guide** (this file) | — | — | here | **active** |
 | **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
-| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` | 3A in review (PR 12); 3B/3C scheduled as PRs 13-14 |
+| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` (§8 records what 3A shipped) | 3A **landed as PR 12** (`55a9a97`); 3B/3C scheduled as PRs 13-14 in the v2 strategy |
 | **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
 | **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5 | scheduled as PRs 15-16 |
 | **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | scheduled as PR 17 |
@@ -132,10 +132,10 @@ Every plan's PR must hold these, or it is not ready:
 ## 6. Working agreement for Plan 1
 
 * **Deliverable:** this file. Its acceptance is completeness: every Chapter 1 section has an owner (§3, including the three items no fidelity plan owns), every checklist section is mapped to the plan that makes it pass (§4), and every finding has a home. The `Closes` column in §2 covers the full set: F-01…F-06 → 2/4, F-07 → 6, F-08/F-09 → 7 and 10, F-10/F-21/F-24/F-25/F-28 → 5, F-11…F-15/F-23 → 7, F-16…F-20/F-26/F-27 → 8, F-22/F-29/F-30/F-31 → 2, O-01 → 9, O-02 → 5 and 8, O-03…O-05 → 7.
-* **Execution schedule:** the PR-by-PR order for everything above lives in `anti-slop/plan-2026-09-24-remaining-pr-roadmap.md` (PRs 12-22), which also records the 2026-09-24 decisions (staged page windows, display-the-bundled-faces, TOC snapshot, save refusal). This file keeps the mapping and the numbers; the roadmap keeps the order.
+* **Execution schedule:** the PR-by-PR order for everything above lives in `anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md` (PRs 13-22, baseline `55a9a97`; v1 at `plan-2026-09-24-remaining-pr-roadmap.md` is the pre-PR-12 record), which also records the 2026-09-24 decisions (staged page windows, display-the-bundled-faces, TOC snapshot, save refusal). This file keeps the mapping and the numbers; the roadmap keeps the order.
 
 * **Update rule:** when a plan lands, update its status here and add one line to the plan's own file recording what actually shipped versus what was written. Numbers in this file are the ones the other documents cite, so corrections happen here first.
 * **Next actions after this file:**
   1. ~~Plan 2, commits 1-2~~ **done**: PR #11 merged the whole plan (its commits 1-2 became the renderer and status-bar commits of PR #11).
-  2. ~~Plan 3, the two mechanical guards~~ **scheduled as roadmap PR 12**, which lands the sweep and the guard together so every later plan runs against them.
+  2. ~~Plan 3, the two mechanical guards~~ **done**: PR 12 merged (`55a9a97`) with the sweep and `SourceHygieneGuardTest` together; every later plan runs against them.
   3. ~~Then Plan 5 with its per-page element dump~~ **scheduled as roadmap PR 15** (dump first, metrics seams second, transform third), exactly because the empty-page mechanism (F-25) is still an open question that only a trace can answer.
