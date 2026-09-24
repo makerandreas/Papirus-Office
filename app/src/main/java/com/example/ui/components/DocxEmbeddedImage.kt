@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.makerandreas.papirusoffice.data.util.OpenXmlUnits
 import java.io.File
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun DocxEmbeddedImage(
@@ -35,7 +36,7 @@ fun DocxEmbeddedImage(
     // Memuat gambar secara asinkron tanpa mengunci UI Thread
     AsyncImage(
         model = imageFile,
-        contentDescription = "Docx Image Element",
+        contentDescription = stringResource(R.string.cd_docx_image_element),
         modifier = modifier.padding(vertical = 4.dp),
         contentScale = ContentScale.Fit
     )

@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.*
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 /**
  * Universal Forms Sheet & Engine (SDK Guide Chapter 39 "Forms API Overview" & Google Forms Lite Concept)
@@ -101,7 +103,7 @@ fun UniversalFormsSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Assignment,
-                                    contentDescription = "Forms",
+                                    contentDescription = stringResource(R.string.cd_forms),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -126,17 +128,17 @@ fun UniversalFormsSheet(
                                 val newF = formsEngine.createNewForm("New Survey", "Form description")
                                 refreshForms()
                                 selectedFormId = newF.formId
-                                Toast.makeText(context, "Created new blank form", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_created_new_blank_form, Toast.LENGTH_SHORT).show()
                             },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "New Form", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_new_form), modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("New Form")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Close")
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                         }
                     }
                 }
@@ -254,7 +256,7 @@ fun UniversalFormsSheet(
                             summary = formsEngine.getResponseSummary(activeForm.formId),
                             onExportSpreadsheet = {
                                 val exportText = formsEngine.exportResponsesToSpreadsheet(activeForm.formId)
-                                Toast.makeText(context, "Exported responses to spreadsheet table", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, R.string.toast_exported_responses_to_spreadsheet_table, Toast.LENGTH_LONG).show()
                             }
                         )
                         3 -> FormInsertTab(
@@ -272,7 +274,7 @@ fun UniversalFormsSheet(
                             onInsertToDoc = { summaryText ->
                                 val schema = formsEngine.createNewForm("Programmatic Form (SDK Ch. 40)", summaryText)
                                 onInsertFormToDoc(schema)
-                                Toast.makeText(context, "Inserted SDK Form Summary into $activeModuleName", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.toast_inserted_sdk_form_summary_into_activemodulename, activeModuleName), Toast.LENGTH_SHORT).show()
                                 onDismiss()
                             }
                         )
@@ -420,7 +422,7 @@ private fun QuestionEditorCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(onClick = onDeleteQuestion) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete), tint = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -735,7 +737,7 @@ private fun FormResponderTab(
                                     ) {
                                         Icon(
                                             imageVector = if (star <= score) Icons.Default.Star else Icons.Default.StarBorder,
-                                            contentDescription = "$star Stars",
+                                            contentDescription = stringResource(R.string.cd_star_stars, star),
                                             tint = if (star <= score) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -1020,7 +1022,7 @@ private fun ProgrammaticFormSdkTab(
                 onClick = {
                     val res = formsEngine.buildFormProgrammatically(databaseName = dbName)
                     buildResult = res
-                    Toast.makeText(context, "Built SDK Form with ${res.totalControlsCreated} controls!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_built_sdk_form_with_res_totalcontrolscreated, res.totalControlsCreated), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.height(56.dp)
             ) {

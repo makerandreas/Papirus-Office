@@ -30,6 +30,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.PapirusEmailEngine
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,7 +128,7 @@ fun UniversalEmailSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Rounded.Email,
-                                    contentDescription = "Email Framework",
+                                    contentDescription = stringResource(R.string.cd_email_framework),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -147,7 +149,7 @@ fun UniversalEmailSheet(
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Rounded.Close, contentDescription = "Close")
+                        Icon(imageVector = Icons.Rounded.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 }
 
@@ -220,7 +222,7 @@ fun UniversalEmailSheet(
                             sdkCodeContent = sdkCodeContent,
                             onCopyClick = {
                                 clipboardManager.setText(AnnotatedString(sdkCodeContent))
-                                Toast.makeText(context, "SDK Example copied to clipboard!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_sdk_example_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         )
                         2 -> ZawinskisLawHelpTab()
@@ -458,9 +460,9 @@ private fun EmailAndShareTab(
                             )
                             onRefreshLogs()
                             if (success) {
-                                Toast.makeText(context, "SMTP simulation finished — no email was actually sent.", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, R.string.toast_smtp_simulation_finished, Toast.LENGTH_LONG).show()
                             } else {
-                                Toast.makeText(context, "SMTP Connection Failed. Check console logs.", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, R.string.toast_smtp_connection_failed_check_console_logs, Toast.LENGTH_LONG).show()
                             }
                         }
                     },
@@ -578,7 +580,7 @@ private fun EmailAndShareTab(
                         },
                         modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "Clear logs", tint = Color.Green)
+                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.cd_clear_logs), tint = Color.Green)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -694,7 +696,7 @@ private fun SdkExamplesTab(
                     IconButton(onClick = onCopyClick, modifier = Modifier.size(32.dp)) {
                         Icon(
                             imageVector = Icons.Rounded.ContentCopy,
-                            contentDescription = "Copy code",
+                            contentDescription = stringResource(R.string.cd_copy_code),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )

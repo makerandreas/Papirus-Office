@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.*
+import androidx.compose.ui.res.stringResource
+import com.example.R
 
 /**
  * Universal Printing Sheet (LibreOffice SDK Chapter 41 "Printing" & Java Print Service JPS).
@@ -107,7 +109,7 @@ fun UniversalPrintSheet(
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Default.Print,
-                                    contentDescription = "Printing Framework",
+                                    contentDescription = stringResource(R.string.cd_printing_framework),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -128,7 +130,7 @@ fun UniversalPrintSheet(
                     }
 
                     IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                        Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.cd_close))
                     }
                 }
 
@@ -183,7 +185,7 @@ fun UniversalPrintSheet(
                             val isLandscape = selectedOrientation == PaperOrientation.LANDSCAPE
                             PapirusPrintingEngine.printSampleDocument(context, docType)
                             lastJobStatus = "Job sent to System Spooler ($docType)"
-                            Toast.makeText(context, "Opening Android Native Print Spooler...", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_opening_android_native_print_spooler, Toast.LENGTH_SHORT).show()
                         }
                     )
 
@@ -194,7 +196,7 @@ fun UniversalPrintSheet(
                         codeContent = sdkCodeContent,
                         onCopyCode = {
                             clipboardManager.setText(AnnotatedString(sdkCodeContent))
-                            Toast.makeText(context, "SDK Example copied to clipboard!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_sdk_example_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                         }
                     )
 
@@ -334,7 +336,7 @@ private fun DocumentPrintControlTab(
                         Text(text = "Copies Count:")
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { if (copiesCount > 1) onCopiesChange(copiesCount - 1) }) {
-                                Icon(Icons.Default.Remove, contentDescription = "Decrease")
+                                Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.cd_decrease))
                             }
                             Text(
                                 text = "$copiesCount",
@@ -342,7 +344,7 @@ private fun DocumentPrintControlTab(
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             )
                             IconButton(onClick = { onCopiesChange(copiesCount + 1) }) {
-                                Icon(Icons.Default.Add, contentDescription = "Increase")
+                                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_increase))
                             }
                         }
                     }
@@ -491,7 +493,7 @@ private fun SdkExamplesTab(
                 fontFamily = FontFamily.Monospace
             )
             IconButton(onClick = onCopyCode) {
-                Icon(Icons.Default.ContentCopy, contentDescription = "Copy Code")
+                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.cd_copy_code_2))
             }
         }
 
