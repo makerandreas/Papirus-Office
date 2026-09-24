@@ -74,3 +74,29 @@ On device, at 320 dp width, in both modes: no per-page counter anywhere; the bar
 Low. One product decision: the Viewer FAB disappears. If the user prefers to keep it, the fallback is to inset the status bar's trailing slot so the two cannot overlap, and the FAB stays.
 
 **Size:** small, 1-2 days, four commits (counter, bar, focus bridge + FCT, fit transform) so each is individually revertible.
+
+---
+
+## 7. Implementation record (2026-09-24, branch `arena/01a0d11c-papirus-office`)
+
+What landed, per scope item. Everything below is code that a CI run has to compile for the first time (`java`/`javac` are unavailable locally), so the local checks are grep, brace balance and reading; nothing here claims a green build.
+
+| Item | State | Notes |
+|---|---|---|
+| 1 counter | done | the card's bottom-centre marker is gone (`LayoutDrivenDocumentRenderer`); `Plan2ChromeTest.viewerPageStack_drawsNoPerPageCounter` asserts the `" / "` shape appears in no node |
+| 2 bar | done | 48 dp `Box` overlay, three slots; leading = page range (Go to Page), centre = words/chars `widthIn(max = 200.dp)`, trailing = zoom menu / Edit. The menu lists fixed steps (50/100/150/200/300) instead of the old ± buttons |
+| 3 FAB | done | deleted; the Viewer Edit action moved into the bar with the same `fab_open_edit_mode` tag and a real `contentDescription`. The `"Edit Mode Active"` toast went with it, since the mode switch is now visible in the bar itself |
+| 4 focus bridge | done | `RendererFocusBridge` (public, `requestFirstEditable()` / `requestElement()` returning `Boolean`), registered by the renderer through a `SideEffect` only while editable; the keyboard button and the sheet-close path call it before `keyboardController?.show()`. The bridge asks the elements in document order and reports `false` when nothing took focus, so the swallowed `catch (e: Exception) {}` is gone |
+| 5 Viewer FCT | done, **[needs run]** | `ParagraphSelectField` reports `boundsInWindow()` while it owns a non-collapsed selection and `null` otherwise. Only the selection owner drives the toolbar, so two fields cannot show and hide it in the same frame. Whether Compose's platform path also fires `showMenu` for a read-only field still needs a device log |
+| 6 fit-to-width | done, with one honest gap | one scale, `renderScale = (viewportWidthDp / 320) * zoomScale`, drives the card, the block spacing and the text; the card's padding now comes from `pageSpec` margins through `pageScale`, and the Viewer hit test divides by `pageScale`, so a tap maps back to the layout's own coordinates at any page size. **Gap:** the text still scales with `renderScale` while the paper maps with `pageScale` (the two differ by the legacy 320-dp card assumption), so the on-screen text column is not yet the print-faithful one. Unifying them needs real measurement and belongs to Plan 5, where the `2.5f` measuring hack dies |
+| 7 chrome / tokens | part done | card chrome is now named tokens (gap, stack padding, corner, elevation, border) and the empty state uses `inky_pages_empty` instead of a literal. The status bar and the page stack were swept for live touch targets; the remaining raw colours and literals live in the Cellina/Slidia/Pagella modules and stay in Plan 3 |
+
+**Shared geometry.** `PageStackMetrics` (`BASE_CARD_WIDTH_DP`, `FALLBACK_CARD_HEIGHT_DP`, `GUTTER_DP`) now lives in the renderer and is imported by the screen, so the viewport calculation and the "how much of a page is visible" range cannot drift from the page stack again.
+
+**Honest counters.** The Viewer range is no longer decided by a hardcoded 1056-dp page: it derives the drawn sheet height from the same fit scale the renderer uses, so "Page 6–7 of 88" describes what is on screen.
+
+**New tests:** `app/src/test/java/com/example/Plan2ChromeTest.kt` (4 cases: no per-card counter, bridge unavailable in Viewer, bridge focuses in Editor, no toolbar request without a selection). Robolectric + Compose; CI is their first run.
+
+**Also cleaned while the file was open:** the seven em dashes in `InkyModule.kt` comments are gone (R-02), and the Viewer page-stack file no longer contains a hardcoded user string (`[Image]`, `No pages to display`). The four *user-facing* em dashes of Plan 3 item 3.4 are untouched and still that item's job.
+
+**Still open after this plan:** the four audit-006 §5 questions (none of them block the code above), the `values-in` translations for the five new ids, and a device pass over the acceptance list in §5.
