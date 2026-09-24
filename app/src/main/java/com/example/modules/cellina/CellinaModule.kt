@@ -43,6 +43,13 @@ import com.example.ui.components.SavingProgressPopupDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// The sheet preview is a simulated spreadsheet on a pinned light board
+// (0xFFF1F5F9) with pinned white cells, so its grid fills and hairlines are
+// document colours, not chrome: they keep their Material-2014 values as
+// explicit ARGB and stay legible whatever the app theme does (plan-03 3.11).
+private val SheetGridFill = Color(0xFFCCCCCC)
+private val SheetGridLine = Color(0xFF888888)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CellinaModule(
@@ -645,8 +652,8 @@ fun CellinaModule(
                                 modifier = Modifier
                                     .width(40.dp)
                                     .height(28.dp)
-                                    .background(Color.LightGray.copy(alpha = 0.5f))
-                                    .border(0.5.dp, Color.Gray),
+                                    .background(SheetGridFill.copy(alpha = 0.5f))
+                                    .border(0.5.dp, SheetGridLine),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("#", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -656,8 +663,8 @@ fun CellinaModule(
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(28.dp)
-                                        .background(Color.LightGray.copy(alpha = 0.5f))
-                                        .border(0.5.dp, Color.Gray),
+                                        .background(SheetGridFill.copy(alpha = 0.5f))
+                                        .border(0.5.dp, SheetGridLine),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -672,8 +679,8 @@ fun CellinaModule(
                                     modifier = Modifier
                                         .width(40.dp)
                                         .height(40.dp)
-                                        .background(Color.LightGray.copy(alpha = 0.3f))
-                                        .border(0.5.dp, Color.Gray),
+                                        .background(SheetGridFill.copy(alpha = 0.3f))
+                                        .border(0.5.dp, SheetGridLine),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text("$rowIdx", fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -693,7 +700,7 @@ fun CellinaModule(
                                             .border(
                                                 border = BorderStroke(
                                                     width = if (isActive) 2.dp else 0.5.dp,
-                                                    color = if (isActive) moduleColor else Color.LightGray
+                                                    color = if (isActive) moduleColor else SheetGridLine
                                                 )
                                             )
                                             .clickable {
@@ -795,7 +802,7 @@ fun CellinaModule(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
                                 onClick = { if (zoomScale > 0.5f) zoomScale -= 0.1f },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(Icons.Default.Remove, contentDescription = stringResource(R.string.cd_zoom_out), modifier = Modifier.size(12.dp))
                             }
@@ -806,7 +813,7 @@ fun CellinaModule(
                             )
                             IconButton(
                                 onClick = { if (zoomScale < 2.0f) zoomScale += 0.1f },
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_zoom_in), modifier = Modifier.size(12.dp))
                             }

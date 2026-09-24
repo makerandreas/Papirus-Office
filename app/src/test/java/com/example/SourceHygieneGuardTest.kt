@@ -10,31 +10,23 @@ import kotlin.math.max
  * Plan 3A guard (plan-03 items 3.1-3.4, 3.8): the hygiene rules every later
  * PR must keep. Scans only the main source set, with comments masked out
  * first; test sources may quote literals freely. The grey-colour allowances
- * are recorded at guard birth (PR 12, 2026-09-24) per file; plan 3B owns
- * burning them down to zero.
+ * were recorded at guard birth (PR 12, 2026-09-24) per file; plan 3B burned
+ * them all down (PR 13), so the allowance map is empty by design.
  */
 class SourceHygieneGuardTest {
 
     // region configuration: the tolerated carve-outs, as data
 
-    /** path under the main java root -> maximum raw grey usages allowed today. */
-    private val greyAllowances: Map<String, Int> = mapOf(
-        "com/example/modules/slidia/SlidiaModule.kt" to 8,
-        "com/example/ui/components/SwTextFormattingInspectorDialog.kt" to 7,
-        "com/example/modules/cellina/CellinaModule.kt" to 7,
-        "com/example/modules/pagella/PagellaModule.kt" to 4,
-        // HomeSubpages: the colour-picker palette entries are document colours (plan-03 3.11)
-        "com/example/modules/inky/HomeSubpages.kt" to 4,
-        "com/example/ui/components/UniversalNavigatorSheet.kt" to 3,
-        "com/example/modules/inky/InkyModule.kt" to 3,
-        "com/example/ui/components/UniversalOdfSheet.kt" to 2,
-        "com/example/ui/components/UniversalEmailSheet.kt" to 2,
-        "com/example/ui/components/UniversalClipboardSheet.kt" to 2,
-        "com/example/ui/components/OfficeUiComponents.kt" to 2,
-        "com/example/ui/components/UniversalChartSheet.kt" to 1,
-        "com/example/ui/components/CloudSyncBar.kt" to 1,
-        "com/example/modules/inky/LayoutDrivenDocumentRenderer.kt" to 1
-    )
+    /**
+     * Path under the main java root -> maximum raw grey usages allowed today.
+     *
+     * Empty since plan 3B (PR 13): all 46 recorded occurrences moved to
+     * Material tokens, or to explicit ARGB document colours where the surface
+     * is a pinned document preview (plan-03 3.11). A new entry here is a
+     * deferral that has to be argued for, not a fix; the guard's own rule is
+     * that chrome follows the theme.
+     */
+    private val greyAllowances: Map<String, Int> = emptyMap()
 
     /** Literals that plan-03 item 3.3 replaced with resources; they must not come back. */
     private val bannedLiterals: List<String> = listOf(

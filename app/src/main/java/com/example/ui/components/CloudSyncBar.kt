@@ -67,7 +67,7 @@ fun CloudSyncBar(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(if (user != null) MaterialTheme.colorScheme.primary else Color.Gray),
+                        .background(if (user != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

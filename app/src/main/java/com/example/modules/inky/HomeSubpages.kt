@@ -454,7 +454,10 @@ fun HomeSubpage(
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
-                        .background(if (highlightColor == Color.Transparent) Color.LightGray else highlightColor)
+                        .background(
+                            if (highlightColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant
+                            else highlightColor
+                        )
                         .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                 )
             },
@@ -1392,12 +1395,17 @@ fun ColorPickerSubpage(
     ) {
         HomeSectionHeader("Color Presets ($title)")
 
+        // Document colours, not chrome (plan-03 3.11): these are values a user
+        // can write into the file, so they are spelled as literal ARGB rather
+        // than theme tokens, and they keep the exact Material-2014 hues the
+        // picker has always offered. The neutral row is the same grey ramp,
+        // written out: DarkGray 0xFF444444, Gray 0xFF888888, LightGray 0xFFD3D3D3.
         val presets = listOf(
             Color.Red, Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF673AB7),
             Color(0xFF3F51B5), Color(0xFF2196F3), Color(0xFF00BCD4), Color(0xFF009688),
             Color(0xFF4CAF50), Color(0xFF8BC34A), Color(0xFFCDDC39), Color(0xFFFFEB3B),
             Color(0xFFFFC107), Color(0xFFFF9800), Color(0xFFFF5722), Color(0xFF795548),
-            Color.Black, Color.DarkGray, Color.Gray, Color.LightGray, Color.White
+            Color.Black, Color(0xFF444444), Color(0xFF888888), Color(0xFFD3D3D3), Color.White
         )
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),

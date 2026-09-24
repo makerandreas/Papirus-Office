@@ -32,6 +32,7 @@ import com.makerandreas.papirusoffice.data.framework.PapirusEmailEngine
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.ui.theme.TerminalPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -596,7 +597,7 @@ private fun EmailAndShareTab(
                                 text = "No execution records found.",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
-                                color = Color.LightGray
+                                color = TerminalPalette.LINE
                             )
                         } else {
                             liveLogs.forEach { log ->
@@ -604,7 +605,7 @@ private fun EmailAndShareTab(
                                     text = log,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontFamily = FontFamily.Monospace,
-                                    color = Color.LightGray
+                                    color = TerminalPalette.LINE
                                 )
                             }
                         }

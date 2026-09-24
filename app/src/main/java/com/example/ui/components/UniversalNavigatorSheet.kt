@@ -219,7 +219,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["headings"] == true) {
                     if (index.headings.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NavigatorEmptyRow("headings", R.string.navigate_by_headings) }
                     } else {
                         items(index.headings) { heading ->
                             HeadingTreeItem(
@@ -246,7 +246,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["tables"] == true) {
                     if (index.tables.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NavigatorEmptyRow("tables", R.string.navigate_by_tables) }
                     } else {
                         items(index.tables) { table ->
                             LeafItemRow(
@@ -270,7 +270,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_frames),
                         icon = Icons.Rounded.CropFree,
-                        count = index.frames.size,
+                        count = null,
                         isExpanded = expandedCategories["frames"] == true,
                         onToggleExpand = {
                             expandedCategories["frames"] = !(expandedCategories["frames"] ?: false)
@@ -279,7 +279,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["frames"] == true) {
                     if (index.frames.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(unassigned): ODT frames reach the model as OfficeImage, so there is no frame identity to list yet.
+                        item { NavigatorEmptyRow("frames", R.string.navigate_by_frames) }
                     } else {
                         items(index.frames) { frame ->
                             LeafItemRow(
@@ -312,7 +313,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["images"] == true) {
                     if (index.images.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        item { NavigatorEmptyRow("images", R.string.navigate_by_images) }
                     } else {
                         items(index.images) { img ->
                             LeafItemRow(
@@ -336,7 +337,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_ole),
                         icon = Icons.Rounded.Extension,
-                        count = index.oleObjects.size,
+                        count = null,
                         isExpanded = expandedCategories["ole"] == true,
                         onToggleExpand = {
                             expandedCategories["ole"] = !(expandedCategories["ole"] ?: false)
@@ -345,7 +346,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["ole"] == true) {
                     if (index.oleObjects.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(unassigned): OLE rows come from OfficeResources.objects, which no parser fills.
+                        item { NavigatorEmptyRow("ole", R.string.navigate_by_ole) }
                     } else {
                         items(index.oleObjects) { ole ->
                             LeafItemRow(
@@ -369,7 +371,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_bookmarks),
                         icon = Icons.Rounded.Bookmark,
-                        count = index.bookmarks.size,
+                        count = null,
                         isExpanded = expandedCategories["bookmarks"] == true,
                         onToggleExpand = {
                             expandedCategories["bookmarks"] = !(expandedCategories["bookmarks"] ?: false)
@@ -378,7 +380,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["bookmarks"] == true) {
                     if (index.bookmarks.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(plan-18/20): bookmark parsing makes this readable.
+                        item { NavigatorEmptyRow("bookmarks", R.string.navigate_by_bookmarks) }
                     } else {
                         items(index.bookmarks) { bm ->
                             LeafItemRow(
@@ -396,7 +399,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_comments),
                         icon = Icons.AutoMirrored.Rounded.Comment,
-                        count = index.comments.size,
+                        count = null,
                         isExpanded = expandedCategories["comments"] == true,
                         onToggleExpand = {
                             expandedCategories["comments"] = !(expandedCategories["comments"] ?: false)
@@ -405,7 +408,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["comments"] == true) {
                     if (index.comments.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(unassigned): no comment model exists yet.
+                        item { NavigatorEmptyRow("comments", R.string.navigate_by_comments) }
                     } else {
                         items(index.comments) { c ->
                             LeafItemRow(
@@ -423,7 +427,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_sections),
                         icon = Icons.Rounded.ViewAgenda,
-                        count = index.sections.size,
+                        count = null,
                         isExpanded = expandedCategories["sections"] == true,
                         onToggleExpand = {
                             expandedCategories["sections"] = !(expandedCategories["sections"] ?: false)
@@ -432,7 +436,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["sections"] == true) {
                     if (index.sections.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(plan-19/21): section identity makes this readable.
+                        item { NavigatorEmptyRow("sections", R.string.navigate_by_sections) }
                     } else {
                         items(index.sections) { sec ->
                             LeafItemRow(
@@ -451,12 +456,34 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 9. Fields
+                // 9. Hyperlinks
+                //
+                // The category AGENTS.md's Navigator Deck list calls for and this
+                // strip never had. No parser constructs OfficeHyperlink yet, so it
+                // opens in the not-yet-readable shape; the jump arrives with the
+                // parser (plan 18/20).
+                // TODO(plan-18/20): hyperlink parsing and its jump make this readable.
+                item {
+                    CategoryHeaderRow(
+                        title = stringResource(R.string.navigate_by_hyperlinks),
+                        icon = Icons.Rounded.Link,
+                        count = null,
+                        isExpanded = expandedCategories["hyperlinks"] == true,
+                        onToggleExpand = {
+                            expandedCategories["hyperlinks"] = !(expandedCategories["hyperlinks"] ?: false)
+                        }
+                    )
+                }
+                if (expandedCategories["hyperlinks"] == true) {
+                    item { NavigatorEmptyRow("hyperlinks", R.string.navigate_by_hyperlinks) }
+                }
+
+                // 10. Fields
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_fields),
                         icon = Icons.Rounded.TextFields,
-                        count = index.fields.size,
+                        count = null,
                         isExpanded = expandedCategories["fields"] == true,
                         onToggleExpand = {
                             expandedCategories["fields"] = !(expandedCategories["fields"] ?: false)
@@ -465,7 +492,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["fields"] == true) {
                     if (index.fields.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(plan-21): the field model makes this readable.
+                        item { NavigatorEmptyRow("fields", R.string.navigate_by_fields) }
                     } else {
                         items(index.fields) { f ->
                             LeafItemRow(
@@ -478,12 +506,12 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 10. Footnotes
+                // 11. Footnotes
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_footnotes),
                         icon = Icons.AutoMirrored.Rounded.Notes,
-                        count = index.footnotes.size,
+                        count = null,
                         isExpanded = expandedCategories["footnotes"] == true,
                         onToggleExpand = {
                             expandedCategories["footnotes"] = !(expandedCategories["footnotes"] ?: false)
@@ -492,7 +520,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["footnotes"] == true) {
                     if (index.footnotes.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(unassigned): no footnote model exists yet.
+                        item { NavigatorEmptyRow("footnotes", R.string.navigate_by_footnotes) }
                     } else {
                         items(index.footnotes) { fn ->
                             LeafItemRow(
@@ -505,12 +534,12 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 11. Shapes / Drawing Objects
+                // 12. Shapes / Drawing Objects
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_drawing),
                         icon = Icons.Rounded.Category,
-                        count = index.shapes.size,
+                        count = null,
                         isExpanded = expandedCategories["shapes"] == true,
                         onToggleExpand = {
                             expandedCategories["shapes"] = !(expandedCategories["shapes"] ?: false)
@@ -519,7 +548,8 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["shapes"] == true) {
                     if (index.shapes.isEmpty()) {
-                        item { EmptyCategoryRow() }
+                        // TODO(unassigned): no shape model exists yet.
+                        item { NavigatorEmptyRow("shapes", R.string.navigate_by_drawing) }
                     } else {
                         items(index.shapes) { sh ->
                             LeafItemRow(
@@ -538,7 +568,7 @@ fun NavigatorSheetContent(
                     }
                 }
 
-                // 12. Pages
+                // 13. Pages
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_page),
@@ -552,7 +582,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["pages"] == true) {
                     if (navState.totalPages <= 0) {
-                        item { EmptyCategoryRow() }
+                        item { NavigatorEmptyRow("pages", R.string.navigate_by_page) }
                     } else {
                         items((1..navState.totalPages).toList()) { p ->
                             LeafItemRow(
@@ -569,7 +599,7 @@ fun NavigatorSheetContent(
                 when (navState.navigateBy) {
                     NavigateBy.HEADING -> {
                         if (index.headings.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("headings", R.string.navigate_by_headings) }
                         } else {
                             items(index.headings) { heading ->
                                 HeadingTreeItem(
@@ -583,7 +613,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.TABLE -> {
                         if (index.tables.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("tables", R.string.navigate_by_tables) }
                         } else {
                             items(index.tables) { table ->
                                 LeafItemRow(
@@ -604,7 +634,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.FRAME -> {
                         if (index.frames.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("frames", R.string.navigate_by_frames) }
                         } else {
                             items(index.frames) { frame ->
                                 LeafItemRow(
@@ -625,7 +655,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.IMAGE -> {
                         if (index.images.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("images", R.string.navigate_by_images) }
                         } else {
                             items(index.images) { img ->
                                 LeafItemRow(
@@ -646,7 +676,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.OLE -> {
                         if (index.oleObjects.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("ole", R.string.navigate_by_ole) }
                         } else {
                             items(index.oleObjects) { ole ->
                                 LeafItemRow(
@@ -667,7 +697,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.BOOKMARK -> {
                         if (index.bookmarks.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("bookmarks", R.string.navigate_by_bookmarks) }
                         } else {
                             items(index.bookmarks) { bm ->
                                 LeafItemRow(
@@ -682,7 +712,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.COMMENT -> {
                         if (index.comments.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("comments", R.string.navigate_by_comments) }
                         } else {
                             items(index.comments) { c ->
                                 LeafItemRow(
@@ -697,7 +727,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.SECTION -> {
                         if (index.sections.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("sections", R.string.navigate_by_sections) }
                         } else {
                             items(index.sections) { sec ->
                                 LeafItemRow(
@@ -718,7 +748,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.FIELD -> {
                         if (index.fields.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("fields", R.string.navigate_by_fields) }
                         } else {
                             items(index.fields) { f ->
                                 LeafItemRow(
@@ -733,7 +763,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.FOOTNOTE -> {
                         if (index.footnotes.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("footnotes", R.string.navigate_by_footnotes) }
                         } else {
                             items(index.footnotes) { fn ->
                                 LeafItemRow(
@@ -748,7 +778,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.DRAWING, NavigateBy.SHAPE -> {
                         if (index.shapes.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("shapes", R.string.navigate_by_drawing) }
                         } else {
                             items(index.shapes) { sh ->
                                 LeafItemRow(
@@ -769,7 +799,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.PAGE -> {
                         if (navState.totalPages <= 0) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("pages", R.string.navigate_by_page) }
                         } else {
                             items((1..navState.totalPages).toList()) { p ->
                                 LeafItemRow(
@@ -784,7 +814,7 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.REMINDER -> {
                         if (index.reminders.isEmpty()) {
-                            item { EmptyCategoryRow() }
+                            item { NavigatorEmptyRow("reminders", R.string.navigate_by_reminder) }
                         } else {
                             items(index.reminders) { rem ->
                                 LeafItemRow(
@@ -796,6 +826,10 @@ fun NavigatorSheetContent(
                                 )
                             }
                         }
+                    }
+                    // TODO(plan-19/21): the TOC/index snapshot makes this readable.
+                    NavigateBy.INDEX -> {
+                        item { NavigatorEmptyRow("indexes", R.string.navigate_by_indexes) }
                     }
                     else -> {
                         item { EmptyCategoryRow() }
@@ -964,10 +998,13 @@ fun NavigateBySheetContent(
 private fun CategoryHeaderRow(
     title: String,
     icon: ImageVector,
-    count: Int,
+    count: Int?,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
+    val toggleDescription = stringResource(
+        if (isExpanded) R.string.cd_collapse else R.string.cd_expand
+    )
     Surface(
         onClick = onToggleExpand,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -982,7 +1019,7 @@ private fun CategoryHeaderRow(
         ) {
             Icon(
                 imageVector = if (isExpanded) Icons.Rounded.Remove else Icons.Rounded.Add,
-                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                contentDescription = toggleDescription,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)
             )
@@ -995,7 +1032,7 @@ private fun CategoryHeaderRow(
             )
 
             Text(
-                text = "$title ($count)",
+                text = if (count == null) title else "$title ($count)",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -1024,6 +1061,9 @@ private fun HeadingTreeItem(
     indentDepth: Int = 0
 ) {
     val isSelected = node.id == activeId
+    val foldDescription = stringResource(
+        if (node.collapsed) R.string.cd_expand else R.string.cd_collapse
+    )
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Surface(
@@ -1050,7 +1090,7 @@ private fun HeadingTreeItem(
                     ) {
                         Icon(
                             imageVector = if (node.collapsed) Icons.Rounded.Add else Icons.Rounded.Remove,
-                            contentDescription = if (node.collapsed) "Expand" else "Collapse",
+                            contentDescription = foldDescription,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
@@ -1094,6 +1134,32 @@ private fun HeadingTreeItem(
 
 @Composable
 private fun EmptyCategoryRow() {
+    CategoryEmptyRow(stringResource(R.string.no_objects_to_navigate))
+}
+
+/**
+ * The honest empty state for one Navigator category.
+ *
+ * The caller only reaches this row when the category's list is empty. What may
+ * be said about that emptiness depends on whether a parser can see the class at
+ * all: "No images in this document" is a fact, "No bookmarks in this document"
+ * would be a guess, because no parser builds OfficeBookmark yet (plan-03 3.32).
+ * [NavigatorCategories] is the single source for that split, and
+ * [NavigatorCategoryHonestyTest] keeps the split in step with the source tree.
+ */
+@Composable
+private fun NavigatorEmptyRow(key: String, labelRes: Int) {
+    val category = NavigatorCategories.of(key)
+    val text = if (category.availability == NavigatorCategoryAvailability.NOT_READABLE_YET) {
+        stringResource(R.string.navigator_not_yet_available)
+    } else {
+        stringResource(R.string.navigator_none_in_document, stringResource(labelRes))
+    }
+    CategoryEmptyRow(text)
+}
+
+@Composable
+private fun CategoryEmptyRow(text: String) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1101,7 +1167,7 @@ private fun EmptyCategoryRow() {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = stringResource(R.string.no_objects_to_navigate),
+            text = text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
@@ -1133,7 +1199,7 @@ private fun LeafItemRow(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isHidden) Color.Gray else MaterialTheme.colorScheme.primary,
+                tint = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(18.dp)
             )
 
@@ -1141,7 +1207,7 @@ private fun LeafItemRow(
                 text = name,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isHidden) Color.Gray else MaterialTheme.colorScheme.onSurface,
+                color = if (isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -1149,9 +1215,9 @@ private fun LeafItemRow(
 
             if (isHidden) {
                 Text(
-                    text = "Hidden",
+                    text = stringResource(R.string.navigator_hidden_label),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Light
                 )
             }

@@ -133,7 +133,7 @@ fun SwTextFormattingInspectorDialog(
                                             if (isUnderline) "Underline" else null
                                         ).joinToString(", ").ifEmpty { "Normal" },
                                         fontSize = 11.sp,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -148,7 +148,7 @@ fun SwTextFormattingInspectorDialog(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
                                 ) {
                                     Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("Line Layout", fontSize = 10.sp, color = Color.Gray)
+                                        Text("Line Layout", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text("${summary.lines.size} Lines", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text("${summary.lineSpacingTwips} twips (${"%.2f".format(summary.lineSpacingFactor)}x)", fontSize = 11.sp)
                                     }
@@ -159,7 +159,7 @@ fun SwTextFormattingInspectorDialog(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
                                 ) {
                                     Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("Text Portions", fontSize = 10.sp, color = Color.Gray)
+                                        Text("Text Portions", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Text("${summary.totalPortions} Portions", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Text("${summary.totalLength} Chars", fontSize = 11.sp)
                                     }
@@ -226,7 +226,7 @@ fun SwTextFormattingInspectorDialog(
                             Text(
                                 text = "LibreOffice Writer partitions text portions based on Unicode script ranges for font fallback & kerning.",
                                 fontSize = 11.sp,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
                             val script = summary.scriptAnalysis
@@ -268,7 +268,7 @@ fun SwTextFormattingInspectorDialog(
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text("Line #${line.lineNumber}", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                            Text("${line.heightTwips} twips (Ascent: ${line.ascentTwips}, Descent: ${line.descentTwips})", fontSize = 10.sp, color = Color.Gray)
+                                            Text("${line.heightTwips} twips (Ascent: ${line.ascentTwips}, Descent: ${line.descentTwips})", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         Text(
                                             text = if (line.textSnippet.isBlank()) "[Blank Line]" else "\"${line.textSnippet}\"",
@@ -370,7 +370,7 @@ private fun ScriptProgressRow(label: String, count: Int, percent: Float, barColo
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text("$count chars (${"%.1f".format(percent)}%)", fontSize = 11.sp, color = Color.Gray)
+            Text("$count chars (${"%.1f".format(percent)}%)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         LinearProgressIndicator(
             progress = { (percent / 100f).coerceIn(0f, 1f) },
@@ -379,7 +379,7 @@ private fun ScriptProgressRow(label: String, count: Int, percent: Float, barColo
                 .height(6.dp)
                 .clip(RoundedCornerShape(3.dp)),
             color = barColor,
-            trackColor = Color.LightGray.copy(alpha = 0.3f)
+            trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )
     }
 }

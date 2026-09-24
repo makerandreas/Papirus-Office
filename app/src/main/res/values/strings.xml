@@ -161,6 +161,10 @@
     <string name="viewer_status_page_single">Page %1$d of %2$d</string>
     <string name="viewer_status_page_range">Page %1$d–%2$d of %3$d</string>
     <string name="viewer_status_words_chars">%1$d words, %2$d chars</string>
+    <!-- WG Ch.1 Table 1 "section or object information": only facts the model proves today -->
+    <string name="statusbar_object_heading">Heading %1$d: %2$s</string>
+    <string name="statusbar_object_table">Table</string>
+    <string name="statusbar_object_list_item">List item</string>
     <!-- Status bar controls (Plan 2) -->
     <string name="inky_image_placeholder">[Image]</string>
     <string name="inky_pages_empty">No pages to display</string>
@@ -232,6 +236,9 @@
     <string name="navigate_by_title">Navigate by...</string>
     <string name="navigate_by_all">All</string>
     <string name="no_objects_to_navigate">There are no objects to navigate</string>
+    <!-- Navigator empty states: a fact about the document vs a gap in the reader (plan-03 3.32) -->
+    <string name="navigator_none_in_document">No %1$s in this document.</string>
+    <string name="navigator_not_yet_available">Not yet available in this build.</string>
     <string name="navigate_by_headings">Headings</string>
     <string name="navigate_by_tables">Tables</string>
     <string name="navigate_by_images">Images</string>
@@ -243,8 +250,9 @@
     <string name="navigate_by_footnotes">Footnotes</string>
     <string name="navigate_by_ole">OLE objects</string>
     <string name="navigate_by_drawing">Drawing objects</string>
-    <string name="navigate_by_page">Page</string>
-    <string name="navigate_by_reminder">Reminder</string>
+    <string name="navigate_by_hyperlinks">Hyperlinks</string>
+    <string name="navigate_by_page">Pages</string>
+    <string name="navigate_by_reminder">Reminders</string>
     <string name="navigate_by_indexes">Indexes</string>
     <string name="navigate_by_selection">Selection</string>
     <string name="navigate_by_recency">Recency</string>
@@ -361,6 +369,9 @@
     <string name="cd_drop_cap_options">Drop Cap Options</string>
     <string name="cd_open_inspector">Open Inspector</string>
     <string name="cd_open_paragraph_styles">Open Paragraph Styles</string>
+    <string name="cd_collapse">Collapse</string>
+    <string name="cd_expand">Expand</string>
+    <string name="cd_ribbon_tab_unavailable">%1$s is not available in this build</string>
     <string name="cd_active">Active</string>
     <string name="cd_color">Color</string>
     <string name="cd_options_for_stylename">Options for %1$s</string>
@@ -431,10 +442,10 @@
     <string name="cd_numbered_list">Numbered List</string>
     <string name="cd_increase_indent">Increase Indent</string>
     <string name="cd_decrease_indent">Decrease Indent</string>
-    <string name="cd_add_image">Add Image</string>
-    <string name="cd_add_table">Add Table</string>
-    <string name="cd_add_link">Add Link</string>
-    <string name="cd_add_comment">Add Comment</string>
+    <string name="cd_add_image">Add Image, not available in this build</string>
+    <string name="cd_add_table">Add Table, not available in this build</string>
+    <string name="cd_add_link">Add Link, not available in this build</string>
+    <string name="cd_add_comment">Add Comment, not available in this build</string>
     <string name="cd_insert_tab">Insert Tab</string>
     <string name="cd_open_bottom_sheet">Open Bottom Sheet</string>
     <string name="cd_back">Back</string>
@@ -463,10 +474,11 @@
     <string name="toast_error_sharing_pdf_e_message">Error sharing PDF: %1$s</string>
     <string name="toast_reading_document_aloud">Reading document aloud...</string>
     <string name="toast_cannot_decrease_indent_further">Cannot decrease indent further</string>
-    <string name="toast_add_image_selected">Add image selected</string>
-    <string name="toast_add_table_selected">Add table selected</string>
-    <string name="toast_add_link_selected">Add link selected</string>
-    <string name="toast_add_comment_selected">Add comment selected</string>
+    <string name="toast_add_image_unavailable">Adding images is not available in this build</string>
+    <string name="toast_add_table_unavailable">Adding tables is not available in this build</string>
+    <string name="toast_add_link_unavailable">Adding links is not available in this build</string>
+    <string name="toast_add_comment_unavailable">Adding comments is not available in this build</string>
+    <string name="toast_ribbon_tab_unavailable">%1$s is not available in this build</string>
     <string name="toast_more_options_will_be_developed_soon">More Options will be developed soon</string>
     <string name="toast_document_properties_room_db_n_file_meta_filename">Document Properties (Room DB):\n\" +
                                                                  \"File: %1$s (%2$s)\n\" +

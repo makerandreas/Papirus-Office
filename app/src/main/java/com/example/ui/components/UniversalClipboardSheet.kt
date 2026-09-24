@@ -37,6 +37,7 @@ import com.makerandreas.papirusoffice.data.framework.PapirusClipboardEngine
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import com.example.ui.theme.TerminalPalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1181,7 +1182,7 @@ private fun TerminalLogs(
                             text = "No diagnostic events registered.",
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.LightGray
+                            color = TerminalPalette.LINE
                         )
                     } else {
                         liveLogs.forEach { log ->
@@ -1189,7 +1190,7 @@ private fun TerminalLogs(
                                 text = log,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontFamily = FontFamily.Monospace,
-                                color = Color.LightGray
+                                color = TerminalPalette.LINE
                             )
                         }
                     }

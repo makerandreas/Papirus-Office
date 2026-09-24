@@ -61,7 +61,7 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
 The central launchpad of the application (equivalent to LibreOffice *Start Center*):
 - **Recents Tab**: Chronological list of recently accessed documents with file thumbnails, timestamps, file sizes, pinned/starred status, and module color badges.
 - **Files Tab (`FilesSubPage`)**: Device file system browser with folder traversal, sorting, search, and Android Storage Access Framework (SAF) system picker integration.
-- **Google Drive Tab**: Cloud storage synchronization, Google Drive file listing, and download/cache mechanisms.
+- **Google Drive Tab (placeholder, not yet implemented)**: An honest placeholder screen. No OAuth, Drive file listing, upload or download exists yet; the connect button raises a "this is a placeholder" notice instead of pretending to sign in.
 - **Top Bar & Module Filter Chips**: Filter view by All, Inky (Writer), Cellina (Calc), Slidia (Impress), or Pagella (PDF).
 - **Search Bar**: Real-time filtering by document title, author, and content snippets.
 
