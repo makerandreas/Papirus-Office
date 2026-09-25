@@ -1,8 +1,8 @@
 # Plan 3 — Compliance Sweep
 
-**Date:** 2026-09-24
-**Status:** ready to start, parallel with Plan 2. No dependency on the fidelity plans; two items are gated by them and are marked.
-**Evidence:** `anti-slop/audit-006-2026-09-24.md` §2 (project documents) and §3 (format specifications). Counts quoted there are reproducible greps.
+**Date:** 2026-09-24; documentation scope updated 2026-09-25
+**Status:** 3A and 3B complete (3B per its implementation record and user confirmation). 3C is the current documentation alignment, expanded in `anti-slop/plan-11-hybrid-experience-design.md`; this branch records the docs update, not a claim that a separate PR has merged.
+**Evidence:** `anti-slop/audit-006-2026-09-24.md` §2 (project documents) and §3 (format specifications). Counts quoted there are reproducible greps. Design-source decisions from 2026-09-25 are recorded in Plan 11.
 **Rule of the plan:** fix against the documents, not against taste. Each item cites the clause it violates and is done when the cited grep count reaches zero or the cited spec behaviour is demonstrated by a test.
 
 ## 0. Decisions taken by the user (2026-09-24)
@@ -135,3 +135,16 @@ What landed for items 3.5, 3.6, 3.7, 3.9, 3.10, 3.11, 3.28 and the two ⚑ items
 **CI evidence:** run `36016012598` on `4c91322` — both jobs green (Build Debug APK + Unit Tests, so the guard and the two new tests compile and pass, and `assembleDebug` succeeds). The two earlier runs on this branch failed at `compileDebugKotlin`; their failure lines were read through a temporary diagnostics step that re-emits gradle errors as check annotations (this sandbox cannot download action logs). The step is removed again and `.github/workflows/build.yml` is byte-identical to `55a9a97`.
 
 **Method note:** the sweep was done in place plus scripted passes; no local toolchain exists, so CI (`./gradlew testDebugUnitTest`) remains the only compile evidence.
+
+## 10. Working-tree record (Plan 3C / design alignment; 2026-09-25)
+
+This records the documentation edits in the current working tree; it does not claim a separate PR has merged.
+
+| Item | State | Notes |
+|---|---|---|
+| 3.12 Design-language review | updated in docs | `DESIGN.md` now defines the hybrid source map, palette modes, UI typography fallback, icon direction and Material 3 decisions for the status/bottom bar, FAB role, adaptive sheet and editor dialogs. Known screenshot deltas remain explicitly assigned to implementation work. |
+| 3.29 Equation pipeline accuracy | updated in docs | `CONCEPT.md`, `AGENTS.md` and `PROJECT_CONTEXT.md` state that conversion exists but writer embedding/round-trip is incomplete. |
+| 3.30 About/engine claim | updated in docs | `PROJECT_CONTEXT.md` requires runtime native/simulated status and avoids implying full ODF/OOXML conformance. About's paged-section direction is recorded as a design target. |
+| 3.31 Nightly notes | updated | `.github/workflows/build.yml` now labels the static bullets as a standing Feature Summary, not Recent Changes, and does not imply ABI variants have active native LOKit rendering. |
+| Hybrid design plan | added | `anti-slop/plan-11-hybrid-experience-design.md` links the six matched ODT/DOCX fixture inventory and Writer Guide Chapter 1 comparison to staged implementation packages. |
+| Build/device verification | not run | This change updates Markdown and release-note template text; no app runtime code changed. Verify the workflow YAML/rendered nightly body in CI and run UI implementation gates on devices when those PRs occur. |

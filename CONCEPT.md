@@ -1,12 +1,12 @@
 # Papirus Office
 
 ## 📘 Application Name
-**Papirus Office** – A modular, open-source office suite for Android, based from the LibreOffice, the most powerful open-source office suite, designed to deliver a **PC-level editing experience** on mobile devices while remaining legally compliant, scalable, and community-driven.
+**Papirus Office** – An Android-first, modular, open-source office suite built around LibreOffice technologies and APIs where available, with ODF as a first-class format and practical OOXML compatibility as a goal. Its design adapts capable office workflows to phones, foldables and tablets.
 
 ---
 
 ## 📝 Short Description
-Papirus Office is a mobile-first port of LibreOffice, architected with a modular design and powered by Material 3 Expressive UI. It aims to bring the **full power of desktop-class office editing** to smartphones and tablets, with a focus on **legal compliance, performance optimization, and user empowerment**.  
+Papirus Office is an Android-first, modular office suite built around LibreOffice technologies and APIs where available, with Material 3 Expressive as its UI foundation. It aims to make capable document editing practical on phones, foldables and tablets. ODF is a first-class format and OOXML compatibility is a goal; actual coverage is feature- and test-dependent. This is not a claim of complete LibreOffice API integration or full format parity.
 
 ---
 
@@ -20,6 +20,33 @@ Papirus Office is a mobile-first port of LibreOffice, architected with a modular
 - **Phase 7**: Adding PC-level features gradually – *planned*
 
 This readme file will be used for development purpose.
+
+---
+
+## 🎨 Hybrid Experience Design (binding direction)
+
+`DESIGN.md` is the authoritative design specification. The reference map below is scoped by surface and must be adapted to Material 3 Expressive, Papirus branding, Android accessibility and responsive layouts; it is not a pixel-copy instruction.
+
+| Product surface | Reference pattern |
+|---|---|
+| Start Screen, all tabs | Google Workspace apps |
+| Editor dialogs across Inky, Cellina, Slidia and Pagella | Google Workspace apps |
+| Welcome Screen and Create New Documents | WPS Office |
+| Options, Crash Logs and About | Android system settings; About sections use accessible vertical page navigation/transition |
+| Editor screens | M365 Copilot mobile office |
+| Standard Bottom Sheet command deck | Microsoft Office 365 for Inky/Cellina/Slidia; SoftMaker FlexiPDF for Pagella |
+| General office layout and document concepts | LibreOffice, adapted to Android touch and adaptive screen sizes |
+
+The app uses Material Symbols Rounded by default. The repository's `app/src/main/share/config/images_colibre.zip` is a candidate optional Colibre set pending provenance and license review. Google Sans is the intended UI family; Roboto/system sans-serif remains the reliability fallback until device rendering is validated. App UI fonts must never replace a document's font/style identity.
+
+### Palette behavior
+
+- Android 12+ defaults to Android's system dynamic color scheme (which may be derived from wallpaper colors by the OS).
+- Android 11 and below use Papirus static light/dark schemes and the established suite/module accents.
+- User-selected custom colors and a Papirus palette derived from system wallpaper colors are separate options. Read wallpaper color input independently (for example, `WallpaperManager.getWallpaperColors` where available) and generate Papirus's own scheme; do not merely re-use the Android 12+ Material system color scheme. If unavailable, offer a user-selected image through SAF or a static fallback.
+- The adaptive bottom sheet may begin near 40% height on a phone, but must expand/scroll as needed; 40% is not a universal fixed limit.
+
+Implementation and PR sequencing are in `anti-slop/plan-11-hybrid-experience-design.md`.
 
 ---
 
@@ -58,8 +85,7 @@ This readme file will be used for development purpose.
 
 ## 🧮 Modular Equation Parser Flow
 
-Papirus Office uses a modular equation handling system to ensure compatibility across platforms and formats.  
-The core input method is **LaTeX-style syntax**, rendered via **KaTeX/MathJax**, and converted to appropriate markup formats for document storage.
+`EquationParser` implements selected conversions from LaTeX-style input to MathML and OMML. In-app KaTeX/MathJax preview and writer-side package embedding/extraction are not yet complete; conversion functions alone do not make equations editable or persistent in ODT/DOCX. The pipeline below distinguishes current conversion code from target behavior.
 
 ---
 
@@ -67,7 +93,7 @@ The core input method is **LaTeX-style syntax**, rendered via **KaTeX/MathJax**,
 - **Input format**: LaTeX-style syntax  
   Example: `\frac{a}{b} + \sqrt{x}`  
 - **Editor modules**: Writer, Calc, Impress  
-- **Rendering engine**: KaTeX or MathJax (lightweight, fast, mobile-friendly)
+- **Preview target**: KaTeX or MathJax (planned; not yet a claim of a working document equation editor)
 
 ### 2. Internal Conversion Pipeline
 - From User Input → Rendered Equation
@@ -75,39 +101,32 @@ The core input method is **LaTeX-style syntax**, rendered via **KaTeX/MathJax**,
 - From Rendered Equation → Document Format
   Depending on the target format:
   - ODF (OpenDocument Format)
-    LaTeX-style input → Convert to MathML → Embed in ODF (.odt, .ods, .odp)
+    LaTeX-style input → MathML conversion exists; ODF package embedding is not yet wired or verified.
   - OOXML (Microsoft Office Format)
-    LaTeX-style input → Convert to OMML → Embed in DOCX, XLSX, PPTX
+    LaTeX-style input → OMML conversion exists; OOXML package embedding is not yet wired or verified.
 
-### 3. Equation Extraction (Opening Existing Documents)
-- ODF
-  Extract MathML → Convert to LaTeX-style → Display in Equation Editor
-- OOXML
-  Extract OMML → Convert to LaTeX-style → Display in Equation Editor
+### 3. Equation Extraction (target behavior, not yet verified)
+- ODF: MathML extraction, conversion to editable input and reinsertion are not yet established as an end-to-end path.
+- OOXML: OMML extraction, conversion to editable input and reinsertion are not yet established as an end-to-end path.
 
-### 4. Equation Saving (Exporting Documents)
-- **ODF**: Save equations as MathML blocks  
-- **OOXML**: Save equations as OMML blocks  
-- **Other formats** (optional):  
-  - Markdown → `$...$` or `$$...$$`  
-  - HTML → `<math>` (MathML)  
-  - Image → SVG/PNG (rendered snapshot)
+### 4. Equation Saving (target behavior, not yet implemented end to end)
+- ODF packages should store equations using appropriate MathML structures after model/writer integration and round-trip tests.
+- OOXML packages should store equations using appropriate OMML structures after model/writer integration and round-trip tests.
+- Markdown, HTML and image export are optional future paths, not current guarantees.
 
 ### 5. Notes & Recommendations
-- **KaTeX/MathJax** are used only for rendering; not stored in final document.  
-- **MathML** is the preferred format for ODF compatibility.  
-- **OMML** is required for full Microsoft Office compatibility.  
-- **LaTeX-style input** ensures user familiarity and cross-platform flexibility.  
-- Conversion modules should be **modular and toggleable** via build flags:
-  - `ENABLE_MATHML_SUPPORT`
-  - `ENABLE_OMML_SUPPORT`
+- A KaTeX/MathJax preview is a target; do not claim it is wired into the editor until verified.
+- MathML/OMML are format representations to validate against ODF 1.4 and ECMA-376, not by themselves a promise of full compatibility.
+- Treat conversion, model integration, rendering, serialization and extraction as separate capabilities with separate tests.
+- Build flags such as `ENABLE_MATHML_SUPPORT` or `ENABLE_OMML_SUPPORT` are proposals only unless present in the actual build.
 
-### 6. Summary Table
-| Scenario                         | Recommended Markup Format  | Notes                                |
-|----------------------------------|----------------------------|--------------------------------------|
-| ODF (open/save)                  | **MathML**                 | LibreOffice native format            |
-| In-app editing (Papirus)      | **LaTeX-style input**      | User-friendly, KaTeX-compatible      |
-| OOXML (open/save)                | **OMML**                   | Required for MS Office compatibility |
+### 6. Status summary
+| Capability | Status |
+|---|---|
+| Selected LaTeX-to-MathML conversion | Implemented in parser code; format conformance is not implied. |
+| Selected LaTeX-to-OMML conversion | Implemented in parser code; format conformance is not implied. |
+| Visual equation editor/preview | Planned; verify before describing as shipped. |
+| ODF/OOXML save and reopen | Not yet established; requires package round-trip tests. |
 
 ---
 ## 🧮 Modular Equation Parser Flow (Mermaid Diagram)
@@ -115,99 +134,66 @@ The core input method is **LaTeX-style syntax**, rendered via **KaTeX/MathJax**,
 ```mermaid
 flowchart TD
 
-    A[User Input: LaTeX-style syntax] --> B[Rendering Engine: KaTeX/MathJax]
-    B --> C[Visual Preview in Editor]
+    A[User Input: LaTeX-style syntax] -. planned preview .-> B[Rendering Engine: KaTeX/MathJax]
+    B -. planned preview .-> C[Visual Preview in Editor]
 
-    %% Conversion to ODF
-    C --> D1[MathML Conversion]
-    D1 --> E1["Embed in ODF (.odt/.ods/.odp)"]
+    %% Selected parser conversions exist; document persistence is future work
+    A --> D1[Selected MathML Conversion]
+    D1 -. planned package embedding .-> E1["ODF package (.odt/.ods/.odp)"]
+    A --> D2[Selected OMML Conversion]
+    D2 -. planned package embedding .-> E2["OOXML package (.docx/.xlsx/.pptx)"]
 
-    %% Conversion to OOXML
-    C --> D2[OMML Conversion]
-    D2 --> E2["Embed in OOXML (.docx/.xlsx/.pptx)"]
+    %% Package extraction and editor round trips are future work
+    F1[Open ODF Document] -. planned extraction .-> G1[MathML extraction]
+    G1 -. planned input mapping .-> H1[Editable equation input]
+    F2[Open OOXML Document] -. planned extraction .-> G2[OMML extraction]
+    G2 -. planned input mapping .-> H2[Editable equation input]
 
-    %% Extraction from ODF
-    F1[Open ODF Document] --> G1[Extract MathML]
-    G1 --> H1[Convert to LaTeX-style]
-    H1 --> B
-
-    %% Extraction from OOXML
-    F2[Open OOXML Document] --> G2[Extract OMML]
-    G2 --> H2[Convert to LaTeX-style]
-    H2 --> B
-
-    %% Export Options
-    C --> X1["Export as Markdown ($...$)"]
-    C --> X2["Export as HTML <math>"]
-    C --> X3["Export as Image (SVG/PNG)"]
+    %% Optional future exports
+    C -. planned .-> X1["Export as Markdown ($...$)"]
+    C -. planned .-> X2["Export as HTML <math>"]
+    C -. planned .-> X3["Export as Image (SVG/PNG)"]
 
 ```
     
 ---
 
 ## 🚀 Roadmap
-### 📦 LibreOffice Core Integration & OOXML Compatibility Foundation (Phase 3)
-This phase consists of five sequential tasks designed to establish a stable LibreOffice core and prepare for robust OOXML interoperability.
+### 📦 LibreOffice and ODF/OOXML foundations (Phase 3)
 
-#### ✅ Task 1: Integrate LibreOffice Core Engine (C++)
-- Integrate the LibreOffice core engine into the Papirus Office runtime.
-- Ensure successful JNI bridging and modular encapsulation of Writer, Calc, and Impress components. Use source code from [Collabora Office](https://github.com/CollaboraOnline/online) as reference.
-- Focus on stability, memory safety, and performance on mobile devices.
+This phase is a staged compatibility effort, not a statement that a native LibreOffice engine or complete format parity is already available. Current code contains Kotlin document parsers and a LibreOfficeKit probe/fallback path; the native C++/JNI API facade and document fidelity remain incomplete. See `PROJECT_CONTEXT.md` and the Plans 5–9 roadmap for verified status.
 
-#### ✅ Task 2: Real-World Document Parsing & Rendering (Stress Test Stage 2)
-- Use the attached real-world documents. Test files included:
-  - `sample.docx` – TOC, images, headers/footers
-  - `sample.xlsx` – PivotTables, formulas, charts
-  - `sample.pptx` – 51 slides with transitions and images
-- Test parsing, layout fidelity, and rendering accuracy across all three modules.
-- Target device profile: **ARMv7, 2GB RAM**
-- Log performance metrics, rendering issues, and crash reports.
-- Document opens without crash, layout fidelity ≥ 80% compared to MS Office
+#### Task 1: Native LibreOfficeKit integration (planned/incomplete)
+- Native libraries and a probe/fallback exist in the repository, but their presence does not establish that native Writer/Calc/Impress rendering is active.
+- Complete the JNI facade and verify usable calls, device stability and memory behavior before claiming native editing/rendering.
 
-#### ✅ Task 3: OOXML Compatibility Foundation (Standards & SDK Reference)
-- Study and reference the following official resources:
-  - [Microsoft Open XML SDK Documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk)
-  - [Open XML SDK Source Code (GitHub)](https://github.com/dotnet/Open-XML-SDK)
-  - [ECMA-376 OOXML Specification (All Parts)](https://ecma-international.org/publications-and-standards/standards/ecma-376/)
-- Use these resources to understand the structure of:
-  - WordprocessingML (DOCX)
-  - SpreadsheetML (XLSX)
-  - PresentationML (PPTX)
-  - OMML (Office Math Markup Language)
+#### Task 2: Real-world document parsing and rendering (ongoing)
+- Use the actual repository corpus, including all six matched ODT/DOCX pairs in `tests/inky/`; add representative ODS/XLSX/ODP/PPTX samples as those workstreams mature.
+- Record parse coverage, rendering differences, page counts, crashes and device/build evidence. Do not report a fidelity percentage without a repeatable comparison method and results.
 
-#### ✅ Task 4: C++ Implementation of OOXML Compatibility Layer
-- Implement a modular C++ engine capable of reading and writing OOXML documents.
-- Required components:
-  - ZIP container handler (Open Packaging Conventions)
-  - XML parser for WordprocessingML, SpreadsheetML, PresentationML
-  - OMML parser for equations
-  - Compatibility fallback handler for unknown or unsupported elements
-- Ensure the engine is modular and can be toggled via **build flags** or plugin architecture. Build flag suggestion:
-  - `ENABLE_OOXML_SUPPORT` – toggles OOXML compatibility layer
-  - `ENABLE_OMML_PARSER` – toggles equation parser for OMML
-- Engine must be tested with both strict and transitional OOXML documents
-- Make sure to avoid any possible conflicts with OOXML integration provided with LibreOffice source code to prevent errors
+#### Task 3: OOXML standards and SDK reference (reference material available)
+- Use [Microsoft Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) and its [source repository](https://github.com/dotnet/Open-XML-SDK) as an API/package guide, with [ECMA-376](https://ecma-international.org/publications-and-standards/standards/ecma-376/) as the normative format specification.
+- Cover WordprocessingML, SpreadsheetML, PresentationML and OMML according to their actual owning plans and tests.
 
-#### ✅ Task 5: Reverse Engineering & Behavioral Testing
-- Perform behavioral testing by comparing rendering results with Microsoft Office (desktop or web).
-- Focus on:
-  - Layout fidelity (margins, fonts, spacing, object positioning)
-  - Feature parity (charts, tables, transitions, equations)
-  - Compatibility with real-world documents
-- Log discrepancies and propose compatibility patches or fallback strategies.
-- Do not use proprietary source code from OnlyOffice or other closed-source projects.
-- All reverse engineering must be based on publicly available specifications and behavioral testing only.
-- Behavioral mimicry is permitted based on document structure and output comparison.
+#### Task 4: ODF/OOXML compatibility layers (partial Kotlin implementation; continued work)
+- Existing parsers and writers cover selected document structures; this is not a complete C++ compatibility engine or a guarantee of lossless read/write behavior.
+- Follow ODF 1.4 in `docs/html` and ECMA-376; preserve package parts/relationships and test the files in the repo before expanding feature claims.
+- Plans 5–9 track metrics, image/media handling, ODF structures, DOCX styles/fields/numbering/tables/sections and save round-trip integrity.
 
-This phase lays the groundwork for full document interoperability and ensures that Papirus Office can serve users transitioning from Microsoft Office with minimal friction.
+#### Task 5: Behavioral comparison (planned and evidence-led)
+- Compare against Microsoft Office or LibreOffice using documented test inputs and observable layout/behavior, never proprietary source code.
+- Log discrepancies and scope fixes to public specifications and testable behavior.
+- Do not use unsupported claims such as a fixed fidelity percentage without a baseline, method and recorded evidence.
+
+The product goal is useful ODF-first editing with practical OOXML compatibility, reached through staged implementation and evidence. It is not a current guarantee of full interoperability.
 
 ---
 
 ### 🔹 Upcoming UI/UX Implementation (Phase 4)
-#### 🎨 Material 3 Aesthetics
-- **Font**: Roboto Flex (Google Fonts)  
-- **Icons**: Material Symbols (fallback to LibreOffice Colibre icons if unavailable)  
-- Unified expressive design across toolbars, dialogs, and sidebars
+#### 🎨 Material 3 Expressive Aesthetics
+- **UI font target**: Google Sans; keep Roboto/system sans-serif as the tested fallback until on-device rendering and accessibility scaling are validated. Roboto Flex is not the current UI-family decision.
+- **Icons**: Material Symbols Rounded by default. Colibre is only an optional alternative after the repository ZIP's provenance and license are checked.
+- Use one coherent Papirus component/token system across toolbars, editor dialogs, settings and navigation; see the surface-specific reference map above.
 
 #### 🛠️ Toolbars (mobile)
 - **Default toolbars**: Standard + Formatting (+ Sheet toolbar in Calc)
@@ -220,7 +206,7 @@ This phase lays the groundwork for full document interoperability and ensures th
 - All of these toolbars can be scrolled horizontally to include all options available on each toolbar
 
 ##### 🎀 Simplified ribbon bar (mobile)
-- UI design & layout inspired from M365 Copilot/Word/Excel/PowerPoint app for Android to give mobile users same experience.
+- Editor-screen hierarchy is informed by M365 Copilot/Word/Excel/PowerPoint on Android, adapted to Papirus and Material 3 Expressive. This is a task-pattern reference, not a promise of Microsoft Copilot integration or identical UI.
 - Can be invoked by tapping on "Open simplified ribbon bar" icon.
   - This action will also hide all toolbars.
   - Closing the simplified ribbon bar will showing these toolbars again.
@@ -305,7 +291,8 @@ This phase lays the groundwork for full document interoperability and ensures th
 - **Tablet**: Full toolbar below Ribbon full view bar  
 
 #### 🪟 Dialogs & Sidebars
-- **Mobile**: Full-page dialogs with header layout:  
+- **All Editor dialogs (all modules)**: Google Workspace-inspired task hierarchy using shared Papirus/M3 components. Choose full-page, sheet or alert presentation based on task scope; do not force every dialog into one size.
+- **Mobile**: Full-page dialogs where task complexity warrants them, with header layout:
   - `← Back | Title` (left), `Apply/OK/Set | ⋮ More options` (right)
   - Preview shown at top if available  
 - **Tablet**: Sidebar dialogs with header:  
@@ -411,8 +398,8 @@ This phase lays the groundwork for full document interoperability and ensures th
 ---
 
 #### 🟡 Intermediate Features
-- Equation editor → LibreOffice Math with MathML (opening and saving in ODF document format), Latex-style (in-app editing, with KaTeX compatibility), and OMML (opening and saving in OOXML document format) input.
-  - See: Modular Equation Parser Flow (above) for conversion logic.
+- Equation editor → planned end-to-end feature. Selected LaTeX-to-MathML/OMML conversion functions exist; preview, package embedding/extraction and ODF/OOXML save/reopen remain unverified.
+  - See: Modular Equation Parser Flow (above) for the implementation boundary and targets.
 - Diagrams/Infographics → Mermaid.js  
   - Rendered as SVG/PNG images  
   - Mermaid syntax stored as linked comments  
