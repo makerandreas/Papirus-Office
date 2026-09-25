@@ -99,15 +99,16 @@ jobs:
           Commit \`$COMMIT_SHORT\` (\`${{ github.sha }}\`) on \`${{ github.ref_name }}\` · workflow run \`${{ github.run_id }}\`
 
           #### Package Variants
-          This build produces ABI-specific packages for devices with native LibreOfficeKit support:
+          This build produces ABI-specific APKs. ABI labels describe the package target and do not imply that native LibreOfficeKit rendering is active; check the in-app engine status for the current build.
           * \`app-arm64-v8a-debug.apk\`: 64-bit ARM devices (modern phones and tablets)
           * \`app-armeabi-v7a-debug.apk\`: 32-bit ARM devices
 
-          #### Recent Changes
-          * **ODF Import Engine:** Context-driven SAX parser (\`SvXMLImport\`) for style hierarchy cascades across text and paragraph properties.
-          * **Character Formatting:** Character-level font size overrides, resolved character style cascades, and run reslicing during document text edits.
-          * **Inky Word Processor:** Toolbar Hub with live font family and size tracking at the active caret position.
-          * **Layout and Testing:** Automated test suites for style fidelity, pagination boundaries, and layout hyphenation.
+          #### Feature Summary
+          The bullets below describe standing project capabilities and areas of work. They are not a commit-by-commit changelog and may not represent changes introduced by this build.
+          * **ODF Import:** Context-driven parser paths include style hierarchy handling for text and paragraph properties.
+          * **Character Formatting:** Character-level font-size overrides and resolved style cascades are available in the Writer pipeline.
+          * **Inky Word Processor:** Toolbar Hub tracks font family and size at the active caret position.
+          * **Layout and Testing:** Automated tests cover selected style, pagination and hyphenation behavior; see the repository test suite for exact coverage.
 
           #### Installation
           Download the APK matching your device architecture (\`arm64-v8a\` for most modern devices) and install.

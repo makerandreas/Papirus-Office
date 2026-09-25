@@ -1,9 +1,9 @@
 # Plan 10 — Font Rendering Engine and UI Design Language
 
-**Date:** 2026-09-24
-**Status:** **parked on purpose.** The user's decision this session: the focus has shifted to document fidelity, and the old PR D (bundled Typeface and substitution) plus old PR E (Font Style UI, SAF/user fonts, curated Google Fonts) are saved here, together with the UI design-language review, to be resumed after the fidelity plans land.
-**Why parked is safe now:** Plan 5 already introduces the `FontRegistry` seam (`E-EN-5`) as a *substitute-or-system* map, and Plan 7 keeps `fo:font-name` on the model. Both are useless to the user until this plan ships the real faces, but they prevent a second rewrite later.
-**Evidence:** `anti-slop/audit-004-2026-09-24.md` (D/E recorded as later bonus work), `anti-slop/audit-006-2026-09-24.md` §2.2 (design-system compliance), and F-08/F-09 in `audit-005` (font size correct by accident, family lost).
+**Date:** 2026-09-24; scope note updated 2026-09-25
+**Status:** **document-font thread parked on purpose.** The user's decision: prioritize document fidelity, with old PR D (bundled Typeface and substitution) and old PR E (Font Style UI, SAF/user fonts, curated Google Fonts) held for later. The broader hybrid UI source map is now defined in `anti-slop/plan-11-hybrid-experience-design.md` and supersedes this plan's narrower Thread B framing. Plan 11 does not authorize the UI implementation by itself; re-scope before coding.
+**Why the document-font thread remains separate:** Plan 5 introduces `FontRegistry` as a substitute-or-system map, and Plans 7/8 preserve imported family identity. Actual document-face loading and metrics parity still need the document fidelity dependencies. This must not block independent UI shell/theme work.
+**Evidence:** `anti-slop/audit-004-2026-09-24.md` (D/E recorded as later bonus work), `anti-slop/audit-006-2026-09-24.md` §2.2 (design-system compliance), F-08/F-09 in `audit-005` (document family fidelity), and Plan 11 (updated product UI direction).
 
 ---
 

@@ -2,14 +2,14 @@
 
 ## 📘 Papirus Office — Description Context & Architecture Summary
 
-**Papirus Office** (originally conceptualized as **LibreDroid Office**) is a modular, open-source office suite for Android based on the LibreOffice architecture, Document Liberation Project, and OASIS OpenDocument Format (ODF v1.4) standards. It delivers a PC-class document editing experience optimized ergonomically for mobile devices (smartphones, foldables, tablets) using **Material 3 Expressive** and Jetpack Compose.
+**Papirus Office** (originally conceptualized as **LibreDroid Office**) is an Android-first, modular, open-source office suite built around LibreOffice technologies and APIs where available. It treats ODF 1.4 as a first-class format and aims for practical OOXML compatibility. Actual parser, renderer, native-engine and save coverage is feature- and test-dependent; do not describe complete compatibility or full native integration without evidence. The UI direction is Material 3 Expressive with adaptive layouts for phones, foldables and tablets.
 
 > *Note on Naming*: The project was initially conceived under the codename **LibreDroid Office**. To ensure trademark safety and prevent trademark conflicts with LibreOffice and The Document Foundation, the production name **Papirus Office** is adopted.
 
 For complete deep architectural documentation, consult `PROJECT_CONTEXT.md` and `DESIGN.md`. For early concepts that shapes the app this day, see `CONCEPT.md`.
 
 ### Suite Modules & Color Conventions
-Default static accent colors for Android 11 and below (devices without dynamic color / Material You support):
+Static Papirus accents (used as seeds/identifiers, not as replacements for semantic color roles):
 - **Papirus (Base Suite)**: `#2563EB` (Primary Suite Blue — Start Center, File Manager, Universal Options)
 - **Inky**: `#0F9D58` (Word Processing Green — Text documents, `.odt`, `.docx`, `.txt`, `.rtf`)
 - **Cellina**: `#16A3B7` (Spreadsheets Cyan/Teal — Workbooks, formulas, `.ods`, `.xlsx`, `.csv`)
@@ -17,6 +17,15 @@ Default static accent colors for Android 11 and below (devices without dynamic c
 - **Pagella**: `#D93025` (PDF Viewer Red — PDF viewing, document annotation, conversion)
 
 ---
+
+## Binding Experience Direction
+
+`DESIGN.md` is the design source of truth; `CONCEPT.md` defines the planned product surfaces and interaction terminology. The product uses Material 3 Expressive, with a bounded hybrid inspiration map: Google Workspace patterns for Start Screen tabs and editor dialogs; WPS Office for Welcome and Create New; Android Settings for Options, Crash Logs and About; M365 Copilot for editor screens; Microsoft Office 365 for the Inky/Cellina/Slidia command ribbon and SoftMaker FlexiPDF for Pagella; LibreOffice for office concepts and general layout, adapted to Android. These references are interaction precedents, not assets or pixel-copy targets.
+
+- Android 12+ defaults to the Android system dynamic palette. Android 11 and below use Papirus static schemes. Custom colors and an app-generated system-wallpaper palette are separate optional modes; derive the latter from wallpaper colors (for example, `WallpaperManager.getWallpaperColors` where supported), not from the Material system scheme. If unavailable, offer a user-selected image or a clear static fallback.
+- Google Sans is the intended UI family; retain Roboto/system sans-serif as a tested fallback. Do not confuse UI typography with the document's stored font identity.
+- Material Symbols Rounded is the default icon style. Colibre in `app/src/main/share/config/images_colibre.zip` is a possible optional set pending asset and license review.
+- In product copy and documentation, distinguish a design target from shipped behavior. Do not describe a simulated/native fallback as a fully integrated LibreOffice API, or imply full ODF/OOXML support without tests.
 
 ## 🎛️ Key UI Terminologies & Ecosystem
 > This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
@@ -37,8 +46,8 @@ A horizontally scrollable quick-action formatting bar docked immediately above t
 - **Scrollable Section**: Font family dropdown, Font size dropdown, Bold, Italic, Underline (long-press opens Underline Options), Strikethrough, Highlight Color, Font Color, Bulleted List, Numbered List, Indentation (Decrease/Increase), Insert Image, Insert Table, Insert Link, Insert Comment.
 - **Persistent Trailing Actions**: Insert Tab character (`\t`), Toggle Soft Keyboard, and **Open Ribbon Button** (opens the Standard Bottom Sheet).
 
-### 3. Standard Bottom Sheet (40% Screen Height Deck)
-A persistent Material 3 Expressive bottom sheet with a 40% screen height constraint:
+### 3. Standard Bottom Sheet (Adaptive Command Deck)
+A Material 3 Expressive bottom-sheet command deck. It should start compact on phones and expand/scroll as content, keyboard, display size or accessibility settings require; 40% is a design reference point, not a hard height cap:
 - **Ribbon Deck**: Tabbed desktop-class office ribbon with 6 standard tabs: File, Home, Insert, Layout, Review, View. References and Mailings are not part of the Writer set in `CONCEPT.md` and are not declared. Only File and Home own a deck today; the other four render in a disabled tone and say plainly that the deck is not in this build (plan-03 §0) instead of opening an empty page:
   - *File*: Save, Save As, Export PDF, Print, Share, Document Properties. (implemented)
   - *Home*: Clipboard, Font formatting, Paragraph alignment/spacing, Styles gallery. (implemented)
@@ -74,7 +83,7 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 3. **About Screen**:
    - Versioning, LibreOfficeKit core engine attribution, Document Liberation Project credits, open-source licenses.
 4. **Papirus Office Options (Settings)**:
-   - General (User profile, autosave interval, default format), Inky View Settings (margins, non-printing characters), Load/Save Subpage, Appearance (Dynamic Material You toggle vs static accents), Crash Logs Screen.
+   - General (user profile, autosave interval, default format), Inky View Settings (margins, non-printing characters), Load/Save, Appearance (system/static/custom/wallpaper palette modes are the target; verify current implementation), and Crash Logs.
 5. **Editor Screen (Dual Mode: Viewer & Editor)**:
    - **Inky**: Word processing canvas, margins, rulers, continuous scroll, text layout.
    - **Cellina**: Spreadsheet grid, formula bar, cell coordinate indicator, sheets tab bar.
@@ -90,12 +99,12 @@ A persistent Material 3 Expressive bottom sheet with a 40% screen height constra
 
 - **Papirus Engine (`com.makerandreas.papirusoffice.data`)**:
   - Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
-  - **ODF Import System (`data.odf`)**: Context-driven parser implementing `SvXMLImport`, `SvXMLImportContext`, and `OdfXmlToken` supporting `.odt`, `.ods` (multi-sheet tables with repeated columns/rows and values), and `.odp` (slides, frames, custom shapes, text boxes, and drawing groups).
-  - **OpenXML / OOXML Engine**: Complete parsing for `.docx` (WordprocessingML), `.xlsx` (SpreadsheetML with sharedStrings and sheet mapping), and `.pptx` (PresentationML with slide titles, body placeholders, and slide counts).
+  - **ODF Import System (`data.odf`)**: Context-driven parser paths use `SvXMLImport`, `SvXMLImportContext`, and `OdfXmlToken` across `.odt`, `.ods` and `.odp`; coverage is partial and is checked against ODF 1.4 and repository fixtures.
+  - **OpenXML / OOXML Engine**: Kotlin parser paths cover selected `.docx`, `.xlsx` and `.pptx` structures; do not call parsing complete. Writer fidelity plans specify remaining style, numbering, field, table, section, relationship and package work.
 - **LibreOfficeKit (LOKit) JNI Bridge**: native `.so` libraries shipped under `app/src/main/libs/<abi>/` (`liblo-native-code.so` + NSS chain, from LibreOffice Viewer for Android). `LibreOfficeCore` probes them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when absent.
 - **DocumentSession & SessionManager**: Tracks active document lifecycle, file path, dirty flags (`isSaved`), autosave timers, and undo/redo stacks.
 - **UndoManager & HistoryManager**: Dual-stack Command Pattern (`UndoAction`). Includes `PendingTypingBuffer`, which owns the debounce → baseline-commit protocol and the flush-then-delete sequence (surfaced via `flushPendingTyping`) before deletions and undo actions to prevent race conditions.
-- **Modular Equation Pipeline**: LaTeX-style input converted by `EquationParser` (fractions, roots, symbols) with bidirectional conversion to MathML (ODF) and OMML (OOXML); rendered KaTeX/MathJax preview is planned.
+- **Modular Equation Pipeline**: `EquationParser` converts selected LaTeX-style input to MathML/OMML representations. Writer-side embedding and round-trip support are not yet established; rendered KaTeX/MathJax preview is planned.
 
 ---
 
@@ -108,8 +117,8 @@ All document format specifications, standards, and schema definitions placed in 
   - `Part 3: OpenDocument Schema` (elements, styles, XML schema rules for text, spreadsheets, presentations)
   - `Part 4: Recalculated Formula (OpenFormula) Format` (OpenFormula expressions, syntax, evaluators)
 - Whenever implementing or modifying parsers, serializers, or document processors in `com.makerandreas.papirusoffice`:
-  1. Consult the relevant specification files in `/sources`.
-  2. Adhere strictly to the normative rules (e.g., exact namespace definitions, element ordering, MIME header constraints, non-destructive package preservation).
+  1. Consult the checked-in ODF 1.4 specification files in `docs/html` and ECMA-376 for OOXML.
+  2. Follow the relevant normative rules (namespaces, package parts/relationships, element constraints and MIME requirements); preserve content where supported and verify round trips rather than assuming lossless behavior.
 
 ### `app/src/main/libs`
 Pre-built native `.so` libraries per ABI (`arm64-v8a`, `armeabi-v7a`) from the official LibreOffice Viewer for Android. Never assume a native capability without checking `LokitEngine.isNativeAvailable`.
