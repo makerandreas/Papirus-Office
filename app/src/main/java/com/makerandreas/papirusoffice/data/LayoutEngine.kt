@@ -104,7 +104,17 @@ class LayoutEngine(
     private val pageHeightDp: Float = pageSpec.heightDp
 
     // Vertical rhythm between stacked elements on the page flow.
-    private val elementGapDp: Float = 12f
+    private val elementGapDp: Float = ELEMENT_GAP_UNITS
+
+    companion object {
+        /**
+         * Gap the paginator reserves between two blocks, layout units. The
+         * renderer draws the same gap through its page scale so the sheet
+         * shows the rhythm the page count was computed with. PR 16b replaces
+         * it with the styles' before/after spacing.
+         */
+        const val ELEMENT_GAP_UNITS = 12f
+    }
 
     // Cache map for Incremental Layout: paragraph index to its paragraph layout
     private val paragraphLayoutCache = mutableMapOf<Int, ParagraphLayout>()
@@ -131,6 +141,30 @@ class LayoutEngine(
 
     private fun measureTextWidth(text: String): Float {
         return textPaint?.measureText(text) ?: (text.length * 8.0f)
+    }
+
+    /**
+     * How this engine measured text, for the plan 5 dump ([LayoutDump]): the
+     * Paint size the `2.5f` factor produces for the 14 pt default and two
+     * probe widths at that size. Equal widths for "MMMM" and "iiii" mean the
+     * Paint counts characters (a JVM without native graphics), not glyphs;
+     * that distinction is what makes a CI page count comparable to a device.
+     */
+    fun measurementProbe(): String {
+        val paint = textPaint ?: return "no Paint: 8 units per character"
+        val previous = paint.textSize
+        val probeSize = 14f * 2.5f
+        return try {
+            paint.textSize = probeSize
+            val wide = paint.measureText("MMMM")
+            val narrow = paint.measureText("iiii")
+            val kind = if (wide > 0f && wide > narrow * 1.2f) "glyph advances" else "per-character stub"
+            String.format(java.util.Locale.ROOT, "Paint at %.1f px for 14 pt: MMMM=%.1f iiii=%.1f (%s)", probeSize, wide, narrow, kind)
+        } catch (t: Throwable) {
+            "Paint probe failed: ${t.javaClass.simpleName}"
+        } finally {
+            paint.textSize = previous
+        }
     }
 
     fun clearCache() {
