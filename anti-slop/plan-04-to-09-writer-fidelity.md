@@ -75,6 +75,8 @@ Low. The only behavioural trade is removing the Viewer FAB (a UX decision the au
 
 ## Plan 5 — Layout metrics and pagination (was PR E, the page-count plan)
 
+> **Amended 2026-09-26.** Plan 5 executes as three PRs: **PR 15 (5A)** the measuring stick, **PR 16a (5B)** breaks and defaults, **PR 16b (5C)** metrics and windows; scope per PR is in `plan-2026-09-24-remaining-pr-roadmap-v2.md` §4.3-§4.4, evidence in `audit-007-2026-09-26-sample-matrix.md`. The acceptance lines below that say "for both formats" are superseded: windows are **per format** for all six pairs (audit-007 §11.3; DOCX around the M365 counts 15/23/20/10/18/21, ODT provisional until the Collabora-regenerated fixtures land), and page geometry is honoured as each file declares it. The rest of this section stays as the design record.
+
 **Goal:** one honest measurement of text, one honest page model. This is the PR that moves 65/88 pages toward 21.
 **Closes:** the page-count half of the user's finding 6, F-10's paragraph metrics, the table-height part of F-11, plus enables F-18.
 **Depends on:** nothing. **Blocks:** G, H acceptance (their page-count tests need E's windows).

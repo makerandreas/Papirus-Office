@@ -29,7 +29,7 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 | **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
 | **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` (§8 records 3A; §9 records 3B) | 3A **landed as PR 12** (`55a9a97`); 3B **complete** per user confirmation and its implementation record; 3C is the docs alignment in PR 14 / Plan 11 |
 | **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
-| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5 | scheduled as PRs 15-16 |
+| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5; evidence `audit-007-2026-09-26-sample-matrix.md` | scheduled as **PR 15 (5A), PR 16a (5B), PR 16b (5C)**; roadmap v2 §4.3-§4.4; windows per format (user decision 2026-09-26) |
 | **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | scheduled as PR 17 |
 | **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7 | scheduled as PRs 18-19 |
 | **8** | **OOXML structural fidelity** (was PR H) | F-16…F-20, F-26, F-27, DOCX halves of F-10/F-11 | Plans 5, 7 | same file, § Plan 8 | scheduled as PRs 20-21 |
@@ -39,7 +39,7 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 
 Plans 2 and 3 are the ones the user asked to start with. Plans 4-9 keep the letters D-I in parentheses and in sub-item IDs (`D-1`, `E-EN-2`, `G-1` …), which read as `plan-n item`: D = 4, E = 5, F = 6, G = 7, H = 8, I = 9.
 
-**Audits consumed:** `audit-005-2026-09-24.md` (F-01…F-20 from the written report), `audit-006-2026-09-24.md` (F-21…F-31 from the screenshots + the compliance sweep), `audit-003-2026-09-22.md` (pre-A/B/C backlog), `plan-2026-09-22-remaining-writer-fixes.md` (the merged A/B/C plan).
+**Audits consumed:** `audit-005-2026-09-24.md` (F-01…F-20 from the written report), `audit-006-2026-09-24.md` (F-21…F-31 from the screenshots + the compliance sweep), `audit-003-2026-09-22.md` (pre-A/B/C backlog), `plan-2026-09-22-remaining-writer-fixes.md` (the merged A/B/C plan). Added 2026-09-26: `audit-007-2026-09-26-sample-matrix.md` (the twelve-file measurement behind Plan 5's split and its per-format windows; it also withdraws the "~60 KB stub" description of `liblo-native-code.so`, which is an LFS pointer to a 196 MB arm64 build).
 
 ---
 
@@ -140,3 +140,4 @@ Every plan's PR must hold these, or it is not ready:
   1. ~~Plan 2, commits 1-2~~ **done**: PR #11 merged the whole plan (its commits 1-2 became the renderer and status-bar commits of PR #11).
   2. ~~Plan 3A/3B~~ **complete**: PR 12 landed with the sweep and `SourceHygieneGuardTest`; Plan 3B is complete per its implementation record and the user's confirmation. Plan 3C is the current docs alignment (PR 14 / Plan 11).
   3. ~~Then Plan 5 with its per-page element dump~~ **scheduled as roadmap PR 15** (dump first, metrics seams second, transform third), exactly because the empty-page mechanism (F-25) is still an open question that only a trace can answer.
+  4. **2026-09-26:** PR 14 (Plan 3C / Plan 11 docs) is merged (`5c99072`). Plan 5 starts with the evidence commit of PR 15 (`audit-007`); the empty-page question (F-25) is narrowed by code reading (the paginator cannot author a blank page except at element 0), so the dump confirms per file whether the blank pages come from the fake breaks or from inflated metrics. Plan 5 is now three PRs (15, 16a, 16b) and its windows are per format. The device checklist run that was postponed in roadmap v2 §5 ("Now, before PR 15": items 5, 8, 9) is still owed and is independent of PR 15's code.
