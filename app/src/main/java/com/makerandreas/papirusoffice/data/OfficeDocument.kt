@@ -203,9 +203,39 @@ data class DocumentStyles(
     val paragraphStyles: Map<String, ParagraphStyle> = emptyMap(),
     val characterStyles: Map<String, CharacterStyle> = emptyMap(),
     val pageStyles: Map<String, PageStyleSpec> = emptyMap(),
-    val defaultPageStyle: PageStyleSpec? = null
-)
+    val defaultPageStyle: PageStyleSpec? = null,
+    /**
+     * ODF `style:master-page` name to its `style:page-layout-name`. Recorded
+     * so the section model (roadmap PR 16a/19) can start from the master page
+     * the body actually references instead of the one named "Standard".
+     */
+    val masterPages: Map<String, String> = emptyMap(),
+    /**
+     * Master page the first body paragraph references through its automatic
+     * style (`style:master-page-name`), null when the body declares none and
+     * the document therefore starts on "Standard". Not yet a pagination
+     * input; [defaultPageStyle] keeps today's resolution until PR 16a.
+     */
+    val firstMasterPageName: String? = null
+) {
+    /** Page box behind an ODF master page, if both the master and its layout were read. */
+    fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
+        val layoutName = masterPageName?.let { masterPages[it] } ?: return null
+        return pageStyles[layoutName]
+    }
+}
 
+/**
+ * Paragraph style as the paginator and the renderer both see it.
+ *
+ * [fontSizeSp] is the font size in points (the name predates [LayoutUnits]).
+ * The metric fields after [parentStyleName] are the plan 5 seam (roadmap
+ * E-EN-3): they are in layout units at 96 per inch, or plain factors and
+ * flags, and their defaults describe "nothing declared". No parser populates
+ * them yet and no consumer reads them yet, so a style built from the first
+ * nine fields renders exactly as before; PR 16a fills them from the file and
+ * PR 16b makes the paginator use them.
+ */
 data class ParagraphStyle(
     val name: String,
     val fontSizeSp: Float = 12f,
@@ -215,8 +245,32 @@ data class ParagraphStyle(
     val colorHex: String? = null,
     val alignment: String = "Left",
     val fontFamily: String? = null,
-    val parentStyleName: String? = null
-)
+    val parentStyleName: String? = null,
+    /** `fo:margin-top` / `w:spacing w:before`, layout units. */
+    val spaceBeforeUnits: Float = 0f,
+    /** `fo:margin-bottom` / `w:spacing w:after`, layout units. */
+    val spaceAfterUnits: Float = 0f,
+    /** `fo:line-height="115%"` / `w:line=276 lineRule=auto` as 1.15; 1 = single. */
+    val lineHeightFactor: Float = 1f,
+    /** Absolute line height (`fo:line-height="0.5cm"`, `lineRule=exact`), layout units; null = use the factor. */
+    val lineHeightExactUnits: Float? = null,
+    /** `fo:margin-left` / `w:ind w:left`, layout units. */
+    val indentStartUnits: Float = 0f,
+    /** `fo:margin-right` / `w:ind w:right`, layout units. */
+    val indentEndUnits: Float = 0f,
+    /** `fo:text-indent` / `w:ind w:firstLine` (negative for `w:hanging`), layout units. */
+    val firstLineIndentUnits: Float = 0f,
+    /** `fo:keep-with-next="always"` / `w:keepNext`. */
+    val keepWithNext: Boolean = false,
+    /** `fo:break-before="page"` / `w:pageBreakBefore`. */
+    val pageBreakBefore: Boolean = false
+) {
+    /** True when the style carries no metric other than its font size, i.e. the pre-plan-5 shape. */
+    val hasMetricFields: Boolean
+        get() = spaceBeforeUnits != 0f || spaceAfterUnits != 0f || lineHeightFactor != 1f ||
+            lineHeightExactUnits != null || indentStartUnits != 0f || indentEndUnits != 0f ||
+            firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore
+}
 
 data class CharacterStyle(
     val name: String,
@@ -235,6 +289,15 @@ data class CharacterStyle(
  * layout units at 96 per inch, the space LayoutEngine paginates in. The
  * fallback mirrors the engine's historical Letter box (50 top, 60 bottom,
  * 40 side) so documents declaring no geometry paginate as before.
+ *
+ * [headerHeightDp]/[footerHeightDp] are the ODF header/footer heights that sit
+ * *between* the margin and the body: fixed `svg:height` (ODF 1.4 Part 3
+ * §20.407.2), else `fo:min-height` (§20.212), else 0. OnlyOffice writes
+ * Word's 1 in top margin as `fo:margin-top="0cm"` plus a 2.54 cm header
+ * (audit-007 finding B), so the body top is [bodyTopDp], not [marginTopDp].
+ * WordprocessingML keeps header and footer inside `w:pgMar`, so both stay 0
+ * for DOCX. The paginator still flows between [marginTopDp] and
+ * [contentBottomDp] in plan 5A; PR 16a switches it to the body rectangle.
  */
 data class PageStyleSpec(
     val name: String = "fallback",
@@ -244,13 +307,27 @@ data class PageStyleSpec(
     val marginBottomDp: Float = 60f,
     val marginStartDp: Float = 40f,
     val marginEndDp: Float = 40f,
-    val landscape: Boolean = false
+    val landscape: Boolean = false,
+    val headerHeightDp: Float = 0f,
+    val footerHeightDp: Float = 0f
 ) {
     val contentWidthDp: Float
         get() = (widthDp - marginStartDp - marginEndDp).coerceAtLeast(MIN_CONTENT_DIMENSION_DP)
 
     val contentBottomDp: Float
         get() = (heightDp - marginBottomDp).coerceAtLeast(marginTopDp + MIN_CONTENT_DIMENSION_DP)
+
+    /** Top of the body rectangle: margin plus the header the file declares. */
+    val bodyTopDp: Float
+        get() = marginTopDp + headerHeightDp.coerceAtLeast(0f)
+
+    /** Bottom of the body rectangle: page height minus margin and declared footer. */
+    val bodyBottomDp: Float
+        get() = (heightDp - marginBottomDp - footerHeightDp.coerceAtLeast(0f))
+            .coerceAtLeast(bodyTopDp + MIN_CONTENT_DIMENSION_DP)
+
+    val bodyHeightDp: Float
+        get() = bodyBottomDp - bodyTopDp
 
     companion object {
         const val MIN_CONTENT_DIMENSION_DP = 120f

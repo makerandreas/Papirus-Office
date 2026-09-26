@@ -37,6 +37,13 @@ class PageGeometryTest {
         return File(candidates.first())
     }
 
+    /**
+     * The numbers below are the *declared* `fo:margin-*` values. Sample-5.odt
+     * (OnlyOffice export) carries Word's 1 in top margin as a 2.54 cm
+     * fixed-height header on the layouts the body uses (Mpm2..6), not as a
+     * margin, so the declared 0 cm top margin is not a 0 cm body top
+     * (audit-007 finding B). The header/footer assertions pin that.
+     */
     @Test
     fun sample5OdtDeclaresA4WithDeclaredMargins() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -50,7 +57,7 @@ class PageGeometryTest {
         val spec = parsedDoc.styles.defaultPageStyle
         assertNotNull("Sample-5.odt declares style:page-layout, expected a resolved page box", spec)
         spec!!
-        // 21cm x 29.71cm at 96 units/inch; margins top 0cm, bottom 1cm, sides 2.54cm
+        // 21cm x 29.71cm at 96 units/inch; declared margins top 0cm, bottom 1cm, sides 2.54cm
         assertEquals(793.7f, spec.widthDp, 1.5f)
         assertEquals(1122.9f, spec.heightDp, 1.5f)
         assertEquals(0f, spec.marginTopDp, 0.5f)
@@ -60,6 +67,55 @@ class PageGeometryTest {
         // "Standard" master page resolves to Mpm1, not the trailing MasterPage* layouts
         assertEquals("Mpm1", spec.name)
         assertTrue("page-layouts must be addressable by name", parsedDoc.styles.pageStyles.containsKey("Mpm1"))
+        // Mpm1 has no header and a 1 cm minimum-height footer.
+        assertEquals(0f, spec.headerHeightDp, 0.01f)
+        assertEquals(37.8f, spec.footerHeightDp, 1f)
+
+        // The body starts on MasterPage2 -> Mpm2, whose header is svg:height="2.54cm"
+        // (ODF 1.4 Part 3 §20.407.2) over fo:min-height="0cm": body top is 1 in.
+        assertEquals("MasterPage2", parsedDoc.styles.firstMasterPageName)
+        assertEquals("Mpm2", parsedDoc.styles.masterPages["MasterPage2"])
+        val bodyLayout = parsedDoc.styles.pageStyleForMaster("MasterPage2")
+        assertNotNull("Mpm2 must be readable through its master page", bodyLayout)
+        bodyLayout!!
+        assertEquals(96f, bodyLayout.headerHeightDp, 0.5f)
+        assertEquals(37.8f, bodyLayout.footerHeightDp, 1f)
+        assertEquals(0f, bodyLayout.marginTopDp, 0.5f)
+        assertEquals(96f, bodyLayout.bodyTopDp, 0.5f)
+        assertEquals(1122.9f - 37.8f - 37.8f, bodyLayout.bodyBottomDp, 2f)
+        // Plan 5A: the paginator still flows from the declared margin; PR 16a moves it to bodyTopDp.
+        assertEquals(spec.marginTopDp, 0f, 0.01f)
+    }
+
+    @Test
+    fun sample1OdtFooterMinHeightBecomesFooterHeight() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val parsedDoc = OfficeDocumentParser(context).parseDocument(findTestFile("tests/inky/Sample-1.odt"), bypassCache = true)
+        assertFalse(parsedDoc.isParsingFailed)
+        val spec = parsedDoc.styles.defaultPageStyle
+        assertNotNull(spec)
+        spec!!
+        // LibreOffice 7.0.4: 1in top, 0.3937in bottom margin plus a 0.6063in footer = 1in body bottom.
+        assertEquals("Mpm1", spec.name)
+        assertEquals(96f, spec.marginTopDp, 0.5f)
+        assertEquals(37.8f, spec.marginBottomDp, 0.5f)
+        assertEquals(0f, spec.headerHeightDp, 0.01f)
+        assertEquals(58.2f, spec.footerHeightDp, 0.5f)
+        assertEquals(spec.heightDp - 96f, spec.bodyBottomDp, 0.6f)
+        assertEquals("Standard", parsedDoc.styles.firstMasterPageName)
+    }
+
+    @Test
+    fun docxPageSpecKeepsHeaderAndFooterInsideTheMargins() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val parsedDoc = OfficeDocumentParser(context).parseDocument(findTestFile("tests/inky/Sample-5.docx"), bypassCache = true)
+        assertFalse(parsedDoc.isParsingFailed)
+        val spec = parsedDoc.styles.defaultPageStyle!!
+        // WordprocessingML: header/footer live inside w:pgMar, so the body rectangle is the margin rectangle.
+        assertEquals(0f, spec.headerHeightDp, 0.01f)
+        assertEquals(0f, spec.footerHeightDp, 0.01f)
+        assertEquals(spec.marginTopDp, spec.bodyTopDp, 0.01f)
+        assertEquals(spec.contentBottomDp, spec.bodyBottomDp, 0.01f)
     }
 
     @Test

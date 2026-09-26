@@ -161,6 +161,17 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
   source(file("src/compileOnly/java"))
 }
 
+// Unit-test output goes to the CI log. The plan 5 element dump
+// (Plan5ElementDumpTest) is read from there, and CI is the only place the
+// test suite runs while no local JDK is available (AGENTS.md).
+tasks.withType<Test>().configureEach {
+  testLogging {
+    events("failed", "skipped")
+    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    showStandardStreams = true
+  }
+}
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {

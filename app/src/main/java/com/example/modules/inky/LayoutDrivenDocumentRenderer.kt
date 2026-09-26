@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
@@ -49,17 +50,11 @@ class RendererFocusBridge {
 }
 
 /**
- * Geometry the page stack is built from. The screen needs the same numbers to
- * size the viewport and to decide how much of a page is on screen, so they live
- * here once instead of being copied into the caller.
+ * Chrome geometry around the page stack. Page size, margins and text scale
+ * come from [PageTransform]; this object only keeps what is not derived from
+ * the page itself.
  */
 object PageStackMetrics {
-    /** Card width the page stack has always been laid out against. */
-    const val BASE_CARD_WIDTH_DP = 320f
-
-    /** Card height used when a document declares no page size. */
-    const val FALLBACK_CARD_HEIGHT_DP = 452f
-
     /** Free space the sheet keeps on each side of the viewport at 100 %. */
     const val GUTTER_DP = 8f
 }
@@ -74,19 +69,17 @@ private val PAGE_ELEVATION_DP = 6.dp
 private val PAGE_BORDER_DP = 1.dp
 private val TABLE_LINE_DP = 0.5.dp
 
-/** Vertical rhythm between blocks inside one page, scaled with the sheet. */
-private const val PAGE_BLOCK_GAP_DP = 8f
-
 /**
  * Single page-stack renderer for Viewer and Editor. Viewer mode draws the
  * laid-out pages read-only; Editor mode swaps each textual element for a
  * field whose value is a window into the one global edit string (see
  * [DocumentTextWindows]), so both modes always agree on page count.
  *
- * [viewportWidthDp] is the width the page must fit into. It drives one scale
- * ([fitScale]) used for the card box *and* for the text inside it, so 100 %
- * zoom means "page width fills the viewport" on every screen instead of a
- * fixed 320 dp card that overflows narrow phones.
+ * [viewportWidthDp] is the width the page must fit into. [PageTransform]
+ * turns it and [zoomScale] into one `pageScale` (dp per layout unit) used for
+ * the card box, the margins, the block gaps, the text and the tap mapping, so
+ * 100 % zoom means "page width fills the viewport" and the text column on
+ * screen is the column the layout engine wrapped against (roadmap E-7).
  */
 @Composable
 fun LayoutDrivenDocumentRenderer(
@@ -143,11 +136,9 @@ fun LayoutDrivenDocumentRenderer(
         }
     }
 
-    // Fit-to-width: 100 % zoom means the page box fills the viewport. The same
-    // factor scales the card and the text it holds, so a run never renders at
-    // a size the layout did not reserve room for.
-    val fitScale = if (viewportWidthDp > 0f) viewportWidthDp / PageStackMetrics.BASE_CARD_WIDTH_DP else 1f
-    val renderScale = fitScale * zoomScale
+    // Page text scales with the sheet, not with the system font size, or the
+    // on-screen column would stop being the paginated column.
+    val fontScale = LocalDensity.current.fontScale
 
     // Which element currently owns the touch selection, if any. Only that element
     // drives the floating toolbar, so neighbouring fields cannot hide it again in
@@ -226,27 +217,16 @@ fun LayoutDrivenDocumentRenderer(
         }
 
         computed.pages.forEachIndexed { pageIdx, page ->
-            // The card keeps the document's aspect ratio: the historical
-            // 320x452 card for the Letter fallback box, the page's own ratio
-            // once a page size was declared.
-            val cardWidthDp = PageStackMetrics.BASE_CARD_WIDTH_DP * renderScale
-            val isFallbackBox = page.widthDp == PageStyleSpec.FALLBACK.widthDp &&
-                page.heightDp == PageStyleSpec.FALLBACK.heightDp
-            val cardHeightDp = when {
-                page.widthDp <= 0f || page.heightDp <= 0f || isFallbackBox ->
-                    cardWidthDp * (PageStackMetrics.FALLBACK_CARD_HEIGHT_DP / PageStackMetrics.BASE_CARD_WIDTH_DP)
-                else -> cardWidthDp * (page.heightDp / page.widthDp)
-            }
-            // The factor that maps the virtual page onto the sheet on screen:
-            // margins and hit-testing use it, so a tap lands on the character
-            // the finger points at whatever the page size is. The text itself is
-            // still drawn at renderScale; unifying those two is plan 5, where
-            // real text measurement replaces the 2.5f measuring hack.
-            val pageScale = if (page.widthDp > 0f) cardWidthDp / page.widthDp else renderScale
+            // One transform per page: the sheet keeps the page's own ratio
+            // (Letter for the fallback box) and every length below is
+            // `units * pageScale`.
+            val sheet = PageTransform.sheetFor(page.widthDp, page.heightDp, viewportWidthDp, zoomScale)
+            val pageScale = sheet.pageScale
+            val textScale = PageTransform.textScale(sheet, fontScale)
             Box(
                 modifier = Modifier
-                    .width(cardWidthDp.dp)
-                    .height(cardHeightDp.dp)
+                    .width(sheet.widthDp.dp)
+                    .height(sheet.heightDp.dp)
                     .shadow(elevation = PAGE_ELEVATION_DP, shape = RoundedCornerShape(PAGE_CORNER_DP))
                     .border(PAGE_BORDER_DP, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(PAGE_CORNER_DP))
                     .background(Color.White)
@@ -259,9 +239,11 @@ fun LayoutDrivenDocumentRenderer(
                             Modifier.pointerInput(page) {
                                 detectTapGestures { offset ->
                                     // Back into the layout's own coordinate space:
-                                    // page-local, origin at the paper corner.
-                                    val virtualX = offset.x / pageScale
-                                    val virtualY = offset.y / pageScale + (pageIdx * page.heightDp)
+                                    // page-local, origin at the paper corner. The
+                                    // offset is in px; density takes it to dp, the
+                                    // sheet takes dp to layout units.
+                                    val virtualX = sheet.toUnits(offset.x / density)
+                                    val virtualY = sheet.toUnits(offset.y / density) + (pageIdx * page.heightDp)
                                     val hitResult = layoutEngine.hitTest(virtualX, virtualY, computed.pages)
                                     if (hitResult != null) {
                                         onCursorChange(
@@ -281,19 +263,21 @@ fun LayoutDrivenDocumentRenderer(
                     // against, not from a fixed guess, so the text column on the
                     // sheet is the column the line breaks were computed for.
                     .padding(
-                        start = (pageSpec.marginStartDp * pageScale).dp,
-                        end = (pageSpec.marginEndDp * pageScale).dp,
-                        top = (pageSpec.marginTopDp * pageScale).dp,
-                        bottom = (pageSpec.marginBottomDp * pageScale).dp
+                        start = sheet.toDp(pageSpec.marginStartDp).dp,
+                        end = sheet.toDp(pageSpec.marginEndDp).dp,
+                        top = sheet.toDp(pageSpec.marginTopDp).dp,
+                        bottom = sheet.toDp(pageSpec.marginBottomDp).dp
                     )
             ) {
                 Column(
-                    verticalArrangement = Arrangement.spacedBy((PAGE_BLOCK_GAP_DP * renderScale).dp)
+                    // The gap the paginator reserved between blocks, on the same scale.
+                    verticalArrangement = Arrangement.spacedBy(sheet.toDp(LayoutEngine.ELEMENT_GAP_UNITS).dp)
                 ) {
                     page.elements.forEach { elemLayout ->
                         RenderLaidOutElement(
                             elemLayout = elemLayout,
-                            zoomScale = renderScale,
+                            zoomScale = textScale,
+                            pageScale = pageScale,
                             styles = document.styles,
                             enableOutlineFolding = enableOutlineFolding,
                             outlineEngine = outlineEngine,
@@ -319,7 +303,10 @@ fun LayoutDrivenDocumentRenderer(
 @Composable
 private fun RenderLaidOutElement(
     elemLayout: PageElementLayout,
+    // Factor from a point size to the `sp` value that lands it on the sheet.
     zoomScale: Float,
+    // Screen dp per layout unit, for lengths that are not text (images).
+    pageScale: Float,
     styles: DocumentStyles,
     enableOutlineFolding: Boolean,
     outlineEngine: OutlineEngine?,
@@ -417,11 +404,11 @@ private fun RenderLaidOutElement(
             RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale)
         }
         is OfficeImage -> {
-            RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, zoomScale)
+            RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, zoomScale, pageScale)
         }
         is OfficeDocElement.ImageElement -> {
             val img = element.image
-            RenderImage(img.imageFile, img.imagePath, img.widthDp, img.heightDp, extractedImages, zoomScale)
+            RenderImage(img.imageFile, img.imagePath, img.widthDp, img.heightDp, extractedImages, zoomScale, pageScale)
         }
         else -> { }
     }
@@ -696,7 +683,8 @@ private fun RenderImage(
     widthDp: Float,
     heightDp: Float,
     extractedImages: Map<String, File>,
-    zoomScale: Float
+    zoomScale: Float,
+    pageScale: Float
 ) {
     val lower = imagePath.lowercase(java.util.Locale.ROOT)
     val fileNameLower = imagePath.substringAfterLast('/').lowercase(java.util.Locale.ROOT)
@@ -713,10 +701,14 @@ private fun RenderImage(
         contentAlignment = Alignment.Center
     ) {
         if (resolved != null && resolved.exists()) {
+            // The image box the paginator reserved (layout units, 200 x 150
+            // when the file declares none), on the sheet's scale.
+            val boxWidthUnits = if (widthDp > 0) widthDp else 200f
+            val boxHeightUnits = if (heightDp > 0) heightDp else 150f
             DocxEmbeddedImage(
                 imageFile = resolved,
-                extentCx = if (widthDp > 0) (widthDp * 9525).toLong() else 1905000L,
-                extentCy = if (heightDp > 0) (heightDp * 9525).toLong() else 1428750L
+                extentCx = LayoutUnits.unitsToEmu(boxWidthUnits * pageScale),
+                extentCy = LayoutUnits.unitsToEmu(boxHeightUnits * pageScale)
             )
         } else {
             Text(

@@ -16,6 +16,9 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # CI report comment on the pull request (see the last step)
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
     steps:
@@ -30,10 +33,53 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      # Read-only look at the bundled .so files (roadmap PR 15): sizes, ELF
+      # header, NEEDED chain, JNI and LibreOfficeKit exports, and whether the
+      # `external fun` declarations in LibreOfficeCore.kt have a symbol. The
+      # LFS checkout above is what makes the binaries inspectable at all; the
+      # step never fails the job.
+      - name: Native inventory (read-only)
+        continue-on-error: true
+        run: |
+          chmod +x scripts/native-inventory.sh
+          scripts/native-inventory.sh build/native-inventory.txt
+
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest
+          mkdir -p build
+          set -o pipefail
+          ./gradlew testDebugUnitTest 2>&1 | tee build/gradle-test.log
+
+      # Test XML/HTML reports and the plan 5 dump (Plan5ElementDumpTest prints
+      # to system-out) plus the native inventory, kept two weeks.
+      - name: Upload test reports and native inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            build/native-inventory.txt
+            build/gradle-test.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # Mirrors what the log shows (compile errors, failing tests, the plan 5
+      # dump, the native inventory) into one PR comment, because the agent
+      # sandbox this repository is worked from can reach api.github.com but
+      # not the Actions log/artifact storage (AGENTS.md, GitHub API approach).
+      - name: Post CI report to the pull request
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 scripts/ci-dump-comment.py app/build/test-results/testDebugUnitTest build/gradle-test.log build/native-inventory.txt > build/ci-report.md || true
+          if [ -s build/ci-report.md ]; then
+            gh pr comment "$PR_NUMBER" --body-file build/ci-report.md || echo "could not post the CI report comment (token permissions?)"
+          fi
 
   build:
     name: Build (SemVer & Nightly)

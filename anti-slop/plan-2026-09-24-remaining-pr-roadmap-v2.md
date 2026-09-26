@@ -1,6 +1,7 @@
 # Papirus Office — PR Split Strategy v2 (Plans 3B–10 + Plan 1)
 
 **Date:** 2026-09-24 (v2.2 — every ⚑ item re-verified against the samples and the specs; corrections listed in §7.12)
+**Amended:** 2026-09-26 (v2.4, baseline `5c99072`, PR #14 merged). PR 16 is split into **PR 16a (Plan 5B)** and **PR 16b (Plan 5C)**; page-count windows are **per format**; PR 15 gains a sample-matrix test, the E-0 dump over all six pairs and header/footer heights in `PageStyleSpec`. Evidence and the user's decisions of 2026-09-26 are in `audit-007-2026-09-26-sample-matrix.md`; deltas in §7.17.
 **Supersedes:** `plan-2026-09-24-remaining-pr-roadmap.md` (v1, baseline `e10f956`). v1 is kept as the record of the pre-PR-12 schedule; where this file and v1 conflict, this file wins.
 **Baseline:** `main` `55a9a97` (PR #12 merged), branch convention `arena/<session>-papirus-office`, CI is the only compile/test evidence (no local JDK; `./gradlew testDebugUnitTest` + the build job in `.github/workflows/build.yml`).
 **Relationship to plan 1:** `plan-01-master-index.md` keeps the WG-chapter mapping, the checklist mapping and the finding registry; this file keeps the PR order and the per-PR scope. Plan 1's update rule (§6) is executed per PR as tabulated in §4.12.
@@ -14,7 +15,7 @@ From v1 §0 (audit-005 §6 / audit-006 §5 answers) and plan-03 §0:
 
 | Decision | Consequence carried into this file |
 |---|---|
-| Page-count tolerance = **staged windows** (Sample-5 `15..21`, Sample-6 `15..26` at Plan 5; tighten to ±10 % of the M365 refs 18/21 after Plans 7/8, never below) | PR 16 lands the wide windows; the tightening commit sits inside PR 21 (or 22), not in a metrics PR. |
+| Page-count tolerance = **staged windows, per format** (amended 2026-09-26, audit-007 §11.3). DOCX windows around the M365 references 15/23/20/10/18/21: `12..18`, `18..28`, `16..24`, `8..12`, `15..21`, `15..26`. ODT windows are provisional until the user regenerates the six `.odt` fixtures with Collabora Office: `9..18`, `15..22`, `12..20`, `7..12`, `12..21`, `15..26`. Tighten to ±10 % of the references after Plans 7/8, never below. Geometry is honoured **as each file declares it** (no repairing an ODT from its DOCX twin). | PR 16b lands the windows; PR 16a may only widen; the tightening commit sits inside PR 21 (or 22), not in a metrics PR. |
 | Font supply = **display the bundled metric-compatible faces** (TNR→Liberation Serif, Calibri→Carlito, Cambria→Caladea, Arial/Helvetica→Liberation Sans, Courier New→Liberation Mono, Symbol/Wingdings→OpenSymbol) in both pagination and painting from the moment `FontRegistry` exists | PR 15 wires the mapping, PR 19 makes the renderer consume it, Plan 10 A1 upgrades loading to real `Typeface`s. |
 | ODT TOC = **authored snapshot** (no "Update Index" stub); regeneration is a later feature after a field model exists | PR 19 G-2; PR 21's DOCX TOC handling mirrors it (the DOCX samples carry the same authored snapshots, §2.2). |
 | Save with unserialisable images = **refuse with a clear en_US message**, no `[Image: path]` placeholders | PR 17 F-5; PR 22 removes the need. |
@@ -56,11 +57,11 @@ From v1 §0 (audit-005 §6 / audit-006 §5 answers) and plan-03 §0:
 
 | Still open | Where | Owning PR |
 |---|---|---|
-| `fontSizeSp * 2.5f` measuring fudge | ✅ `LayoutEngine.kt:154` | 16 (5B) |
-| Flat `elementGapDp = 12f` between all elements | ✅ `LayoutEngine.kt:107` | 16 (5B) |
-| `StyleResolver` 14 sp default on null/miss (F-21) | ✅ `LayoutEngine.kt:61` | 16 (5B) |
+| `fontSizeSp * 2.5f` measuring fudge | ✅ `LayoutEngine.kt:154` | 16b (5C) |
+| Flat `elementGapDp = 12f` between all elements | ✅ `LayoutEngine.kt:107` | 16b (5C) |
+| `StyleResolver` 14 sp default on null/miss (F-21) | ✅ `LayoutEngine.kt:61` | 16a (5B) |
 | Text scales with `renderScale` while paper maps with `pageScale` | ✅ `LayoutDrivenDocumentRenderer.kt:149-150,243-245` | 15 (5A) |
-| Renderer line height = `(sizeSp + 5f)` magic constant | ✅ `LayoutDrivenDocumentRenderer.kt:474,500,579,596,650` | 16 (5B, E-2) |
+| Renderer line height = `(sizeSp + 5f)` magic constant | ✅ `LayoutDrivenDocumentRenderer.kt:474,500,579,596,650` | 16b (5C, E-2) |
 | Table height `rows * 35 + 10`, all cells `10.sp` | ✅ `LayoutEngine.kt` | 19 (7B) / 21 (8B) |
 | Ribbon: 8 tabs declared, only File+Home have content, literal "…will be implemented soon." | ✅ `InkyModule.kt:2936`, `:3383-3390` (pre-13 numbering) | 13 (3B) |
 | Toolbar hub image/table/link/comment toast-only (TODOs landed in 12) | ✅ `InkyModule.kt:2790-2811` | 13 (3B) |
@@ -78,7 +79,7 @@ From v1 §0 (audit-005 §6 / audit-006 §5 answers) and plan-03 §0:
 | `word/numbering.xml` never read; writer hard-codes `w:numId="1"` | ✅ no `numPr`/`numId` handling in the parser; `DocxDocumentParser.kt:740` | 21 (8B) |
 | Fields (`w:fldSimple`, `w:fldChar`/`instrText`) land in body text; `w:hyperlink` anchors dropped | ✅ shared TEXT arm appends unconditionally; no `hyperlink`/`anchor`/`fldChar` handling | 21 (8B) |
 | Only the last `w:sectPr` read | ✅ `OfficeDocumentParser.kt:144` `extractDocxPageStyleSpec` | 21 (8B) |
-| `w:lastRenderedPageBreak` → hard break + `--- Page Break ---` text | ✅ shared parse block (the `w:br` arm at :961 already distinguishes `type="page"` from soft breaks — that part is correct) | 16 (5B) / 21 (8B) |
+| `w:lastRenderedPageBreak` → hard break + `--- Page Break ---` text | ✅ shared parse block (the `w:br` arm at :961 already distinguishes `type="page"` from soft breaks — that part is correct) | 16a (5B) / 21 (8B) |
 | Save round trip: ODT written as bare `office:document-content` (`office:version="1.2"`, no styles/manifest), DOCX writer references styles/numbering it does not define | ✅ `DocxDocumentParser.kt:748+` `generateOdtXml`, `saveDocxZip` | 22 (9) |
 
 Plan 4 remains **consumed by PR #11 — do not re-execute.**
@@ -156,17 +157,18 @@ Sub-item IDs keep their plan identity (E = Plan 5, F = 6, G = 7, H = 8, I = 9). 
 | 12 | 3A | Mechanical strings sweep + CI hygiene guards | — | — | **landed** (`55a9a97`) |
 | 13 | 3B | Honesty and dead controls (ribbon, hub, Drive, ⚑ Navigator, ⚑ status bar) + token sweep | 12 | medium | Delivery Gate report at 320 dp; grey allowances at 0 |
 | 14 | 3C | Documentation accuracy (DESIGN.md review, CONCEPT/About/nightly notes) | — (docs-only) | small | diffs against cited files |
-| 15 | 5A | The measuring stick: per-page dump, `LayoutUnits`, `TextMetrics`, `FontRegistry` seam, one render transform | 12 | medium | dump answers F-25; zero pagination change |
-| 16 | 5B | Honest pagination: real metrics, spacing, breaks, widows, windows | 15 | large | Sample-5 `15..21`, Sample-6 `15..26`, both formats |
+| 15 | 5A | The measuring stick: per-page dump (all six pairs), `SampleMatrixTest`, `LayoutUnits`, `TextMetrics`, `FontRegistry` seam, header/footer heights in `PageStyleSpec`, one render transform | 12 | medium | dump answers F-25 for every pair; zero pagination change |
+| 16a | 5B | Breaks and defaults: fake breaks out, real breaks and section starts in, body rect from margins + header/footer, metric-only style chain, document defaults replace the 14/24/20/16 sp constants | 15 | medium | dump shows no fake breaks; windows only widened |
+| 16b | 5C | Metrics and windows: `TextMetrics` load-bearing, fudge and gap constants deleted, widows/orphans, tab stops, per-format windows for all six pairs | 16a | large | audit-007 §11.3 windows green, both formats |
 | 17 | 6 | Image pipeline: extents in both formats, media store, no fake delays, save refusal | 15 | medium | no blank frame; self-heal; refusal dialog |
-| 18 | 7A | ODF numbering, heading runs, hyperlinks, ⚑ bookmarks | 16 | large | BAB/2.1 labels render; no link text lost |
+| 18 | 7A | ODF numbering, heading runs, hyperlinks, ⚑ bookmarks | 16b | large | BAB/2.1 labels render; no link text lost |
 | 19 | 7B | ODF TOC snapshot, table geometry, font identity, ⚑ sections | 18 | large | Sample-6 ODT fidelity checklist |
 | 20 | 8A | DOCX style chain + run formatting (⚑ char-link convention, numId-suppression flag) | 15 | large | heading/body sizes from the file, no leak |
-| 21 | 8B | DOCX numbering, fields, tables, sections, ⚑ TOC snapshot | 20 (+19 shared geometry) | large | Sample-6 DOCX checklist; both formats converge |
+| 21 | 8B | DOCX numbering, fields, tables, sections, ⚑ TOC snapshot | 20 (+19 shared geometry) | large | Sample-6 DOCX checklist; Sample-6's formats converge, per-format windows hold |
 | 22 | 9 | Save round-trip integrity (pre-change gate first) | 17, 19, 21 | large | open → save → reopen preserves structure |
 | 10 | — | Font engine + design language — **parked** | 21 + user decision | — | resume trigger §4.11 |
 
-Parallelism: 13 and 14 share no code with 15/16 (they touch `InkyModule`'s ribbon/hub regions, not the layout path) and can run in a parallel session. 20's reader scaffolding (the `styles.xml`/`numbering.xml` part readers) starts while 18 is in review — different files. Everything else is sequential.
+Parallelism: 13 and 14 share no code with 15/16 (they touch `InkyModule`'s ribbon/hub regions, not the layout path) and can run in a parallel session. 20's reader scaffolding (the `styles.xml`/`numbering.xml` part readers) starts while 18 is in review — different files; note that 16a already lands the *metric-only* part of that chain (size, spacing, line height, indents, keep/break), so 20 extends a reader rather than creating one. Everything else is sequential. Plan 11's UI packages are a separate track (chrome only) and need their own Compose BOM bump PR first (BOM `2024.09.00` has no Material 3 Expressive API).
 
 ---
 
@@ -212,28 +214,51 @@ Closes plan-03 3.12, 3.29, 3.30, 3.31. `DESIGN.md` review against m3.material.io
 1. **E-0 · Per-page element dump (first).** Debug-only, CI-invokable: for each page of a laid-out sample, element indices, kinds, reserved heights, leftover space. Shipped as a unit test on Sample-6 (ODT + DOCX), output asserted *and* printed. The suspected empty-page mechanism — the `OfficePageBreak` arm in `LayoutEngine.kt` adds an extra **empty page** when a break lands at the top of a page (double break → blank) — is confirmed or refuted by evidence here; plan-2 §1 item 7 closes in this PR, not 16.
 2. **E-EN-1 · `LayoutUnits`.** One converter: `ptToUnits`, `cmToUnits`, `emuToUnits`, `twipsToUnits` (96/inch). The `* 2.5f` fudge is *not yet deleted* (16 deletes it); every new call site uses the converter; the `OdfFrameContext` 160/in drift dies here too.
 3. **E-EN-2 · `TextMetrics(style): Measurable`.** Same resolved style for measure and display; Android `Paint` on device, deterministic JVM advance table in tests.
-4. **E-EN-3 · `ParagraphStyle` grows metric fields** (`spaceBefore/AfterUnits`, `lineHeightFactor`, indents, `keepWithNext`, `pageBreakBefore`, `fontFamily`). Parsers don't populate them yet (16/18/20 do); defaults keep today's rendering byte-identical.
+4. **E-EN-3 · `ParagraphStyle` grows metric fields** (`spaceBefore/AfterUnits`, `lineHeightFactor`, indents, `keepWithNext`, `pageBreakBefore`, `fontFamily`). Parsers don't populate them yet (16a/18/20 do); defaults keep today's rendering byte-identical.
 5. **E-EN-5 · `FontRegistry` seam.** Substitution order per §0 (exact → bundled metric-compatible → user fonts → system → default), one family per name for both `TextMetrics` and `OfficeRuns.fontFamilyFor`. This PR wires the *mapping*; real `Typeface` loading is Plan 10 A1; the display decision is recorded in `FontRegistry` itself.
 6. **E-7 · One render transform (+ ⚑ centralisation).** The renderer derives card size, margins, and text scale from the page's own `widthDp/heightDp` through a single `pageScale`; `PageStackMetrics.BASE_CARD_WIDTH_DP` retires from the render path. ⚑ The status bar's page-range logic consumes the same single transform as the renderer, so the two can never drift again. `PageStackMetrics` survives only as the Go-to-Page/visibility-range input until that range derives from real page heights.
-**Files:** new `data/LayoutUnits.kt`, `data/TextMetrics.kt`, `data/FontRegistry.kt`; `data/OfficeDocument.kt`; `LayoutEngine.kt` (dump + seams only); `LayoutDrivenDocumentRenderer.kt` (transform); `InkyModule.kt` (transform inputs; page-range consumers).
-**Tests:** `LayoutUnitsTest`, `TextMetricsTest`, `FontRegistrySubstitutionTest` (30-name corpus from the samples resolves identically for metrics and display), `Plan5ElementDumpTest` (Sample-6, both formats), and **the pagination windows must not move** (Sample-5 stays `12..30` until 16).
-**Acceptance:** no pagination-window change; at 100 % the on-screen text column equals the layout's content width at any viewport size; the dump names the empty-page mechanism in its output.
-**Size:** medium (2–3 days). **Commit plan:** dump → units → metrics + styles → fonts → transform.
+**Amendments of 2026-09-26 (audit-007 §11.1):**
+7. **⚑ E-0 runs on all six pairs**, not Sample-6 alone: per file it prints the body rectangle used, the default metrics used, the page count, the reference count (audit-007 §1: M365 15/23/20/10/18/21 for DOCX; ODT pending Collabora) and the number of pages holding fewer than three elements. The assertion is still only "the dump ran and named the mechanism". Code reading already refutes the double-break theory (`flushPage()` emits nothing for an empty page; audit-007 finding G); the dump confirms which files' blank pages come from the fake breaks (audit-007 §5) and which from inflated metrics.
+8. **⚑ `SampleMatrixTest` (pure JVM).** Pins, for all twelve files, the declared page size, margins, header/footer heights, first master page (ODT) or section count (DOCX), body font and size, default line height and after-spacing, exactly as tabulated in audit-007 §2 and §3, and the reference counts as named constants with their provenance in a comment. `PageGeometryTest`'s "margins" test is re-worded to "declared margins" and keeps its numbers.
+9. **⚑ `PageStyleSpec` gains `headerHeightDp`/`footerHeightDp`** inside E-EN-3 (fixed `svg:height`, else `fo:min-height`; ODF 1.4 Part 3 §20.407.2 / §20.212), populated by `SvXMLImport`, left 0 for DOCX (Word keeps header and footer inside the margin). Defaults keep today's pagination byte-identical; 16a makes the paginator use them. Reason: Sample-4/5 ODT carry Word's 1 in top margin as a 2.54 cm fixed-height header with `fo:margin-top="0cm"` (audit-007 finding B), so today they paginate against a 29.7 cm body.
+10. **⚑ `FontRegistry` input corpus** is audit-007 §8 (eleven family names actually present in the six pairs); the Aptos stand-in is an open user choice recorded in the registry as "not metric-compatible".
+**Files:** new `data/LayoutUnits.kt`, `data/TextMetrics.kt`, `data/FontRegistry.kt`; `data/OfficeDocument.kt`; `LayoutEngine.kt` (dump + seams only); `LayoutDrivenDocumentRenderer.kt` (transform); `InkyModule.kt` (transform inputs; page-range consumers); `data/odf/SvXMLImport.kt` (header/footer heights only).
+**Tests:** `LayoutUnitsTest`, `TextMetricsTest`, `FontRegistrySubstitutionTest` (the §8 corpus resolves identically for metrics and display), `Plan5ElementDumpTest` (all six pairs), `SampleMatrixTest` (twelve files), and **the pagination windows must not move** (Sample-5 stays `12..30` until 16b).
+**Acceptance:** no pagination-window change; at 100 % the on-screen text column equals the layout's content width at any viewport size; the dump names the empty-page mechanism per file; `SampleMatrixTest` green against the audit-007 tables.
+**Size:** medium (2–3 days). **Commit plan:** audit-007 evidence (landed 2026-09-26) → dump → matrix test → units → metrics + styles (incl. header/footer heights) → fonts → transform.
 
-### 4.4 PR 16 — Plan 5B: honest pagination
+### 4.4 PR 16 — split on 2026-09-26 into PR 16a (Plan 5B) and PR 16b (Plan 5C)
 
-**Goal:** the page count stops lying. Closes E-2…E-6, F-21, the page-count half of finding 6, plan-03 3.17, and the F-24/F-25/F-28 symptoms once the dump's mechanism is confirmed.
+The original single PR 16 ("honest pagination", E-2…E-6 + F-21) was rated large and medium-high risk, and audit-007 showed its two halves fail differently: the parsing half (breaks, defaults, body rectangle, style chain) is visible commit by commit in the E-0 dump, the measurement half (real advances, line heights, widows, tabs) moves every window at once. They are therefore two PRs. Item IDs keep their Plan 5 identity.
 
-1. **E-2:** `layoutParagraph` measures through `TextMetrics` at `ptToUnits(fontSize)`; line height = `max(ascent+descent, fontSizeUnits * lineHeightFactor)` — which also deletes the renderer's `(sizeSp + 5f)` magic line-height constant (⚑ made explicit; the constant dies in favour of style-driven line height, Sample-6 `Normal` = 116 %). The `2.5f` fudge and `fallbackTextSize` are deleted.
-2. **E-3:** `spaceBefore/After` from the style fields, populated from `fo:margin-top/bottom`, `fo:line-height`, `fo:text-indent`, `fo:margin-left/right` in `SvXMLImport` and `w:spacing`/`w:ind` in the DOCX branch (including docDefaults `pPr` — §2.2); `elementGapDp` dies.
-3. **E-4:** break semantics: honour `fo:break-before/after`, `keep-with-next`, `w:pageBreakBefore`, `w:keepNext`; `text:soft-page-break` and `w:lastRenderedPageBreak` stop being page breaks and the `--- Page Break ---` text pollution goes with them (3.17, O-02 pagination half). The ODT/DOCX difference for chapter breaks (style-level `fo:break-before` on the auto style vs `w:br type=page` inside the heading paragraph, §2.3 item 4) normalises to the same model fact here.
-4. **E-5:** widow/orphan floor of 2 where the style declares it (Sample-6 `Normal`).
-5. **E-6:** windows: `Sample5UnifiedPaginationTest` tightens from `12..30` to `15..21`; new `Sample6PaginationTest` asserts `15..26` for both formats with the M365 references (18/21) recorded. Staged window per §0; the ±10 % tightening is a later commit after 7/8.
-6. **F-21:** one default-size constant: `StyleResolver`'s 14 sp default is replaced by the document's `docDefaults`/default-style size (Sample-6: 12 pt), falling back to 12 pt; toolbar chip, paginator and renderer read the same constant (audit-003 D5 closes with it).
-**Files:** `LayoutEngine.kt`, `TextMetrics.kt` (now load-bearing), `data/odf/SvXMLImport.kt`, `OfficeDocumentParser.kt`, `OfficeDocument.kt`, `LayoutDrivenDocumentRenderer.kt` (line heights).
-**Tests:** `ParagraphMetricsTest` (Sample-6 `Normal`: 116 % line height, 0.282 cm after), `PaginationFidelityTest` (windows, both formats), the dump test re-run showing no zero-element pages unless the document authors one, caret/selection/undo suites unchanged.
-**Acceptance:** Sample-5 in `15..21`, Sample-6 in `15..26` (ODT **and** DOCX), no empty page in any sample, one-page documents stay one page.
-**Size:** large. **Risk:** medium-high (upstream assertions move). Mitigations: windows not exact counts; `forceRebuildAll` spot checks; `TextMetrics` reverts alone.
+#### 4.4a PR 16a — Plan 5B: breaks and defaults (parsing side)
+
+**Goal:** every page break in the model is one the document authored, and every default metric comes from the file. Closes E-4, the parsing half of E-3, F-21, plan-03 3.17, the O-02 pagination half. Each commit re-runs the E-0 dump so its effect is visible alone.
+
+1. **E-4a · Fake breaks out.** `w:lastRenderedPageBreak` (Sample-2: 22, Sample-5: 3) and `text:soft-page-break` (Sample-1: 8, Sample-2: 10, Sample-4/5: 2) stop being page breaks; the `--- Page Break ---` text pollution goes with them (3.17). First commit, on its own, because nothing after it is readable while they are in.
+2. **E-4b · Real breaks in.** `fo:break-before/after` on paragraph (auto) styles, `w:br type="page"` inside runs (Sample-2/4/5/6 start chapter headings that way), `w:pageBreakBefore`, and section starts (`w:sectPr` `type=nextPage` or default) become one model fact; `keep-with-next`/`w:keepNext` are recorded on the paragraph for 16b. The ODT/DOCX chapter-break difference (§2.3 item 4) normalises here.
+3. **⚑ E-3a · Body rectangle = margins + header/footer heights** (audit-007 finding B), consuming the `PageStyleSpec` fields PR 15 added. Sample-4/5 ODT stop paginating against a 29.7 cm body; Sample-3 ODT keeps its declared 0 cm margins (honoured as declared, user decision 2026-09-26).
+4. **⚑ E-3b · Metric-only style chain, both formats.** `docDefaults`/`default-style` → default paragraph style → `w:basedOn`/`style:parent-style-name` → paragraph style → direct `w:pPr`/paragraph properties, for **size, line height (`w:line`/`lineRule`, `fo:line-height`), before/after spacing, indents, keep/break flags only**. Populates the `ParagraphStyle` metric fields from PR 15 (E-EN-3). Run formatting, fonts, colours and the char-link rule stay in PR 20, which extends this reader. Sample-4 is the acceptance case for the order (docDefaults 1.5 lines, Normal `w:line=240`, body 278/360; audit-007 §3.3).
+5. **F-21 · Document defaults replace the constants.** `StyleResolver`'s 14 sp default and its 24/20/16 sp heading fallbacks are replaced by the chain's result (Sample-1: 11 pt; Samples 2-6: 12 pt; TextMaker headings are body-size bold, audit-007 finding D), falling back to 12 pt only when a file declares nothing. Toolbar chip, paginator and renderer read the same value (audit-003 D5 closes with it). `Sample5StyleFidelityTest.mappedHeadingStyleBeatsHeuristic` is re-worded to assert the document default instead of the heuristic.
+6. **Windows:** only **widened** where the dump shows the current `12..30` (Sample-5) is dishonest; nothing is tightened in this PR.
+**Files:** `data/odf/SvXMLImport.kt`, `data/odf/SvXMLImportContext.kt`, `OfficeDocumentParser.kt` (DOCX branch + shared parse block), `OfficeDocument.kt` (`ParagraphStyle` population, break model), `LayoutEngine.kt` (`StyleResolver`, break handling, body rect), the dump test.
+**Tests:** `BreakSemanticsTest` (per file: authored breaks in, fake breaks out, counts from audit-007 §5), `StyleChainMetricsTest` (Sample-4 order; Sample-1 11 pt; Sample-6 heading = 12 pt bold; Sample-3 heading 1 = 20 pt), `BodyRectTest` (Sample-4/5 ODT body top 2.54 cm; Sample-3 0 cm; DOCX 6.27 × 9.69 in), `SampleMatrixTest` and the dump re-run, `Sample5UnifiedPaginationTest` unchanged or widened.
+**Acceptance:** the dump shows zero non-authored breaks in all twelve files; every paragraph's resolved size equals the audit-007 §3/§4 expectation for the sampled paragraphs; no window tightened.
+**Size:** medium. **Risk:** medium (parser changes touch every file, but each is dump-visible and reverts alone).
+
+#### 4.4b PR 16b — Plan 5C: metrics and windows (measurement side)
+
+**Goal:** the page count stops lying. Closes E-2, the measurement half of E-3, E-5, E-6, the page-count half of finding 6, and the F-24/F-25/F-28 symptoms.
+
+1. **E-2:** `layoutParagraph` measures through `TextMetrics` at `ptToUnits(fontSize)` with the family `FontRegistry` resolved; line height = `max(ascent+descent, fontSizeUnits * lineHeightFactor)`, which also deletes the renderer's `(sizeSp + 5f)` magic line-height constant in favour of style-driven line height (Sample-6 `Normal` = 116 %). The `2.5f` fudge and `fallbackTextSize` are deleted.
+2. **E-3c:** `currentY += h + spaceAfter(prev) + spaceBefore(next)` from the fields 16a populated; `elementGapDp` dies.
+3. **E-5:** widow/orphan floor of 2 where the style declares it (Sample-1/2 `Standard`, Sample-6 `Normal`).
+4. **⚑ E-5b · Tab stops enough for line-count honesty:** default tab distance (`style:tab-stop-distance`, `w:defaultTabStop`/`w:tabs defTabSz`) and paragraph-level `w:tabs`/`style:tab-stops` (Sample-6: 167 `w:tab`, Sample-4: 35; the TOC entries wrap differently if tab widths are wrong). Leaders are painted by PR 19/21, not here.
+5. **E-6 · Windows, per format, all six pairs** (§0 as amended; audit-007 §11.3): DOCX `12..18`, `18..28`, `16..24`, `8..12`, `15..21`, `15..26`; ODT provisional `9..18`, `15..22`, `12..20`, `7..12`, `12..21`, `15..26`, re-derived from Collabora's page counts when the regenerated `.odt` fixtures land. `Sample5UnifiedPaginationTest` becomes the Sample-5 rows of `PaginationFidelityTest`. The ±10 % tightening is a later commit after 7/8.
+**Files:** `LayoutEngine.kt`, `TextMetrics.kt` (now load-bearing), `LayoutDrivenDocumentRenderer.kt` (line heights), `OfficeDocument.kt` (tab stops on `ParagraphStyle`), the parsers for tab stops only.
+**Tests:** `ParagraphMetricsTest` (Sample-6 `Normal`: 116 % line height, 0.282 cm after; Sample-1 `Standard`: 115 %, 0.111 in), `PaginationFidelityTest` (twelve rows), the dump re-run showing no page with fewer than three elements unless the document authors one, caret/selection/undo suites unchanged.
+**Acceptance:** all twelve windows green; no blank page in any sample; one-page documents stay one page; an empty document stays one page.
+**Size:** large. **Risk:** medium-high (upstream assertions move). Mitigations: windows not exact counts; `forceRebuildAll` spot checks; `TextMetrics` reverts alone; 16a's parsing is already in and green before any metric moves.
 
 ### 4.5 PR 17 — Plan 6: image pipeline and load performance (unchanged from v1)
 
@@ -300,7 +325,7 @@ Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F
 7. **H-7:** `w:lastRenderedPageBreak` excluded from pagination and editable text (Sample-2's 22 occurrences are the regression case).
 **Files:** `OfficeDocumentParser.kt` (numbering/field/section readers + run path completion), `data/OfficeDocument.kt`, `data/DocxDocumentParser.kt` (TOC rendering only — save is PR 22), `LayoutEngine.kt` (section-aware pagination).
 **Tests:** `DocxNumberingTest` (Sample-6: `BAB 1…3` on the 42 numbered headings, none on the 3 suppressed; Sample-4 legal-numbered list; Sample-3: zero labels), `DocxFieldTest` (no `SEQ`/`TOC \`/`PAGEREF` instruction text in parsed output for Samples 1/2/6), `DocxTocTest` (entries, dot leaders, literal pages, `_TOC` anchors), `DocxTableGeometryTest`, `DocxSectionGeometryTest` (5 sections → 5 geometry boxes; pgNumType recorded), and **the convergence test: Sample-6 ODT and DOCX paginate into the same page windows** (§2.4.7).
-**Acceptance:** Sample-6.docx fidelity checklist; both formats converge on the same page windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of 18/21, never below).
+**Acceptance:** Sample-6.docx fidelity checklist; Sample-6's two formats (the one metric-identical pair, audit-007 §1) converge on the same page window, the other pairs hold their per-format windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of the audit-007 §1 references, never below).
 **Size:** large.
 
 ### 4.10 PR 22 — Plan 9: save round-trip integrity (unchanged from v1, pre-change gate first)
@@ -323,7 +348,8 @@ Per plan-01 §6's update rule, every PR's **final commit** contains:
 | 13 | row 3 → "3A landed (PR 12); 3B landed (PR 13)" | plan-03 §8 gets a 3B record (3.5–3.11, 3.28, ⚑3.32/⚑3.33 as shipped) |
 | 14 | row 3 → "3C landed (PR 14)" | plan-03 §8 gets a 3C record |
 | 15 | row 5 → "5A landed (PR 15)" | plan-04-to-09 § Plan 5 gets E-0/E-7/⚑centralisation record |
-| 16 | row 5 → "landed (PR 15-16)" | § Plan 5 gets the windows actually achieved |
+| 16a | row 5 → "5A, 5B landed (PR 15, 16a)" | § Plan 5 gets the break/defaults record and any widened window |
+| 16b | row 5 → "landed (PR 15, 16a, 16b)" | § Plan 5 gets the twelve windows actually achieved, per format |
 | 17 | row 6 → landed | § Plan 6 record |
 | 18 | row 7 → "7A landed (PR 18)" | § Plan 7 gets G-1/G-3/G-4/⚑G-4b record |
 | 19 | row 7 → "landed (PR 18-19)" | § Plan 7 gets G-2/G-5/G-6/⚑G-7 record |
@@ -342,7 +368,8 @@ One-time plan-1 changes with PR 13's commits (they describe state now): registry
 |---|---|---|---|
 | 1 | 13 (3B) | 14 (docs-only) | Delivery Gate PASS at 320 dp; grey allowances 0 |
 | 2 | 15 (5A) | 13/14 if a second session is free | dump answers F-25; windows unmoved |
-| 3 | 16 (5B) | — | both-format windows green |
+| 3 | 16a (5B) | — | dump shows no fake breaks; defaults from the file; no window tightened |
+| 3b | 16b (5C) | — | twelve per-format windows green |
 | 4 | 17 (6) | 20 (8A) scaffolding | no blank frame; refusal proven |
 | 5 | 18 (7A) | 20 (8A) scaffolding | ODT numbering fidelity |
 | 6 | 19 (7B) | tail of 18 | ODT checklist green |
@@ -353,7 +380,7 @@ One-time plan-1 changes with PR 13's commits (they describe state now): registry
 **Device checklist resume points** (`docs/InkyC1Checklist.md`, deliberately postponed; section order = item number):
 
 1. **Now (before PR 15):** install the latest nightly (≥ PR 12), run plan-02 §5 acceptance and checklist items 5 (Selection), 8 (Reminder), 9 (Zoom), plus the `[needs run]` device log for the Viewer FCT platform-menu question.
-2. **After PR 16:** items 2 (editing stages), 4 (Caret), 6 (Go To with believable counts), 9 re-run, 11 (Session Restore: page 15 at 170 %, migrated zoom semantics).
+2. **After PR 16b:** items 2 (editing stages), 4 (Caret), 6 (Go To with believable counts), 9 re-run, 11 (Session Restore: page 15 at 170 %, migrated zoom semantics).
 3. **After PR 19/21:** item 7 (Navigator categories — now including the Images/Hyperlinks/Bookmarks/Sections data that 15/17/18/19/20/21 feed), item 10 (Save Compatibility), and the item 12 stress test after PR 17 (media memory).
 
 ---
@@ -375,13 +402,14 @@ One paginator, one unit system, one style resolver, one numbering model, one med
 7. **⚑ Bookmarks (G-4b in 18, DOCX arm in 20)** — tokens exist but are unconsumed; the Navigator bookmarks category and the `_TOC` anchors need them.
 8. **⚑ Sections (G-7 in 19, H-6b in 21)** — ODT `text:section` identity had no plan item; DOCX `pgNumType`/`titlePg` is now explicit (WG status-bar page-number-vs-sequence-number).
 9. **⚑ E-7 centralisation (15)** — the status bar's duplicated fit-scale computation now consumes the renderer's single transform; PR 13 deliberately does not touch that region.
-10. **⚑ E-2 line-height constant (16)** — the renderer's `(sizeSp + 5f)` magic line height dies with the fudge, in favour of style-driven line height.
+10. **⚑ E-2 line-height constant (16b)** — the renderer's `(sizeSp + 5f)` magic line height dies with the fudge, in favour of style-driven line height.
 11. **Guard baseline corrected (§1.2)** — 47 textual occurrences in 14 files, **46 in code across 13** once comments are masked; the `LayoutDrivenDocumentRenderer` allowance is stale. PR 13's scope states that every map entry is deleted.
 12. **`w:br` handling corrected in the record** — the shared parse block *does* distinguish `type="page"` from soft breaks (`OfficeDocumentParser.kt:961`); v1's "still open" row implied otherwise. The remaining issue is `w:lastRenderedPageBreak` (ODT soft-page-break pollution), unchanged.
 13. **`w:tabs` attribution corrected** — the first draft of this file placed the TOC dot-leader tab in the `toc 1/2/3` styles; it is a paragraph-level property in `document.xml` (§2.3 item 5, §4.9 item 3).
 14. **Pagella 3.9 corrected** — the zoom pair there already has 48 dp targets through Material 3's minimum; only Cellina and Slidia override it with `Modifier.size(24.dp)` (§4.1 item 4).
 15. **⚑ items re-numbered and tightened (v2.2, 2026-09-24):** the Navigator and status-bar items are now **3.32/3.33**, because 3.14/3.15 in the first draft collided with plan-03's existing ODF-conformance rows (list styles / TOC index dropped, owned by plans 7 and 9). **⚑3.32** distinguishes *verified-absent* from *not-yet-readable* and moves the justification from "the index engine populates only some categories" (it has arms for all of them, exercised by `NavigationEngineTest`) to the verified fact that **no parser constructs the element classes**; **⚑3.33** fixes the data sources (caret→element seam; heading level+text from the Navigator index; table and list-item kinds; hyphen fallback, no invented data); **⚑G-4b** pins the DOCX `w:bookmarkStart/End` arm to PR 20 so both formats expose anchors in the same wave as the TOC snapshot rendering; **⚑G-7** leaves the section model shape (wrapper vs attribute) to implementation, fixed on the exposed name; **⚑H-1b** adds the precedence (explicit `w:link` → naming convention → style's own `rPr`; a direct run always overrides); **⚑H-1c** states the three-state flag and that the `pStyle` chain is walked through `w:basedOn`; **⚑H-2b** fixes the fallback for styleIds missing from the file's own style table (Normal-based, not a heading); **⚑H-3** states the resolution precedence (direct `numPr` incl. `numId=0` → style chain → none); **⚑H-4b** fixes entry detection to "toc-styled paragraph, inside or outside a field-result run"; **⚑H-6b** records `headerReference`/`footerReference` in the model without rendering them (no plan item owns page furniture).
 16. **⚑3.32 implementation additions (recorded in PR 13, v2.3):** the Indexes filter (`NavigateBy.INDEX`) was the same class of lie as the twelve categories in the All view — it fell through to the generic "There are no objects to navigate" row although a TOC/index is authored document content that plans 19/21 read — so `indexes` joined the not-yet-readable set in `NavigatorCategories` (key `indexes`, element classes hand-checked like `frames`/`ole`, owner `plan-19/21`). The "Pages" and "Reminders" Navigate-By labels became plural so the verified-absent sentence ("No %1$s in this document.") reads correctly for them; `values-in` is untouched. The Hyperlinks category carries no rows and no `Navigate-By` filter option in this PR: `NavigationEngine` has no hyperlink jump yet, so the rows and their jump land together with the parser in 18/20.
+17. **⚑ v2.4 (2026-09-26, audit-007):** (a) **PR 16 split** into 16a (Plan 5B, parsing: fake breaks out, real breaks and section starts in, body rect from margins + header/footer heights, metric-only style chain, F-21 defaults) and 16b (Plan 5C, measurement: `TextMetrics` load-bearing, constants deleted, widows/orphans, tab stops, windows); 17 still depends on 15, 18 now depends on 16b. (b) **Windows are per format** and cover all six pairs; the "Sample-5 `15..21` both formats" wording is withdrawn because the OnlyOffice ODT exports of Sample-3/4/5 lost Word's `pPrDefault` (single-spaced, 0 after) and Sample-3.odt declares 0 cm top/bottom margins; geometry is honoured as declared (user decision), and the ODT column is provisional until the user regenerates the `.odt` fixtures with Collabora Office. (c) **DOCX references completed** from M365 Copilot: Sample-1 15, Sample-3 20, Sample-4 10 (Sample-2 23 and Sample-5 18 from `app.xml`, Sample-6 21 as before). (d) **PR 15 gains** the dump over all six pairs, `SampleMatrixTest`, header/footer heights in `PageStyleSpec`, and the §8 font corpus. (e) **Corrections to the record:** §2's counts are confirmed; Sample-4/5 ODT's "margin-top 0" (§2.1's Sample-5 note) is a fixed-height header carrying the margin (equivalent to the DOCX), not a defect, while Sample-3.odt's 0 cm margins are; the "double break makes a blank page" theory (plan-02 item 7) is refuted by `flushPage()`'s guard, so E-0 is confirmation, not diagnosis. (f) **Native libraries:** the checked-in `.so` files are LFS pointers to a 196 MB (arm64) / 135 MB (v7a) `liblo-native-code.so` plus the NSS/NSPR set; the "~60 KB stub" wording in earlier audits is withdrawn (audit-007 §10).
 
 ---
 
@@ -392,10 +420,13 @@ One paginator, one unit system, one style resolver, one numbering model, one med
 3. The plan-9 pre-change gate when PR 21 nears (its scope paragraph is a seed, not a commitment).
 4. The staged-window tightening decision is already recorded (§0) and executes inside PR 21 — no action needed, listed for completeness.
 5. **⚑ The new scope items (3.32, 3.33 in PR 13; ⚑G-4b bookmarks in PR 18/20; ⚑G-7 sections in PR 19/21; ⚑H-1b/H-1c/H-2b and ⚑H-3/H-4b/H-6b in PR 20/21)** are additive and each unblocks an existing checklist item or a verified sample fact; strike any of them and the owning PR simply drops that bullet — nothing else depends on them.
+6. **⚑ From audit-007 §12 (2026-09-26):** the Aptos stand-in for `FontRegistry` (Carlito, Liberation Sans, or system default; cosmetic for pagination); whether to add a read-only native-library inventory step to the CI `test` job; whether Sample-1's ODT keeps the bridging window `9..18` or has no ODT assertion until the Collabora count exists; and the Collabora regeneration itself (drop the six `.odt` files in place, record the six status-bar page counts, update `SampleMatrixTest` and the ODT window column in one commit).
 
 ---
 
 ## Appendix A — Verification evidence (this session, at `55a9a97`)
+
+*2026-09-26:* the full twelve-file re-measurement (geometry, defaults, headings, breaks, structure counts, producer quirks, fonts, native-library sizes, and the per-column regexes) lives in `audit-007-2026-09-26-sample-matrix.md`; the evidence below is kept as the PR 12/13-era record.
 
 **Sample-6 DOCX (verbatim, abridged):**
 
