@@ -30,10 +30,35 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      # Read-only look at the bundled .so files (roadmap PR 15): sizes, ELF
+      # header, NEEDED chain, JNI and LibreOfficeKit exports, and whether the
+      # `external fun` declarations in LibreOfficeCore.kt have a symbol. The
+      # LFS checkout above is what makes the binaries inspectable at all; the
+      # step never fails the job.
+      - name: Native inventory (read-only)
+        continue-on-error: true
+        run: |
+          chmod +x scripts/native-inventory.sh
+          scripts/native-inventory.sh build/native-inventory.txt
+
       - name: Run Unit Tests
         run: |
           chmod +x gradlew
           ./gradlew testDebugUnitTest
+
+      # Test XML/HTML reports and the plan 5 dump (Plan5ElementDumpTest prints
+      # to system-out) plus the native inventory, kept two weeks.
+      - name: Upload test reports and native inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            build/native-inventory.txt
+          if-no-files-found: ignore
+          retention-days: 14
 
   build:
     name: Build (SemVer & Nightly)
