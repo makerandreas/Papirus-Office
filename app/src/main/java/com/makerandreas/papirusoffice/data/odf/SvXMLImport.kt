@@ -3,6 +3,7 @@ package com.makerandreas.papirusoffice.data.odf
 import android.content.Context
 import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
+import com.makerandreas.papirusoffice.data.LayoutUnits
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.PageStyleSpec
@@ -51,7 +52,9 @@ data class OdfStyleInfo(
     val isItalic: Boolean? = null,
     val isUnderline: Boolean? = null,
     val colorHex: String? = null,
-    val alignment: String? = null
+    val alignment: String? = null,
+    /** `style:master-page-name` on a paragraph (automatic) style: the page style this paragraph starts. */
+    val masterPageName: String? = null
 )
 
 /** Bold/italic/underline resolved from a character style, never from the style name. */
@@ -67,6 +70,7 @@ private class StyleDraft(
     val parentName: String?,
     val displayName: String?,
     val outlineLevel: Int?,
+    val masterPageName: String? = null,
     var fontFamily: String? = null,
     var fontSizePt: Float? = null,
     var isBold: Boolean? = null,
@@ -87,26 +91,13 @@ private class StyleDraft(
         isItalic = isItalic,
         isUnderline = isUnderline,
         colorHex = colorHex,
-        alignment = alignment
+        alignment = alignment,
+        masterPageName = masterPageName
     )
 }
 
-private val FONT_SIZE_NUMBER = Regex("^([-+]?[0-9]*\\.?[0-9]+)")
-
-/** ODF `fo:font-size` like `12pt` stays in points; not converted through [OdfLength]. */
-internal fun parseOdfFontSizePt(raw: String?): Float? {
-    if (raw.isNullOrBlank()) return null
-    val text = raw.trim().lowercase(Locale.ROOT)
-    val number = FONT_SIZE_NUMBER.find(text)?.groupValues?.get(1)?.toFloatOrNull() ?: return null
-    if (number <= 0f) return null
-    return when {
-        text.endsWith("%") -> null
-        text.endsWith("in") -> number * 72f
-        text.endsWith("cm") -> number * 72f / 2.54f
-        text.endsWith("mm") -> number * 72f / 25.4f
-        else -> number
-    }
-}
+/** ODF `fo:font-size` like `12pt` stays in points; [LayoutUnits.parsePoints] owns the arithmetic. */
+internal fun parseOdfFontSizePt(raw: String?): Float? = LayoutUnits.parsePoints(raw)
 
 private fun parseAlignment(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
@@ -170,7 +161,8 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     isItalic = over.isItalic ?: base.isItalic,
     isUnderline = over.isUnderline ?: base.isUnderline,
     colorHex = over.colorHex ?: base.colorHex,
-    alignment = over.alignment ?: base.alignment
+    alignment = over.alignment ?: base.alignment,
+    masterPageName = over.masterPageName ?: base.masterPageName
 )
 
 class SvXMLImport(
@@ -182,6 +174,7 @@ class SvXMLImport(
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
     private val styleMap = mutableMapOf<String, OdfStyleInfo>()
     private val pageLayouts = LinkedHashMap<String, PageStyleSpec>()
+    private val masterPages = LinkedHashMap<String, String>()
     private var pageSpecFromDefaultStyle: PageStyleSpec? = null
     private var standardPageLayoutName: String? = null
     private var firstMasterPageLayoutName: String? = null
@@ -199,6 +192,10 @@ class SvXMLImport(
         var capturingDefaultPageStyle = false
         var pendingDraft: StyleDraft? = null
         var pendingIsDefault = false
+        // style:header-style / style:footer-style inside the current page layout.
+        var pendingHeaderFooter: String? = null
+        var pendingHeaderHeight = 0f
+        var pendingFooterHeight = 0f
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -213,7 +210,8 @@ class SvXMLImport(
                     // tags; content.xml would otherwise pay this cost per element.
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
-                        "master-page", "text-properties", "paragraph-properties" -> attrIndex(parser)
+                        "master-page", "text-properties", "paragraph-properties",
+                        "header-footer-properties" -> attrIndex(parser)
                         else -> emptyMap()
                     }
                     when (localName) {
@@ -227,13 +225,32 @@ class SvXMLImport(
                                     family = attrs["family"] ?: "paragraph",
                                     parentName = attrs["parent-style-name"],
                                     displayName = attrs["display-name"],
-                                    outlineLevel = attrs["default-outline-level"]?.toIntOrNull()
+                                    outlineLevel = attrs["default-outline-level"]?.toIntOrNull(),
+                                    masterPageName = attrs["master-page-name"]?.takeIf { it.isNotBlank() }
                                 )
                             } else {
                                 null
                             }
                         }
-                        "page-layout" -> pendingPageLayoutName = attrs["name"]?.takeIf { it.isNotBlank() }
+                        "page-layout" -> {
+                            pendingPageLayoutName = attrs["name"]?.takeIf { it.isNotBlank() }
+                            pendingHeaderHeight = 0f
+                            pendingFooterHeight = 0f
+                        }
+                        "header-style" -> pendingHeaderFooter = "header"
+                        "footer-style" -> pendingHeaderFooter = "footer"
+                        // Height the header/footer occupies between margin and body:
+                        // fixed svg:height (ODF 1.4 Part 3 §20.407.2) wins over the
+                        // content minimum fo:min-height (§20.212).
+                        "header-footer-properties" -> {
+                            val height = attrs["height"]?.let { OdfLength.toLayoutUnits(it) }
+                                ?: attrs["min-height"]?.let { OdfLength.toLayoutUnits(it) }
+                                ?: 0f
+                            when (pendingHeaderFooter) {
+                                "header" -> pendingHeaderHeight = height.coerceAtLeast(0f)
+                                "footer" -> pendingFooterHeight = height.coerceAtLeast(0f)
+                            }
+                        }
                         "default-style" -> {
                             pendingDraft?.let { commitStyleDraft(it, isDefault = pendingIsDefault) }
                             val family = attrs["family"] ?: ""
@@ -265,6 +282,7 @@ class SvXMLImport(
                         "master-page" -> {
                             val layoutName = attrs["page-layout-name"]?.takeIf { it.isNotBlank() }
                             if (layoutName != null) {
+                                attrs["name"]?.takeIf { it.isNotBlank() }?.let { masterPages.putIfAbsent(it, layoutName) }
                                 if (firstMasterPageLayoutName == null) firstMasterPageLayoutName = layoutName
                                 if (attrs["name"].equals("Standard", ignoreCase = true)) {
                                     standardPageLayoutName = layoutName
@@ -274,7 +292,21 @@ class SvXMLImport(
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     when ((parser.name ?: "").substringAfterLast(':')) {
-                        "page-layout" -> pendingPageLayoutName = null
+                        "header-style", "footer-style" -> pendingHeaderFooter = null
+                        "page-layout" -> {
+                            val layoutName = pendingPageLayoutName
+                            if (layoutName != null && (pendingHeaderHeight > 0f || pendingFooterHeight > 0f)) {
+                                pageLayouts[layoutName]?.let { spec ->
+                                    pageLayouts[layoutName] = spec.copy(
+                                        headerHeightDp = pendingHeaderHeight,
+                                        footerHeightDp = pendingFooterHeight
+                                    )
+                                }
+                            }
+                            pendingPageLayoutName = null
+                            pendingHeaderHeight = 0f
+                            pendingFooterHeight = 0f
+                        }
                         "style" -> {
                             pendingDraft?.let { commitStyleDraft(it, isDefault = false) }
                             pendingDraft = null
@@ -424,8 +456,36 @@ class SvXMLImport(
             paragraphStyles = paragraphs,
             characterStyles = characters,
             pageStyles = pageLayouts.toMap(),
-            defaultPageStyle = defaultPage
+            defaultPageStyle = defaultPage,
+            masterPages = masterPages.toMap(),
+            firstMasterPageName = firstBodyMasterPageName()
         )
+    }
+
+    /**
+     * Master page the body starts on: the first paragraph's or heading's
+     * style chain is walked for `style:master-page-name` (ODF 1.4 Part 3
+     * §19.505, set on the automatic style of the paragraph that begins a
+     * page). Null when the body names none, which ODF resolves to "Standard".
+     */
+    private fun firstBodyMasterPageName(): String? {
+        val firstStyle = parsedElements.firstNotNullOfOrNull { element ->
+            when (element) {
+                is OfficeDocumentElement.Paragraph -> element.styleName ?: ""
+                is OfficeDocumentElement.Heading -> element.styleName ?: ""
+                else -> null
+            }
+        } ?: return null
+        var curr: String? = firstStyle.takeIf { it.isNotBlank() }
+        val seen = HashSet<String>(8)
+        var depth = 0
+        while (curr != null && depth < 16 && seen.add(curr.lowercase(Locale.ROOT))) {
+            val info = lookupStyle(curr) ?: return null
+            info.masterPageName?.takeIf { it.isNotBlank() }?.let { return it }
+            curr = info.parentName
+            depth++
+        }
+        return null
     }
 
     /**
@@ -443,6 +503,7 @@ class SvXMLImport(
         contextStack.clear()
         styleMap.clear()
         pageLayouts.clear()
+        masterPages.clear()
         pageSpecFromDefaultStyle = null
         standardPageLayoutName = null
         firstMasterPageLayoutName = null
