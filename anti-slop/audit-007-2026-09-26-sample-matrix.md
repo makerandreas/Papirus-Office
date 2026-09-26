@@ -43,7 +43,7 @@
 Notes that matter for the windows:
 
 * `meta:page-count` is what LibreOffice 7.0.4 wrote at save time. It is a claim, not a measurement we can reproduce: Sample-1's ODT and DOCX carry the same six images at the same sizes (§6), the same body font and size (Times New Roman 11 pt), the same line height (115 % vs `w:line=276`) and the same after-spacing (0.111 in vs 160 twips), yet the ODT claims 9 pages and M365 renders the DOCX at 15. Until the Collabora count exists, Sample-1's ODT window bridges both numbers (§11.3).
-* Sample-2's twins differ by construction: the ODT `Standard` is 11 pt, the DOCX `Normal` inherits 12 pt from `docDefaults` (it carries no `w:sz`). 18 vs 23 pages is consistent with that.
+* Sample-2's twins are metric twins after all. **Correction 2026-09-26 (PR 15, `SampleMatrixTest`):** the first draft read the ODT `Standard` as 11 pt; it carries no `fo:font-size`, so the body inherits 12 pt from `default-style`, exactly as the DOCX `Normal` inherits 12 pt from `docDefaults`. 18 (LO claim) vs 23 (M365) is therefore the same unexplained producer gap as Sample-1, not a font-size difference.
 * Sample-6 is the only pair whose declared metrics match on both sides (TextMaker wrote both): Times New Roman 12 pt, 116 % vs `w:line=278`, 0.282 cm vs `w:after=160`, 2.54 cm margins all round. Its shared window (15..26) stands.
 
 ---
@@ -114,11 +114,13 @@ Sample-2 and Sample-5 carry **zero** direct `w:b`/`w:i` and still show bold head
 | # | `default-style` (paragraph) | `Standard` / "Normal" | Effective body |
 |---|---|---|---|
 | 1 | Aptos 12 pt | `Standard`: TNR 11 pt, line-height 115 %, margin-bottom 0.111 in, justify, widows 2, orphans 2, lang id-ID | TNR 11 pt, 1.15, 8 pt after |
-| 2 | Aptos 12 pt | same as 1 | same as 1 |
+| 2 | Aptos 12 pt | `Standard`: TNR, **no `fo:font-size`** (corrected 2026-09-26; first draft said 11 pt), line-height 115 %, margin-bottom 0.111 in | TNR **12 pt** (from `default-style`), 1.15, 8 pt after |
 | 3 | Aptos 12 pt, line-height 100 %, justify, tab 36 pt | `style0` (display "Normal"): TNR 12 pt, **line-height 100 %**, no margins | TNR 12 pt, single, **0 after** |
 | 4 | Aptos 12 pt, line-height 100 %, text-indent 1.27 cm, justify | `987` (display "Normal"): TNR, line-height 100 %, text-indent 1.27 cm | per paragraph: 115.833 % ×5, 150 % ×3, margin-bottom 8 pt ×6 in `content.xml` |
 | 5 | Aptos 12 pt, line-height 100 %, justify | `Normal`: TNR 12 pt, **empty paragraph properties** | TNR 12 pt, **single, 0 after** (no `fo:line-height` or `fo:margin-bottom` anywhere in `content.xml`) |
 | 6 | TNR 12 pt | `Normal`: margin-bottom 0.282 cm, line-height 116 %, widows/orphans declared | TNR 12 pt, 1.16, 8 pt after |
+
+Reading note (added 2026-09-26): Sample-3/4/5 (OnlyOffice and WPS exports) name the default font with `fo:font-family="Aptos"` and never with `style:font-name`; Sample-1/2/6 use `style:font-name`. A reader that only looks at `style:font-name` sees no default font in three of six files. `SampleMatrixTest` pins both spellings.
 
 Finding F in one sentence: OnlyOffice's ODT export did not carry Word's `pPrDefault` into `style:default-style`, so Sample-3 and Sample-5 are single-spaced with no paragraph spacing **as declared**, and an honest engine will paginate them shorter than the M365 count of their DOCX twins. That is not something the engine should "repair"; it is why the windows are per format and why the ODT fixtures are being regenerated.
 
@@ -291,7 +293,7 @@ Everything else in §4.3 stands: `LayoutUnits`, `TextMetrics`, `FontRegistry` se
 | # | DOCX reference (M365) | DOCX window at PR 16b | ODT declared metrics vs twin | ODT window at PR 16b (provisional until the Collabora fixtures land) |
 |---|---|---|---|---|
 | 1 | 15 | **12..18** | same font, size, spacing, images; LO claims 9 | **9..18** (bridges the LO claim and the M365 count; replaced by the Collabora count) |
-| 2 | 23 | **18..28** | 11 pt body vs 12 pt; LO claims 18 | **15..22** |
+| 2 | 23 | **18..28** | metric twin at 12 pt (§3.2 correction); LO claims 18 | **15..22** |
 | 3 | 20 | **16..24** | 0 cm top/bottom margins, single-spaced, 0 after | **12..20** |
 | 4 | 10 | **8..12** | header-carried margin (equivalent), mixed spacing | **7..12** |
 | 5 | 18 | **15..21** (roadmap §0, kept) | header-carried margin (equivalent), single-spaced, 0 after | **12..21** (replaces "15..21 both formats") |
@@ -305,13 +307,53 @@ PR 17 to 22 scope and order; the binding decisions in roadmap §0 other than the
 
 ---
 
-## 12. Open items for the user
+## 12. Open items and their resolution
 
-1. **Aptos stand-in** (§8): Carlito, Liberation Sans, or the system default? Cosmetic for pagination; matters for painting Sample-3's headings.
-2. **Native inventory in CI** (§10): add the read-only step, or skip.
-3. **Sample-1 ODT**: keep the bridging window `9..18` until the Collabora count exists, or drop the ODT assertion for Sample-1 entirely until then.
-4. **Collabora regeneration**: when it happens, drop the six new `.odt` files in place with the same names and record the six status-bar page counts in §1; the `SampleMatrixTest` constants and the §11.3 ODT column are then updated in one commit.
-5. **Engine status on the device**: at the next device pass, note whether the About screen reports NATIVE or SIMULATED (§10); it is the only evidence available for the native path.
+Resolved by the user on 2026-09-26 (before PR 15 code):
+
+1. **Aptos stand-in** (§8): **Martel Sans** (Google Fonts, SIL OFL 1.1). Regular and Bold ship in `assets/fonts`; the family has no italic face. `FontRegistry` records the choice as a stand-in that is not metric-compatible.
+2. **Native inventory in CI** (§10): **added**. `scripts/native-inventory.sh` runs in the `test` job with `continue-on-error`; its output is in the job log and in the `unit-test-reports` artifact.
+3. **Sample-1 ODT**: **keep** the bridging window `9..18` until the Collabora count exists.
+
+Still open:
+
+4. **Collabora regeneration**: when it happens, drop the six new `.odt` files in place with the same names and record the six status-bar page counts in §1; `SampleMatrix.references`, the `SampleMatrixTest` ODT rows and the §11.3 ODT column are then updated in one commit.
+5. **Engine status on the device**: at the next device pass, note whether the About screen reports NATIVE or SIMULATED (§10); the CI inventory (§12.1) says what the binary exports, the device says whether it loads.
+
+### 12.1 PR 15 evidence from CI
+
+Source: GitHub Actions run 36230161495 on PR #15 (`Plan5ElementDumpTest` system-out and the native inventory step, mirrored into the PR comment by `scripts/ci-dump-comment.py`); 191 unit tests, 0 failures. The numbers are what the paginator does **today**, under Robolectric, with the page box each file declares (`defaultPageStyle`, else the Letter fallback). They are the baseline PR 16a/16b move from, not targets.
+
+| file | pages | ref | window | thin (<3) | break elements in model | blank paragraphs | mechanism |
+|---|---|---|---|---|---|---|---|
+| Sample-1.odt | 16 | (LO 9) | 9..18 | 0 | 7 | 0 | no thin pages |
+| Sample-1.docx | 17 | 15 | 12..18 | 0 | 0 | 0 | no thin pages |
+| Sample-2.odt | 22 | (LO 18) | 15..22 | 0 | 7 | 0 | no thin pages |
+| Sample-2.docx | **38** | 23 | 18..28 | **9** | **22** | 0 | break elements (8 of 9 thin pages end at a break element) |
+| Sample-3.odt | **9** | n/a | 12..20 | 0 | 0 | 0 | no thin pages (0 cm top/bottom margins honoured: flow 0..1122.5) |
+| Sample-3.docx | 15 | 20 | 16..24 | 0 | 0 | 0 | no thin pages |
+| Sample-4.odt | 7 | n/a | 7..12 | 0 | 0 | **43** | no thin pages |
+| Sample-4.docx | 8 | 10 | 8..12 | 0 | 0 | 0 | no thin pages |
+| Sample-5.odt | 12 | n/a | 12..21 | 0 | 0 | 3 | no thin pages |
+| Sample-5.docx | 18 | 18 | 15..21 | 2 | 3 | 0 | break elements (1 of 2 thin pages ends at a break element) |
+| Sample-6.odt | 21 | n/a | 15..26 | 0 | 0 | 0 | no thin pages |
+| Sample-6.docx | 27 | 21 | 15..26 | 0 | 0 | 0 | no thin pages |
+
+What the dump established beyond the counts:
+
+1. **CI measures nothing.** Every file prints `measurement: Paint at 35.0 px for 14 pt: MMMM=4.0 iiii=4.0 (per-character stub)`: Robolectric's legacy graphics answer one unit per character, so no paragraph ever wraps on CI. Each paragraph is one line of 52.5 units plus the 12-unit gap; 14 of them make the `reserved` 891.0 printed on every full page of every file. **Every CI page count in this table, including the 12..30 guard for Sample-5, is paragraph-count arithmetic plus break elements, not text layout.** PR 16b must run the paginator on `TextMetrics` with `TableAdvanceSource` under Robolectric (the `measuresRealGlyphs()` probe already selects it) before any window can mean anything; on device, `PaintAdvanceSource` measures real glyphs.
+2. **Defaults are not read from the file.** `default body style: 14.0 pt (no family) line factor 1.00` for all twelve files: `StyleResolver` never sees `default-style`/`docDefaults` (Aptos 12 pt) nor `Standard`/`Normal` (Times New Roman). PR 16a item "defaults from file".
+3. **Sample-2.docx is the fake-break case.** 22 break elements (its 22 `w:lastRenderedPageBreak`) produce 38 pages, nine of them with one or two paragraphs; 8 of those 9 end at a break element. Sample-5.docx has 3 (its `lastRenderedPageBreak` count). PR 16a item "fake breaks out" has its before-number.
+4. **Sample-1/2.odt** carry 7 break elements each in the model against 8 and 10 `text:soft-page-break` in the XML plus 0 and 1 `fo:break-before` (the reader drops breaks that fall at index 0 or collapse, and does not read `fo:break-before` at all); Sample-4/5/6.odt carry 0 against 4/4/2 at parse level. PR 16a item "real breaks in".
+5. **Sample-4.odt has 43 blank paragraphs** (empty `text:p` used as vertical spacing by the producer); each costs a full one-line paragraph today (52.5 units plus the 12-unit gap, the same as a paragraph with text). Spacing semantics are PR 16b's.
+6. **ODT body rectangle:** for Sample-4/5.odt the paginator flows from top 0.0 (declared margin of `Mpm1`), while the body's first master page (`MasterPage2` -> `Mpm2`) has body top 96.0 through its 2.54 cm header (`PageGeometryTest` pins it). PR 16a item "body rect incl. header/footer + first-master rule".
+7. **Sample-3.odt** at 9 pages is the file's own 0 cm top/bottom margins honoured (finding B in §2.2); it stays out of any window until the Collabora fixture replaces it.
+
+Native inventory (same run, `scripts/native-inventory.sh`; full text in the `unit-test-reports` artifact):
+
+* `liblo-native-code.so` is 196 227 296 bytes (arm64-v8a, ELF64 AArch64, 4989 exported symbols) and 134 699 252 bytes (armeabi-v7a, ELF32 ARM, 4991). NEEDED: the bundled NSS/NSPR/sqlite chain plus `libGLESv2`, `libandroid`, `libjnigraphics`, `liblog`, `libz`, `libc++_shared`, `libm`, `libdl`, `libc`; all resolvable on device, so `System.loadLibrary` succeeds.
+* It is a **LibreOfficeKit** build: JNI exports are `Java_org_libreoffice_kit_Office_*`, `Java_org_libreoffice_kit_Document_*`, `Java_org_libreoffice_kit_LibreOfficeKit_*`, `Java_org_libreoffice_android_Bootstrap_*`, `Java_com_sun_star_*`, plus `libreofficekit_hook`, `libreofficekit_hook_2`, `libreofficekit_initialize`, `libreofficekit_set_javavm`.
+* **None of the five `external fun` declarations in `LibreOfficeCore.kt` has a symbol** (`Java_com_example_core_jni_LibreOfficeCore_nativeInitialize`, `nativeRenderPage`, `nativeEvaluateFormula`, `nativeRegisterCallback`, `nativeCreateDocument` all MISSING). Consequence: the loader reports the library as loaded (the About screen's NATIVE), while every call throws `UnsatisfiedLinkError` and takes the catch branch that returns the simulated result. Nothing crashes; nothing native runs either. This is the answer to open item 5 as far as a binary can give it; the device pass only confirms the loader half. Fixing the seam (binding to `org.libreoffice.kit.*` or building the expected symbols) is a separate plan, not Plan 5.
 
 ---
 

@@ -45,7 +45,10 @@ object LayoutDump {
         val pageBreakMarkerParagraphs: Int,
         val referencePageCount: Int?,
         val measurementProbe: String,
-        val defaultBodyStyle: ParagraphStyle
+        val defaultBodyStyle: ParagraphStyle,
+        /** ODF: master page the body starts on and its layout, when the file names one (null for DOCX or "Standard"). */
+        val firstMasterPageName: String? = null,
+        val firstMasterPageSpec: PageStyleSpec? = null
     ) {
         val pageCount: Int get() = pages.size
         val emptyPages: Int get() = pages.count { it.elementCount == 0 }
@@ -85,6 +88,21 @@ object LayoutDump {
                     spec.marginTopDp, spec.contentBottomDp, spec.contentWidthDp, spec.bodyTopDp, spec.bodyBottomDp
                 )
             )
+            if (firstMasterPageName != null) {
+                val master = firstMasterPageSpec
+                if (master != null) {
+                    sb.append(
+                        String.format(
+                            Locale.ROOT,
+                            "first body master page: %s -> %s: body top %.1f bottom %.1f (header/footer %.1f/%.1f); paginator uses %s%n",
+                            firstMasterPageName, master.name, master.bodyTopDp, master.bodyBottomDp,
+                            master.headerHeightDp, master.footerHeightDp, spec.name
+                        )
+                    )
+                } else {
+                    sb.append("first body master page: ").append(firstMasterPageName).append(" (layout not read)\n")
+                }
+            }
             sb.append(
                 String.format(
                     Locale.ROOT,
@@ -170,7 +188,9 @@ object LayoutDump {
             pageBreakMarkerParagraphs = elements.count { textOf(it)?.contains(PAGE_BREAK_MARKER) == true },
             referencePageCount = referencePageCount,
             measurementProbe = measurementProbe,
-            defaultBodyStyle = StyleResolver.resolveParagraphStyle(null, document.styles)
+            defaultBodyStyle = StyleResolver.resolveParagraphStyle(null, document.styles),
+            firstMasterPageName = document.styles.firstMasterPageName,
+            firstMasterPageSpec = document.styles.pageStyleForMaster(document.styles.firstMasterPageName)
         )
     }
 
