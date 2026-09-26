@@ -2426,28 +2426,12 @@ fun InkyModule(
                 ) {
                     derivedStateOf {
                         if (!isEditMode && totalDocPages > 1 && currentDocPage < totalDocPages) {
-                            // Height of one sheet as actually drawn, at the same
-                            // fit-to-width scale the renderer uses. A hardcoded
-                            // 1056 dp page would describe paper nobody sees.
-                            val fitScale = if (viewportWidthDp > 0f) {
-                                pageFitWidthDp / PageStackMetrics.BASE_CARD_WIDTH_DP * zoomScale
-                            } else {
-                                1f
-                            }
-                            // Mirror the renderer's rule: the fallback sheet keeps
-                            // the historical 320x452 card, declared page sizes keep
-                            // their own ratio.
-                            val isFallbackBox =
-                                documentPageSpec.widthDp == com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK.widthDp &&
-                                    documentPageSpec.heightDp == com.makerandreas.papirusoffice.data.PageStyleSpec.FALLBACK.heightDp
-                            val declaredRatio = if (
-                                isFallbackBox || documentPageSpec.widthDp <= 0f || documentPageSpec.heightDp <= 0f
-                            ) {
-                                PageStackMetrics.FALLBACK_CARD_HEIGHT_DP / PageStackMetrics.BASE_CARD_WIDTH_DP
-                            } else {
-                                documentPageSpec.heightDp / documentPageSpec.widthDp
-                            }
-                            val pageHeightDp = PageStackMetrics.BASE_CARD_WIDTH_DP * fitScale * declaredRatio
+                            // Height of one sheet as actually drawn: the same
+                            // PageTransform the renderer uses, so this range can
+                            // never describe paper nobody sees.
+                            val pageHeightDp = PageTransform
+                                .sheetFor(documentPageSpec, if (viewportWidthDp > 0f) pageFitWidthDp else 0f, zoomScale)
+                                .heightDp
                             val viewportH = viewportCoordinates?.size?.height?.toFloat()?.div(density)
                             val looksContinuous = viewportH == null || viewportH > pageHeightDp * 0.85f
                             if (looksContinuous) (currentDocPage + 1).coerceAtMost(totalDocPages) else currentDocPage
