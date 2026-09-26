@@ -70,14 +70,14 @@ object OfficeRuns {
         // entries inherit the paragraph base. Boolean defaults are "absent",
         // so only positive char-style flags add to the run/paragraph flags.
         val charHit = styles.characterStyles[run.characterStyle ?: run.styleName]
-        return ParagraphStyle(
-            name = base.name,
+        // copy() keeps the paragraph-level metric fields (spacing, indents,
+        // keep flags) with the run; a run only re-decides character facts.
+        return base.copy(
             fontSizeSp = charHit?.fontSizeSp ?: base.fontSizeSp,
             isBold = charHit?.isBold == true || run.isBold || base.isBold,
             isItalic = charHit?.isItalic == true || run.isItalic || base.isItalic,
             isUnderline = charHit?.isUnderline == true || run.isUnderline || base.isUnderline,
             colorHex = charHit?.colorHex ?: base.colorHex,
-            alignment = base.alignment,
             fontFamily = charHit?.fontFamily ?: base.fontFamily
         )
     }
@@ -94,13 +94,12 @@ object OfficeRuns {
         )
     }
 
-    /** Name to Compose family map; unknown names fall back to the system default. */
-    fun fontFamilyFor(name: String?): FontFamily = when (name?.lowercase(Locale.ROOT)) {
-        "serif", "times new roman", "liberation serif", "caladea" -> FontFamily.Serif
-        "sans-serif", "roboto", "arial", "helvetica", "liberation sans", "carlito" -> FontFamily.SansSerif
-        "monospace", "courier", "courier new", "liberation mono" -> FontFamily.Monospace
-        else -> FontFamily.Default
-    }
+    /**
+     * Display family for a document font name, decided by [FontRegistry] so
+     * the paginator's [TextMetrics] and the renderer resolve one name to one
+     * face. Unknown names fall back to the platform default.
+     */
+    fun fontFamilyFor(name: String?): FontFamily = FontRegistry.composeFamilyFor(name)
 
     fun composeTextAlign(alignment: String?): TextAlign = when (alignment?.lowercase(Locale.ROOT)) {
         "center" -> TextAlign.Center
