@@ -199,4 +199,28 @@ Tests whose assertions depend on laid-out page counts (`Sample5UnifiedPagination
 
 ## 8. CI evidence
 
-Recorded after the first CI run on this branch.
+PR #16, run `36302887245` on `ee1be1c`: **195 unit tests, 0 failed**; the build job is green too. `Sample5UnifiedPaginationTest`, `HyphenationEngineTest` and the 12..30 check in `Sample5StyleFidelityTest` needed no change.
+
+Layout today (from the `Plan5ElementDumpTest` dump in the CI report; windows are printed, not asserted):
+
+| File | Laid out | Reference | Window | In window | Break elements in the model | Parse-level breaks | Thin pages (<3 elements) |
+|---|---|---|---|---|---|---|---|
+| Sample-1.odt | 15 | 15 | 12..18 | yes | 11 | 14 soft + 0 | 0 |
+| Sample-1.docx | 23 | 15 | 12..18 | **no** | 14 | 14 `lastRendered` + 0 `br` | 3 |
+| Sample-2.odt | 23 | 23 | 18..28 | yes | 9 | 16 + 1 | 2 |
+| Sample-2.docx | **38** | 23 | 18..28 | **no** | 22 | 22 + 2 | 9 |
+| Sample-3.odt | 20 | 22 | 18..26 | yes | 16 | 21 + 0 | 2 |
+| Sample-3.docx | 27 | 22 | 18..26 | **no** | 25 | 25 + 0 | 4 |
+| Sample-4.odt | 7 | 11 | 9..13 | **no** | 3 | 3 + 2 | 0 |
+| Sample-4.docx | 9 | 10 | 8..12 | yes | 3 | 3 + 2 | 0 |
+| Sample-5.odt | 14 | 19 | 15..23 | **no** | 4 | 12 + 1 | 0 |
+| Sample-5.docx | 22 | 18 | 15..21 | **no** | 17 | 17 + 2 | 4 |
+| Sample-6.odt | 22 | 22 | 17..27 | yes | 6 | 15 + 1 | 1 |
+| Sample-6.docx | **38** | 21 | 15..26 | **no** | 19 | 19 + 2 | 2 |
+
+What the dump says, for 5d and 5e:
+
+1. **DOCX: the break-element count equals the `w:lastRenderedPageBreak` count in all six files** (14, 22, 25, 3, 17, 19). Word's "where the page ended last time I rendered it" hint (ECMA-376 §17.3.3.13) is being turned into a hard break. Every thin DOCX page ends at one of them. This is 5d's first commit, and it is now evidenced in all six files, not only Sample-2.
+2. **ODT: some soft breaks leak into the model** (Sample-1: 11 of 14, Sample-3: 16 of 21). `text:soft-page-break` is also a producer hint (ODF 1.4 Part 3 §5.6) and belongs to the same 5d commit.
+3. The ODT files that land "in window" do so partly by accident: the body style still measures at the 14 pt stub (`default body style: 14.0 pt (no family)`) with per-character stub metrics. 5d (real defaults) and 5e (real metrics) will move every number here; nothing in this table is a target.
+4. The paginator already flows inside the declared body (`flow used by paginator: top 96.0 bottom 1084.7` for Sample-1.odt). It still ignores the footer (declared body bottom 1026.5), which is the 5d body-rect item.
