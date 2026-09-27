@@ -1,6 +1,6 @@
 # Project Conventions & Specification References
 
-## 📘 Papirus Office — Description Context & Architecture Summary
+## 📘 Papirus Office: Description Context & Architecture Summary
 
 **Papirus Office** (originally conceptualized as **LibreDroid Office**) is an Android-first, modular, open-source office suite built around LibreOffice technologies and APIs where available. It treats ODF 1.4 as a first-class format and aims for practical OOXML compatibility. Actual parser, renderer, native-engine and save coverage is feature- and test-dependent; do not describe complete compatibility or full native integration without evidence. The UI direction is Material 3 Expressive with adaptive layouts for phones, foldables and tablets.
 
@@ -10,11 +10,11 @@ For complete deep architectural documentation, consult `PROJECT_CONTEXT.md` and 
 
 ### Suite Modules & Color Conventions
 Static Papirus accents (used as seeds/identifiers, not as replacements for semantic color roles):
-- **Papirus (Base Suite)**: `#2563EB` (Primary Suite Blue — Start Center, File Manager, Universal Options)
-- **Inky**: `#0F9D58` (Word Processing Green — Text documents, `.odt`, `.docx`, `.txt`, `.rtf`)
-- **Cellina**: `#16A3B7` (Spreadsheets Cyan/Teal — Workbooks, formulas, `.ods`, `.xlsx`, `.csv`)
-- **Slidia**: `#F59E0B` (Presentations Amber/Orange — Slide decks, `.odp`, `.pptx`)
-- **Pagella**: `#D93025` (PDF Viewer Red — PDF viewing, document annotation, conversion)
+- **Papirus (Base Suite)**: `#2563EB` (Primary Suite Blue: Start Center, File Manager, Universal Options)
+- **Inky**: `#0F9D58` (Word Processing Green: text documents, `.odt`, `.docx`, `.txt`, `.rtf`)
+- **Cellina**: `#16A3B7` (Spreadsheets Cyan/Teal: workbooks, formulas, `.ods`, `.xlsx`, `.csv`)
+- **Slidia**: `#F59E0B` (Presentations Amber/Orange: slide decks, `.odp`, `.pptx`)
+- **Pagella**: `#D93025` (PDF Viewer Red: PDF viewing, document annotation, conversion)
 
 ---
 
@@ -22,10 +22,12 @@ Static Papirus accents (used as seeds/identifiers, not as replacements for seman
 
 `DESIGN.md` is the design source of truth; `CONCEPT.md` defines the planned product surfaces and interaction terminology. The product uses Material 3 Expressive, with a bounded hybrid inspiration map: Google Workspace patterns for Start Screen tabs and editor dialogs; WPS Office for Welcome and Create New; Android Settings for Options, Crash Logs and About; M365 Copilot for editor screens; Microsoft Office 365 for the Inky/Cellina/Slidia command ribbon and SoftMaker FlexiPDF for Pagella; LibreOffice for office concepts and general layout, adapted to Android. These references are interaction precedents, not assets or pixel-copy targets.
 
-- Android 12+ defaults to the Android system dynamic palette. Android 11 and below use Papirus static schemes. Custom colors and an app-generated system-wallpaper palette are separate optional modes; derive the latter from wallpaper colors (for example, `WallpaperManager.getWallpaperColors` where supported), not from the Material system scheme. If unavailable, offer a user-selected image or a clear static fallback.
-- Google Sans is the intended UI family; retain Roboto/system sans-serif as a tested fallback. Do not confuse UI typography with the document's stored font identity.
-- Material Symbols Rounded is the default icon style. Colibre in `app/src/main/share/config/images_colibre.zip` is a possible optional set pending asset and license review.
+- **Shipped theme (verified 2026-09-27, `ui/theme/Theme.kt`, `ThemeSettings`, `PapirusOfficeOptionsScreen.kt:699-776`)**: Android 12+ (API 31) defaults to the Android system dynamic palette, with a user switch to turn it off; Android 11 and below, or dynamic colour off, use the Papirus static light/dark schemes per workspace. The only other preference is theme mode: System, Light, Dark. **Target, not shipped**: Custom seed colours and an app-generated system-wallpaper palette (derive the latter from `WallpaperManager.getWallpaperColors` where supported, not from the Material system scheme, with a user-selected image or the static scheme as fallback).
+- Google Sans is the intended UI family; retain Roboto/system sans-serif as a tested fallback. `Type.kt` currently loads the static `google_sans_*` faces for the display, headline, title, body and label roles and `google_sans_code_*` for code text, all with `FontLoadingStrategy.OptionalLocal`; the bundled `google_sans_flex_*` files are not referenced. Do not confuse UI typography with the document's stored font identity.
+- **Icons**: the shipped set is Material Icons in the Rounded theme from `androidx.compose.material:material-icons-extended` (`Icons.Rounded.*`). Material Symbols Rounded is the target family and needs its own dependency or font before it can be claimed. Colibre in `app/src/main/share/config/images_colibre.zip` is a possible optional set pending asset and license review.
+- **Material 3 Expressive is the target design system.** The build is on Compose BOM `2024.09.00` (material3 1.3.0), which has no `MaterialExpressiveTheme`, `MotionScheme`, emphasized type styles or the Expressive components; the BOM upgrade is a code-plan prerequisite (Plan 11), not a documentation claim.
 - In product copy and documentation, distinguish a design target from shipped behavior. Do not describe a simulated/native fallback as a fully integrated LibreOffice API, or imply full ODF/OOXML support without tests.
+- **Reference editions**: LibreOffice guides are cited from the 26.2 shelf (`https://books.libreoffice.org/en/`, Writer Guide Chapter 1 at `https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html`); ODF 1.4 from `docs/html`; OOXML from ECMA-376. Older guide editions in historical plan files are not updated retroactively.
 
 ## 🎛️ Key UI Terminologies & Ecosystem
 > This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
@@ -78,12 +80,14 @@ A Material 3 Expressive bottom-sheet command deck. It should start compact on ph
    - **Files**: Device file system explorer, folder traversal, sorting, SAF system picker.
    - **Google Drive**: Placeholder only, not yet implemented. There is no OAuth, file listing, upload or download; the screen says so and a press raises a "this is a placeholder" notice rather than faking a connection.
    - **Filter Chips**: All, Inky (Writer), Cellina (Calc), Slidia (Impress), Pagella (PDF).
-2. **Create New Screen**:
-   - Template selection (Blank Document, Resume, Letter, Invoice, Report, Agenda) and direct module creation.
+2. **Create New Screen** (`ui/home/NewDocumentScreen.kt`, opened by the Start Screen FAB; the WPS-inspired target lives in `DESIGN.md`):
+   - **Shipped**: a two-tab pager. Tab 1 "Create New" holds three module cards (Inky Document, Cellina Spreadsheet, Slidia Presentation) that open the module on the bundled blank package `assets/templates/untitled.od{t,s,p}` with `MainActivity.pendingNewDocument = true`, and a "Create Pagella PDF Document" group with three rows: Create from Image (JPEG/PNG/WebP), Create from Camera (CAMERA permission) and Convert from Document (ODF/OOXML/legacy MS). Tab 2 "Create from Template" has All/ODT/ODS/ODP filter chips, a search field and a download list from `TemplateManager.searchTemplates`.
+   - **Known deltas (code, owned by the Plan 11 home-entry surfaces package and the Plan 3 backlog, not by documentation)**: 9 of the 12 built-in `curatedTemplates` entries are third-party sample files from filesamples.com with invented names, not templates (R-38); the 112 real LibreOffice templates bundled under `assets/templates/` are not surfaced; the blank `untitled.*` packages are non-conformant and open on the Letter fallback (audit-008 §6); the in-editor "Create from Template" dialog injects a fabricated resume (`InkyModule.kt:1157`); two literals and per-type raw hex colours remain on the screen.
+   - **First run only**: `WelcomeScreen` (one card, one full-width "Get Started" button, no permission request) precedes the Start Screen when `papirus_first_run/is_first_run` is true.
 3. **About Screen**:
    - Versioning, LibreOfficeKit core engine attribution, Document Liberation Project credits, open-source licenses.
 4. **Papirus Office Options (Settings)**:
-   - General (user profile, autosave interval, default format), Inky View Settings (margins, non-printing characters), Load/Save, Appearance (system/static/custom/wallpaper palette modes are the target; verify current implementation), and Crash Logs.
+   - General (user profile, autosave interval, default format), Inky View Settings (margins, non-printing characters), Load/Save, Appearance (shipped: dynamic-colour switch plus System/Light/Dark; target: Custom and Wallpaper palette modes; the Appearance copy is still hard-coded rather than in `strings.xml`), and Crash Logs.
 5. **Editor Screen (Dual Mode: Viewer & Editor)**:
    - **Inky**: Word processing canvas, margins, rulers, continuous scroll, text layout.
    - **Cellina**: Spreadsheet grid, formula bar, cell coordinate indicator, sheets tab bar.
@@ -121,7 +125,7 @@ All document format specifications, standards, and schema definitions placed in 
   2. Follow the relevant normative rules (namespaces, package parts/relationships, element constraints and MIME requirements); preserve content where supported and verify round trips rather than assuming lossless behavior.
 
 ### `app/src/main/libs`
-Pre-built native `.so` libraries per ABI (`arm64-v8a`, `armeabi-v7a`) from the official LibreOffice Viewer for Android. Never assume a native capability without checking `LokitEngine.isNativeAvailable`.
+Pre-built native `.so` libraries per ABI (`arm64-v8a`, `armeabi-v7a`) from the official LibreOffice Viewer for Android, tracked with Git LFS: the pointer for `liblo-native-code.so` declares 196,227,296 bytes (arm64-v8a) and 134,699,252 bytes (armeabi-v7a). An agent sandbox without LFS sees pointer files of about 130 bytes, so do not report library sizes or "stub" status from such a checkout; CI checks out with `lfs: true` and publishes `scripts/native-inventory.sh` output as the evidence. Never assume a native capability without checking `LokitEngine.isNativeAvailable`; `LokitEngine.statusLabel` reports SIMULATED when the library does not load.
 
 ### `sdk-references` and `app/src/main/sdk-examples`
 When necessary, consult all SDK examples in `/sdk-references` and `app/src/main/sdk-examples` directory.
@@ -136,9 +140,15 @@ When necessary, translate all strings to `en_US` and add to `strings.xml`
 If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
 ## Handling `build.yml`
-- Before creating a new build, execute a deletion of all old assets in the `nightly` tag, delete **all** old release with its tag (`gh release delete nightly --yes --cleanup-tag`) and forcing push tag `nightly` to active SHA commit (`${{ github-sha }}`)
-- Add `target_commitish: ${{ github-sha }}` and `mske_latest: false` on the `Drop Papirus Nightly Release` step to freshly make new release with current timestamp, tag exactly pointed to current commit, and all old files are not retained again.
-- Make sure to rewrite description of the releae by stritcly following `antislop.md` rules. 
+- Before creating a new build, delete all old assets in the `nightly` tag, delete **all** old releases with their tag (`gh release delete nightly --yes --cleanup-tag`) and force-push the `nightly` tag to the active commit (`${{ github.sha }}`).
+- Add `target_commitish: ${{ github.sha }}` and `make_latest: false` on the `Drop Papirus Nightly Release` step so each release is fresh: current timestamp, tag pointed exactly at the current commit, no old files retained.
+- Write the release description by strictly following `antislop.md` rules (no em dash, no fabricated claims, real changes only).
+
+## antislop project addendum (Papirus-specific, keeps `antislop.md` as the untouched upstream core)
+1. **Target versus shipped.** Every statement about the UI in `AGENTS.md`, `DESIGN.md`, `PROJECT_CONTEXT.md`, release notes and PR bodies is labelled either *shipped* (with `file:line`, a test name or a device screenshot) or *target* (with the plan that owns the code change). An unlabelled UI claim is a defect (R-36, C-5).
+2. **References are patterns, not skins.** The app-to-app map in `DESIGN.md` (Google Workspace, WPS Office, M365 Copilot, Office 365, FlexiPDF, LibreOffice) is bounded by surface and borrows task-level interaction patterns only; no screen may read as a clone of one of them (R-30), and no reference implies Papirus has that product's features.
+3. **Documentation-only deliverables run a reduced Delivery Gate**: R-02, R-15, R-16, R-17, R-36, R-38 and C-5 with evidence; R-26, R-27, R-32, R-34 and R-35 are reported as N/A with the reason "no UI shipped in this deliverable". UI and code deliverables run the full gate.
+4. **Editions are pinned in `DESIGN.md` front matter** (design sources by filename, LibreOffice 26.2 guides, ODF 1.4 in `docs/html`, ECMA-376). A citation to another edition is a doc bug unless the file is a dated historical plan or audit.
 
 <!-- antislop:start -->
 ## antislop

@@ -37,7 +37,7 @@ This readme file will be used for development purpose.
 | Standard Bottom Sheet command deck | Microsoft Office 365 for Inky/Cellina/Slidia; SoftMaker FlexiPDF for Pagella |
 | General office layout and document concepts | LibreOffice, adapted to Android touch and adaptive screen sizes |
 
-The app uses Material Symbols Rounded by default. The repository's `app/src/main/share/config/images_colibre.zip` is a candidate optional Colibre set pending provenance and license review. Google Sans is the intended UI family; Roboto/system sans-serif remains the reliability fallback until device rendering is validated. App UI fonts must never replace a document's font/style identity.
+The app targets Material Symbols Rounded (shipped today: Material Icons Rounded from `material-icons-extended`). The repository's `app/src/main/share/config/images_colibre.zip` is a candidate optional Colibre set pending provenance and license review. Google Sans is the intended UI family; Roboto/system sans-serif remains the reliability fallback until device rendering is validated. App UI fonts must never replace a document's font/style identity.
 
 ### Palette behavior
 

@@ -1,21 +1,24 @@
 ---
-version: 2.0
-name: Papirus Office — Hybrid Material 3 Expressive
-status: Product design direction; implementation is staged separately
+version: 2.1
+name: Papirus Office, Hybrid Material 3 Expressive
+status: Product design direction; implementation is staged separately. Version 2.1 is an interim truth pass (Plan 5c-1); version 3.0 is the direction rewrite from the owner's reference files (Plan 5c-2).
 source:
   design_system: https://m3.material.io/
   material_symbols: https://fonts.google.com/icons
-  writer_reference: https://documentation.libreoffice.org/assets/Uploads/Documentation/en/WG7.2/WG72-WriterGuide.pdf
+  writer_reference: https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html
+  libreoffice_guides: https://books.libreoffice.org/en/index.html (26.2 shelf: Getting Started, Writer, Calc, Impress, Draw)
   product: Papirus Office
 ---
 
-# Design Direction — Papirus Office
+# Design Direction: Papirus Office
+
+> Reading rule: a statement marked **shipped** is verified in code (`file:line`) on the date given; a statement marked **target** describes intent and names the plan that owns the code change. Unmarked statements are design principles.
 
 ## 1. Product intent
 
 Papirus Office is an Android-first, open-source office suite intended to be a credible alternative to proprietary mobile office products, including Microsoft 365 Copilot. It is built around LibreOffice technologies and APIs where available, treats ODF as a first-class format, and aims to preserve practical OOXML compatibility. This is a product direction, not a claim that every native LibreOffice API or every format feature is implemented today. See `PROJECT_CONTEXT.md` and the PR plans under `anti-slop/` for implementation status and evidence.
 
-The experience is a deliberate hybrid: Material 3 Expressive supplies the design system and accessibility baseline; selected office apps inform task-specific interaction patterns; LibreOffice Writer and the other LibreOffice modules inform document concepts and capabilities. References are inspiration, not pixel-for-pixel targets. Papirus keeps its own identity, adapts desktop concepts to touch, and does not reuse third-party logos, proprietary assets, or branded artwork.
+The experience is a deliberate hybrid: Material 3 Expressive supplies the design system and accessibility baseline (target; the build is on Compose BOM 2024.09.00, which has no Expressive theme, motion scheme or emphasized type styles, so the upgrade is a Plan 11 prerequisite); selected office apps inform task-specific interaction patterns; LibreOffice Writer and the other LibreOffice modules inform document concepts and capabilities. References are inspiration, not pixel-for-pixel targets. Papirus keeps its own identity, adapts desktop concepts to touch, and does not reuse third-party logos, proprietary assets, or branded artwork.
 
 ## 2. Design principles and dials
 
@@ -32,7 +35,7 @@ The experience is a deliberate hybrid: Material 3 Expressive supplies the design
 |---|---|---|
 | Start Screen, all tabs | Google Workspace apps | Familiar, focused document browsing and tab navigation; Papirus module identity and Android navigation remain authoritative. |
 | Editor dialogs, all modules | Google Workspace apps | Consistent, task-focused editor dialogs and sheets; use Papirus theme tokens, accessible dismissal and clear commit/cancel behavior. |
-| Welcome Screen and Create New Documents | WPS Office | Friendly entry and template-first creation flow, simplified for Android and integrated with Papirus navigation. |
+| Welcome Screen and Create New Documents | WPS Office | **Target**: friendly entry and a creation flow with real, previewable templates, simplified for Android and integrated with Papirus navigation. **Shipped (2026-09-27, `ui/home/NewDocumentScreen.kt`, `WelcomeScreen.kt`)**: Welcome is one card with one "Get Started" button on first run; Create New is a two-tab pager that opens module-first (three blank-document cards plus three Pagella PDF entries) with a second "Create from Template" tab whose built-in list is mostly third-party sample files (see `PROJECT_CONTEXT.md` §3.2 known deltas). |
 | Papirus Office Options, Crash Logs, About | Android system settings | Native-feeling preference rows and diagnostic information. About is a set of vertically paged sections with a restrained, TikTok-like vertical page-to-page gesture/transition; it is not an endless social feed. Provide explicit navigation, screen-reader semantics and a non-gesture route. |
 | Editor screens | M365 Copilot mobile office | Context-aware, document-first editing chrome and compact command access, adapted to the Papirus engine and Android rather than copied. |
 | Standard Bottom Sheet / Ribbon | Microsoft Office 365 for Inky, Cellina and Slidia; SoftMaker FlexiPDF for Pagella | A shared Papirus bottom-sheet host with module-specific decks, spacing and actions. The content and interaction model are specified in `CONCEPT.md`; unsupported commands stay visibly unavailable until implemented. |
@@ -48,8 +51,10 @@ All UI chrome uses semantic theme roles (`primary`, `onPrimary`, container, surf
 
 1. **System dynamic (Android 12 / API 31 and above)**: default to the Android-provided Material dynamic light/dark scheme. On supported devices this reflects the system's wallpaper-derived palette. Papirus reads the system color scheme; it does not independently claim to reproduce Android's algorithm.
 2. **Papirus static**: on Android 11 and below, use the Papirus light/dark schemes and module accents listed below. This is also an available user choice on newer Android versions.
-3. **Custom**: allow a user-selected Papirus seed/accent scheme, with generated tonal roles and validated text/icon contrast.
-4. **Wallpaper palette**: offer an opt-in Papirus palette derived from the device's system wallpaper colors, independently of the Material system color scheme. On API 27+, use `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)` as the wallpaper-color input, then generate Papirus semantic tones; do not consume `dynamicLightColorScheme`/`dynamicDarkColorScheme` as the source for this mode. The app's minimum SDK is lower, so unsupported/null cases need the selected-image or static fallback. If the API returns no colors or is unavailable, offer a user-selected wallpaper image through the Storage Access Framework or fall back clearly to the Papirus static scheme. Do not request broad storage access.
+3. **Custom (target, not shipped)**: allow a user-selected Papirus seed/accent scheme, with generated tonal roles and validated text/icon contrast.
+4. **Wallpaper palette (target, not shipped)**: offer an opt-in Papirus palette derived from the device's system wallpaper colors, independently of the Material system color scheme. On API 27+, use `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)` as the wallpaper-color input, then generate Papirus semantic tones; do not consume `dynamicLightColorScheme`/`dynamicDarkColorScheme` as the source for this mode. The app's minimum SDK is lower, so unsupported/null cases need the selected-image or static fallback. If the API returns no colors or is unavailable, offer a user-selected wallpaper image through the Storage Access Framework or fall back clearly to the Papirus static scheme. Do not request broad storage access.
+
+**Shipped (2026-09-27, `ui/theme/Theme.kt`, `ThemeSettings`, `PapirusOfficeOptionsScreen.kt:699-776`)**: modes 1 and 2 only, exposed as a dynamic-colour switch plus a System / Light / Dark choice; static schemes are per workspace (Base, Inky, Cellina, Slidia, Pagella) with shared slate neutrals.
 
 Users can switch between available modes. A mode that cannot be provided on the current OS/device must be explained and disabled or offered with a suitable fallback, not silently misrepresented. Respect system light/dark preference unless the user selects an explicit theme mode.
 
@@ -68,7 +73,7 @@ These are brand seeds/identifiers for the static Papirus theme. Dynamic and cust
 ## 5. Typography and document-font separation
 
 - **Target UI family:** Google Sans, using the appropriate Google Sans text/display styles where those bundled faces are available and legally distributable. Google Sans Code may be used for diagnostic or code-like content.
-- **Reliability fallback:** Roboto / Android sans-serif. The repository includes Google Sans font resources and the theme currently attempts to load them; previous integration tests reported rendering hiccups. Keep Roboto as a deliberate fallback until on-device rendering, font weights, accessibility scaling and performance pass. Do not claim the target is fully validated based on resource presence alone.
+- **Reliability fallback:** Roboto / Android sans-serif. **Shipped (`ui/theme/Type.kt`)**: display, headline and title roles use `GoogleSansFlexFontFamily`, body and label roles use `GoogleSansFontFamily`, and both are built from the same static `google_sans_{light,regular,medium,bold}.ttf` files (the body family adds `google_sans_italic`) with `FontLoadingStrategy.OptionalLocal`; code text uses `google_sans_code_*`; the bundled `google_sans_flex_*` files are not referenced. Previous integration tests reported rendering hiccups. Keep Roboto as a deliberate fallback until on-device rendering, font weights, accessibility scaling and performance pass. Do not claim the target is fully validated based on resource presence alone.
 - UI typography is independent of document typography. Opening or editing an ODT/DOCX must preserve the document's family/style identity; substitutions used for rendering belong to the document-font engine and must not change the saved family name.
 - Define the UI type scale in Android `sp` with line height, weight, letter spacing, scalable text and component mapping. The table in this file is a design target, not evidence of the values currently used by every composable. Reconcile it with `ui/theme/Type.kt` during the implementation audit.
 
@@ -84,7 +89,7 @@ Follow Material typography roles and user font scaling; do not set text sizes in
 
 ## 6. Icons and visual assets
 
-- **Default icon family:** Material Symbols Rounded. Select icons by meaning and maintain consistent optical size, weight, fill and accessibility descriptions.
+- **Icon family:** target is Material Symbols Rounded; **shipped** is Material Icons in the Rounded theme from `androidx.compose.material:material-icons-extended` (`Icons.Rounded.*`), which has no Symbols dependency yet. Select icons by meaning and maintain consistent optical size, weight, fill and accessibility descriptions.
 - **Optional icon set:** Colibre is a candidate alternate icon theme; the repository contains `app/src/main/share/config/images_colibre.zip`. Inventory its contents and license/provenance before wiring it into the app or redistributing extracted assets. Do not mix icon families casually within one screen.
 - Logos, empty-state illustrations and document page previews are distinct from action icons. Keep contrast and meaning understandable without color alone; avoid decorative emoji as interface iconography.
 
@@ -121,7 +126,7 @@ Material 3 references: [Android color guidance](https://developer.android.com/de
 
 - **ODF 1.4**: use the normative files in `docs/html` for package, schema and formula behavior.
 - **OOXML**: use ECMA-376 as normative; Microsoft's Open XML SDK documentation is a useful package/part model and API guide, not a substitute for the standard. Existing links are collected in `CONCEPT.md`.
-- **Writer interaction reference**: LibreOffice Writer Guide, Chapter 1, is a functional comparison for the window, navigation, document lifecycle, dialogs, views, creation, opening and saving. Mobile equivalents are documented in `anti-slop/plan-11-hybrid-experience-design.md`.
+- **Writer interaction reference**: LibreOffice Writer Guide 26.2, Chapter 1 (`https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html`), is a functional comparison for the window, navigation, document lifecycle, dialogs, views, creation, opening and saving. Its Sidebar lists nine decks (Properties, Styles, Gallery, Navigator, Page, Style Inspector, Manage Changes, Accessibility Check, Find) and its Status bar adds an accessibility-check field; Papirus has no Accessibility Check or Find deck yet. Mobile equivalents are documented in `anti-slop/plan-11-hybrid-experience-design.md` (mapped against 24.8; re-mapping is Plan 1 work).
 - Inspiration from M365 Copilot, Google Workspace, WPS Office and FlexiPDF should be expressed as task-level patterns only. Do not imply Papirus has M365 Copilot features, Google Workspace integrations, or native LibreOfficeKit execution unless those are independently implemented and verified.
 
 ## 9. Acceptance gates for design changes
