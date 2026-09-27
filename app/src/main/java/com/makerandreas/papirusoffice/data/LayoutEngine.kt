@@ -3,6 +3,7 @@ package com.makerandreas.papirusoffice.data
 import android.graphics.Paint
 import android.graphics.Rect
 import java.io.File
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 

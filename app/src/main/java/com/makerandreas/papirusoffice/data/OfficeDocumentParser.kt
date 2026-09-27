@@ -484,7 +484,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         val level = when {
                                             currentOutlineLvl != null -> currentOutlineLvl!! + 1
                                             else -> DIGITS_REGEX.find(sName)?.value?.toIntOrNull()
-                                                ?: DIGITS_REGEX.find(currentStyleId!)?.value?.toIntOrNull()
+                                                ?: DIGITS_REGEX.find(currentStyleId!!)?.value?.toIntOrNull()
                                                 ?: 1
                                         }
 
