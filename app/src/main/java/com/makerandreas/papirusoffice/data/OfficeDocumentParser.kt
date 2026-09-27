@@ -113,8 +113,8 @@ class OfficeDocumentParser(private val context: Context) {
                         var ev = parser.eventType
                         while (ev != XmlPullParser.END_DOCUMENT) {
                             if (ev == XmlPullParser.START_TAG && (parser.name?.equals("relationship", ignoreCase = true) == true || parser.name?.equals("Relationship", ignoreCase = true) == true)) {
-                                val id = parser.getAttributeValue(null, "Id")
-                                val target = parser.getAttributeValue(null, "Target")
+                                val id = getXmlAttr(parser, "id")
+                                val target = getXmlAttr(parser, "target")
                                 if (!id.isNullOrBlank() && !target.isNullOrBlank()) {
                                     relsMap[id] = target
                                 }
@@ -236,6 +236,17 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
+    private fun getXmlAttr(parser: XmlPullParser, localOrQName: String): String? {
+        val target = localOrQName.lowercase(Locale.ROOT).substringAfter(':')
+        for (i in 0 until parser.attributeCount) {
+            val attrName = parser.getAttributeName(i).lowercase(Locale.ROOT).substringAfter(':')
+            if (attrName == target) {
+                return parser.getAttributeValue(i)
+            }
+        }
+        return null
+    }
+
     private fun extractDocxStyles(file: File): DocxStylesParseResult {
         if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return DocxStylesParseResult()
         try {
@@ -299,39 +310,39 @@ class OfficeDocumentParser(private val context: Context) {
                 val rawStylesMap = mutableMapOf<String, DocxStyleMeta>()
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
-                    val tagName = parser.name?.lowercase(Locale.ROOT) ?: ""
+                    val rawTag = parser.name ?: ""
+                    val tagName = rawTag.lowercase(Locale.ROOT).substringAfter(':')
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
                             when {
-                                tagName == "w:docdefaults" || tagName == "docdefaults" -> {
+                                tagName == "docdefaults" -> {
                                     inDocDefaults = true
                                 }
-                                inDocDefaults && (tagName == "w:rprdefault" || tagName == "rprdefault" || tagName == "w:rpr" || tagName == "rpr") -> {
+                                inDocDefaults && (tagName == "rprdefault" || tagName == "rpr") -> {
                                     inDocDefaultsRPr = true
                                 }
-                                inDocDefaults && (tagName == "w:pprdefault" || tagName == "pprdefault" || tagName == "w:ppr" || tagName == "ppr") -> {
+                                inDocDefaults && (tagName == "pprdefault" || tagName == "ppr") -> {
                                     inDocDefaultsPPr = true
                                 }
-                                inDocDefaultsRPr && (tagName == "w:sz" || tagName == "sz") -> {
-                                    val valStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                inDocDefaultsRPr && tagName == "sz" -> {
+                                    val valStr = getXmlAttr(parser, "val")
                                     valStr?.toIntOrNull()?.let { docDefaultSz = LayoutUnits.halfPointsToPt(it) }
                                 }
-                                inDocDefaultsRPr && (tagName == "w:rfonts" || tagName == "rfonts") -> {
-                                    val fontStr = parser.getAttributeValue(null, "w:ascii") ?: parser.getAttributeValue(null, "ascii")
-                                        ?: parser.getAttributeValue(null, "w:hansi") ?: parser.getAttributeValue(null, "hansi")
+                                inDocDefaultsRPr && tagName == "rfonts" -> {
+                                    val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
                                     if (!fontStr.isNullOrBlank()) docDefaultFont = fontStr.trim('\'', '"')
                                 }
-                                inDocDefaultsPPr && (tagName == "w:spacing" || tagName == "spacing") -> {
-                                    val bStr = parser.getAttributeValue(null, "w:before") ?: parser.getAttributeValue(null, "before")
+                                inDocDefaultsPPr && tagName == "spacing" -> {
+                                    val bStr = getXmlAttr(parser, "before")
                                     bStr?.toIntOrNull()?.let { docDefaultBefore = LayoutUnits.twipsToUnits(it) }
-                                    val aStr = parser.getAttributeValue(null, "w:after") ?: parser.getAttributeValue(null, "after")
+                                    val aStr = getXmlAttr(parser, "after")
                                     aStr?.toIntOrNull()?.let { docDefaultAfter = LayoutUnits.twipsToUnits(it) }
-                                    val lStr = parser.getAttributeValue(null, "w:line") ?: parser.getAttributeValue(null, "line")
-                                    val lrStr = parser.getAttributeValue(null, "w:linerule") ?: parser.getAttributeValue(null, "linerule") ?: "auto"
+                                    val lStr = getXmlAttr(parser, "line")
+                                    val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
                                     if (lStr != null) {
                                         val lv = lStr.toIntOrNull()
                                         if (lv != null) {
-                                            if (lrStr == "exact" || lrStr == "atleast") {
+                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
                                                 docDefaultLineExact = LayoutUnits.twipsToUnits(lv)
                                             } else {
                                                 docDefaultLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
@@ -339,22 +350,20 @@ class OfficeDocumentParser(private val context: Context) {
                                         }
                                     }
                                 }
-                                inDocDefaultsPPr && (tagName == "w:ind" || tagName == "ind") -> {
-                                    val lStr = parser.getAttributeValue(null, "w:left") ?: parser.getAttributeValue(null, "left")
-                                        ?: parser.getAttributeValue(null, "w:start") ?: parser.getAttributeValue(null, "start")
+                                inDocDefaultsPPr && tagName == "ind" -> {
+                                    val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
                                     lStr?.toIntOrNull()?.let { docDefaultIndentStart = LayoutUnits.twipsToUnits(it) }
-                                    val rStr = parser.getAttributeValue(null, "w:right") ?: parser.getAttributeValue(null, "right")
-                                        ?: parser.getAttributeValue(null, "w:end") ?: parser.getAttributeValue(null, "end")
+                                    val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
                                     rStr?.toIntOrNull()?.let { docDefaultIndentEnd = LayoutUnits.twipsToUnits(it) }
-                                    val flStr = parser.getAttributeValue(null, "w:firstline") ?: parser.getAttributeValue(null, "firstline")
+                                    val flStr = getXmlAttr(parser, "firstline")
                                     flStr?.toIntOrNull()?.let { docDefaultFirstLine = LayoutUnits.twipsToUnits(it) }
-                                    val hStr = parser.getAttributeValue(null, "w:hanging") ?: parser.getAttributeValue(null, "hanging")
+                                    val hStr = getXmlAttr(parser, "hanging")
                                     hStr?.toIntOrNull()?.let { docDefaultFirstLine = -LayoutUnits.twipsToUnits(it) }
                                 }
-                                tagName == "w:style" || tagName == "style" -> {
+                                tagName == "style" -> {
                                     inStyle = true
-                                    currentStyleType = parser.getAttributeValue(null, "w:type") ?: parser.getAttributeValue(null, "type") ?: "paragraph"
-                                    currentStyleId = parser.getAttributeValue(null, "w:styleid") ?: parser.getAttributeValue(null, "styleid")
+                                    currentStyleType = getXmlAttr(parser, "type") ?: "paragraph"
+                                    currentStyleId = getXmlAttr(parser, "styleid")
                                     currentStyleName = null
                                     currentBasedOn = null
                                     currentOutlineLvl = null
@@ -376,53 +385,52 @@ class OfficeDocumentParser(private val context: Context) {
                                     currentPageBreakBefore = null
                                     currentJc = null
                                 }
-                                inStyle && (tagName == "w:name" || tagName == "name") -> {
-                                    currentStyleName = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                inStyle && tagName == "name" -> {
+                                    currentStyleName = getXmlAttr(parser, "val")
                                 }
-                                inStyle && (tagName == "w:basedon" || tagName == "basedon") -> {
-                                    currentBasedOn = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                inStyle && tagName == "basedon" -> {
+                                    currentBasedOn = getXmlAttr(parser, "val")
                                 }
-                                inStyle && (tagName == "w:outlinelvl" || tagName == "outlinelvl") -> {
-                                    currentOutlineLvl = (parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val"))?.toIntOrNull()
+                                inStyle && tagName == "outlinelvl" -> {
+                                    currentOutlineLvl = getXmlAttr(parser, "val")?.toIntOrNull()
                                 }
-                                inStyle && (tagName == "w:rpr" || tagName == "rpr") -> {
+                                inStyle && tagName == "rpr" -> {
                                     inRPr = true
                                 }
-                                inStyle && inRPr && (tagName == "w:sz" || tagName == "sz") -> {
-                                    val valStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                inStyle && inRPr && tagName == "sz" -> {
+                                    val valStr = getXmlAttr(parser, "val")
                                     valStr?.toIntOrNull()?.let { currentSz = LayoutUnits.halfPointsToPt(it) }
                                 }
-                                inStyle && inRPr && (tagName == "w:b" || tagName == "b") -> {
-                                    val valStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val") ?: "1"
+                                inStyle && inRPr && tagName == "b" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "1"
                                     currentBold = valStr !in listOf("0", "false", "off")
                                 }
-                                inStyle && inRPr && (tagName == "w:i" || tagName == "i") -> {
-                                    val valStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val") ?: "1"
+                                inStyle && inRPr && tagName == "i" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "1"
                                     currentItalic = valStr !in listOf("0", "false", "off")
                                 }
-                                inStyle && inRPr && (tagName == "w:u" || tagName == "u") -> {
-                                    val valStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val") ?: "single"
+                                inStyle && inRPr && tagName == "u" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "single"
                                     currentUnderline = valStr !in listOf("none", "0", "false", "off")
                                 }
-                                inStyle && inRPr && (tagName == "w:rfonts" || tagName == "rfonts") -> {
-                                    val fontStr = parser.getAttributeValue(null, "w:ascii") ?: parser.getAttributeValue(null, "ascii")
-                                        ?: parser.getAttributeValue(null, "w:hansi") ?: parser.getAttributeValue(null, "hansi")
+                                inStyle && inRPr && tagName == "rfonts" -> {
+                                    val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
                                     if (!fontStr.isNullOrBlank()) currentFont = fontStr.trim('\'', '"')
                                 }
-                                inStyle && (tagName == "w:ppr" || tagName == "ppr") -> {
+                                inStyle && tagName == "ppr" -> {
                                     inPPr = true
                                 }
-                                inStyle && inPPr && (tagName == "w:spacing" || tagName == "spacing") -> {
-                                    val bStr = parser.getAttributeValue(null, "w:before") ?: parser.getAttributeValue(null, "before")
+                                inStyle && inPPr && tagName == "spacing" -> {
+                                    val bStr = getXmlAttr(parser, "before")
                                     bStr?.toIntOrNull()?.let { currentBefore = LayoutUnits.twipsToUnits(it) }
-                                    val aStr = parser.getAttributeValue(null, "w:after") ?: parser.getAttributeValue(null, "after")
+                                    val aStr = getXmlAttr(parser, "after")
                                     aStr?.toIntOrNull()?.let { currentAfter = LayoutUnits.twipsToUnits(it) }
-                                    val lStr = parser.getAttributeValue(null, "w:line") ?: parser.getAttributeValue(null, "line")
-                                    val lrStr = parser.getAttributeValue(null, "w:linerule") ?: parser.getAttributeValue(null, "linerule") ?: "auto"
+                                    val lStr = getXmlAttr(parser, "line")
+                                    val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
                                     if (lStr != null) {
                                         val lv = lStr.toIntOrNull()
                                         if (lv != null) {
-                                            if (lrStr == "exact" || lrStr == "atleast") {
+                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
                                                 currentLineExact = LayoutUnits.twipsToUnits(lv)
                                             } else {
                                                 currentLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
@@ -430,49 +438,47 @@ class OfficeDocumentParser(private val context: Context) {
                                         }
                                     }
                                 }
-                                inStyle && inPPr && (tagName == "w:ind" || tagName == "ind") -> {
-                                    val lStr = parser.getAttributeValue(null, "w:left") ?: parser.getAttributeValue(null, "left")
-                                        ?: parser.getAttributeValue(null, "w:start") ?: parser.getAttributeValue(null, "start")
+                                inStyle && inPPr && tagName == "ind" -> {
+                                    val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
                                     lStr?.toIntOrNull()?.let { currentIndentStart = LayoutUnits.twipsToUnits(it) }
-                                    val rStr = parser.getAttributeValue(null, "w:right") ?: parser.getAttributeValue(null, "right")
-                                        ?: parser.getAttributeValue(null, "w:end") ?: parser.getAttributeValue(null, "end")
+                                    val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
                                     rStr?.toIntOrNull()?.let { currentIndentEnd = LayoutUnits.twipsToUnits(it) }
-                                    val flStr = parser.getAttributeValue(null, "w:firstline") ?: parser.getAttributeValue(null, "firstline")
+                                    val flStr = getXmlAttr(parser, "firstline")
                                     flStr?.toIntOrNull()?.let { currentFirstLine = LayoutUnits.twipsToUnits(it) }
-                                    val hStr = parser.getAttributeValue(null, "w:hanging") ?: parser.getAttributeValue(null, "hanging")
+                                    val hStr = getXmlAttr(parser, "hanging")
                                     hStr?.toIntOrNull()?.let { currentFirstLine = -LayoutUnits.twipsToUnits(it) }
                                 }
-                                inStyle && inPPr && (tagName == "w:jc" || tagName == "jc") -> {
-                                    currentJc = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                                inStyle && inPPr && tagName == "jc" -> {
+                                    currentJc = getXmlAttr(parser, "val")
                                 }
-                                inStyle && inPPr && (tagName == "w:keepnext" || tagName == "keepnext") -> {
+                                inStyle && inPPr && tagName == "keepnext" -> {
                                     currentKeepNext = true
                                 }
-                                inStyle && inPPr && (tagName == "w:pagebreakbefore" || tagName == "pagebreakbefore") -> {
+                                inStyle && inPPr && tagName == "pagebreakbefore" -> {
                                     currentPageBreakBefore = true
                                 }
                             }
                         }
                         XmlPullParser.END_TAG -> {
                             when {
-                                tagName == "w:docdefaults" || tagName == "docdefaults" -> {
+                                tagName == "docdefaults" -> {
                                     inDocDefaults = false
                                     inDocDefaultsRPr = false
                                     inDocDefaultsPPr = false
                                 }
-                                inDocDefaults && (tagName == "w:rprdefault" || tagName == "rprdefault" || tagName == "w:rpr" || tagName == "rpr") -> {
+                                inDocDefaults && (tagName == "rprdefault" || tagName == "rpr") -> {
                                     inDocDefaultsRPr = false
                                 }
-                                inDocDefaults && (tagName == "w:pprdefault" || tagName == "pprdefault" || tagName == "w:ppr" || tagName == "ppr") -> {
+                                inDocDefaults && (tagName == "pprdefault" || tagName == "ppr") -> {
                                     inDocDefaultsPPr = false
                                 }
-                                inStyle && (tagName == "w:rpr" || tagName == "rpr") -> {
+                                inStyle && tagName == "rpr" -> {
                                     inRPr = false
                                 }
-                                inStyle && (tagName == "w:ppr" || tagName == "ppr") -> {
+                                inStyle && tagName == "ppr" -> {
                                     inPPr = false
                                 }
-                                tagName == "w:style" || tagName == "style" -> {
+                                tagName == "style" -> {
                                     if (currentStyleId != null && (currentStyleType == null || currentStyleType.equals("paragraph", ignoreCase = true))) {
                                         val sName = currentStyleName ?: currentStyleId!!
                                         val catalogLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
@@ -1194,6 +1200,7 @@ class OfficeDocumentParser(private val context: Context) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
                         val nameLower = name.lowercase(Locale.ROOT)
+                        val tagLocal = nameLower.substringAfter(':')
 
                         // Check for unknown or custom XML tags to log diagnostic warnings
                         if (name.isNotEmpty() && !supportedTags.contains(name) && !supportedTags.contains(nameLower)) {
@@ -1213,16 +1220,15 @@ class OfficeDocumentParser(private val context: Context) {
 
                         when {
                             // Headings
-                            nameLower == "text:h" || nameLower == "h" -> {
+                            tagLocal == "h" -> {
                                 inHeading = true
-                                val outlineLevel = parser.getAttributeValue(null, "outline-level")
-                                    ?: parser.getAttributeValue(null, "text:outline-level")
+                                val outlineLevel = getXmlAttr(parser, "outline-level")
                                 headingLevel = outlineLevel?.toIntOrNull() ?: 1
                                 currentText.clear()
                             }
 
                             // Paragraphs
-                            nameLower == "text:p" || nameLower == "w:p" || nameLower == "p" || nameLower == "a:p" -> {
+                            tagLocal == "p" -> {
                                 inParagraph = true
                                 inHeading = false
                                 headingLevel = 1
@@ -1244,14 +1250,13 @@ class OfficeDocumentParser(private val context: Context) {
                                 paraHasSectPr = false
                             }
 
-                            nameLower == "w:ppr" || nameLower == "ppr" -> {
+                            tagLocal == "ppr" -> {
                                 inPPr = true
                             }
 
                             // DOCX / Word Style & Outline Level detection
-                            nameLower == "w:pstyle" || nameLower == "pstyle" -> {
-                                val styleVal = parser.getAttributeValue(null, "w:val")
-                                    ?: parser.getAttributeValue(null, "val") ?: ""
+                            tagLocal == "pstyle" -> {
+                                val styleVal = getXmlAttr(parser, "val") ?: ""
                                 currentPStyle = styleVal
                                 val meta = docxStylesMap[styleVal.lowercase(Locale.ROOT)]
                                 if (meta != null && meta.isHeading) {
@@ -1268,9 +1273,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     }
                                 }
                             }
-                            nameLower == "w:outlinelvl" || nameLower == "outlinelvl" -> {
-                                val lvlVal = parser.getAttributeValue(null, "w:val")
-                                    ?: parser.getAttributeValue(null, "val")
+                            tagLocal == "outlinelvl" -> {
+                                val lvlVal = getXmlAttr(parser, "val")
                                 val parsedLvl = lvlVal?.toIntOrNull()
                                 if (parsedLvl != null) {
                                     inHeading = true
@@ -1278,17 +1282,17 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
-                            inPPr && (nameLower == "w:spacing" || nameLower == "spacing") -> {
-                                val bStr = parser.getAttributeValue(null, "w:before") ?: parser.getAttributeValue(null, "before")
+                            inPPr && tagLocal == "spacing" -> {
+                                val bStr = getXmlAttr(parser, "before")
                                 bStr?.toIntOrNull()?.let { directBefore = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
-                                val aStr = parser.getAttributeValue(null, "w:after") ?: parser.getAttributeValue(null, "after")
+                                val aStr = getXmlAttr(parser, "after")
                                 aStr?.toIntOrNull()?.let { directAfter = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
-                                val lStr = parser.getAttributeValue(null, "w:line") ?: parser.getAttributeValue(null, "line")
-                                val lrStr = parser.getAttributeValue(null, "w:linerule") ?: parser.getAttributeValue(null, "linerule") ?: "auto"
+                                val lStr = getXmlAttr(parser, "line")
+                                val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
                                 if (lStr != null) {
                                     val lv = lStr.toIntOrNull()
                                     if (lv != null) {
-                                        if (lrStr == "exact" || lrStr == "atleast") {
+                                        if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
                                             directLineExact = LayoutUnits.twipsToUnits(lv)
                                         } else {
                                             directLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
@@ -1298,99 +1302,91 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
-                            inPPr && (nameLower == "w:ind" || nameLower == "ind") -> {
-                                val lStr = parser.getAttributeValue(null, "w:left") ?: parser.getAttributeValue(null, "left")
-                                    ?: parser.getAttributeValue(null, "w:start") ?: parser.getAttributeValue(null, "start")
+                            inPPr && tagLocal == "ind" -> {
+                                val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
                                 lStr?.toIntOrNull()?.let { directIndentStart = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
-                                val rStr = parser.getAttributeValue(null, "w:right") ?: parser.getAttributeValue(null, "right")
-                                    ?: parser.getAttributeValue(null, "w:end") ?: parser.getAttributeValue(null, "end")
+                                val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
                                 rStr?.toIntOrNull()?.let { directIndentEnd = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
-                                val flStr = parser.getAttributeValue(null, "w:firstline") ?: parser.getAttributeValue(null, "firstline")
+                                val flStr = getXmlAttr(parser, "firstline")
                                 flStr?.toIntOrNull()?.let { directFirstLine = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
-                                val hStr = parser.getAttributeValue(null, "w:hanging") ?: parser.getAttributeValue(null, "hanging")
+                                val hStr = getXmlAttr(parser, "hanging")
                                 hStr?.toIntOrNull()?.let { directFirstLine = -LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
                             }
 
-                            inPPr && (nameLower == "w:jc" || nameLower == "jc") -> {
-                                val jcVal = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
+                            inPPr && tagLocal == "jc" -> {
+                                val jcVal = getXmlAttr(parser, "val")
                                 if (jcVal != null) {
                                     directJc = jcVal
                                     hasDirectPPr = true
                                 }
                             }
 
-                            inPPr && (nameLower == "w:keepnext" || nameLower == "keepnext") -> {
+                            inPPr && tagLocal == "keepnext" -> {
                                 directKeepNext = true
                                 hasDirectPPr = true
                             }
 
-                            inPPr && (nameLower == "w:pagebreakbefore" || nameLower == "pagebreakbefore") -> {
+                            inPPr && tagLocal == "pagebreakbefore" -> {
                                 directPageBreakBefore = true
                                 hasDirectPPr = true
                             }
 
-                            inPPr && (nameLower == "w:sectpr" || nameLower == "sectpr") -> {
+                            inPPr && tagLocal == "sectpr" -> {
                                 paraHasSectPr = true
                             }
 
                             // Page breaks
-                            nameLower == "w:lastrenderedpagebreak" || nameLower == "lastrenderedpagebreak" ||
-                            nameLower == "text:soft-page-break" || nameLower == "soft-page-break" -> {
+                            tagLocal == "lastrenderedpagebreak" || tagLocal == "soft-page-break" -> {
                                 // Ignored: soft page breaks are layout hints, not authored breaks
                             }
 
                             // Text formatting
-                            nameLower == "w:b" || nameLower == "b" || nameLower == "style:text-properties" -> {
+                            tagLocal == "b" || tagLocal == "text-properties" -> {
                                 isBold = true
                             }
-                            nameLower == "w:i" || nameLower == "i" -> {
+                            tagLocal == "i" -> {
                                 isItalic = true
                             }
-                            nameLower == "w:u" || nameLower == "u" -> {
+                            tagLocal == "u" -> {
                                 isUnderline = true
                             }
 
                             // Tables
-                            nameLower == "table:table" || nameLower == "w:tbl" || nameLower == "table" -> {
+                            tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = true
                                 currentRows.clear()
-                                currentTableName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "table:name")
+                                currentTableName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "draw:frame" || nameLower == "frame" -> {
-                                lastGraphicName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "draw:name")
+                            tagLocal == "frame" -> {
+                                lastGraphicName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "wp:docpr" || nameLower == "docpr" -> {
-                                lastGraphicName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "wp:name")
+                            tagLocal == "docpr" -> {
+                                lastGraphicName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "table:table-row" || nameLower == "w:tr" || nameLower == "tr" -> {
+                            tagLocal == "tr" || tagLocal == "table-row" -> {
                                 currentCells.clear()
                             }
-                            nameLower == "table:table-cell" || nameLower == "w:tc" || nameLower == "tc" -> {
+                            tagLocal == "tc" || tagLocal == "table-cell" -> {
                                 currentCellParagraphs.clear()
                                 currentText.clear()
                             }
 
                             // Lists
-                            nameLower == "text:list-item" || nameLower == "w:numpr" -> {
+                            tagLocal == "list-item" || tagLocal == "numpr" -> {
                                 currentText.append("• ")
                             }
 
                             // Spaces & Tabs
-                            nameLower == "text:s" || nameLower == "s" -> {
-                                val countAttr = parser.getAttributeValue(null, "c")
-                                    ?: parser.getAttributeValue(null, "text:c")
+                            tagLocal == "s" -> {
+                                val countAttr = getXmlAttr(parser, "c")
                                 val count = countAttr?.toIntOrNull() ?: 1
                                 repeat(count) { currentText.append(" ") }
                             }
-                            nameLower == "text:tab" || nameLower == "w:tab" || nameLower == "tab" -> {
+                            tagLocal == "tab" -> {
                                 currentText.append("\t")
                             }
-                            nameLower == "text:line-break" || nameLower == "w:br" || nameLower == "w:cr" -> {
-                                val brType = parser.getAttributeValue(null, "type")
-                                    ?: parser.getAttributeValue(null, "w:type")
+                            tagLocal == "line-break" || tagLocal == "br" || tagLocal == "cr" -> {
+                                val brType = getXmlAttr(parser, "type")
                                 if (brType?.equals("page", ignoreCase = true) == true) {
                                     elements.add(OfficeDocumentElement.PageBreak)
                                 } else {
@@ -1399,9 +1395,8 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             // Images: P0-3: lower-cased fallback so Pictures/ vs pictures/ still resolves
-                            nameLower == "draw:image" -> {
-                                val href = parser.getAttributeValue(null, "href")
-                                    ?: parser.getAttributeValue("http://www.w3.org/1999/xlink", "href")
+                            tagLocal == "image" -> {
+                                val href = getXmlAttr(parser, "href")
                                 if (!href.isNullOrBlank()) {
                                     val imgName = href.substringAfterLast("/")
                                     val hrefLower = href.lowercase(Locale.ROOT)
@@ -1418,17 +1413,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     )
                                 }
                             }
-                            nameLower == "a:blip" || nameLower == "blip" || nameLower == "v:imagedata" -> {
-                                var embedId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed")
-                                if (embedId.isNullOrBlank()) {
-                                    for (i in 0 until parser.attributeCount) {
-                                        val attrName = parser.getAttributeName(i).lowercase(Locale.ROOT)
-                                        if (attrName == "embed" || attrName.endsWith(":embed") || attrName == "id" || attrName.endsWith(":id") || attrName == "href" || attrName.endsWith(":href")) {
-                                            embedId = parser.getAttributeValue(i)
-                                            break
-                                        }
-                                    }
-                                }
+                            tagLocal == "blip" || tagLocal == "imagedata" -> {
+                                val embedId = getXmlAttr(parser, "embed") ?: getXmlAttr(parser, "id") ?: getXmlAttr(parser, "href")
                                 if (!embedId.isNullOrBlank()) {
                                     val target = docxRelsMap[embedId] ?: ""
                                     val imgName = target.substringAfterLast("/").ifBlank { embedId }
@@ -1462,9 +1448,10 @@ class OfficeDocumentParser(private val context: Context) {
                     XmlPullParser.END_TAG -> {
                         val name = parser.name ?: ""
                         val nameLower = name.lowercase(Locale.ROOT)
+                        val tagLocal = nameLower.substringAfter(':')
 
                         when {
-                            nameLower == "text:h" || nameLower == "h" -> {
+                            tagLocal == "h" -> {
                                 inHeading = false
                                 val headingText = currentText.toString().trim()
                                 if (headingText.isNotEmpty()) {
@@ -1479,11 +1466,11 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            nameLower == "w:ppr" || nameLower == "ppr" -> {
+                            tagLocal == "ppr" -> {
                                 inPPr = false
                             }
 
-                            nameLower == "text:p" || nameLower == "w:p" || nameLower == "p" || nameLower == "a:p" -> {
+                            tagLocal == "p" -> {
                                 inParagraph = false
                                 inPPr = false
                                 val paraText = currentText.toString().trim()
@@ -1554,7 +1541,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 isUnderline = false
                             }
 
-                            nameLower == "table:table-cell" || nameLower == "w:tc" || nameLower == "tc" -> {
+                            tagLocal == "tc" || tagLocal == "table-cell" -> {
                                 val cellText = if (currentCellParagraphs.isNotEmpty()) {
                                     currentCellParagraphs.joinToString("\n") { it.text }
                                 } else {
@@ -1570,14 +1557,14 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            nameLower == "table:table-row" || nameLower == "w:tr" || nameLower == "tr" -> {
+                            tagLocal == "tr" || tagLocal == "table-row" -> {
                                 if (currentCells.isNotEmpty()) {
                                     currentRows.add(TableRow(cells = currentCells.toList()))
                                     currentCells.clear()
                                 }
                             }
 
-                            nameLower == "table:table" || nameLower == "w:tbl" || nameLower == "table" -> {
+                            tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = false
                                 if (currentRows.isNotEmpty()) {
                                     val maxCols = currentRows.maxOfOrNull { it.cells.size } ?: 0
