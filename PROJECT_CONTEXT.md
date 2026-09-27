@@ -29,7 +29,7 @@ Default static accent colors (for Android 11 and below, or when Dynamic Color is
 - Editor screens: M365 Copilot mobile office patterns.
 - Standard Bottom Sheet: Microsoft Office 365 command model for Inky, Cellina and Slidia; SoftMaker FlexiPDF for Pagella.
 - General office concepts and layout: LibreOffice, adapted rather than copied from desktop.
-- Icons: shipped set is Material Icons Rounded (`material-icons-extended`); Material Symbols Rounded is the target family. Colibre is an optional candidate pending asset/license review. A Papirus wallpaper palette (target, not shipped) is distinct from Android 12+ system dynamic color and should use system wallpaper colors directly where available, with a user-selected image fallback if needed.
+- Icons: shipped dependency `material-icons-extended` is used as both Rounded and Default/Filled (`CellinaModule.kt:569`, `PagellaModule.kt:147`); Material Symbols Rounded is the target family. Colibre is an optional candidate pending asset/license review. A Papirus wallpaper palette (target, not shipped) is distinct from Android 12+ system dynamic color and should use system wallpaper colors directly where available, with a user-selected image fallback if needed.
 - Reference editions: LibreOffice 26.2 guides (`https://books.libreoffice.org/en/`), ODF 1.4 in `docs/html`, ECMA-376 for OOXML; design sources are listed by filename in `DESIGN.md` front matter.
 
 ## 🏛️ 2. Core Architecture & Dual-Engine Model
@@ -72,9 +72,9 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
 The central launchpad of the application (equivalent to LibreOffice *Start Center*):
 - **Recents Tab**: Chronological list of recently accessed documents with file thumbnails, timestamps, file sizes, pinned/starred status, and module color badges.
 - **Files Tab (`FilesSubPage`)**: Device file system browser with folder traversal, sorting, search, and Android Storage Access Framework (SAF) system picker integration.
-- **Google Drive Tab (placeholder, not yet implemented)**: An honest placeholder screen. No OAuth, Drive file listing, upload or download exists yet; the connect button raises a "this is a placeholder" notice instead of pretending to sign in.
+- **Google Drive Tab shipped (`HomeDashboard.kt:1210-1275`)**: no OAuth, Drive listing, upload or download exists. The screen advertises Google Workspace cloud access and offers a "Connect Google Account" button, but pressing it raises only a placeholder toast. **Target, Plan 11 home-entry package / Plan 3 copy backlog**: disclose the unavailable state on screen before asking for a press.
 - **Top Bar & Module Filter Chips**: Filter view by All, Inky (Writer), Cellina (Calc), Slidia (Impress), or Pagella (PDF).
-- **Search Bar**: Real-time filtering by document title, author, and content snippets.
+- **Search Bar shipped (`HomeDashboard.kt:655-690`)**: filters Recents by filename only; it does not search authors or document content, and the top search query is not passed to Files or Drive (`HomeDashboard.kt:571-580`). **Target, Plan 11 home-entry package**: label any broader search by the fields it really indexes.
 
 ### 2. Create New Screen (`NewDocumentScreen`)
 Opened from the Start Screen FAB (`HomeDashboard.kt:534-550`, route `create_new_document`). Verified against `ui/home/NewDocumentScreen.kt` and `core/util/TemplateManager.kt` on 2026-09-27.
@@ -97,7 +97,7 @@ Opened from the Start Screen FAB (`HomeDashboard.kt:534-550`, route `create_new_
 **Target** (design pattern: WPS Office create flow, detailed in `DESIGN.md` surface brief "Create New"): blank documents first with a real, previewable template gallery built from the bundled LibreOffice templates, per-module grouping, and an honest offline state; online sources only as an explicit, opt-in extension.
 
 ### 2a. Welcome Screen (`WelcomeScreen`, first run only)
-- **Shipped**: shown once when `papirus_first_run/is_first_run` is true (`MainActivity.kt:304-306`): one centered card with a 28 dp icon tile, the title "Welcome to Papirus Office", a short body about on-device documents and the system file picker, and one full-width 56 dp button. No permission is requested; the key name `welcome_grant_btn` is a leftover from an earlier permission design.
+- **Shipped**: shown once when `papirus_first_run/is_first_run` is true (`MainActivity.kt:304-306`): one centered column with a 112 dp logo tile (28 dp radius, 80 dp icon, `WelcomeScreen.kt:40-52`), the title "Welcome to Papirus Office", a short body about on-device documents and the system file picker, and one full-width 56 dp button. No permission is requested; the key name `welcome_grant_btn` is a leftover from an earlier permission design.
 - **Target**: WPS-inspired friendly entry with a specific primary action label, defined in `DESIGN.md`.
 
 ### 3. About Screen (`AboutScreen`)
@@ -119,7 +119,7 @@ Every suite module operates in two distinct modes:
   - **Inky Module**: Word processor with paginated/continuous document view, zoom scaling, margin rulers, and text canvas.
   - **Cellina Module**: Spreadsheet workbook with row/column headers, cell grid, formula bar (`=SUM(...)`), sheet tabs, and cell coordinate selector.
   - **Slidia Module**: Presentation deck editor with thumbnail navigation rail, slide canvas, speaker notes drawer, and presentation slideshow playback.
-  - **Pagella Module**: PDF reader with thumbnail scrubber, multi-page continuous vertical scroll, zoom/fit-to-page, and annotation overlay.
+  - **Pagella Module shipped**: Android `PdfRenderer` current-page display, zoom/previous/next, and in-memory ink paths (`PagellaModule.kt:85-120,132-198,202-299`). **Target, Plan 11 Pagella package**: thumbnail scrubber, continuous paging and persisted annotation/export; do not cite the fallback's native-renderer text as implementation evidence (`PagellaModule.kt:229-253`).
 
 ### 6. Loading Screen & Splash
 - Startup initialization screen displaying suite branding while `LibreOfficeCore` probes `liblo-native-code.so` (SIMULATED fallback when it does not load), fonts are registered, and the document package is parsed.
@@ -237,6 +237,11 @@ A touch-oriented bottom-sheet surface. A compact height around 40% may be a star
 │   ├── OpenDocument-v1.4-part3-schema.html
 │   └── OpenDocument-v1.4-part4-formula.html
 ├── docs/InkyC1Checklist.md                  # Writer Guide 26.2 Chapter 1 device test checklist
+├── docs/GS262-GettingStarted_compressed.pdf # LibreOffice 26.2 Getting Started guide
+├── docs/WG262-WriterGuide_compressed.pdf    # LibreOffice 26.2 Writer guide
+├── docs/CG262-CalcGuide.pdf                 # LibreOffice 26.2 Calc guide
+├── docs/IG262-ImpressGuide_compressed.pdf   # LibreOffice 26.2 Impress guide
+├── docs/DG262-DrawGuide.pdf                 # LibreOffice 26.2 Draw guide
 ├── anti-slop/                               # Numbered audits and plans (evidence trail)
 ├── app/src/main/assets/templates/           # 115 LibreOffice templates; only untitled.od{t,s,p} are used by Create New
 ├── app/src/main/libs/                       # Pre-built native .so per ABI (LibreOffice Viewer for Android, Git LFS)
@@ -329,7 +334,7 @@ Papirus Office (codenamed LibreDroid Office during conceptualization) follows a 
 4. **Theme & Color Fidelity**:
    - Maintain module color separation: Base Suite Blue (`#2563EB`), Inky Green (`#0F9D58`), Cellina Teal (`#16A3B7`), Slidia Amber (`#F59E0B`), Pagella Red (`#D93025`).
    - Shipped: Android 12+ system dynamic color by default (user switch), Papirus static schemes below Android 12 or when the switch is off, theme mode System / Light / Dark. Target: custom and user-selected-wallpaper palette modes. Always use semantic `MaterialTheme.colorScheme` roles.
-   - Google Sans is the UI target with a Roboto/system fallback until validated. UI typography stays separate from document font identity and saved styles.
+   - Google Sans is the UI target, not a validated shipped face: `Type.kt` requests `OptionalLocal` font resources, but read-only fontTools parsing found malformed bundled TTFs and byte-identical weights (audit-009 §9.3). `README.txt`/`OFL.txt` do not establish those binaries' provenance. System sans-serif is the intended fallback pending a device and licence check in a later asset/code plan. UI typography stays separate from document font identity and saved styles.
 5. **Testing Verification**:
    - Execute local JVM tests via `gradle :app:testDebugUnitTest`.
    - Never attempt to launch emulators or run instrumented tests requiring `adb`.
