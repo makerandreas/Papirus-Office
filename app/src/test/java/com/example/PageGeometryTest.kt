@@ -10,6 +10,7 @@ import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.PageStyleSpec
+import com.makerandreas.papirusoffice.data.odf.SvXMLImport
 import com.makerandreas.papirusoffice.data.util.OdfLength
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -38,11 +39,10 @@ class PageGeometryTest {
     }
 
     /**
-     * The numbers below are the *declared* `fo:margin-*` values. Sample-5.odt
-     * (OnlyOffice export) carries Word's 1 in top margin as a 2.54 cm
-     * fixed-height header on the layouts the body uses (Mpm2..6), not as a
-     * margin, so the declared 0 cm top margin is not a 0 cm body top
-     * (audit-007 finding B). The header/footer assertions pin that.
+     * Collabora 26.04 writes one page layout into every regenerated `.odt`
+     * (audit-008 §2): A4, 2.54 cm top and sides, 1 cm bottom margin plus a
+     * footer of fo:min-height 1.54 cm, so the body bottom sits 2.54 cm above
+     * the page edge, like the DOCX twin.
      */
     @Test
     fun sample5OdtDeclaresA4WithDeclaredMargins() = runBlocking {
@@ -57,34 +57,76 @@ class PageGeometryTest {
         val spec = parsedDoc.styles.defaultPageStyle
         assertNotNull("Sample-5.odt declares style:page-layout, expected a resolved page box", spec)
         spec!!
-        // 21cm x 29.71cm at 96 units/inch; declared margins top 0cm, bottom 1cm, sides 2.54cm
+        // 21.001cm x 29.7cm at 96 units/inch; margins top 2.54cm, bottom 1cm, sides 2.54cm
         assertEquals(793.7f, spec.widthDp, 1.5f)
-        assertEquals(1122.9f, spec.heightDp, 1.5f)
-        assertEquals(0f, spec.marginTopDp, 0.5f)
+        assertEquals(1122.5f, spec.heightDp, 1.5f)
+        assertEquals(96f, spec.marginTopDp, 0.5f)
         assertEquals(37.8f, spec.marginBottomDp, 1f)
         assertEquals(96.0f, spec.marginStartDp, 0.5f)
         assertEquals(96.0f, spec.marginEndDp, 0.5f)
-        // "Standard" master page resolves to Mpm1, not the trailing MasterPage* layouts
         assertEquals("Mpm1", spec.name)
         assertTrue("page-layouts must be addressable by name", parsedDoc.styles.pageStyles.containsKey("Mpm1"))
-        // Mpm1 has no header and a 1 cm minimum-height footer.
+        // No header; the footer's 1.54 cm minimum height completes the 2.54 cm bottom.
         assertEquals(0f, spec.headerHeightDp, 0.01f)
-        assertEquals(37.8f, spec.footerHeightDp, 1f)
+        assertEquals(58.2f, spec.footerHeightDp, 0.5f)
+        assertEquals(96f, spec.bodyTopDp, 0.5f)
+        assertEquals(spec.heightDp - 96f, spec.bodyBottomDp, 0.6f)
 
-        // The body starts on MasterPage2 -> Mpm2, whose header is svg:height="2.54cm"
-        // (ODF 1.4 Part 3 §20.407.2) over fo:min-height="0cm": body top is 1 in.
-        assertEquals("MasterPage2", parsedDoc.styles.firstMasterPageName)
-        assertEquals("Mpm2", parsedDoc.styles.masterPages["MasterPage2"])
-        val bodyLayout = parsedDoc.styles.pageStyleForMaster("MasterPage2")
-        assertNotNull("Mpm2 must be readable through its master page", bodyLayout)
-        bodyLayout!!
-        assertEquals(96f, bodyLayout.headerHeightDp, 0.5f)
-        assertEquals(37.8f, bodyLayout.footerHeightDp, 1f)
-        assertEquals(0f, bodyLayout.marginTopDp, 0.5f)
-        assertEquals(96f, bodyLayout.bodyTopDp, 0.5f)
-        assertEquals(1122.9f - 37.8f - 37.8f, bodyLayout.bodyBottomDp, 2f)
-        // Plan 5A: the paginator still flows from the declared margin; PR 16a moves it to bodyTopDp.
-        assertEquals(spec.marginTopDp, 0f, 0.01f)
+        // The first body paragraph's automatic style names master page Standard -> Mpm1.
+        assertEquals("Standard", parsedDoc.styles.firstMasterPageName)
+        assertEquals("Mpm1", parsedDoc.styles.masterPages["Standard"])
+        assertEquals("Mpm2", parsedDoc.styles.masterPages["Converted1"])
+    }
+
+    /**
+     * No regenerated fixture carries a fixed-height header any more (the
+     * OnlyOffice exports of audit-007 finding B were replaced), so the
+     * svg:height-over-fo:min-height rule (ODF 1.4 Part 3 §20.407.2, §20.212)
+     * is pinned on a minimal styles.xml instead.
+     */
+    @Test
+    fun fixedHeaderHeightWinsOverMinHeight() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val stylesXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+                xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+                xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0">
+              <office:automatic-styles>
+                <style:page-layout style:name="Mpm1">
+                  <style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm"
+                      fo:margin-top="0cm" fo:margin-bottom="1cm" fo:margin-left="2.54cm" fo:margin-right="2.54cm"/>
+                  <style:header-style>
+                    <style:header-footer-properties svg:height="2.54cm" fo:min-height="0cm"/>
+                  </style:header-style>
+                  <style:footer-style>
+                    <style:header-footer-properties fo:min-height="1cm"/>
+                  </style:footer-style>
+                </style:page-layout>
+              </office:automatic-styles>
+              <office:master-styles>
+                <style:master-page style:name="Standard" style:page-layout-name="Mpm1"/>
+              </office:master-styles>
+            </office:document-styles>
+        """.trimIndent()
+        val contentXml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
+              <office:body><office:text><text:p>body</text:p></office:text></office:body>
+            </office:document-content>
+        """.trimIndent()
+        val parsed = SvXMLImport(context).parseOdfXml(contentXml, "fixed-header.odt", stylesXmlContent = stylesXml)
+        assertFalse(parsed.isParsingFailed)
+        val spec = parsed.styles.pageStyleForMaster("Standard")
+        assertNotNull("Mpm1 must be readable through its master page", spec)
+        spec!!
+        assertEquals(0f, spec.marginTopDp, 0.5f)
+        assertEquals(96f, spec.headerHeightDp, 0.5f)
+        assertEquals(37.8f, spec.footerHeightDp, 1f)
+        assertEquals(96f, spec.bodyTopDp, 0.5f)
+        assertEquals(spec.heightDp - 37.8f - 37.8f, spec.bodyBottomDp, 2f)
     }
 
     @Test
@@ -95,14 +137,15 @@ class PageGeometryTest {
         val spec = parsedDoc.styles.defaultPageStyle
         assertNotNull(spec)
         spec!!
-        // LibreOffice 7.0.4: 1in top, 0.3937in bottom margin plus a 0.6063in footer = 1in body bottom.
+        // Collabora 26.04: 2.54cm top, 1cm bottom margin plus a 1.54cm footer = 2.54cm body bottom.
         assertEquals("Mpm1", spec.name)
         assertEquals(96f, spec.marginTopDp, 0.5f)
         assertEquals(37.8f, spec.marginBottomDp, 0.5f)
         assertEquals(0f, spec.headerHeightDp, 0.01f)
         assertEquals(58.2f, spec.footerHeightDp, 0.5f)
         assertEquals(spec.heightDp - 96f, spec.bodyBottomDp, 0.6f)
-        assertEquals("Standard", parsedDoc.styles.firstMasterPageName)
+        // The first paragraph names no master page, which ODF resolves to Standard.
+        assertEquals(null, parsedDoc.styles.firstMasterPageName)
     }
 
     @Test

@@ -3,23 +3,28 @@ package com.example
 import java.io.File
 
 /**
- * The six `tests/inky` sample pairs as plan 5 (roadmap PR 15/16a/16b)
- * describes them: reference page counts with their provenance, and the
- * per-format page-count windows. Values and sources are audit-007
- * (`anti-slop/audit-007-2026-09-26-sample-matrix.md`) §1 and §11.3.
+ * The six `tests/inky` sample pairs as plan 5 describes them: reference page
+ * counts with their provenance, and the per-format page-count windows.
+ *
+ * Re-baselined in PR 16 (Plan 5b) against the regenerated fixtures: every
+ * `.docx` is saved by Microsoft 365 (`docProps/app.xml` `<Application>`
+ * "Microsoft Office Word", `<Pages>` read by the user in the M365 app), every
+ * `.odt` by Collabora Office 26.04 (`meta:page-count`). Values and sources are
+ * audit-008 (`anti-slop/audit-008-2026-09-27-fixture-rebaseline.md`) §1 and §4,
+ * which supersedes audit-007 §1 and §11.3.
  *
  * Windows are *recorded* here so the dump can print them; they are not
- * asserted until PR 16b (`PaginationFidelityTest`). The only pagination
- * guard in force is `Sample5UnifiedPaginationTest`'s 12..30.
+ * asserted until Plan 5e (`PaginationFidelityTest`). The only pagination
+ * guard in force is `Sample5UnifiedPaginationTest`'s interim window.
  */
 object SampleMatrix {
 
     data class Reference(
-        /** Pages Microsoft 365 renders for the DOCX (user, 2026-09-26; `docProps/app.xml` where present). */
+        /** Pages Microsoft 365 renders for the DOCX (`docProps/app.xml` `<Pages>`, confirmed by the user in M365). */
         val docxPages: Int,
         val docxSource: String,
-        /** Pages Collabora Office renders for the ODT; null until the regenerated fixtures land. */
-        val odtPages: Int?,
+        /** Pages Collabora Office renders for the ODT (`meta.xml` `meta:page-count`, confirmed by the user). */
+        val odtPages: Int,
         val odtSource: String
     )
 
@@ -29,32 +34,39 @@ object SampleMatrix {
     }
 
     val references: Map<Int, Reference> = mapOf(
-        1 to Reference(15, "M365 (user, 2026-09-26); app.xml carries no page count", null, "pending Collabora regeneration"),
-        2 to Reference(23, "app.xml <Pages>23</Pages>, confirmed by M365", null, "pending Collabora regeneration"),
-        3 to Reference(20, "M365 (user, 2026-09-26); WPS export carries no page count", null, "pending Collabora regeneration"),
-        4 to Reference(10, "M365 (user, 2026-09-26); OnlyOffice export carries no page count", null, "pending Collabora regeneration"),
-        5 to Reference(18, "app.xml <Pages>18</Pages>, confirmed by M365; roadmap §0", null, "pending Collabora regeneration"),
-        6 to Reference(21, "M365 (user, 2026-09-26); roadmap v2 §0", null, "pending Collabora regeneration")
+        1 to Reference(15, "M365, app.xml <Pages>15</Pages>", 15, "Collabora 26.04, meta:page-count 15"),
+        2 to Reference(23, "M365, app.xml <Pages>23</Pages>", 23, "Collabora 26.04, meta:page-count 23"),
+        3 to Reference(22, "M365, app.xml <Pages>22</Pages> (user re-checked; audit-007 had 20)", 22, "Collabora 26.04, meta:page-count 22"),
+        4 to Reference(10, "M365, app.xml <Pages>10</Pages>", 11, "Collabora 26.04, meta:page-count 11"),
+        5 to Reference(18, "M365, app.xml <Pages>18</Pages>", 19, "Collabora 26.04, meta:page-count 19"),
+        6 to Reference(21, "M365, app.xml <Pages>21</Pages>", 22, "Collabora 26.04, meta:page-count 22")
     )
 
-    /** audit-007 §11.3, DOCX side. */
+    /**
+     * audit-008 §4, DOCX side. Staged windows of roughly ±20 % around the
+     * reference; only Sample-3 moved (16..24 around 20 became 18..26 around 22).
+     */
     val docxWindows: Map<Int, Window> = mapOf(
         1 to Window(12, 18),
         2 to Window(18, 28),
-        3 to Window(16, 24),
+        3 to Window(18, 26),
         4 to Window(8, 12),
         5 to Window(15, 21),
         6 to Window(15, 26)
     )
 
-    /** audit-007 §11.3, ODT side, provisional until the Collabora counts exist (Sample-1 bridges 9 and 15). */
+    /**
+     * audit-008 §4, ODT side, re-derived from the Collabora counts with the
+     * same staging as the DOCX side. The audit-007 provisional windows for
+     * Sample-2 (15..22) and Sample-3 (12..20) excluded their own references.
+     */
     val odtWindows: Map<Int, Window> = mapOf(
-        1 to Window(9, 18),
-        2 to Window(15, 22),
-        3 to Window(12, 20),
-        4 to Window(7, 12),
-        5 to Window(12, 21),
-        6 to Window(15, 26)
+        1 to Window(12, 18),
+        2 to Window(18, 28),
+        3 to Window(18, 26),
+        4 to Window(9, 13),
+        5 to Window(15, 23),
+        6 to Window(17, 27)
     )
 
     val sampleNumbers: List<Int> = (1..6).toList()
