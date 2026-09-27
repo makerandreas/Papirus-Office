@@ -1,4 +1,4 @@
-# Plan 1 — Master Index and Working Guide
+# Plan 1 - Master Index and Working Guide
 
 **Date:** 2026-09-24
 **Role:** the entry point for all work described in `anti-slop/plan-*.md`. It says what each plan is, what it closes, where its detail lives, and how the reference guide behind the test checklist maps onto the plans.
@@ -25,11 +25,11 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1-
 
 | # | Plan | Closes | Depends on | Detail | Status |
 |---|---|---|---|---|---|
-| **1** | **Master index and working guide** (this file) | — | — | here | **active** |
-| **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | — | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
-| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | — | `plan-03-compliance-sweep.md` (§8 records 3A; §9 records 3B) | 3A **landed as PR 12** (`55a9a97`); 3B **complete** per user confirmation and its implementation record; 3C is the docs alignment in PR 14 / Plan 11 |
-| **4** | **Chrome and input** (was PR D) | F-01…F-06 | — | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
-| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | — | same file, § Plan 5; evidence `audit-007-2026-09-26-sample-matrix.md` (§12.1 = PR 15 baseline dump) | **5A in review as PR #15** (`LayoutUnits`, style/page seam, `FontRegistry` + Martel Sans, `TextMetrics`, `LayoutDump`, `PageTransform`, `SampleMatrixTest`, CI inventory + PR report comment); **5B = PR 16a, 5C = PR 16b** next; windows per format (user decision 2026-09-26) |
+| **1** | **Master index and working guide** (this file) | - | - | here | **active** |
+| **2** | **Screenshots and UI backlog** | F-01…F-06, F-22, F-29, F-30, F-31 | - | `plan-02-screenshots-and-ui-backlog.md` | **landed as PR #11** (merge `e10f956`); acceptance list still open on device |
+| **3** | **Compliance sweep** | the `AGENTS.md` / `DESIGN.md` / `antislop` / ODF / OOXML findings in `audit-006` §2-§3 | - | `plan-03-compliance-sweep.md` (§8 records 3A; §9 records 3B) | 3A **landed as PR 12** (`55a9a97`); 3B **complete** per user confirmation and its implementation record; 3C is the docs alignment in PR 14 / Plan 11 |
+| **4** | **Chrome and input** (was PR D) | F-01…F-06 | - | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
+| **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | - | same file, § Plan 5; evidence `audit-007`, `audit-008`, `audit-009`, `audit-010` | **5a (PR #15)**, **5b (PR #16)**, **5c (PR #17)** landed; **5d** (breaks and defaults) is active next; **5e** (metrics and windows) follows; windows per format |
 | **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | scheduled as PR 17 |
 | **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7 | scheduled as PRs 18-19 |
 | **8** | **OOXML structural fidelity** (was PR H) | F-16…F-20, F-26, F-27, DOCX halves of F-10/F-11 | Plans 5, 7 | same file, § Plan 8 | scheduled as PRs 20-21 |
@@ -70,7 +70,7 @@ Every section of WG 24.8 Chapter 1 is listed below with what it means for Papiru
 | Opening files not in `.odt` format | DOCX support (and ODS/ODP/XLSX/PPTX in the other modules) | 8, 7 | DOCX opens; fidelity is the largest gap in the whole report |
 | Saving a document: Save, Save As, Save a copy, Save all, Save to remote, autosave | top-bar save, Save As dialog, autosave timer | 9 | save exists; the written content loses structure (dangling style refs on ODT, `[Image: path]` on DOCX) |
 | Saving as a Microsoft Word document | `DocumentSerializer.serializeToFormat(..., "DOCX")` | 8, 9 | writes a document.xml without styles, numbering, table grid or images |
-| Exchanging with Apple Pages | — | — | out of scope; recorded here so it is a decision, not an omission |
+| Exchanging with Apple Pages | - | - | out of scope; recorded here so it is a decision, not an omission |
 | Password protection, OpenPGP encryption, remote servers (Google Drive, WebDAV, FTP, CMIS) | Google Drive tab is a labelled placeholder | 3 (honesty), unassigned (feature) | no encryption path; `AGENTS.md` lists Google Drive as a screen, which the docs will correct in Plan 3 |
 | Reloading a document (discard changes after last save) | Reload action + confirmation dialog | 9, guard | present per the checklist |
 | Closing a document (save-or-discard prompt) | back/close handler + Save before Exit dialog | 9, guard | present per the checklist |
@@ -84,7 +84,7 @@ Every section of WG 24.8 Chapter 1 is listed below with what it means for Papiru
 | Using outline folding (options toggle, hide/show content under headings, include sub-levels) | double-tap a heading toggles (`OutlineEngine`) | 3 (discoverability), guard | implemented, but the affordance is invisible: the guide gives it a setting and a visible button, Papirus gives it an undocumented double-tap |
 | Setting reminders (up to five; the sixth deletes the first; not saved with the document) | Set Reminder in FCT, Reminder filter in the Navigator, Prev/Next | 2, guard | the checklist already tests the cap; the guide's "not saved with the document" matches `ReminderManager` behaviour to confirm in Plan 2 |
 | Undoing and redoing changes (undo list, multi-step undo, redo list) | top-bar undo/redo, Actions to Undo/Redo subpage, dual-stack `HistoryManager` | guard | implemented; Plans 4-5 must not disturb the buffer-flush protocol |
-| Displaying multiple views of a document | no mobile analogue (the guide's Window > New Window) | — | the `isWebView` toggle is the nearest analogue, and Plan 5 handles it with the document-views row above |
+| Displaying multiple views of a document | no mobile analogue (the guide's Window > New Window) | - | the `isWebView` toggle is the nearest analogue, and Plan 5 handles it with the document-views row above |
 
 ### 3.4 What this mapping means for the plans
 
@@ -140,4 +140,5 @@ Every plan's PR must hold these, or it is not ready:
   1. ~~Plan 2, commits 1-2~~ **done**: PR #11 merged the whole plan (its commits 1-2 became the renderer and status-bar commits of PR #11).
   2. ~~Plan 3A/3B~~ **complete**: PR 12 landed with the sweep and `SourceHygieneGuardTest`; Plan 3B is complete per its implementation record and the user's confirmation. Plan 3C is the current docs alignment (PR 14 / Plan 11).
   3. ~~Then Plan 5 with its per-page element dump~~ **scheduled as roadmap PR 15** (dump first, metrics seams second, transform third), exactly because the empty-page mechanism (F-25) is still an open question that only a trace can answer.
-  4. **2026-09-26:** PR 14 (Plan 3C / Plan 11 docs) is merged (`5c99072`). Plan 5 starts with the evidence commit of PR 15 (`audit-007`); the empty-page question (F-25) is narrowed by code reading (the paginator cannot author a blank page except at element 0), so the dump confirms per file whether the blank pages come from the fake breaks or from inflated metrics. Plan 5 is now three PRs (15, 16a, 16b) and its windows are per format. The device checklist run that was postponed in roadmap v2 §5 ("Now, before PR 15": items 5, 8, 9) is still owed and is independent of PR 15's code.
+  4. **2026-09-26:** PR 14 (Plan 3C / Plan 11 docs) is merged (`5c99072`). Plan 5 starts with the evidence commit of PR 15 (`audit-007`); the empty-page question (F-25) is narrowed by code reading (the paginator cannot author a blank page except at element 0), so the dump confirms per file whether the blank pages come from the fake breaks or from inflated metrics. Plan 5 is renumbered into 5a-5e (audit-008).
+  5. **2026-09-27:** Plan 5a (PR #15 measuring stick), Plan 5b (PR #16 fixture re-baseline with M365 DOCX and Collabora 26.04 ODT, audit-008), and Plan 5c (PR #17 documentation refresh, DESIGN.md v3.0, audit-009) merged. Plan 5d (breaks and defaults: fake breaks out, authored breaks in, body rect, metric style chain, F-21 defaults; audit-010) is active next.

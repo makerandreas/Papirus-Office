@@ -59,9 +59,9 @@ class Sample5StyleFidelityTest {
             paragraphStyles = mapOf("Judul1" to ParagraphStyle("Judul1", fontSizeSp = 14f, isBold = true))
         )
         assertEquals(14f, StyleResolver.resolveParagraphStyle("Judul1", mapped).fontSizeSp)
-        assertEquals(24f, StyleResolver.resolveParagraphStyle("Heading 1", DocumentStyles()).fontSizeSp)
-        assertEquals(20f, StyleResolver.resolveParagraphStyle("Heading 2", DocumentStyles()).fontSizeSp)
-        assertEquals(16f, StyleResolver.resolveParagraphStyle("Heading 3", DocumentStyles()).fontSizeSp)
+        assertEquals(12f, StyleResolver.resolveParagraphStyle("Heading 1", DocumentStyles()).fontSizeSp)
+        assertEquals(12f, StyleResolver.resolveParagraphStyle("Heading 2", DocumentStyles()).fontSizeSp)
+        assertEquals(12f, StyleResolver.resolveParagraphStyle("Heading 3", DocumentStyles()).fontSizeSp)
     }
 
     @Test

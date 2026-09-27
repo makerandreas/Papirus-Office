@@ -54,7 +54,16 @@ data class OdfStyleInfo(
     val colorHex: String? = null,
     val alignment: String? = null,
     /** `style:master-page-name` on a paragraph (automatic) style: the page style this paragraph starts. */
-    val masterPageName: String? = null
+    val masterPageName: String? = null,
+    val spaceBeforeUnits: Float? = null,
+    val spaceAfterUnits: Float? = null,
+    val lineHeightFactor: Float? = null,
+    val lineHeightExactUnits: Float? = null,
+    val indentStartUnits: Float? = null,
+    val indentEndUnits: Float? = null,
+    val firstLineIndentUnits: Float? = null,
+    val keepWithNext: Boolean? = null,
+    val pageBreakBefore: Boolean? = null
 )
 
 /** Bold/italic/underline resolved from a character style, never from the style name. */
@@ -77,7 +86,16 @@ private class StyleDraft(
     var isItalic: Boolean? = null,
     var isUnderline: Boolean? = null,
     var colorHex: String? = null,
-    var alignment: String? = null
+    var alignment: String? = null,
+    var spaceBeforeUnits: Float? = null,
+    var spaceAfterUnits: Float? = null,
+    var lineHeightFactor: Float? = null,
+    var lineHeightExactUnits: Float? = null,
+    var indentStartUnits: Float? = null,
+    var indentEndUnits: Float? = null,
+    var firstLineIndentUnits: Float? = null,
+    var keepWithNext: Boolean? = null,
+    var pageBreakBefore: Boolean? = null
 ) {
     fun toInfo(): OdfStyleInfo = OdfStyleInfo(
         name = name,
@@ -92,7 +110,16 @@ private class StyleDraft(
         isUnderline = isUnderline,
         colorHex = colorHex,
         alignment = alignment,
-        masterPageName = masterPageName
+        masterPageName = masterPageName,
+        spaceBeforeUnits = spaceBeforeUnits,
+        spaceAfterUnits = spaceAfterUnits,
+        lineHeightFactor = lineHeightFactor,
+        lineHeightExactUnits = lineHeightExactUnits,
+        indentStartUnits = indentStartUnits,
+        indentEndUnits = indentEndUnits,
+        firstLineIndentUnits = firstLineIndentUnits,
+        keepWithNext = keepWithNext,
+        pageBreakBefore = pageBreakBefore
     )
 }
 
@@ -147,6 +174,29 @@ private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
 
 private fun applyParagraphProperties(draft: StyleDraft, attrs: Map<String, String>) {
     parseAlignment(attrs["text-align"])?.let { draft.alignment = it }
+    attrs["margin-top"]?.let { draft.spaceBeforeUnits = LayoutUnits.parseLength(it) }
+    attrs["margin-bottom"]?.let { draft.spaceAfterUnits = LayoutUnits.parseLength(it) }
+    attrs["margin-left"]?.let { draft.indentStartUnits = LayoutUnits.parseLength(it) }
+    attrs["margin-right"]?.let { draft.indentEndUnits = LayoutUnits.parseLength(it) }
+    attrs["text-indent"]?.let { draft.firstLineIndentUnits = LayoutUnits.parseLength(it) }
+    attrs["line-height"]?.let { lhRaw ->
+        val factor = LayoutUnits.parseLineHeightFactor(lhRaw)
+        if (factor != null) {
+            draft.lineHeightFactor = factor
+        } else {
+            val exact = LayoutUnits.parseLength(lhRaw)
+            if (exact > 0f) draft.lineHeightExactUnits = exact
+        }
+    }
+    val kwn = attrs["keep-with-next"]
+    if (kwn == "always" || kwn == "true") {
+        draft.keepWithNext = true
+    }
+    val bb = attrs["break-before"]
+    val ba = attrs["break-after"]
+    if (bb == "page" || ba == "page") {
+        draft.pageBreakBefore = true
+    }
 }
 
 private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo = OdfStyleInfo(
@@ -162,7 +212,16 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     isUnderline = over.isUnderline ?: base.isUnderline,
     colorHex = over.colorHex ?: base.colorHex,
     alignment = over.alignment ?: base.alignment,
-    masterPageName = over.masterPageName ?: base.masterPageName
+    masterPageName = over.masterPageName ?: base.masterPageName,
+    spaceBeforeUnits = over.spaceBeforeUnits ?: base.spaceBeforeUnits,
+    spaceAfterUnits = over.spaceAfterUnits ?: base.spaceAfterUnits,
+    lineHeightFactor = over.lineHeightFactor ?: base.lineHeightFactor,
+    lineHeightExactUnits = over.lineHeightExactUnits ?: base.lineHeightExactUnits,
+    indentStartUnits = over.indentStartUnits ?: base.indentStartUnits,
+    indentEndUnits = over.indentEndUnits ?: base.indentEndUnits,
+    firstLineIndentUnits = over.firstLineIndentUnits ?: base.firstLineIndentUnits,
+    keepWithNext = over.keepWithNext ?: base.keepWithNext,
+    pageBreakBefore = over.pageBreakBefore ?: base.pageBreakBefore
 )
 
 class SvXMLImport(
@@ -452,14 +511,22 @@ class SvXMLImport(
             ?.let { pageLayouts[it] }
             ?: pageLayouts.values.firstOrNull()
             ?: pageSpecFromDefaultStyle
+        val defaultPara = defaultParagraphStyle?.toParagraphStyle()
         return DocumentStyles(
             paragraphStyles = paragraphs,
             characterStyles = characters,
             pageStyles = pageLayouts.toMap(),
             defaultPageStyle = defaultPage,
             masterPages = masterPages.toMap(),
-            firstMasterPageName = firstBodyMasterPageName()
+            firstMasterPageName = firstBodyMasterPageName(),
+            defaultParagraphStyle = defaultPara
         )
+    }
+
+    fun hasPageBreakBefore(styleName: String?): Boolean {
+        if (styleName.isNullOrBlank()) return false
+        val cascaded = cascadeStyle(styleName, "paragraph") ?: return false
+        return cascaded.pageBreakBefore == true
     }
 
     /**
@@ -658,7 +725,16 @@ private fun OdfStyleInfo.toParagraphStyle(): ParagraphStyle = ParagraphStyle(
     colorHex = colorHex,
     alignment = alignment ?: "Left",
     fontFamily = fontFamily,
-    parentStyleName = parentName
+    parentStyleName = parentName,
+    spaceBeforeUnits = spaceBeforeUnits ?: 0f,
+    spaceAfterUnits = spaceAfterUnits ?: 0f,
+    lineHeightFactor = lineHeightFactor ?: 1f,
+    lineHeightExactUnits = lineHeightExactUnits,
+    indentStartUnits = indentStartUnits ?: 0f,
+    indentEndUnits = indentEndUnits ?: 0f,
+    firstLineIndentUnits = firstLineIndentUnits ?: 0f,
+    keepWithNext = keepWithNext == true,
+    pageBreakBefore = pageBreakBefore == true
 )
 
 private fun OdfStyleInfo.toCharacterStyle(): CharacterStyle = CharacterStyle(

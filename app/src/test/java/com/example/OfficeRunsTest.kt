@@ -27,14 +27,14 @@ class OfficeRunsTest {
 
         assertEquals("Hello world", annotated.text)
         val baseSpan = annotated.spanStyles.first()
-        assertEquals(14.sp, baseSpan.item.fontSize)
+        assertEquals(12.sp, baseSpan.item.fontSize)
         assertEquals(TextAlign.Left, annotated.paragraphStyles.single().item.textAlign)
     }
 
     @Test
     fun baseSpanHonorsScale() {
         val annotated = OfficeRuns.toAnnotatedString(OfficeParagraph(text = "x"), DocumentStyles(), 0.5f, black)
-        assertEquals(7.sp, annotated.spanStyles.single().item.fontSize)
+        assertEquals(6.sp, annotated.spanStyles.single().item.fontSize)
     }
 
     @Test
@@ -46,7 +46,7 @@ class OfficeRunsTest {
             black
         )
         val span = annotated.spanStyles.single()
-        assertEquals(20.sp, span.item.fontSize)
+        assertEquals(12.sp, span.item.fontSize)
         assertEquals(FontWeight.Bold, span.item.fontWeight)
     }
 
