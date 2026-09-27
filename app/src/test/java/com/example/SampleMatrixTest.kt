@@ -7,9 +7,9 @@ import java.io.File
 import java.util.zip.ZipFile
 
 /**
- * Pins the twelve `tests/inky` fixtures exactly as audit-007 §2 and §3
- * tabulate them, straight from the package XML with no parser in between
- * (pure JVM). If a fixture is regenerated (the Collabora `.odt` set) or a
+ * Pins the twelve `tests/inky` fixtures exactly as audit-008 §2 and §3
+ * tabulate them (re-baselined for the M365/Collabora fixtures), straight from the package XML with no parser in between
+ * (pure JVM). If a fixture is regenerated again or a
  * table in the audit was wrong, this is the test that says so, and the
  * parser tests (`PageGeometryTest`, `Plan5ElementDumpTest`) stay about the
  * parser. Reference page counts and windows live in [SampleMatrix].
@@ -21,7 +21,7 @@ class SampleMatrixTest {
 
     // ---- expectations -----------------------------------------------------
 
-    /** `w:sectPr` (last), `w:styles` defaults and break inventory of one DOCX (audit-007 §2.1, §3.1, §5). */
+    /** `w:sectPr` (last), `w:styles` defaults and break inventory of one DOCX (audit-008 §2, §3). */
     data class DocxRow(
         val sample: Int,
         val pgW: Int, val pgH: Int,
@@ -35,7 +35,7 @@ class SampleMatrixTest {
         val lastRenderedBreaks: Int, val hardBreaks: Int
     )
 
-    /** Master pages, the layout the body starts on, and paragraph defaults of one ODT (audit-007 §2.2, §3.2, §5). */
+    /** Master pages, the layout the body starts on, and paragraph defaults of one ODT (audit-008 §2, §3). */
     data class OdtRow(
         val sample: Int,
         val masters: Map<String, String>,
@@ -54,75 +54,69 @@ class SampleMatrixTest {
     )
 
     private val docxRows = listOf(
-        DocxRow(1, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 1, "Aptos", 24, 160, 276, null, "para0", "Times New Roman", 22, null, 0, 0),
+        // M365 moves the paragraph defaults of Sample-1/3 out of w:pPrDefault into the Normal style.
+        DocxRow(1, 11906, 16838, 1440, 1440, 1440, 1440, 0, 567, 1, "Aptos", 24, null, null, null, "Normal", "Times New Roman", 22, 15, 14, 0),
         DocxRow(2, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 5, "Aptos", 24, 160, 278, null, "Normal", "Times New Roman", null, 23, 22, 2),
-        DocxRow(3, 11906, 16838, 1440, 1440, 1440, 1440, 0, 0, 1, "Aptos", 24, 160, 278, null, "style0", "Times New Roman", null, null, 0, 0),
-        DocxRow(4, 11906, 16838, 1440, 1440, 1440, 1440, 0, 567, 6, "Aptos", 24, 0, 360, 720, "987", "Times New Roman", null, null, 0, 2),
-        DocxRow(5, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 5, "Aptos", 24, 160, 278, null, "Normal", "Times New Roman", null, 18, 3, 2),
-        DocxRow(6, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 5, "Aptos", 24, 160, 278, null, "para0", "Times New Roman", null, null, 0, 2)
+        DocxRow(3, 11906, 16838, 1440, 2203, 1440, 1440, 0, 1440, 1, "Aptos", 24, null, null, null, "Normal", "Times New Roman", null, 22, 25, 0),
+        DocxRow(4, 11906, 16838, 1440, 1440, 1440, 1440, 0, 567, 6, "Aptos", 24, null, 360, 720, "Normal", "Times New Roman", null, 10, 3, 2),
+        DocxRow(5, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 5, "Aptos", 24, 160, 278, null, "Normal", "Times New Roman", null, 18, 17, 2),
+        DocxRow(6, 11907, 16840, 1440, 1440, 1440, 1440, 0, 567, 5, "Aptos", 24, 160, 278, null, "Normal", "Times New Roman", null, 21, 19, 2)
     )
+
+    /** Collabora 26.04 writes the same page layout into all six files: A4, 2.54 cm top/sides, 1 cm bottom + footer. */
+    private val converted = { n: Int -> mapOf("Standard" to "Mpm1") + (1..n).associate { "Converted$it" to "Mpm2" } }
 
     private val odtRows = listOf(
         OdtRow(
-            1, mapOf("Standard" to "Mpm1"), "Standard", "Mpm1",
-            "8.2681in", "11.6929in", "1in", "0.3937in", "1in", "1in",
-            null, null, null, "0.6063in",
+            1, mapOf("Standard" to "Mpm1"), null, "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "1cm", "2.54cm", "2.54cm",
+            null, null, null, "1.54cm",
             "Aptos", "12pt", null,
-            "Standard", "Times New Roman", "11pt", "115%", "0.111in",
-            9, 8, 0
+            "Standard", "Times New Roman", "11pt", "115%", "0.282cm",
+            15, 14, 0
         ),
         OdtRow(
-            2, mapOf(
-                "Standard" to "Mpm1", "First_20_Page" to "Mpm2",
-                "Converted1" to "Mpm3", "Converted2" to "Mpm3", "Converted3" to "Mpm3", "Converted4" to "Mpm3"
-            ), "First_20_Page", "Mpm2",
-            "8.2681in", "11.6929in", "1in", "1in", "1in", "1in",
-            null, null, null, null,
+            2, converted(4), "Standard", "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "1cm", "2.54cm", "2.54cm",
+            null, null, null, "1.54cm",
             "Aptos", "12pt", null,
-            // Correction to audit-007 §1/§3.2: Standard carries no fo:font-size, so the body is 12 pt from default-style.
-            "Standard", "Times New Roman", null, "115%", "0.111in",
-            18, 10, 1
+            "Standard", "Times New Roman", null, "116%", "0.282cm",
+            23, 16, 1
         ),
         OdtRow(
-            3, mapOf("Standard" to "Mpm1", "MasterPage2" to "Mpm2"), "MasterPage2", "Mpm2",
-            "21cm", "29.7cm", "0cm", "0cm", "2.54cm", "2.54cm",
-            null, null, null, null,
-            "Aptos", "12pt", "100%",
-            "style0", "Times New Roman", "12pt", "100%", null,
-            null, 0, 0
+            // The audit-007 "0 cm top and bottom" export defect is gone: 2.54 cm all round, empty footer.
+            3, mapOf("Standard" to "Mpm1"), null, "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "2.54cm", "2.54cm", "2.54cm",
+            null, null, null, "0cm",
+            "Aptos", "12pt", null,
+            "Standard", "Times New Roman", null, "116%", "0.282cm",
+            22, 21, 0
         ),
         OdtRow(
-            4, mapOf(
-                "Standard" to "Mpm1", "MasterPage2" to "Mpm2", "MasterPage3" to "Mpm3", "MasterPage4" to "Mpm4",
-                "MasterPage5" to "Mpm5", "MasterPage6" to "Mpm6", "MasterPage7" to "Mpm7"
-            ), "MasterPage2", "Mpm2",
-            "21cm", "29.7cm", "0cm", "1cm", "2.54cm", "2.54cm",
-            "2.54cm", "0cm", null, "1cm",
-            "Aptos", "12pt", "100%",
-            "987", "Times New Roman", "12pt", "100%", null,
-            null, 2, 2
+            // The OnlyOffice fixed-height 2.54 cm header (audit-007 finding B) is gone.
+            4, converted(5), null, "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "1cm", "2.54cm", "2.54cm",
+            null, null, null, "1.54cm",
+            "Aptos", "12pt", null,
+            "Standard", "Times New Roman", null, "150%", "0cm",
+            11, 3, 2
         ),
         OdtRow(
-            5, mapOf(
-                "Standard" to "Mpm1", "MasterPage2" to "Mpm2", "MasterPage3" to "Mpm3",
-                "MasterPage4" to "Mpm4", "MasterPage5" to "Mpm5", "MasterPage6" to "Mpm6"
-            ), "MasterPage2", "Mpm2",
-            "21cm", "29.71cm", "0cm", "1cm", "2.54cm", "2.54cm",
-            "2.54cm", "0cm", null, "1cm",
-            "Aptos", "12pt", "100%",
-            "Normal", "Times New Roman", "12pt", null, null,
-            null, 2, 2
+            5, converted(4), "Standard", "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "1cm", "2.54cm", "2.54cm",
+            null, null, null, "1.54cm",
+            "Aptos", "12pt", null,
+            "Standard", "Times New Roman", null, "116%", "0.282cm",
+            19, 12, 1
         ),
         OdtRow(
-            6, mapOf(
-                "Standard_Next" to "pm1", "Standard" to "pm1_f",
-                "Chapter2" to "pm2", "Chapter3" to "pm3", "Chapter4" to "pm4", "Chapter5" to "pm5"
-            ), null, "pm1_f",
-            "21.003cm", "29.704cm", "2.540cm", "2.540cm", "2.540cm", "2.540cm",
-            null, null, null, null,
-            "Times New Roman", "12pt", "116%",
-            "Normal", "Times New Roman", "12pt", "116%", "0.282cm",
-            null, 0, 2
+            // "Aptos1" is the style:font-face name Collabora declared; the family is still Aptos.
+            6, converted(4), "Standard", "Mpm1",
+            "21.001cm", "29.7cm", "2.54cm", "1cm", "2.54cm", "2.54cm",
+            null, null, null, "1.54cm",
+            "Aptos1", "12pt", null,
+            "Standard", "Times New Roman", null, "116%", "0.282cm",
+            22, 15, 1
         )
     )
 
@@ -182,7 +176,7 @@ class SampleMatrixTest {
             check.eq("br type=page", row.hardBreaks, Regex("<w:br w:type=\"page\"").findAll(document).count())
             check.eq("reference page count", SampleMatrix.references.getValue(row.sample).docxPages, SampleMatrix.referenceFor(name))
         }
-        if (problems.isNotEmpty()) fail("DOCX fixtures differ from audit-007:\n" + problems.joinToString("\n"))
+        if (problems.isNotEmpty()) fail("DOCX fixtures differ from audit-008:\n" + problems.joinToString("\n"))
     }
 
     @Test
@@ -288,7 +282,7 @@ class SampleMatrixTest {
             check.eq("fo:break-before=page", row.breakBefore, Regex("fo:break-before=\"page\"").findAll(contentXml + stylesXml).count())
             check.eq("reference page count", SampleMatrix.references.getValue(row.sample).odtPages, SampleMatrix.referenceFor(name))
         }
-        if (problems.isNotEmpty()) fail("ODT fixtures differ from audit-007:\n" + problems.joinToString("\n"))
+        if (problems.isNotEmpty()) fail("ODT fixtures differ from audit-008:\n" + problems.joinToString("\n"))
     }
 
     @Test
@@ -299,7 +293,7 @@ class SampleMatrixTest {
             val docx = SampleMatrix.docxWindows.getValue(sample)
             assertTrue("Sample-$sample DOCX window $docx must contain reference ${ref.docxPages}", ref.docxPages in docx)
             val odt = SampleMatrix.odtWindows.getValue(sample)
-            assertTrue("Sample-$sample ODT window $odt must be non-empty", odt.min <= odt.max)
+            assertTrue("Sample-$sample ODT window $odt must contain reference ${ref.odtPages}", ref.odtPages in odt)
         }
     }
 

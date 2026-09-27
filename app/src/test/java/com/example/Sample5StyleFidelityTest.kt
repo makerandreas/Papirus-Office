@@ -127,27 +127,30 @@ class Sample5StyleFidelityTest {
         val office = parsed.toOfficeDocument()
         val paragraphs = office.styles.paragraphStyles
 
-        val judul1 = paragraphs["Judul1"]
-        assertNotNull("Judul1 must be imported as a paragraph style", judul1)
+        // Collabora 26.04 re-save (audit-008 §3.3): the OnlyOffice "Judul1/Judul2"
+        // styles became Heading_20_1 (14pt bold) and Heading_20_2 (bold, no size,
+        // so 12pt from default-style through Standard).
+        val heading1 = paragraphs["Heading_20_1"]
+        assertNotNull("Heading_20_1 must be imported as a paragraph style", heading1)
         assertTrue(
-            "Judul1 ODT size is 14pt, got ${judul1!!.fontSizeSp}",
-            abs(judul1.fontSizeSp - 14f) <= 1f
+            "Heading_20_1 ODT size is 14pt, got ${heading1!!.fontSizeSp}",
+            abs(heading1.fontSizeSp - 14f) <= 1f
         )
-        assertTrue("Judul1 is bold in the ODT", judul1.isBold)
+        assertTrue("Heading_20_1 is bold in the ODT", heading1.isBold)
 
-        val judul2 = paragraphs["Judul2"]
-        assertNotNull("Judul2 must be imported as a paragraph style", judul2)
+        val heading2 = paragraphs["Heading_20_2"]
+        assertNotNull("Heading_20_2 must be imported as a paragraph style", heading2)
         assertTrue(
-            "Judul2 inherits Normal 12pt, got ${judul2!!.fontSizeSp}",
-            abs(judul2.fontSizeSp - 12f) <= 1f
+            "Heading_20_2 inherits the 12pt body size, got ${heading2!!.fontSizeSp}",
+            abs(heading2.fontSizeSp - 12f) <= 1f
         )
         assertTrue(
-            "mapped Judul1 must beat the Heading-1 24pt heuristic",
-            abs(StyleResolver.resolveParagraphStyle("Judul1", office.styles).fontSizeSp - 14f) <= 1f
+            "mapped Heading_20_1 must beat the Heading-1 24pt heuristic",
+            abs(StyleResolver.resolveParagraphStyle("Heading_20_1", office.styles).fontSizeSp - 14f) <= 1f
         )
         assertTrue(
-            "mapped Judul2 must beat the Heading-2 20pt heuristic",
-            abs(StyleResolver.resolveParagraphStyle("Judul2", office.styles).fontSizeSp - 12f) <= 1f
+            "mapped Heading_20_2 must beat the Heading-2 20pt heuristic",
+            abs(StyleResolver.resolveParagraphStyle("Heading_20_2", office.styles).fontSizeSp - 12f) <= 1f
         )
 
         fun parentChain(name: String?): List<String> {
@@ -166,7 +169,7 @@ class Sample5StyleFidelityTest {
                 is OfficeParagraph -> element.styleName
                 else -> null
             }
-            if (!parentChain(styleName).any { it.contains("Judul1", ignoreCase = true) }) {
+            if (!parentChain(styleName).any { it.equals("Heading_20_1", ignoreCase = true) }) {
                 return@mapNotNull null
             }
             StyleResolver.resolveParagraphStyle(styleName, office.styles).fontSizeSp
@@ -174,7 +177,7 @@ class Sample5StyleFidelityTest {
         val headings = office.body.elements.filterIsInstance<OfficeHeading>()
         if (headingSizes.isNotEmpty()) {
             assertTrue(
-                "Judul1-backed headings must stay 14±1, not 24: $headingSizes names=${headings.map { it.styleName }}",
+                "Heading_20_1-backed headings must stay 14±1, not 24: $headingSizes names=${headings.map { it.styleName }}",
                 headingSizes.all { abs(it - 14f) <= 1f }
             )
         } else {

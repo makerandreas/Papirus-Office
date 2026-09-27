@@ -28,7 +28,7 @@ import java.util.Locale
  * than three elements, and the mechanism that produced them (a break
  * element in the model, or metrics that overflow). Only structural
  * invariants of the layout are asserted here; the page windows stay with
- * `Sample5UnifiedPaginationTest` (12..30) until PR 16b.
+ * `Sample5UnifiedPaginationTest` (12..30) until Plan 5e.
  *
  * Runs under the same Robolectric configuration as the pagination guard so
  * the numbers are the numbers CI already produces.
@@ -74,7 +74,7 @@ class Plan5ElementDumpTest {
             val run = layoutSample(fileName)
             runs += run
             println(run.report.toText())
-            println("window (not asserted until PR 16b): ${run.window ?: "none"}")
+            println("window (not asserted until Plan 5e): ${run.window ?: "none"}")
             println()
             checkInvariants(run, problems)
         }
@@ -106,14 +106,14 @@ class Plan5ElementDumpTest {
 
     @Test
     fun reportBreakElementsAgainstTheParseLevelInventory() {
-        // audit-007 §5, parse level: text:soft-page-break plus fo:break-before="page"
-        // per ODT (8+0, 10+1, 0, 2+2, 2+2, 0+2). What the model holds today is
-        // printed next to it; the difference is what PR 16a ("fake breaks out",
+        // audit-008 §3, parse level: text:soft-page-break plus fo:break-before="page"
+        // per ODT (14+0, 16+1, 21+0, 3+2, 12+1, 15+1). What the model holds today is
+        // printed next to it; the difference is what Plan 5d ("fake breaks out",
         // "real breaks in") has to move. Reported, not asserted: this test is
         // evidence about the reader, not a target for it.
         val parseLevel = mapOf(
-            "Sample-1.odt" to 8, "Sample-2.odt" to 11, "Sample-3.odt" to 0,
-            "Sample-4.odt" to 4, "Sample-5.odt" to 4, "Sample-6.odt" to 2
+            "Sample-1.odt" to 14, "Sample-2.odt" to 17, "Sample-3.odt" to 21,
+            "Sample-4.odt" to 5, "Sample-5.odt" to 13, "Sample-6.odt" to 16
         )
         for ((fileName, count) in parseLevel) {
             val run = layoutSample(fileName)
