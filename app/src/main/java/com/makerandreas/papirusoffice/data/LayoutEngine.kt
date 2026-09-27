@@ -3,6 +3,7 @@ package com.makerandreas.papirusoffice.data
 import android.graphics.Paint
 import android.graphics.Rect
 import java.io.File
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -59,30 +60,51 @@ data class DocumentLayoutResult(
 
 object StyleResolver {
     fun resolveParagraphStyle(styleName: String?, styles: DocumentStyles): ParagraphStyle {
-        if (styleName == null) return ParagraphStyle("Default", fontSizeSp = 14f)
-        val style = styles.paragraphStyles[styleName]
+        val defaultStyle = styles.defaultParagraphStyle
+            ?: styles.paragraphStyles["Normal"]
+            ?: styles.paragraphStyles["normal"]
+            ?: styles.paragraphStyles["Standard"]
+            ?: styles.paragraphStyles["standard"]
+            ?: styles.paragraphStyles["Default"]
+            ?: styles.paragraphStyles.values.firstOrNull {
+                it.name.equals("Normal", ignoreCase = true) || it.name.equals("Standard", ignoreCase = true)
+            }
+
+        val fallbackSize = defaultStyle?.fontSizeSp ?: 12f
+        val fallbackFont = defaultStyle?.fontFamily
+
+        if (styleName.isNullOrBlank()) {
+            return defaultStyle ?: ParagraphStyle("Default", fontSizeSp = 12f)
+        }
+        val style = styles.paragraphStyles[styleName] ?: styles.paragraphStyles[styleName.lowercase(Locale.ROOT)]
         if (style != null) return style
 
-        // 24/20/16 only if the named style is absent. Mapped file sizes win.
         val headingLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleName)
+        if (headingLevel > 0) {
+            return ParagraphStyle(
+                name = styleName,
+                fontSizeSp = fallbackSize,
+                isBold = true,
+                fontFamily = fallbackFont,
+                parentStyleName = defaultStyle?.name
+            )
+        }
+
         return when {
-            headingLevel == 1 -> ParagraphStyle(styleName, fontSizeSp = 24f, isBold = true)
-            headingLevel == 2 -> ParagraphStyle(styleName, fontSizeSp = 20f, isBold = true)
-            headingLevel == 3 -> ParagraphStyle(styleName, fontSizeSp = 16f, isBold = true)
-            headingLevel > 0 -> ParagraphStyle(styleName, fontSizeSp = 18f, isBold = true)
-            styleName.contains("Title", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 28f, isBold = true)
-            styleName.contains("Subtitle", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 18f, isItalic = true)
-            styleName.contains("Quote", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 14f, isItalic = true, colorHex = "#555555")
-            styleName.contains("Caption", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = 11f, colorHex = "#777777")
-            else -> ParagraphStyle(styleName, fontSizeSp = 14f)
+            styleName.contains("Title", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = fallbackSize * 1.5f, isBold = true, fontFamily = fallbackFont)
+            styleName.contains("Subtitle", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = fallbackSize * 1.2f, isItalic = true, fontFamily = fallbackFont)
+            styleName.contains("Quote", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = fallbackSize, isItalic = true, colorHex = "#555555", fontFamily = fallbackFont)
+            styleName.contains("Caption", ignoreCase = true) -> ParagraphStyle(styleName, fontSizeSp = (fallbackSize - 1f).coerceAtLeast(8f), colorHex = "#777777", fontFamily = fallbackFont)
+            else -> defaultStyle?.copy(name = styleName) ?: ParagraphStyle(styleName, fontSizeSp = fallbackSize, fontFamily = fallbackFont)
         }
     }
 
     fun resolveCharacterStyle(styleName: String?, styles: DocumentStyles): CharacterStyle {
-        if (styleName == null) return CharacterStyle("Default", fontSizeSp = 14f)
-        val style = styles.characterStyles[styleName]
+        val fallbackSize = styles.defaultParagraphStyle?.fontSizeSp ?: 12f
+        if (styleName == null) return CharacterStyle("Default", fontSizeSp = fallbackSize)
+        val style = styles.characterStyles[styleName] ?: styles.characterStyles[styleName.lowercase(Locale.ROOT)]
         if (style != null) return style
-        return CharacterStyle(styleName, fontSizeSp = 14f)
+        return CharacterStyle(styleName, fontSizeSp = fallbackSize)
     }
 }
 
@@ -329,15 +351,15 @@ class LayoutEngine(
 
         val pages = mutableListOf<PageLayout>()
         var currentPageElements = mutableListOf<PageElementLayout>()
-        var currentY = pageSpec.marginTopDp
-        val maxUsableHeight = pageSpec.contentBottomDp
+        var currentY = pageSpec.bodyTopDp
+        val maxUsableHeight = pageSpec.bodyBottomDp
         val elementPageIndex = mutableMapOf<Int, Int>()
 
         fun flushPage() {
             if (currentPageElements.isNotEmpty()) {
                 pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
                 currentPageElements = mutableListOf()
-                currentY = pageSpec.marginTopDp
+                currentY = pageSpec.bodyTopDp
             }
         }
 
@@ -387,10 +409,18 @@ class LayoutEngine(
                     }
                 }
                 is OfficeParagraph -> {
+                    val style = StyleResolver.resolveParagraphStyle(element.styleName, document.styles)
+                    if (style.pageBreakBefore && currentPageElements.isNotEmpty()) {
+                        flushPage()
+                    }
                     val pLayout = layoutParagraph(index, element, document.styles, forceRebuildAll)
                     place(index, element, pLayout.height, pLayout.width, pLayout)
                 }
                 is OfficeHeading -> {
+                    val style = StyleResolver.resolveParagraphStyle(element.styleName, document.styles)
+                    if (style.pageBreakBefore && currentPageElements.isNotEmpty()) {
+                        flushPage()
+                    }
                     val asPara = OfficeParagraph(
                         text = element.text,
                         styleName = element.styleName ?: "Heading ${element.level}",

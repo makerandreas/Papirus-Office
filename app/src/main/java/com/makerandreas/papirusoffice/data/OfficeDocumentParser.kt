@@ -34,10 +34,31 @@ sealed class SchemaValidationResult {
 data class DocxStyleMeta(
     val styleId: String,
     val name: String,
-    val outlineLvl: Int?,
-    val isHeading: Boolean,
-    val headingLevel: Int,
-    val basedOn: String? = null
+    val outlineLvl: Int? = null,
+    val isHeading: Boolean = false,
+    val headingLevel: Int = 1,
+    val basedOn: String? = null,
+    val fontSizeSp: Float? = null,
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val isUnderline: Boolean? = null,
+    val fontFamily: String? = null,
+    val spaceBeforeUnits: Float? = null,
+    val spaceAfterUnits: Float? = null,
+    val lineHeightFactor: Float? = null,
+    val lineHeightExactUnits: Float? = null,
+    val indentStartUnits: Float? = null,
+    val indentEndUnits: Float? = null,
+    val firstLineIndentUnits: Float? = null,
+    val keepWithNext: Boolean? = null,
+    val pageBreakBefore: Boolean? = null,
+    val alignment: String? = null
+)
+
+data class DocxStylesParseResult(
+    val stylesMetaMap: Map<String, DocxStyleMeta> = emptyMap(),
+    val paragraphStyles: Map<String, ParagraphStyle> = emptyMap(),
+    val defaultParagraphStyle: ParagraphStyle? = null
 )
 
 /**
@@ -92,8 +113,8 @@ class OfficeDocumentParser(private val context: Context) {
                         var ev = parser.eventType
                         while (ev != XmlPullParser.END_DOCUMENT) {
                             if (ev == XmlPullParser.START_TAG && (parser.name?.equals("relationship", ignoreCase = true) == true || parser.name?.equals("Relationship", ignoreCase = true) == true)) {
-                                val id = parser.getAttributeValue(null, "Id")
-                                val target = parser.getAttributeValue(null, "Target")
+                                val id = getXmlAttr(parser, "id")
+                                val target = getXmlAttr(parser, "target")
                                 if (!id.isNullOrBlank() && !target.isNullOrBlank()) {
                                     relsMap[id] = target
                                 }
@@ -215,9 +236,19 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
-    private fun extractDocxStyles(file: File): Map<String, DocxStyleMeta> {
-        val stylesMap = mutableMapOf<String, DocxStyleMeta>()
-        if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return stylesMap
+    private fun getXmlAttr(parser: XmlPullParser, localOrQName: String): String? {
+        val target = localOrQName.lowercase(Locale.ROOT).substringAfter(':')
+        for (i in 0 until parser.attributeCount) {
+            val attrName = parser.getAttributeName(i).lowercase(Locale.ROOT).substringAfter(':')
+            if (attrName == target) {
+                return parser.getAttributeValue(i)
+            }
+        }
+        return null
+    }
+
+    private fun extractDocxStyles(file: File): DocxStylesParseResult {
+        if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return DocxStylesParseResult()
         try {
             var stylesXmlContent: String? = null
             java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
@@ -239,57 +270,370 @@ class OfficeDocumentParser(private val context: Context) {
                 parser.setInput(ByteArrayInputStream(stylesXmlContent.toByteArray(Charsets.UTF_8)), "UTF-8")
 
                 var eventType = parser.eventType
+                var inDocDefaults = false
+                var inDocDefaultsRPr = false
+                var inDocDefaultsPPr = false
+                var docDefaultSz: Float? = null
+                var docDefaultFont: String? = null
+                var docDefaultBefore: Float? = null
+                var docDefaultAfter: Float? = null
+                var docDefaultLineFactor: Float? = null
+                var docDefaultLineExact: Float? = null
+                var docDefaultIndentStart: Float? = null
+                var docDefaultIndentEnd: Float? = null
+                var docDefaultFirstLine: Float? = null
+
+                var inStyle = false
+                var currentStyleType: String? = null
                 var currentStyleId: String? = null
                 var currentStyleName: String? = null
+                var currentBasedOn: String? = null
                 var currentOutlineLvl: Int? = null
+                var inRPr = false
+                var inPPr = false
+                var currentSz: Float? = null
+                var currentBold: Boolean? = null
+                var currentItalic: Boolean? = null
+                var currentUnderline: Boolean? = null
+                var currentFont: String? = null
+                var currentBefore: Float? = null
+                var currentAfter: Float? = null
+                var currentLineFactor: Float? = null
+                var currentLineExact: Float? = null
+                var currentIndentStart: Float? = null
+                var currentIndentEnd: Float? = null
+                var currentFirstLine: Float? = null
+                var currentKeepNext: Boolean? = null
+                var currentPageBreakBefore: Boolean? = null
+                var currentJc: String? = null
+
+                val rawStylesMap = mutableMapOf<String, DocxStyleMeta>()
 
                 while (eventType != XmlPullParser.END_DOCUMENT) {
-                    val tagName = parser.name?.lowercase(Locale.ROOT) ?: ""
+                    val rawTag = parser.name ?: ""
+                    val tagName = rawTag.lowercase(Locale.ROOT).substringAfter(':')
                     when (eventType) {
                         XmlPullParser.START_TAG -> {
-                            if (tagName == "w:style" || tagName == "style") {
-                                currentStyleId = parser.getAttributeValue(null, "w:styleId") ?: parser.getAttributeValue(null, "styleId")
-                                currentStyleName = null
-                                currentOutlineLvl = null
-                            } else if (tagName == "w:name" || tagName == "name") {
-                                currentStyleName = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
-                            } else if (tagName == "w:outlinelvl" || tagName == "outlinelvl") {
-                                val lvlStr = parser.getAttributeValue(null, "w:val") ?: parser.getAttributeValue(null, "val")
-                                currentOutlineLvl = lvlStr?.toIntOrNull()
+                            when {
+                                tagName == "docdefaults" -> {
+                                    inDocDefaults = true
+                                }
+                                inDocDefaults && (tagName == "rprdefault" || tagName == "rpr") -> {
+                                    inDocDefaultsRPr = true
+                                }
+                                inDocDefaults && (tagName == "pprdefault" || tagName == "ppr") -> {
+                                    inDocDefaultsPPr = true
+                                }
+                                inDocDefaultsRPr && tagName == "sz" -> {
+                                    val valStr = getXmlAttr(parser, "val")
+                                    valStr?.toIntOrNull()?.let { docDefaultSz = LayoutUnits.halfPointsToPt(it) }
+                                }
+                                inDocDefaultsRPr && tagName == "rfonts" -> {
+                                    val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
+                                    if (!fontStr.isNullOrBlank()) docDefaultFont = fontStr.trim('\'', '"')
+                                }
+                                inDocDefaultsPPr && tagName == "spacing" -> {
+                                    val bStr = getXmlAttr(parser, "before")
+                                    bStr?.toIntOrNull()?.let { docDefaultBefore = LayoutUnits.twipsToUnits(it) }
+                                    val aStr = getXmlAttr(parser, "after")
+                                    aStr?.toIntOrNull()?.let { docDefaultAfter = LayoutUnits.twipsToUnits(it) }
+                                    val lStr = getXmlAttr(parser, "line")
+                                    val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
+                                    if (lStr != null) {
+                                        val lv = lStr.toIntOrNull()
+                                        if (lv != null) {
+                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
+                                                docDefaultLineExact = LayoutUnits.twipsToUnits(lv)
+                                            } else {
+                                                docDefaultLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                            }
+                                        }
+                                    }
+                                }
+                                inDocDefaultsPPr && tagName == "ind" -> {
+                                    val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
+                                    lStr?.toIntOrNull()?.let { docDefaultIndentStart = LayoutUnits.twipsToUnits(it) }
+                                    val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
+                                    rStr?.toIntOrNull()?.let { docDefaultIndentEnd = LayoutUnits.twipsToUnits(it) }
+                                    val flStr = getXmlAttr(parser, "firstline")
+                                    flStr?.toIntOrNull()?.let { docDefaultFirstLine = LayoutUnits.twipsToUnits(it) }
+                                    val hStr = getXmlAttr(parser, "hanging")
+                                    hStr?.toIntOrNull()?.let { docDefaultFirstLine = -LayoutUnits.twipsToUnits(it) }
+                                }
+                                tagName == "style" -> {
+                                    inStyle = true
+                                    currentStyleType = getXmlAttr(parser, "type") ?: "paragraph"
+                                    currentStyleId = getXmlAttr(parser, "styleid")
+                                    currentStyleName = null
+                                    currentBasedOn = null
+                                    currentOutlineLvl = null
+                                    inRPr = false
+                                    inPPr = false
+                                    currentSz = null
+                                    currentBold = null
+                                    currentItalic = null
+                                    currentUnderline = null
+                                    currentFont = null
+                                    currentBefore = null
+                                    currentAfter = null
+                                    currentLineFactor = null
+                                    currentLineExact = null
+                                    currentIndentStart = null
+                                    currentIndentEnd = null
+                                    currentFirstLine = null
+                                    currentKeepNext = null
+                                    currentPageBreakBefore = null
+                                    currentJc = null
+                                }
+                                inStyle && tagName == "name" -> {
+                                    currentStyleName = getXmlAttr(parser, "val")
+                                }
+                                inStyle && tagName == "basedon" -> {
+                                    currentBasedOn = getXmlAttr(parser, "val")
+                                }
+                                inStyle && tagName == "outlinelvl" -> {
+                                    currentOutlineLvl = getXmlAttr(parser, "val")?.toIntOrNull()
+                                }
+                                inStyle && tagName == "rpr" -> {
+                                    inRPr = true
+                                }
+                                inStyle && inRPr && tagName == "sz" -> {
+                                    val valStr = getXmlAttr(parser, "val")
+                                    valStr?.toIntOrNull()?.let { currentSz = LayoutUnits.halfPointsToPt(it) }
+                                }
+                                inStyle && inRPr && tagName == "b" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "1"
+                                    currentBold = valStr !in listOf("0", "false", "off")
+                                }
+                                inStyle && inRPr && tagName == "i" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "1"
+                                    currentItalic = valStr !in listOf("0", "false", "off")
+                                }
+                                inStyle && inRPr && tagName == "u" -> {
+                                    val valStr = getXmlAttr(parser, "val") ?: "single"
+                                    currentUnderline = valStr !in listOf("none", "0", "false", "off")
+                                }
+                                inStyle && inRPr && tagName == "rfonts" -> {
+                                    val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
+                                    if (!fontStr.isNullOrBlank()) currentFont = fontStr.trim('\'', '"')
+                                }
+                                inStyle && tagName == "ppr" -> {
+                                    inPPr = true
+                                }
+                                inStyle && inPPr && tagName == "spacing" -> {
+                                    val bStr = getXmlAttr(parser, "before")
+                                    bStr?.toIntOrNull()?.let { currentBefore = LayoutUnits.twipsToUnits(it) }
+                                    val aStr = getXmlAttr(parser, "after")
+                                    aStr?.toIntOrNull()?.let { currentAfter = LayoutUnits.twipsToUnits(it) }
+                                    val lStr = getXmlAttr(parser, "line")
+                                    val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
+                                    if (lStr != null) {
+                                        val lv = lStr.toIntOrNull()
+                                        if (lv != null) {
+                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
+                                                currentLineExact = LayoutUnits.twipsToUnits(lv)
+                                            } else {
+                                                currentLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                            }
+                                        }
+                                    }
+                                }
+                                inStyle && inPPr && tagName == "ind" -> {
+                                    val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
+                                    lStr?.toIntOrNull()?.let { currentIndentStart = LayoutUnits.twipsToUnits(it) }
+                                    val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
+                                    rStr?.toIntOrNull()?.let { currentIndentEnd = LayoutUnits.twipsToUnits(it) }
+                                    val flStr = getXmlAttr(parser, "firstline")
+                                    flStr?.toIntOrNull()?.let { currentFirstLine = LayoutUnits.twipsToUnits(it) }
+                                    val hStr = getXmlAttr(parser, "hanging")
+                                    hStr?.toIntOrNull()?.let { currentFirstLine = -LayoutUnits.twipsToUnits(it) }
+                                }
+                                inStyle && inPPr && tagName == "jc" -> {
+                                    currentJc = getXmlAttr(parser, "val")
+                                }
+                                inStyle && inPPr && tagName == "keepnext" -> {
+                                    currentKeepNext = true
+                                }
+                                inStyle && inPPr && tagName == "pagebreakbefore" -> {
+                                    currentPageBreakBefore = true
+                                }
                             }
                         }
                         XmlPullParser.END_TAG -> {
-                            if ((tagName == "w:style" || tagName == "style") && currentStyleId != null) {
-                                val sName = currentStyleName ?: currentStyleId
-                                val catalogLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
-                                val isHeading = catalogLevel > 0 ||
-                                        currentStyleId.matches(PARA_STYLE_REGEX) ||
-                                        currentStyleId.matches(HEADING_STYLE_REGEX) ||
-                                        currentOutlineLvl != null
-
-                                val level = when {
-                                    currentOutlineLvl != null -> currentOutlineLvl + 1
-                                    else -> DIGITS_REGEX.find(sName)?.value?.toIntOrNull()
-                                        ?: DIGITS_REGEX.find(currentStyleId)?.value?.toIntOrNull()
-                                        ?: 1
+                            when {
+                                tagName == "docdefaults" -> {
+                                    inDocDefaults = false
+                                    inDocDefaultsRPr = false
+                                    inDocDefaultsPPr = false
                                 }
-                                stylesMap[currentStyleId.lowercase(Locale.ROOT)] = DocxStyleMeta(
-                                    styleId = currentStyleId,
-                                    name = sName,
-                                    outlineLvl = currentOutlineLvl,
-                                    isHeading = isHeading,
-                                    headingLevel = level.coerceIn(1, 6)
-                                )
+                                inDocDefaults && (tagName == "rprdefault" || tagName == "rpr") -> {
+                                    inDocDefaultsRPr = false
+                                }
+                                inDocDefaults && (tagName == "pprdefault" || tagName == "ppr") -> {
+                                    inDocDefaultsPPr = false
+                                }
+                                inStyle && tagName == "rpr" -> {
+                                    inRPr = false
+                                }
+                                inStyle && tagName == "ppr" -> {
+                                    inPPr = false
+                                }
+                                tagName == "style" -> {
+                                    if (currentStyleId != null && (currentStyleType == null || currentStyleType.equals("paragraph", ignoreCase = true))) {
+                                        val sName = currentStyleName ?: currentStyleId!!
+                                        val catalogLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
+                                        val isHeading = catalogLevel > 0 ||
+                                                currentStyleId!!.matches(PARA_STYLE_REGEX) ||
+                                                currentStyleId!!.matches(HEADING_STYLE_REGEX) ||
+                                                currentOutlineLvl != null
+
+                                        val level = when {
+                                            currentOutlineLvl != null -> currentOutlineLvl!! + 1
+                                            else -> DIGITS_REGEX.find(sName)?.value?.toIntOrNull()
+                                                ?: DIGITS_REGEX.find(currentStyleId!!)?.value?.toIntOrNull()
+                                                ?: 1
+                                        }
+
+                                        rawStylesMap[currentStyleId!!] = DocxStyleMeta(
+                                            styleId = currentStyleId!!,
+                                            name = sName,
+                                            outlineLvl = currentOutlineLvl,
+                                            isHeading = isHeading,
+                                            headingLevel = level.coerceIn(1, 6),
+                                            basedOn = currentBasedOn,
+                                            fontSizeSp = currentSz,
+                                            isBold = currentBold,
+                                            isItalic = currentItalic,
+                                            isUnderline = currentUnderline,
+                                            fontFamily = currentFont,
+                                            spaceBeforeUnits = currentBefore,
+                                            spaceAfterUnits = currentAfter,
+                                            lineHeightFactor = currentLineFactor,
+                                            lineHeightExactUnits = currentLineExact,
+                                            indentStartUnits = currentIndentStart,
+                                            indentEndUnits = currentIndentEnd,
+                                            firstLineIndentUnits = currentFirstLine,
+                                            keepWithNext = currentKeepNext,
+                                            pageBreakBefore = currentPageBreakBefore,
+                                            alignment = currentJc?.replaceFirstChar { it.uppercase() }
+                                        )
+                                    }
+                                    inStyle = false
+                                }
                             }
                         }
                     }
                     eventType = parser.next()
                 }
+
+                fun cascadeDocxStyle(meta: DocxStyleMeta): ParagraphStyle {
+                    val chain = mutableListOf<DocxStyleMeta>()
+                    var curr: String? = meta.styleId
+                    val seen = mutableSetOf<String>()
+                    while (curr != null && seen.add(curr.lowercase(Locale.ROOT))) {
+                        val st = rawStylesMap[curr] ?: rawStylesMap.values.firstOrNull { it.styleId.equals(curr, ignoreCase = true) || it.name.equals(curr, ignoreCase = true) }
+                        if (st == null) break
+                        chain.add(st)
+                        curr = st.basedOn
+                    }
+
+                    var sz = docDefaultSz ?: 12f
+                    var font = docDefaultFont
+                    var bold = false
+                    var italic = false
+                    var underline = false
+                    var before = docDefaultBefore ?: 0f
+                    var after = docDefaultAfter ?: 0f
+                    var lineFactor = docDefaultLineFactor ?: 1f
+                    var lineExact = docDefaultLineExact
+                    var indStart = docDefaultIndentStart ?: 0f
+                    var indEnd = docDefaultIndentEnd ?: 0f
+                    var firstLine = docDefaultFirstLine ?: 0f
+                    var keepNext = false
+                    var pageBreakBefore = false
+                    var alignment = "Left"
+
+                    for (i in chain.lastIndex downTo 0) {
+                        val s = chain[i]
+                        s.fontSizeSp?.let { sz = it }
+                        s.fontFamily?.let { font = it }
+                        s.isBold?.let { bold = it }
+                        s.isItalic?.let { italic = it }
+                        s.isUnderline?.let { underline = it }
+                        s.spaceBeforeUnits?.let { before = it }
+                        s.spaceAfterUnits?.let { after = it }
+                        s.lineHeightFactor?.let { lineFactor = it }
+                        s.lineHeightExactUnits?.let { lineExact = it }
+                        s.indentStartUnits?.let { indStart = it }
+                        s.indentEndUnits?.let { indEnd = it }
+                        s.firstLineIndentUnits?.let { firstLine = it }
+                        s.keepWithNext?.let { keepNext = it }
+                        s.pageBreakBefore?.let { pageBreakBefore = it }
+                        s.alignment?.let { alignment = it }
+                    }
+
+                    return ParagraphStyle(
+                        name = meta.name,
+                        fontSizeSp = sz,
+                        isBold = bold,
+                        isItalic = italic,
+                        isUnderline = underline,
+                        alignment = alignment,
+                        fontFamily = font,
+                        parentStyleName = meta.basedOn,
+                        spaceBeforeUnits = before,
+                        spaceAfterUnits = after,
+                        lineHeightFactor = lineFactor,
+                        lineHeightExactUnits = lineExact,
+                        indentStartUnits = indStart,
+                        indentEndUnits = indEnd,
+                        firstLineIndentUnits = firstLine,
+                        keepWithNext = keepNext,
+                        pageBreakBefore = pageBreakBefore
+                    )
+                }
+
+                val stylesMetaMap = mutableMapOf<String, DocxStyleMeta>()
+                val resolvedParagraphStyles = mutableMapOf<String, ParagraphStyle>()
+
+                for ((id, meta) in rawStylesMap) {
+                    stylesMetaMap[id] = meta
+                    stylesMetaMap[id.lowercase(Locale.ROOT)] = meta
+                    stylesMetaMap[meta.name] = meta
+                    stylesMetaMap[meta.name.lowercase(Locale.ROOT)] = meta
+
+                    val cascaded = cascadeDocxStyle(meta)
+                    resolvedParagraphStyles[id] = cascaded
+                    resolvedParagraphStyles[id.lowercase(Locale.ROOT)] = cascaded
+                    resolvedParagraphStyles[meta.name] = cascaded
+                    resolvedParagraphStyles[meta.name.lowercase(Locale.ROOT)] = cascaded
+                }
+
+                val normalMeta = rawStylesMap.values.firstOrNull { it.styleId.equals("Normal", ignoreCase = true) || it.name.equals("Normal", ignoreCase = true) }
+                val defaultParaStyle = normalMeta?.let { cascadeDocxStyle(it) }
+                    ?: ParagraphStyle(
+                        name = "Normal",
+                        fontSizeSp = docDefaultSz ?: 12f,
+                        fontFamily = docDefaultFont,
+                        spaceBeforeUnits = docDefaultBefore ?: 0f,
+                        spaceAfterUnits = docDefaultAfter ?: 0f,
+                        lineHeightFactor = docDefaultLineFactor ?: 1f,
+                        lineHeightExactUnits = docDefaultLineExact,
+                        indentStartUnits = docDefaultIndentStart ?: 0f,
+                        indentEndUnits = docDefaultIndentEnd ?: 0f,
+                        firstLineIndentUnits = docDefaultFirstLine ?: 0f
+                    )
+
+                return DocxStylesParseResult(
+                    stylesMetaMap = stylesMetaMap,
+                    paragraphStyles = resolvedParagraphStyles,
+                    defaultParagraphStyle = defaultParaStyle
+                )
             }
         } catch (e: Exception) {
             // Graceful fallback
         }
-        return stylesMap
+        return DocxStylesParseResult()
     }
 
     private val cacheRepository = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
@@ -776,8 +1120,12 @@ class OfficeDocumentParser(private val context: Context) {
 
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
-        val docxStylesMap = if (isDocx) extractDocxStyles(file) else emptyMap()
+        val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
+        val docxStylesMap = docxStylesResult.stylesMetaMap
+        val docxParagraphStyles = docxStylesResult.paragraphStyles.toMutableMap()
+        val docxDefaultParagraphStyle = docxStylesResult.defaultParagraphStyle
         val docxRelsMap = if (isDocx) extractDocxRelationships(file) else emptyMap()
+        val generatedStyles = mutableMapOf<String, ParagraphStyle>()
 
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -803,6 +1151,21 @@ class OfficeDocumentParser(private val context: Context) {
             var isItalic = false
             var isUnderline = false
             var eventCount = 0
+
+            var inPPr = false
+            var currentPStyle: String? = null
+            var hasDirectPPr = false
+            var directBefore: Float? = null
+            var directAfter: Float? = null
+            var directLineFactor: Float? = null
+            var directLineExact: Float? = null
+            var directIndentStart: Float? = null
+            var directIndentEnd: Float? = null
+            var directFirstLine: Float? = null
+            var directKeepNext: Boolean? = null
+            var directPageBreakBefore: Boolean? = null
+            var directJc: String? = null
+            var paraHasSectPr = false
 
             // Standard supported tag set for warning/unsupported tag diagnostic logging
             val supportedTags = setOf(
@@ -837,6 +1200,7 @@ class OfficeDocumentParser(private val context: Context) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
                         val nameLower = name.lowercase(Locale.ROOT)
+                        val tagLocal = nameLower.substringAfter(':')
 
                         // Check for unknown or custom XML tags to log diagnostic warnings
                         if (name.isNotEmpty() && !supportedTags.contains(name) && !supportedTags.contains(nameLower)) {
@@ -856,27 +1220,44 @@ class OfficeDocumentParser(private val context: Context) {
 
                         when {
                             // Headings
-                            nameLower == "text:h" || nameLower == "h" -> {
+                            tagLocal == "h" -> {
                                 inHeading = true
-                                val outlineLevel = parser.getAttributeValue(null, "outline-level")
-                                    ?: parser.getAttributeValue(null, "text:outline-level")
+                                val outlineLevel = getXmlAttr(parser, "outline-level")
                                 headingLevel = outlineLevel?.toIntOrNull() ?: 1
                                 currentText.clear()
                             }
 
                             // Paragraphs
-                            nameLower == "text:p" || nameLower == "w:p" || nameLower == "p" || nameLower == "a:p" -> {
+                            tagLocal == "p" -> {
                                 inParagraph = true
                                 inHeading = false
                                 headingLevel = 1
                                 currentText.clear()
                                 currentRuns.clear()
+                                inPPr = false
+                                currentPStyle = null
+                                hasDirectPPr = false
+                                directBefore = null
+                                directAfter = null
+                                directLineFactor = null
+                                directLineExact = null
+                                directIndentStart = null
+                                directIndentEnd = null
+                                directFirstLine = null
+                                directKeepNext = null
+                                directPageBreakBefore = null
+                                directJc = null
+                                paraHasSectPr = false
+                            }
+
+                            tagLocal == "ppr" -> {
+                                inPPr = true
                             }
 
                             // DOCX / Word Style & Outline Level detection
-                            nameLower == "w:pstyle" || nameLower == "pstyle" -> {
-                                val styleVal = parser.getAttributeValue(null, "w:val")
-                                    ?: parser.getAttributeValue(null, "val") ?: ""
+                            tagLocal == "pstyle" -> {
+                                val styleVal = getXmlAttr(parser, "val") ?: ""
+                                currentPStyle = styleVal
                                 val meta = docxStylesMap[styleVal.lowercase(Locale.ROOT)]
                                 if (meta != null && meta.isHeading) {
                                     inHeading = true
@@ -892,9 +1273,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     }
                                 }
                             }
-                            nameLower == "w:outlinelvl" || nameLower == "outlinelvl" -> {
-                                val lvlVal = parser.getAttributeValue(null, "w:val")
-                                    ?: parser.getAttributeValue(null, "val")
+                            tagLocal == "outlinelvl" -> {
+                                val lvlVal = getXmlAttr(parser, "val")
                                 val parsedLvl = lvlVal?.toIntOrNull()
                                 if (parsedLvl != null) {
                                     inHeading = true
@@ -902,77 +1282,121 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
+                            inPPr && tagLocal == "spacing" -> {
+                                val bStr = getXmlAttr(parser, "before")
+                                bStr?.toIntOrNull()?.let { directBefore = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                                val aStr = getXmlAttr(parser, "after")
+                                aStr?.toIntOrNull()?.let { directAfter = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                                val lStr = getXmlAttr(parser, "line")
+                                val lrStr = getXmlAttr(parser, "linerule") ?: "auto"
+                                if (lStr != null) {
+                                    val lv = lStr.toIntOrNull()
+                                    if (lv != null) {
+                                        if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
+                                            directLineExact = LayoutUnits.twipsToUnits(lv)
+                                        } else {
+                                            directLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                        }
+                                        hasDirectPPr = true
+                                    }
+                                }
+                            }
+
+                            inPPr && tagLocal == "ind" -> {
+                                val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
+                                lStr?.toIntOrNull()?.let { directIndentStart = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                                val rStr = getXmlAttr(parser, "right") ?: getXmlAttr(parser, "end")
+                                rStr?.toIntOrNull()?.let { directIndentEnd = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                                val flStr = getXmlAttr(parser, "firstline")
+                                flStr?.toIntOrNull()?.let { directFirstLine = LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                                val hStr = getXmlAttr(parser, "hanging")
+                                hStr?.toIntOrNull()?.let { directFirstLine = -LayoutUnits.twipsToUnits(it); hasDirectPPr = true }
+                            }
+
+                            inPPr && tagLocal == "jc" -> {
+                                val jcVal = getXmlAttr(parser, "val")
+                                if (jcVal != null) {
+                                    directJc = jcVal
+                                    hasDirectPPr = true
+                                }
+                            }
+
+                            inPPr && tagLocal == "keepnext" -> {
+                                directKeepNext = true
+                                hasDirectPPr = true
+                            }
+
+                            inPPr && tagLocal == "pagebreakbefore" -> {
+                                directPageBreakBefore = true
+                                hasDirectPPr = true
+                            }
+
+                            inPPr && tagLocal == "sectpr" -> {
+                                paraHasSectPr = true
+                            }
+
                             // Page breaks
-                            nameLower == "w:lastrenderedpagebreak" || nameLower == "lastrenderedpagebreak" ||
-                            nameLower == "text:soft-page-break" || nameLower == "soft-page-break" -> {
-                                elements.add(OfficeDocumentElement.PageBreak)
-                                plainTextBuilder.append("\n\n--- Page Break ---\n\n")
+                            tagLocal == "lastrenderedpagebreak" || tagLocal == "soft-page-break" -> {
+                                // Ignored: soft page breaks are layout hints, not authored breaks
                             }
 
                             // Text formatting
-                            nameLower == "w:b" || nameLower == "b" || nameLower == "style:text-properties" -> {
+                            tagLocal == "b" || tagLocal == "text-properties" -> {
                                 isBold = true
                             }
-                            nameLower == "w:i" || nameLower == "i" -> {
+                            tagLocal == "i" -> {
                                 isItalic = true
                             }
-                            nameLower == "w:u" || nameLower == "u" -> {
+                            tagLocal == "u" -> {
                                 isUnderline = true
                             }
 
                             // Tables
-                            nameLower == "table:table" || nameLower == "w:tbl" || nameLower == "table" -> {
+                            tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = true
                                 currentRows.clear()
-                                currentTableName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "table:name")
+                                currentTableName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "draw:frame" || nameLower == "frame" -> {
-                                lastGraphicName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "draw:name")
+                            tagLocal == "frame" -> {
+                                lastGraphicName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "wp:docpr" || nameLower == "docpr" -> {
-                                lastGraphicName = parser.getAttributeValue(null, "name")
-                                    ?: parser.getAttributeValue(null, "wp:name")
+                            tagLocal == "docpr" -> {
+                                lastGraphicName = getXmlAttr(parser, "name")
                             }
-                            nameLower == "table:table-row" || nameLower == "w:tr" || nameLower == "tr" -> {
+                            tagLocal == "tr" || tagLocal == "table-row" -> {
                                 currentCells.clear()
                             }
-                            nameLower == "table:table-cell" || nameLower == "w:tc" || nameLower == "tc" -> {
+                            tagLocal == "tc" || tagLocal == "table-cell" -> {
                                 currentCellParagraphs.clear()
                                 currentText.clear()
                             }
 
                             // Lists
-                            nameLower == "text:list-item" || nameLower == "w:numpr" -> {
+                            tagLocal == "list-item" || tagLocal == "numpr" -> {
                                 currentText.append("• ")
                             }
 
                             // Spaces & Tabs
-                            nameLower == "text:s" || nameLower == "s" -> {
-                                val countAttr = parser.getAttributeValue(null, "c")
-                                    ?: parser.getAttributeValue(null, "text:c")
+                            tagLocal == "s" -> {
+                                val countAttr = getXmlAttr(parser, "c")
                                 val count = countAttr?.toIntOrNull() ?: 1
                                 repeat(count) { currentText.append(" ") }
                             }
-                            nameLower == "text:tab" || nameLower == "w:tab" || nameLower == "tab" -> {
+                            tagLocal == "tab" -> {
                                 currentText.append("\t")
                             }
-                            nameLower == "text:line-break" || nameLower == "w:br" || nameLower == "w:cr" -> {
-                                val brType = parser.getAttributeValue(null, "type")
-                                    ?: parser.getAttributeValue(null, "w:type")
+                            tagLocal == "line-break" || tagLocal == "br" || tagLocal == "cr" -> {
+                                val brType = getXmlAttr(parser, "type")
                                 if (brType?.equals("page", ignoreCase = true) == true) {
                                     elements.add(OfficeDocumentElement.PageBreak)
-                                    plainTextBuilder.append("\n\n--- Page Break ---\n\n")
                                 } else {
                                     currentText.append("\n")
                                 }
                             }
 
-                            // Images — P0-3: lower-cased fallback so Pictures/ vs pictures/ still resolves
-                            nameLower == "draw:image" -> {
-                                val href = parser.getAttributeValue(null, "href")
-                                    ?: parser.getAttributeValue("http://www.w3.org/1999/xlink", "href")
+                            // Images: P0-3: lower-cased fallback so Pictures/ vs pictures/ still resolves
+                            tagLocal == "image" -> {
+                                val href = getXmlAttr(parser, "href")
                                 if (!href.isNullOrBlank()) {
                                     val imgName = href.substringAfterLast("/")
                                     val hrefLower = href.lowercase(Locale.ROOT)
@@ -989,17 +1413,8 @@ class OfficeDocumentParser(private val context: Context) {
                                     )
                                 }
                             }
-                            nameLower == "a:blip" || nameLower == "blip" || nameLower == "v:imagedata" -> {
-                                var embedId = parser.getAttributeValue("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed")
-                                if (embedId.isNullOrBlank()) {
-                                    for (i in 0 until parser.attributeCount) {
-                                        val attrName = parser.getAttributeName(i).lowercase(Locale.ROOT)
-                                        if (attrName == "embed" || attrName.endsWith(":embed") || attrName == "id" || attrName.endsWith(":id") || attrName == "href" || attrName.endsWith(":href")) {
-                                            embedId = parser.getAttributeValue(i)
-                                            break
-                                        }
-                                    }
-                                }
+                            tagLocal == "blip" || tagLocal == "imagedata" -> {
+                                val embedId = getXmlAttr(parser, "embed") ?: getXmlAttr(parser, "id") ?: getXmlAttr(parser, "href")
                                 if (!embedId.isNullOrBlank()) {
                                     val target = docxRelsMap[embedId] ?: ""
                                     val imgName = target.substringAfterLast("/").ifBlank { embedId }
@@ -1033,9 +1448,10 @@ class OfficeDocumentParser(private val context: Context) {
                     XmlPullParser.END_TAG -> {
                         val name = parser.name ?: ""
                         val nameLower = name.lowercase(Locale.ROOT)
+                        val tagLocal = nameLower.substringAfter(':')
 
                         when {
-                            nameLower == "text:h" || nameLower == "h" -> {
+                            tagLocal == "h" -> {
                                 inHeading = false
                                 val headingText = currentText.toString().trim()
                                 if (headingText.isNotEmpty()) {
@@ -1050,34 +1466,73 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            nameLower == "text:p" || nameLower == "w:p" || nameLower == "p" || nameLower == "a:p" -> {
+                            tagLocal == "ppr" -> {
+                                inPPr = false
+                            }
+
+                            tagLocal == "p" -> {
                                 inParagraph = false
+                                inPPr = false
                                 val paraText = currentText.toString().trim()
-                                if (paraText.isNotEmpty()) {
-                                    if (inHeading && !inTable) {
-                                        elements.add(
-                                            OfficeDocumentElement.Heading(
-                                                text = paraText,
-                                                level = headingLevel,
-                                                styleName = "Heading $headingLevel"
-                                            )
+                                val resolvedStyleName: String? = when {
+                                    hasDirectPPr -> {
+                                        val baseStyle = currentPStyle?.let { docxParagraphStyles[it] ?: docxParagraphStyles[it.lowercase(Locale.ROOT)] }
+                                            ?: docxDefaultParagraphStyle
+                                            ?: ParagraphStyle("Normal")
+                                        val syntheticName = "inline-p-${generatedStyles.size + 1}"
+                                        val syntheticStyle = baseStyle.copy(
+                                            name = syntheticName,
+                                            parentStyleName = currentPStyle ?: baseStyle.name,
+                                            spaceBeforeUnits = directBefore ?: baseStyle.spaceBeforeUnits,
+                                            spaceAfterUnits = directAfter ?: baseStyle.spaceAfterUnits,
+                                            lineHeightFactor = directLineFactor ?: baseStyle.lineHeightFactor,
+                                            lineHeightExactUnits = directLineExact ?: baseStyle.lineHeightExactUnits,
+                                            indentStartUnits = directIndentStart ?: baseStyle.indentStartUnits,
+                                            indentEndUnits = directIndentEnd ?: baseStyle.indentEndUnits,
+                                            firstLineIndentUnits = directFirstLine ?: baseStyle.firstLineIndentUnits,
+                                            keepWithNext = directKeepNext ?: baseStyle.keepWithNext,
+                                            pageBreakBefore = directPageBreakBefore ?: baseStyle.pageBreakBefore,
+                                            alignment = directJc?.replaceFirstChar { it.uppercase() } ?: baseStyle.alignment
                                         )
-                                        plainTextBuilder.append(paraText).append("\n\n")
-                                    } else {
-                                        val paragraphObj = OfficeDocumentElement.Paragraph(
+                                        generatedStyles[syntheticName] = syntheticStyle
+                                        docxParagraphStyles[syntheticName] = syntheticStyle
+                                        syntheticName
+                                    }
+                                    else -> currentPStyle
+                                }
+
+                                if (inHeading && !inTable) {
+                                    val headingStyle = resolvedStyleName ?: "Heading $headingLevel"
+                                    elements.add(
+                                        OfficeDocumentElement.Heading(
                                             text = paraText,
-                                            runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
-                                                TextRun(paraText, isBold, isItalic, isUnderline)
-                                            )
+                                            level = headingLevel,
+                                            styleName = headingStyle
                                         )
-                                        if (inTable) {
-                                            currentCellParagraphs.add(paragraphObj)
-                                        } else {
-                                            elements.add(paragraphObj)
-                                            plainTextBuilder.append(paraText).append("\n\n")
-                                        }
+                                    )
+                                    if (paraText.isNotEmpty()) {
+                                        plainTextBuilder.append(paraText).append("\n\n")
+                                    }
+                                } else if (paraText.isNotEmpty()) {
+                                    val paragraphObj = OfficeDocumentElement.Paragraph(
+                                        text = paraText,
+                                        styleName = resolvedStyleName,
+                                        runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
+                                            TextRun(paraText, isBold, isItalic, isUnderline)
+                                        )
+                                    )
+                                    if (inTable) {
+                                        currentCellParagraphs.add(paragraphObj)
+                                    } else {
+                                        elements.add(paragraphObj)
+                                        plainTextBuilder.append(paraText).append("\n\n")
                                     }
                                 }
+
+                                if (paraHasSectPr) {
+                                    elements.add(OfficeDocumentElement.PageBreak)
+                                }
+
                                 inHeading = false
                                 currentText.clear()
                                 currentRuns.clear()
@@ -1086,7 +1541,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 isUnderline = false
                             }
 
-                            nameLower == "table:table-cell" || nameLower == "w:tc" || nameLower == "tc" -> {
+                            tagLocal == "tc" || tagLocal == "table-cell" -> {
                                 val cellText = if (currentCellParagraphs.isNotEmpty()) {
                                     currentCellParagraphs.joinToString("\n") { it.text }
                                 } else {
@@ -1102,14 +1557,14 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            nameLower == "table:table-row" || nameLower == "w:tr" || nameLower == "tr" -> {
+                            tagLocal == "tr" || tagLocal == "table-row" -> {
                                 if (currentCells.isNotEmpty()) {
                                     currentRows.add(TableRow(cells = currentCells.toList()))
                                     currentCells.clear()
                                 }
                             }
 
-                            nameLower == "table:table" || nameLower == "w:tbl" || nameLower == "table" -> {
+                            tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = false
                                 if (currentRows.isNotEmpty()) {
                                     val maxCols = currentRows.maxOfOrNull { it.cells.size } ?: 0
@@ -1169,15 +1624,14 @@ class OfficeDocumentParser(private val context: Context) {
 
         val detectedDocPageCount = (if (isDocx) extractDocxPageCount(file) else if (isOdt) extractOdtPageCount(file) else null) ?: 0
         val plainTextResult = plainTextBuilder.toString().trim()
+        val allParagraphStyles = LinkedHashMap<String, ParagraphStyle>()
+        allParagraphStyles.putAll(docxParagraphStyles)
+        allParagraphStyles.putAll(generatedStyles)
         val docxDocumentStyles = if (isDocx) {
             DocumentStyles(
-                paragraphStyles = docxStylesMap.mapValues { (_, meta) ->
-                    ParagraphStyle(
-                        name = meta.name,
-                        parentStyleName = meta.basedOn
-                    )
-                },
-                defaultPageStyle = extractDocxPageStyleSpec(xmlContent)
+                paragraphStyles = allParagraphStyles,
+                defaultPageStyle = extractDocxPageStyleSpec(xmlContent),
+                defaultParagraphStyle = docxDefaultParagraphStyle
             )
         } else DocumentStyles()
         val parsedDoc = OfficeParsedDocument(
@@ -2427,7 +2881,7 @@ class OfficeDocumentParser(private val context: Context) {
 
     /**
      * Phase 6: parses one worksheet by streaming its ZIP entry straight into
-     * the pull parser — no intermediate ByteArray of the sheet XML is kept,
+     * the pull parser; no intermediate ByteArray of the sheet XML is kept,
      * and the materialized row model is capped by [ZipSafe.MAX_XLSX_ROWS].
      */
     private fun streamXlsxWorksheet(
@@ -2566,7 +3020,7 @@ class OfficeDocumentParser(private val context: Context) {
         val budget = ZipScanBudget()
 
         try {
-            // Pass 1: strict slide inventory — slide layouts/masters share the
+            // Pass 1: strict slide inventory; slide layouts/masters share the
             // ppt/slides/slide prefix but must not count as slides.
             ZipInputStream(file.inputStream()).use { zip ->
                 var entry = zip.nextEntryBudgeted(budget)

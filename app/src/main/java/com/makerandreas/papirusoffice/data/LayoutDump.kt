@@ -154,7 +154,7 @@ object LayoutDump {
             val placed = page.elements
             val first = placed.firstOrNull()?.elementIndex
             val last = placed.lastOrNull()?.elementIndex
-            val lastBottom = placed.maxOfOrNull { it.bounds.bottom } ?: pageSpec.marginTopDp
+            val lastBottom = placed.maxOfOrNull { it.bounds.bottom } ?: pageSpec.bodyTopDp
             val kinds = kindsSummary(placed)
             val blanks = placed.count { isBlankParagraph(it.element) }
             val endedBy = when {
@@ -171,8 +171,8 @@ object LayoutDump {
                     lastElementIndex = last,
                     kinds = kinds,
                     blankParagraphs = blanks,
-                    reservedHeight = (lastBottom - pageSpec.marginTopDp).coerceAtLeast(0f),
-                    leftover = (pageSpec.contentBottomDp - lastBottom).coerceAtLeast(0f),
+                    reservedHeight = (lastBottom - pageSpec.bodyTopDp).coerceAtLeast(0f),
+                    leftover = (pageSpec.bodyBottomDp - lastBottom).coerceAtLeast(0f),
                     endedBy = endedBy
                 )
             )

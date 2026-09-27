@@ -79,8 +79,20 @@ class OdfTextBodyContext(
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
-            OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
+            OdfXmlToken.XML_P -> {
+                val styleName = attributes["style-name"]
+                if (importFilter.hasPageBreakBefore(styleName)) {
+                    importFilter.addElement(OfficeDocumentElement.PageBreak)
+                }
+                OdfParagraphContext(importFilter, token, attributes)
+            }
+            OdfXmlToken.XML_H -> {
+                val styleName = attributes["style-name"]
+                if (importFilter.hasPageBreakBefore(styleName)) {
+                    importFilter.addElement(OfficeDocumentElement.PageBreak)
+                }
+                OdfHeadingContext(importFilter, token, attributes)
+            }
             OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
             OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
             OdfXmlToken.XML_PAGE -> OdfSlidePageContext(importFilter, token, attributes) // Slide page for ODP
@@ -89,7 +101,6 @@ class OdfTextBodyContext(
                 OdfDrawingContainerContext(importFilter, token)
             }
             OdfXmlToken.XML_SOFT_PAGE_BREAK -> {
-                importFilter.addElement(OfficeDocumentElement.PageBreak)
                 super.createChildContext(token, attributes)
             }
             else -> super.createChildContext(token, attributes)
@@ -192,7 +203,6 @@ class OdfParagraphContext(
                 super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_SOFT_PAGE_BREAK -> {
-                importFilter.addElement(OfficeDocumentElement.PageBreak)
                 super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)

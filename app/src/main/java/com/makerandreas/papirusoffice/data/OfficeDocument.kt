@@ -216,7 +216,12 @@ data class DocumentStyles(
      * the document therefore starts on "Standard". Not yet a pagination
      * input; [defaultPageStyle] keeps today's resolution until PR 16a.
      */
-    val firstMasterPageName: String? = null
+    val firstMasterPageName: String? = null,
+    /**
+     * Root default paragraph style for the document (ODF default-style or DOCX docDefaults / Normal).
+     * Used as the metric baseline when styles do not declare their own font size or metrics.
+     */
+    val defaultParagraphStyle: ParagraphStyle? = null
 ) {
     /** Page box behind an ODF master page, if both the master and its layout were read. */
     fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
