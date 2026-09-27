@@ -67,12 +67,12 @@ fun CellinaModule(
 
     // Mode state
     var isEditMode by remember { mutableStateOf(false) }
-    var docTitle by remember { mutableStateOf("Cellina_Data.ods") }
+    var docTitle by remember { mutableStateOf("untitled.ods") }
     var isSaved by remember { mutableStateOf(true) }
-    var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null) }
+    var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null || com.example.MainActivity.pendingNewDocument) }
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var currentSaveMimeType by remember { mutableStateOf("application/vnd.oasis.opendocument.spreadsheet") }
-    var currentSaveDefaultFilename by remember { mutableStateOf("Cellina_Data.ods") }
+    var currentSaveDefaultFilename by remember { mutableStateOf("untitled.ods") }
     var isSaving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
     var showSaveFailedDialog by remember { mutableStateOf(false) }
@@ -156,37 +156,48 @@ fun CellinaModule(
 
     LaunchedEffect(com.example.MainActivity.openedFileNonce, com.example.MainActivity.openedFilePath) {
         val path = com.example.MainActivity.openedFilePath
-        if (path != null) {
-            val file = java.io.File(path)
-            if (file.exists()) {
-                docTitle = file.name
-                loadingDocName = file.name
-                isLoadingDocument = true
+        val file = if (path != null) {
+            java.io.File(path)
+        } else {
+            com.example.core.util.TemplateManager.getCalcDefaultTemplateFile(context)
+        }
+        if (file != null && file.exists()) {
+            val isTemplateNew = com.example.MainActivity.pendingNewDocument ||
+                    file.name.equals("untitled.ods", ignoreCase = true) ||
+                    path == null
+            com.example.MainActivity.pendingNewDocument = false
+            isNewDocument = isTemplateNew
+            docTitle = file.name
+            loadingDocName = file.name
+            isLoadingDocument = true
 
-                val result = docxParser.parseDocument(file)
-                isLoadingDocument = false
+            val result = docxParser.parseDocument(file)
+            isLoadingDocument = false
 
-                if (result.parsedDocument?.isParsingFailed == true) {
-                    docOpenFailedError = result.parsedDocument.failureReason ?: context.getString(R.string.doc_open_failed_msg, file.name)
-                    showDocOpenFailedDialog = true
-                } else if (result.text.isNotBlank()) {
-                    val lines = result.text.split("\n")
-                    var rowIdx = 1
-                    for (line in lines) {
-                        if (line.isNotBlank()) {
-                            val cells = line.split("\t")
-                            var colIdx = 0
-                            for (cell in cells) {
-                                if (colIdx < columnsLabels.size) {
-                                    val cellKey = "${columnsLabels[colIdx]}$rowIdx"
-                                    cellValues[cellKey] = cell.trim()
-                                }
-                                colIdx++
+            if (result.parsedDocument?.isParsingFailed == true) {
+                docOpenFailedError = result.parsedDocument.failureReason ?: context.getString(R.string.doc_open_failed_msg, file.name)
+                showDocOpenFailedDialog = true
+            } else if (result.text.isNotBlank()) {
+                cellValues.clear()
+                val lines = result.text.split("\n")
+                var rowIdx = 1
+                for (line in lines) {
+                    if (line.isNotBlank()) {
+                        val cells = line.split("\t")
+                        var colIdx = 0
+                        for (cell in cells) {
+                            if (colIdx < columnsLabels.size) {
+                                val cellKey = "${columnsLabels[colIdx]}$rowIdx"
+                                cellValues[cellKey] = cell.trim()
                             }
-                            rowIdx++
+                            colIdx++
                         }
+                        rowIdx++
                     }
                 }
+            } else if (isTemplateNew) {
+                cellValues.clear()
+                formulaText = ""
             }
         }
     }

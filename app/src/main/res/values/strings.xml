@@ -19,6 +19,25 @@
     <string name="cellina_desc">Analyze data, budget tables, and functions in ODS/XLSX format</string>
     <string name="slidia_title">New Slidia Presentation</string>
     <string name="slidia_desc">Design modern presentation decks in ODP/PPTX format</string>
+    <string name="create_new_inky_card">Inky Document</string>
+    <string name="create_new_cellina_card">Cellina Spreadsheet</string>
+    <string name="create_new_slidia_card">Slidia Presentation</string>
+    <string name="group_create_pagella_pdf">Create Pagella PDF Document</string>
+    <string name="pagella_create_from_image_title">Create from Image</string>
+    <string name="pagella_create_from_image_desc">Open a JPG, JPEG, PNG, or WebP image to import as PDF</string>
+    <string name="pagella_create_from_camera_title">Create from Camera</string>
+    <string name="pagella_create_from_camera_desc">Capture a photo with the camera to create a PDF</string>
+    <string name="pagella_convert_from_document_title">Convert from Document</string>
+    <string name="pagella_convert_from_document_desc">Open any ODF or OOXML file and convert it to PDF</string>
+    <string name="cd_create_pagella_from_image">Create PDF from image</string>
+    <string name="cd_create_pagella_from_camera">Create PDF from camera</string>
+    <string name="cd_convert_document_to_pdf">Convert document to PDF</string>
+    <string name="toast_camera_permission_required">Camera permission is required to capture a photo for PDF creation.</string>
+    <string name="toast_pdf_created_from_image">PDF created from image.</string>
+    <string name="toast_pdf_created_from_camera">PDF created from camera photo.</string>
+    <string name="toast_pdf_converted_from_document">Document converted to PDF.</string>
+    <string name="toast_pdf_creation_failed">Failed to create PDF file.</string>
+    <string name="toast_unsupported_document_for_pdf">Please select a valid ODF or OOXML document.</string>
     
     <!-- Template Tab -->
     <string name="search_templates">Search online templates</string>

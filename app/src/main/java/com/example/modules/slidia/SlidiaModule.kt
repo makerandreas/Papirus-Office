@@ -78,13 +78,14 @@ fun SlidiaModule(
     }
 
     // Mode state
+    val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
     var isEditMode by remember { mutableStateOf(false) }
-    var docTitle by remember { mutableStateOf("Slidia_Presentation.odp") }
+    var docTitle by remember { mutableStateOf("untitled.odp") }
     var isSaved by remember { mutableStateOf(true) }
-    var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null) }
+    var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null || com.example.MainActivity.pendingNewDocument) }
     var showSaveAsDialog by remember { mutableStateOf(false) }
     var currentSaveMimeType by remember { mutableStateOf("application/vnd.oasis.opendocument.presentation") }
-    var currentSaveDefaultFilename by remember { mutableStateOf("Slidia_Presentation.odp") }
+    var currentSaveDefaultFilename by remember { mutableStateOf("untitled.odp") }
     var isSaving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
     var showSaveFailedDialog by remember { mutableStateOf(false) }
@@ -175,8 +176,58 @@ fun SlidiaModule(
         activeSlideIndex = (slides.size - 1).coerceAtLeast(0)
     }
 
-    val activeSlide = slides.getOrElse(activeSlideIndex) { slides[0] }
+    val activeSlide = slides.getOrElse(activeSlideIndex) {
+        SlideItem(id = 1, title = "", subtitle = "")
+    }
     val moduleColor = Color(0xFFD97706) // Impress Amber/Orange
+
+    LaunchedEffect(com.example.MainActivity.openedFileNonce, com.example.MainActivity.openedFilePath) {
+        val path = com.example.MainActivity.openedFilePath
+        val file = if (path != null) {
+            java.io.File(path)
+        } else {
+            com.example.core.util.TemplateManager.getSlidiaDefaultTemplateFile(context)
+        }
+        if (file != null && file.exists()) {
+            val isTemplateNew = com.example.MainActivity.pendingNewDocument ||
+                    file.name.equals("untitled.odp", ignoreCase = true) ||
+                    path == null
+            com.example.MainActivity.pendingNewDocument = false
+            isNewDocument = isTemplateNew
+            docTitle = file.name
+            loadingDocName = file.name
+            isLoadingDocument = true
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                docxParser.parseDocument(file)
+            }
+            isLoadingDocument = false
+            if (result.text.isNotBlank()) {
+                val paragraphs = result.text.split("\n\n").map { it.trim() }.filter { it.isNotBlank() }
+                if (paragraphs.isNotEmpty()) {
+                    slides.clear()
+                    paragraphs.forEachIndexed { idx, block ->
+                        val lines = block.lines().map { it.trim() }.filter { it.isNotBlank() }
+                        val title = lines.firstOrNull() ?: "Slide ${idx + 1}"
+                        val sub = lines.getOrNull(1) ?: ""
+                        val bullets = if (lines.size > 2) lines.drop(2) else emptyList()
+                        slides.add(SlideItem(id = idx + 1, title = title, subtitle = sub, bullets = bullets))
+                    }
+                    activeSlideIndex = 0
+                }
+            } else if (isTemplateNew) {
+                slides.clear()
+                slides.add(
+                    SlideItem(
+                        id = 1,
+                        title = "",
+                        subtitle = "",
+                        bullets = emptyList()
+                    )
+                )
+                activeSlideIndex = 0
+            }
+        }
+    }
 
     // Helper: Sync Document Metadata to Room DB
     val updateSlidiaMetadata: suspend (String, String) -> Unit = { path, name ->
@@ -1449,7 +1500,7 @@ fun SlidiaModule(
         if (showDocPropertiesDialog) {
             var meta by remember { mutableStateOf<com.makerandreas.papirusoffice.data.cache.InkyDocumentMetadataEntity?>(null) }
             LaunchedEffect(docTitle) {
-                val currentPath = com.example.MainActivity.openedFilePath ?: "templates/slidia/Default.otp"
+                val currentPath = com.example.MainActivity.openedFilePath ?: "templates/untitled.odp"
                 updateSlidiaMetadata(currentPath, docTitle)
                 meta = inkyMetadataRepo.getMetadata(currentPath)
             }

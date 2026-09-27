@@ -343,7 +343,10 @@ fun InkyModule(
         if (filePath != null && com.example.MainActivity.openedFileType == "Inky") {
             val f = java.io.File(filePath)
             if (f.exists()) {
-                isNewDocument = false
+                val isTemplateNew = com.example.MainActivity.pendingNewDocument ||
+                        f.name.equals("untitled.odt", ignoreCase = true)
+                com.example.MainActivity.pendingNewDocument = false
+                isNewDocument = isTemplateNew
                 isSaved = true
                 docTitle = f.name
                 loadingDocName = f.name
@@ -366,7 +369,7 @@ fun InkyModule(
                             // Session state restore on reopen / process recreation
                             val sessionRestore = com.makerandreas.papirusoffice.data.SafeSessionRestore(context)
                             val lastSession = sessionRestore.getLastSession()
-                            if (lastSession != null && lastSession.uri == f.absolutePath) {
+                            if (!isTemplateNew && lastSession != null && lastSession.uri == f.absolutePath) {
                                 if (!lastSession.isSaved && !lastSession.draftText.isNullOrBlank()) {
                                     val safeCursor = lastSession.cursor.coerceIn(0, lastSession.draftText.length)
                                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(
@@ -394,18 +397,20 @@ fun InkyModule(
                             docxImages = parseResult.extractedImages
                             docxExtents = parseResult.imageExtents
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
-                            RecentFilesTracker.addFile(context, f.absolutePath, "Inky")
+                            if (!isTemplateNew) {
+                                RecentFilesTracker.addFile(context, f.absolutePath, "Inky")
+                            }
                             updateActiveSession(f, parseResult.parsedDocument)
                         }
                     }
                 }
             }
         } else if (com.example.MainActivity.openedFilePath == null) {
-            // Load Normal.ott template automatically as the base for new Inky documents
+            // Load untitled.odt template automatically as the base for new Inky documents
             isNewDocument = true
             isSaved = true
-            docTitle = "Document.odt"
-            loadingDocName = "Document.odt"
+            docTitle = "untitled.odt"
+            loadingDocName = "untitled.odt"
             isLoadingDocument = true
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 val templateFile = com.example.core.util.TemplateManager.getInkyNormalTemplateFile(context)
@@ -424,9 +429,9 @@ fun InkyModule(
 
                     // Set active session for the default loaded template
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
-                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = "Document.odt")
+                        metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = "untitled.odt")
                     )
-                    val dummyFile = java.io.File(context.filesDir, "Document.odt")
+                    val dummyFile = templateFile ?: java.io.File(context.filesDir, "untitled.odt")
                     val session = com.makerandreas.papirusoffice.data.DocumentSession(
                         engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
                         document = officeDoc,
@@ -1217,16 +1222,16 @@ fun InkyModule(
 
     val handleNewDocument = {
         val createNew = {
-            val name = "Document.odt"
+            val name = "untitled.odt"
+            val templateFile = com.example.core.util.TemplateManager.getInkyNormalTemplateFile(context)
             com.example.MainActivity.pendingNewDocument = true
-            com.example.MainActivity.openedFilePath = null
+            com.example.MainActivity.openedFilePath = templateFile?.absolutePath
             com.example.MainActivity.openedFileType = "Inky"
             com.makerandreas.papirusoffice.data.SafeSessionRestore(context).clearLastSession()
             com.example.core.jni.LibreOfficeCore.createDocument(name)
             runDocumentLoading(true, name) {
                 docTitle = name
                 coroutineScope.launch {
-                    val templateFile = com.example.core.util.TemplateManager.getInkyNormalTemplateFile(context)
                     val parseResult = if (templateFile != null && templateFile.exists()) {
                         docxParser.parseDocument(templateFile)
                     } else {
@@ -1242,7 +1247,7 @@ fun InkyModule(
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
                         metadata = com.makerandreas.papirusoffice.data.DocumentMetadata(title = name)
                     )
-                    val dummyFile = java.io.File(context.filesDir, name)
+                    val dummyFile = templateFile ?: java.io.File(context.filesDir, name)
                     val session = com.makerandreas.papirusoffice.data.DocumentSession(
                         engine = com.makerandreas.papirusoffice.data.DocumentEngine(),
                         document = officeDoc,

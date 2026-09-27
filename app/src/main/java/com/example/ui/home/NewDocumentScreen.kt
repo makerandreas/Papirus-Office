@@ -1,18 +1,22 @@
 package com.example.ui.home
 
+import android.Manifest
 import android.content.Context
-import android.util.Log
-import kotlinx.coroutines.launch
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -28,17 +32,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.example.R
 import com.example.core.util.TemplateManager
+import com.example.modules.pagella.PagellaPdfCreator
 import com.example.ui.theme.*
+import com.makerandreas.papirusoffice.data.OpenedDocumentStore
+import kotlinx.coroutines.launch
+import java.io.File
 
 /**
  * Checks if the device has an active internet connection.
@@ -217,204 +229,397 @@ fun NewDocumentScreen(
 
 @Composable
 fun CreateNewDocumentList(onNavigateToModule: (String) -> Unit) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var pendingCameraFile by remember { mutableStateOf<File?>(null) }
+
+    val openPdfInPagella = { pdfFile: File, successStringRes: Int ->
+        RecentFilesTracker.addFile(context, pdfFile.absolutePath, "Pagella")
+        com.example.MainActivity.pendingNewDocument = false
+        com.example.MainActivity.openedFilePath = pdfFile.absolutePath
+        com.example.MainActivity.openedFileType = "Pagella"
+        com.example.MainActivity.openedFileNonce++
+        Toast.makeText(context, successStringRes, Toast.LENGTH_SHORT).show()
+        onNavigateToModule("Pagella")
+    }
+
+    // 1. Create from Image launcher (*.jpg, *.jpeg, *.png, *.webp)
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val pdfFile = PagellaPdfCreator.createPdfFromImageUri(context, uri)
+                if (pdfFile != null) {
+                    openPdfInPagella(pdfFile, R.string.toast_pdf_created_from_image)
+                } else {
+                    Toast.makeText(context, R.string.toast_pdf_creation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    // 2. Create from Camera launcher
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { captured: Boolean ->
+        val file = pendingCameraFile
+        if (captured && file != null && file.exists()) {
+            coroutineScope.launch {
+                val baseName = "Camera_Scan_${System.currentTimeMillis()}"
+                val pdfFile = PagellaPdfCreator.createPdfFromImageFile(context, file, baseName)
+                try { file.delete() } catch (_: Exception) {}
+                if (pdfFile != null) {
+                    openPdfInPagella(pdfFile, R.string.toast_pdf_created_from_camera)
+                } else {
+                    Toast.makeText(context, R.string.toast_pdf_creation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val launchCameraCapture = {
+        try {
+            val captureDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+            val photoFile = File(captureDir, "pagella_capture_${System.currentTimeMillis()}.jpg")
+            pendingCameraFile = photoFile
+            val authority = "${context.packageName}.fileprovider"
+            val photoUri = FileProvider.getUriForFile(context, authority, photoFile)
+            takePictureLauncher.launch(photoUri)
+        } catch (e: Exception) {
+            Log.e("CreateNewDocumentList", "Failed to launch camera capture", e)
+            Toast.makeText(context, R.string.toast_pdf_creation_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted: Boolean ->
+        if (granted) {
+            launchCameraCapture()
+        } else {
+            Toast.makeText(context, R.string.toast_camera_permission_required, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 3. Convert from Document launcher (ODF or OOXML -> PDF)
+    val convertDocPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            coroutineScope.launch {
+                try {
+                    val displayName = PagellaPdfCreator.resolveDisplayName(context, uri, "Document.odt")
+                    if (!PagellaPdfCreator.isSupportedOfficeDocumentName(displayName)) {
+                        Toast.makeText(context, R.string.toast_unsupported_document_for_pdf, Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+                    val persisted = OpenedDocumentStore.persistFromUri(context, uri, displayName)
+                    val pdfFile = PagellaPdfCreator.convertDocumentToPdf(context, persisted, displayName)
+                    if (pdfFile != null) {
+                        openPdfInPagella(pdfFile, R.string.toast_pdf_converted_from_document)
+                    } else {
+                        Toast.makeText(context, R.string.toast_pdf_creation_failed, Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Log.e("CreateNewDocumentList", "Failed to convert document to PDF", e)
+                    Toast.makeText(context, R.string.toast_pdf_creation_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Option 1: Inky Document
+        // Section 1: Create New Document (3-column single-row carousel grid, no supporting text)
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        com.example.MainActivity.pendingNewDocument = true
-                        com.example.MainActivity.openedFilePath = null
-                        com.example.MainActivity.openedFileType = null
-                        onNavigateToModule("Inky")
-                    }
-                    .testTag("item_new_inky")
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                Text(
+                    text = stringResource(R.string.create_new_document),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .testTag("group_title_create_new_document")
+                )
+
                 Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Max)
+                        .testTag("create_new_carousel_grid"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_inky_logo),
+                    CreateNewModuleGridCard(
+                        title = stringResource(R.string.create_new_inky_card),
+                        iconRes = R.drawable.ic_inky_logo,
                         contentDescription = stringResource(R.string.cd_inky_document),
-                        modifier = Modifier.size(52.dp)
+                        testTag = "item_new_inky",
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        onClick = {
+                            val templateFile = TemplateManager.getInkyNormalTemplateFile(context)
+                            com.example.MainActivity.pendingNewDocument = true
+                            com.example.MainActivity.openedFilePath = templateFile?.absolutePath
+                            com.example.MainActivity.openedFileType = "Inky"
+                            com.example.MainActivity.openedFileNonce++
+                            onNavigateToModule("Inky")
+                        }
                     )
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.inky_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.inky_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
-
-        // Option 2: Cellina Spreadsheet
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateToModule("Cellina") }
-                    .testTag("item_new_cellina")
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_cellina_logo),
+                    CreateNewModuleGridCard(
+                        title = stringResource(R.string.create_new_cellina_card),
+                        iconRes = R.drawable.ic_cellina_logo,
                         contentDescription = stringResource(R.string.cd_cellina_spreadsheet),
-                        modifier = Modifier.size(52.dp)
+                        testTag = "item_new_cellina",
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        onClick = {
+                            val templateFile = TemplateManager.getCalcDefaultTemplateFile(context)
+                            com.example.MainActivity.pendingNewDocument = true
+                            com.example.MainActivity.openedFilePath = templateFile?.absolutePath
+                            com.example.MainActivity.openedFileType = "Cellina"
+                            com.example.MainActivity.openedFileNonce++
+                            onNavigateToModule("Cellina")
+                        }
                     )
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.cellina_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.cellina_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
-
-        // Option 3: Slidia Presentation
-        item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateToModule("Slidia") }
-                    .testTag("item_new_slidia")
-            ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_slidia_logo),
+                    CreateNewModuleGridCard(
+                        title = stringResource(R.string.create_new_slidia_card),
+                        iconRes = R.drawable.ic_slidia_logo,
                         contentDescription = stringResource(R.string.cd_slidia_presentation),
-                        modifier = Modifier.size(52.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.slidia_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.slidia_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        testTag = "item_new_slidia",
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        onClick = {
+                            val templateFile = TemplateManager.getSlidiaDefaultTemplateFile(context)
+                            com.example.MainActivity.pendingNewDocument = true
+                            com.example.MainActivity.openedFilePath = templateFile?.absolutePath
+                            com.example.MainActivity.openedFileType = "Slidia"
+                            com.example.MainActivity.openedFileNonce++
+                            onNavigateToModule("Slidia")
+                        }
                     )
                 }
             }
         }
 
-        // Option 4: Pagella PDF Document
+        // Section 2: Create Pagella PDF Document (Grouped list)
         item {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onNavigateToModule("Pagella") }
-                    .testTag("item_new_pagella")
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    text = stringResource(R.string.group_create_pagella_pdf),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(horizontal = 4.dp)
+                        .testTag("group_title_pagella_pdf")
+                )
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("group_card_pagella_pdf")
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_pagella_logo),
-                        contentDescription = stringResource(R.string.cd_pagella_pdf_document),
-                        modifier = Modifier.size(52.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Pagella Document",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        PagellaCreateListItem(
+                            title = stringResource(R.string.pagella_create_from_image_title),
+                            description = stringResource(R.string.pagella_create_from_image_desc),
+                            icon = Icons.Rounded.Image,
+                            iconContentDescription = stringResource(R.string.cd_create_pagella_from_image),
+                            testTag = "item_pagella_from_image",
+                            onClick = {
+                                imagePickerLauncher.launch(
+                                    arrayOf("image/jpeg", "image/png", "image/webp")
+                                )
+                            }
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "PDF viewer and document annotation module",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        PagellaCreateListItem(
+                            title = stringResource(R.string.pagella_create_from_camera_title),
+                            description = stringResource(R.string.pagella_create_from_camera_desc),
+                            icon = Icons.Rounded.PhotoCamera,
+                            iconContentDescription = stringResource(R.string.cd_create_pagella_from_camera),
+                            testTag = "item_pagella_from_camera",
+                            onClick = {
+                                val hasPermission = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (hasPermission) {
+                                    launchCameraCapture()
+                                } else {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            }
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        PagellaCreateListItem(
+                            title = stringResource(R.string.pagella_convert_from_document_title),
+                            description = stringResource(R.string.pagella_convert_from_document_desc),
+                            icon = Icons.Rounded.PictureAsPdf,
+                            iconContentDescription = stringResource(R.string.cd_convert_document_to_pdf),
+                            testTag = "item_pagella_convert_document",
+                            onClick = {
+                                convertDocPickerLauncher.launch(
+                                    arrayOf(
+                                        "application/vnd.oasis.opendocument.text",
+                                        "application/vnd.oasis.opendocument.text-template",
+                                        "application/vnd.oasis.opendocument.spreadsheet",
+                                        "application/vnd.oasis.opendocument.spreadsheet-template",
+                                        "application/vnd.oasis.opendocument.presentation",
+                                        "application/vnd.oasis.opendocument.presentation-template",
+                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        "application/msword",
+                                        "application/vnd.ms-excel",
+                                        "application/vnd.ms-powerpoint"
+                                    )
+                                )
+                            }
                         )
                     }
-
-                    Icon(
-                        imageVector = Icons.Rounded.ChevronRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CreateNewModuleGridCard(
+    title: String,
+    iconRes: Int,
+    contentDescription: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+            .heightIn(min = 120.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Image(
+                painter = painterResource(id = iconRes),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(48.dp)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun PagellaCreateListItem(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    iconContentDescription: String,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = iconContentDescription,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Icon(
+            imageVector = Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        )
     }
 }
 

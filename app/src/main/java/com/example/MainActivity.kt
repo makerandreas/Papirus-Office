@@ -268,9 +268,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     LaunchedEffect(Unit) {
         if (MainActivity.pendingNewDocument) {
             MainActivity.pendingNewDocument = false
-            MainActivity.openedFilePath = null
-            MainActivity.openedFileType = null
-            currentWorkspace = "Inky"
+            currentWorkspace = MainActivity.openedFileType ?: "Inky"
             return@LaunchedEffect
         }
         if (MainActivity.openedFilePath != null && MainActivity.openedFileType != null) {

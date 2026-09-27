@@ -3,7 +3,10 @@ package com.example.modules.pagella
 import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.automirrored.filled.*
 import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -20,14 +23,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.example.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 
 // Data class to store drawn lines
 data class LinePath(
@@ -64,6 +72,54 @@ fun PagellaModule(
     var isCreatingDoc by remember { mutableStateOf(false) }
     var loadingDocName by remember { mutableStateOf("Pagella_Document.pdf") }
     var loadingProgressStatus by remember { mutableStateOf("") }
+    var renderedPageBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    val openedPath = com.example.MainActivity.openedFilePath
+    val openedNonce = com.example.MainActivity.openedFileNonce
+
+    LaunchedEffect(openedPath, openedNonce) {
+        currentPage = 1
+        paths.clear()
+    }
+
+    LaunchedEffect(openedPath, openedNonce, currentPage, zoomLevel) {
+        val file = openedPath?.let { File(it) }
+        if (file != null && file.exists() && file.name.endsWith(".pdf", ignoreCase = true)) {
+            loadingDocName = file.name
+            val bmp = withContext(Dispatchers.IO) {
+                var pfd: ParcelFileDescriptor? = null
+                var renderer: PdfRenderer? = null
+                try {
+                    pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                    renderer = PdfRenderer(pfd)
+                    val count = renderer.pageCount.coerceAtLeast(1)
+                    val safeIdx = (currentPage - 1).coerceIn(0, count - 1)
+                    val page = renderer.openPage(safeIdx)
+                    val scaleFactor = (zoomLevel / 100f).coerceIn(0.5f, 2.5f)
+                    val bmpW = (page.width * 2f * scaleFactor).toInt().coerceIn(300, 2048)
+                    val bmpH = (page.height * 2f * scaleFactor).toInt().coerceIn(300, 2048)
+                    val out = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+                    out.eraseColor(android.graphics.Color.WHITE)
+                    page.render(out, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    page.close()
+                    Pair(count, out)
+                } catch (_: Exception) {
+                    null
+                } finally {
+                    try { renderer?.close() } catch (_: Exception) {}
+                    try { pfd?.close() } catch (_: Exception) {}
+                }
+            }
+            if (bmp != null) {
+                totalPages = bmp.first
+                renderedPageBitmap = bmp.second
+            } else {
+                renderedPageBitmap = null
+            }
+        } else {
+            renderedPageBitmap = null
+        }
+    }
 
     val moduleColor = Color(0xFFDC2626) // Pagella Red
 
@@ -159,30 +215,43 @@ fun PagellaModule(
                     .border(0.5.dp, PaperEdge, MaterialTheme.shapes.medium)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // PDF Document static content render helper
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Papirus Portable Document (Page $currentPage)",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
+                    val pageBmp = renderedPageBitmap
+                    if (pageBmp != null) {
+                        Image(
+                            bitmap = pageBmp.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp)
+                                .testTag("pagella_rendered_pdf_page")
                         )
-                        Text(
-                            text = "This PDF document is rendered by the Pagella native layout renderer. JNI bridging handles the high-performance rasterization of lines, vectors, and font assets.",
-                            color = PaperInkMuted,
-                            lineHeight = 20.sp
-                        )
-                        Text(
-                            text = "The stylus ink layer enables vector graphics to be annotated directly above text elements, which can be stored as PNG images inside ODF documents or exported as separate vector overlays.",
-                            color = PaperInkMuted,
-                            lineHeight = 20.sp
-                        )
+                    } else {
+                        // PDF Document static content render helper
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp)
+                                .verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "Papirus Portable Document (Page $currentPage)",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                            Text(
+                                text = "This PDF document is rendered by the Pagella native layout renderer. JNI bridging handles the high-performance rasterization of lines, vectors, and font assets.",
+                                color = PaperInkMuted,
+                                lineHeight = 20.sp
+                            )
+                            Text(
+                                text = "The stylus ink layer enables vector graphics to be annotated directly above text elements, which can be stored as PNG images inside ODF documents or exported as separate vector overlays.",
+                                color = PaperInkMuted,
+                                lineHeight = 20.sp
+                            )
+                        }
                     }
 
                     // Touch / Stylus Freehand Ink Drawing Canvas layer
