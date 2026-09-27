@@ -1,7 +1,7 @@
 # Papirus Office: Inky Test Checklist
 *Chapter 1: Introducing Writer*
 
-> Based on LibreOffice Writer Guide - Chapter 1: Introducing Writer
+> Based on LibreOffice Writer Guide 26.2, Chapter 1: Introducing Writer (https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html). Earlier passes used the 24.8 edition; the Chapter 1 lifecycle, undo, Go To, Navigator, reminder, zoom and reload sections are unchanged in 26.2.
 
 ## Document Lifecycle
 Perform the following test to ensure eligibility.

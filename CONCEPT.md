@@ -37,7 +37,7 @@ This readme file will be used for development purpose.
 | Standard Bottom Sheet command deck | Microsoft Office 365 for Inky/Cellina/Slidia; SoftMaker FlexiPDF for Pagella |
 | General office layout and document concepts | LibreOffice, adapted to Android touch and adaptive screen sizes |
 
-The app uses Material Symbols Rounded by default. The repository's `app/src/main/share/config/images_colibre.zip` is a candidate optional Colibre set pending provenance and license review. Google Sans is the intended UI family; Roboto/system sans-serif remains the reliability fallback until device rendering is validated. App UI fonts must never replace a document's font/style identity.
+The app targets Material Symbols Rounded (shipped: `material-icons-extended`, mixing Rounded and Default/Filled icons; see `DESIGN.md` §8). The repository's `app/src/main/share/config/images_colibre.zip` is a candidate optional Colibre set pending provenance and license review. Google Sans is the intended UI family; its bundled TTFs fail basic name-table inspection (audit-009 §9.3). System sans-serif is the intended fallback pending asset provenance and device validation. App UI fonts must never replace a document's font/style identity.
 
 ### Palette behavior
 
@@ -191,7 +191,7 @@ The product goal is useful ODF-first editing with practical OOXML compatibility,
 
 ### 🔹 Upcoming UI/UX Implementation (Phase 4)
 #### 🎨 Material 3 Expressive Aesthetics
-- **UI font target**: Google Sans; keep Roboto/system sans-serif as the tested fallback until on-device rendering and accessibility scaling are validated. Roboto Flex is not the current UI-family decision.
+- **UI font target**: Google Sans after binary/provenance and device checks; use system sans-serif as the intended fallback, not a claimed tested result (audit-009 §9.3). Roboto Flex is not the current UI-family decision.
 - **Icons**: Material Symbols Rounded by default. Colibre is only an optional alternative after the repository ZIP's provenance and license are checked.
 - Use one coherent Papirus component/token system across toolbars, editor dialogs, settings and navigation; see the surface-specific reference map above.
 
