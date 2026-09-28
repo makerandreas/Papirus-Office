@@ -502,7 +502,7 @@ private fun ParagraphEditField(
         }
     )
 
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
@@ -543,7 +543,7 @@ private fun ParagraphEditField(
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .testTag("doc_body_editor_element_${window.elementIndex}")
@@ -626,7 +626,7 @@ private fun ParagraphSelectField(
         onDispose { requestToolbar?.invoke(null) }
     }
 
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
@@ -659,7 +659,7 @@ private fun ParagraphSelectField(
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .onGloballyPositioned { coordinates -> fieldBounds = coordinates.boundsInWindow() }
                 .testTag("doc_body_viewer_element_${window.elementIndex}")
         )
@@ -697,7 +697,7 @@ private fun ParagraphText(
         Modifier
     }
 
-    val displayParagraph = if (leadingPrefix != null) paragraph.copy(text = leadingPrefix + paragraph.text) else paragraph
+    val displayParagraph = paragraph
     val resolved = remember(displayParagraph.styleName, styles) {
         OfficeRuns.baseStyle(displayParagraph, styles)
     }
@@ -706,6 +706,10 @@ private fun ParagraphText(
         OfficeRuns.toAnnotatedString(displayParagraph, styles, zoomScale, textColor)
     }
 
+    Box(Modifier.fillMaxWidth()) {
+        if (leadingPrefix != null) Text(text = leadingPrefix,
+            fontSize = (sizeSp * zoomScale).sp, color = textColor,
+            fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily))
     Text(
         text = ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT,
             displayParagraph, styles).filter(annotated).text,
@@ -718,6 +722,7 @@ private fun ParagraphText(
         textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment),
         modifier = Modifier.fillMaxWidth().then(headingModifier)
     )
+    }
 }
 
 @Composable

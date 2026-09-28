@@ -295,7 +295,8 @@ data class ParagraphStyle(
             lineHeightExactUnits != null || indentStartUnits != 0f || indentEndUnits != 0f ||
             firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore || pageBreakAfter ||
             lineHeightMinimumUnits != null || lineHeightUsesFontSize || collapseSpacing ||
-            keepTogether || tabStops.isNotEmpty() || defaultTabIntervalUnits != 48f || orphans != 2 || widows != 2
+            keepTogether || tabStops.isNotEmpty() || defaultTabIntervalUnits != 48f || orphans != 2 || widows != 2 ||
+            !masterPageName.isNullOrBlank()
 }
 
 data class CharacterStyle(

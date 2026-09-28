@@ -134,4 +134,12 @@ class FragmentPaginationTest {
         assertEquals(PageEndReason.AUTHORED, result.pages.first().endReason)
     }
 
+    @Test fun listDecorationDoesNotConsumeEditableSourceOffsets() {
+        val item = OfficeListItem("text ".repeat(100), bullet = "• ")
+        val result = engine().performLayout(doc(item))
+        val fragments = result.pages.flatMap { it.elements }
+        assertEquals(item.text, fragments.joinToString("") { item.text.substring(it.sourceStart, it.sourceEnd) })
+        assertTrue(fragments.first().paragraphLayout!!.lines.first().left > 0f)
+    }
+
 }

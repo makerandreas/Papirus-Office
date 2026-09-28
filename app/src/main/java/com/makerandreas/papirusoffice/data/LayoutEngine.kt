@@ -159,7 +159,8 @@ class LayoutEngine(
         styles: DocumentStyles,
         forceRebuild: Boolean = false
     ): ParagraphLayout {
-        val style = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
+        val baseStyle = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
+        val style = baseStyle.copy(indentStartUnits = baseStyle.indentStartUnits + paragraph.indent)
         val key = CacheKey(paragraph.copy(runs = paragraph.runs.toList()), style.copy(tabStops = style.tabStops.toList()),
             styles.characterStyles.toMap(), pageSpec.contentWidthDp)
         if (!forceRebuild) paragraphLayoutCache[paragraphIndex]?.takeIf { it.first == key }?.let { return it.second }
@@ -213,7 +214,8 @@ class LayoutEngine(
         fun paragraph(element: OfficeElement): OfficeParagraph? = when (element) {
             is OfficeParagraph -> element
             is OfficeHeading -> OfficeParagraph(element.text, element.styleName ?: "Heading ${element.level}", runs = element.runs, pageBreakOffsets = element.pageBreakOffsets)
-            is OfficeListItem -> OfficeParagraph(element.bullet + element.text)
+            is OfficeListItem -> OfficeParagraph(element.text, runs = element.runs,
+                indent = TextMetrics.forStyle(StyleResolver.resolveParagraphStyle(null, document.styles), advanceSource).widthOf(element.bullet))
             is OfficeDocElement.ParagraphElement -> element.paragraph
             else -> null
         }
