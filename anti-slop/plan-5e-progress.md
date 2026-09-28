@@ -2,7 +2,13 @@
 
 Date: 2026-09-28. Scope and gates: [audit-011](audit-011-2026-09-28-plan-5e-readiness.md), section 6.
 
-**Status: started, not complete.** Plan 1 synchronization and Plans 6-11 have not started.
+**Status: implementation and automated acceptance complete; merged.** Merged to `main` as PR #19, merge commit `439ed05`, 2026-09-28. Final head `5fa52e3`, GitHub test merge `d855dc2`, CI run [36377627605](https://github.com/makerandreas/Papirus-Office/actions/runs/36377627605): 247 tests, zero failures, errors or skips, Unit Tests and APK build both green. The scheduled run on the merged `main` is [36398216577](https://github.com/makerandreas/Papirus-Office/actions/runs/36398216577), also green.
+
+All five gates of audit-011 §6 are closed: baseline repair and fixture identity, break and style semantics, load-bearing measurement through `TextMetrics`, line-fragment pagination with bounded keep and progress rules, and renderer/input/navigation parity through one projected input field per logical paragraph. The twelve fixture windows pass with no hint, scaling or spacing constant, and the alternate flow view is explicitly unavailable rather than bypassing the pipeline.
+
+**Not approved and not claimed:** physical-device visual, gesture, IME and accessibility verification. The owner deferred that pass until after Plan 11; the deferral does not change any automated fixture window or source-integrity assertion. Plans 7, 8 and 10 may move page counts again for structural and real-font reasons, in which case windows tighten only with measured support.
+
+Plan 1 synchronization of this record started 2026-09-28; see [audit-012](audit-012-2026-09-28-plan-1-synchronization.md).
 
 ## Gate 0: baseline repair
 
