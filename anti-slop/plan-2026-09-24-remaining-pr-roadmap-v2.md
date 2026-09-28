@@ -356,16 +356,16 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 18 | 2026-09-27 | row 5 → "5D landed" | § Plan 5 got the 5D breaks and defaults record (audit-010) |
 | 19 | 2026-09-28 | row 5 → "5A to 5E landed" | § Plan 5 got the 5E record; `plan-5e-progress.md` carries the batch-by-batch evidence |
 
-**Forward schedule, re-numbered 2026-09-28.** The next free PR slot is **#20**. Future rows are keyed on plan IDs, so a plan that splits or merges does not invalidate the record again.
+**Forward schedule, re-numbered 2026-09-28.** Plan 1's own two documentation PRs took **#20** (1A, the ledger) and **#21** (1B, the product-docs pass), so the first slot available to Plans 6 to 9 is **#22**. Future rows are keyed on plan IDs, and the numbers are expectations rather than reservations: a plan that splits, merges or is preceded by unplanned work keeps its ID and takes the next free number.
 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
-| 6 | 20 | row 6 → landed | plan-04-to-09 § Plan 6 gets F-1 to F-5 record |
-| 7A | 21 | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
-| 7B | 22 | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
-| 8A | 23 | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
-| 8B | 24 | row 8 → "8A, 8B landed" | § Plan 8 gets H-3 to H-7 (with b) record plus any tightened window |
-| 9 | 25 | row 9 → landed | § Plan 9 record; plan-01 §4 checklist items 1 and 10 close |
+| 6 | 22 (expected) | row 6 → landed | plan-04-to-09 § Plan 6 gets F-1 to F-5 record |
+| 7A | 23 (expected) | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
+| 7B | 24 (expected) | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
+| 8A | 25 (expected) | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
+| 8B | 26 (expected) | row 8 → "8A, 8B landed" | § Plan 8 gets H-3 to H-7 (with b) record plus any tightened window |
+| 9 | 27 (expected) | row 9 → landed | § Plan 9 record; plan-01 §4 checklist items 1 and 10 close |
 | 10 resume | TBD | row 10 status change when it starts | plan-10 head note |
 | 11 packages | TBD | row 11 status change per package | plan-11 §5 |
 
@@ -379,16 +379,16 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 **Landed 2026-09-24 to 2026-09-28:** 13 (3B), 14 (Plan 3C / Plan 11 docs), 15 (5A), 16 (5B), 17 (5C), 18 (5D), 19 (5E). Plan 5 shipped as five PRs rather than the 16a/16b split predicted below.
 
-**Forward schedule, re-numbered 2026-09-28** (plan IDs first, PR slot in parentheses):
+**Forward schedule, re-numbered 2026-09-28** (plan IDs first, expected PR slot in parentheses; Plan 1's two documentation PRs took #20 and #21):
 
 | Order | Plan | PR slot | Parallel with | Gate to enter the next |
 |---|---|---|---|---|
-| 1 | 6 (images and media) | 20 | 8A scaffolding | no blank frame; unsafe image save refuses |
-| 2 | 7A (ODF numbering, headings, links, TOC) | 21 | 8A scaffolding | ODT numbering fidelity |
-| 3 | 7B (ODT tables, font identity, sections) | 22 | tail of 7A | ODT checklist green |
-| 4 | 8A (DOCX style chain, runs) | 23 | none | DOCX style chain green |
-| 5 | 8B (DOCX numbering, fields, tables, sections) | 24 | none | both-format convergence, then re-measure and tighten only with support |
-| 6 | 9 (save round trip) | 25 | Plan 10 resume decision | round-trip CI test |
+| 1 | 6 (images and media) | 22 | 8A scaffolding | no blank frame; unsafe image save refuses |
+| 2 | 7A (ODF numbering, headings, links, TOC) | 23 | 8A scaffolding | ODT numbering fidelity |
+| 3 | 7B (ODT tables, font identity, sections) | 24 | tail of 7A | ODT checklist green |
+| 4 | 8A (DOCX style chain, runs) | 25 | none | DOCX style chain green |
+| 5 | 8B (DOCX numbering, fields, tables, sections) | 26 | none | both-format convergence, then re-measure and tighten only with support |
+| 6 | 9 (save round trip) | 27 | Plan 10 resume decision | round-trip CI test |
 | 7 | 10, 11 packages | TBD | per package | per package gate in plan-11 §5 |
 | 8 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
 
@@ -396,7 +396,7 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 1. **Now (before PR 15):** install the latest nightly (≥ PR 12), run plan-02 §5 acceptance and checklist items 5 (Selection), 8 (Reminder), 9 (Zoom), plus the `[needs run]` device log for the Viewer FCT platform-menu question.
 2. **After Plan 5 (merged):** items 2 (editing stages), 4 (Caret), 6 (Go To with believable counts), 9 re-run, 11 (Session Restore: page 15 at 170 %, migrated zoom semantics). All of these are code-complete and await hardware.
-3. **After PR #22 (7B) and PR #24 (8B):** item 7 (Navigator categories, now including the Images, Hyperlinks, Bookmarks and Sections data those plans feed), item 10 (Save Compatibility), and the item 12 stress test after Plan 6 (PR #20) lands media memory.
+3. **After Plan 7B and Plan 8B:** item 7 (Navigator categories, now including the Images, Hyperlinks, Bookmarks and Sections data those plans feed), item 10 (Save Compatibility), and the item 12 stress test after Plan 6 lands media memory.
 4. **After Plan 11:** the full twelve-section pass, recorded with APK, commit, device and Android version. This is the gate before Chapter 2 work starts. The owner deferred it to this point on 2026-09-28.
 
 ---

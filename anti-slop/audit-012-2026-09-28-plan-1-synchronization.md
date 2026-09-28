@@ -222,3 +222,5 @@ Applied as one PR on `arena/01a0e7ac-papirus-office`:
 | `anti-slop/plan-11-hybrid-experience-design.md` | §3 edition corrected to 26.2 with the 7.2 citation kept as the historical source; §4 sample inventory marked as pre-5b; §5 PR-slot paragraph and dependency note re-numbered; editor-surfaces row gained the dead mobile-view control (P1-32); `docs/html` corrected at two sites |
 
 No Kotlin, resource, test, fixture or workflow file was touched. 1B (the product-documentation truth pass over `AGENTS.md`, `DESIGN.md`, `PROJECT_CONTEXT.md` and `CONCEPT.md`) is the remaining half of Plan 1 and carries P1-01 to P1-05, P1-08 to P1-13 and P1-33.
+
+**Post-merge correction (same day).** PR #20 was assigned to 1A and PR #21 is held for 1B, which consumed the two slots the forward schedule had reserved for Plan 6 and Plan 7A. The tables were updated the same day: the record now keys on plan IDs with PR numbers marked as expectations, and Plans 6 to 9 are expected at #22 to #27. This is the exact failure mode `audit-011` §8 warned about, and the fix is the labelling rule, not a new set of fixed numbers.
