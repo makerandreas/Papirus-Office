@@ -514,8 +514,9 @@ private fun ParagraphEditField(
         }
         BasicTextField(
             value = localValue,
-            visualTransformation = ParagraphProjection(lines, lineGapsBefore,
-                zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles),
+            visualTransformation = remember(lines, lineGapsBefore, zoomScale, windowParagraph, styles) {
+                ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles)
+            },
             onValueChange = { newLocal ->
                 val newGlobalText = DocumentTextWindows.applyLocalEdit(globalValue.text, window, newLocal.text)
                 val newSelStart = (newLocal.selection.start + window.start).coerceIn(0, newGlobalText.length)
@@ -601,8 +602,9 @@ private fun ParagraphSelectField(
     val requestToolbar by rememberUpdatedState(onToolbarRequest)
     var fieldBounds by remember { mutableStateOf(Rect.Zero) }
     var fieldLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val projection = ParagraphProjection(lines, lineGapsBefore,
-        zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles)
+    val projection = remember(lines, lineGapsBefore, zoomScale, windowParagraph, styles) {
+        ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles)
+    }
     LaunchedEffect(isToolbarOwner, anySelectionActive, fieldBounds, fieldLayout, globalValue.selection) {
         val request = requestToolbar ?: return@LaunchedEffect
         when {
@@ -637,7 +639,9 @@ private fun ParagraphSelectField(
         BasicTextField(
             value = localValue,
             visualTransformation = projection,
-            onTextLayout = { fieldLayout = it },
+            onTextLayout = {
+                if (fieldLayout?.layoutInput != it.layoutInput || fieldLayout?.size != it.size) fieldLayout = it
+            },
             onValueChange = { newLocal ->
                 if (newLocal.text == window.text) {
                     onSelectionChange(DocumentTextWindows.toGlobalSelection(window, newLocal.selection))

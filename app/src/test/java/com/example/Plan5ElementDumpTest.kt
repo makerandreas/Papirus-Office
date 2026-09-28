@@ -74,7 +74,7 @@ class Plan5ElementDumpTest {
             val run = layoutSample(fileName)
             runs += run
             println(run.report.toText())
-            println("window (not asserted until Plan 5e): ${run.window ?: "none"}")
+            println("window (asserted by PaginationFidelityTest): ${run.window ?: "none"}")
             println()
             checkInvariants(run, problems)
         }
