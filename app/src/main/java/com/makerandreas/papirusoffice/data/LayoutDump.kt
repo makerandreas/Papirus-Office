@@ -16,7 +16,7 @@ import java.util.Locale
  */
 object LayoutDump {
 
-    enum class PageEnd { BREAK, OVERFLOW, END }
+    enum class PageEnd { BREAK, OVERFLOW, KEEP, END }
 
     data class PageRow(
         val pageNumber: Int,
@@ -59,14 +59,14 @@ object LayoutDump {
 
         /**
          * The mechanism behind this file's page count, named from the rows:
-         * break-driven when most thin pages end at a break element, metric-driven
-         * when pages overflow with few elements, or neither when no page is thin.
+         * break-associated when most thin pages end at a break element. A low
+         * element count alone cannot diagnose metrics (an image/table may fill a page).
          */
         val mechanism: String
             get() = when {
                 thinPages == 0 -> "no thin pages"
                 thinPagesEndedByBreak * 2 >= thinPages -> "break elements ($thinPagesEndedByBreak of $thinPages thin pages end at a break element; $breakElements break elements in the model)"
-                else -> "inflated metrics (${thinPages - thinPagesEndedByBreak} of $thinPages thin pages overflow with fewer than $THIN_PAGE_ELEMENTS elements)"
+                else -> "thin non-break pages (${thinPages - thinPagesEndedByBreak} of $thinPages; inspect bounds and content, not proof of inflated metrics)"
             }
 
         fun toText(): String {
@@ -85,7 +85,7 @@ object LayoutDump {
                 String.format(
                     Locale.ROOT,
                     "flow used by paginator: top %.1f bottom %.1f width %.1f | declared body: top %.1f bottom %.1f%n",
-                    spec.marginTopDp, spec.contentBottomDp, spec.contentWidthDp, spec.bodyTopDp, spec.bodyBottomDp
+                    spec.bodyTopDp, spec.bodyBottomDp, spec.contentWidthDp, spec.bodyTopDp, spec.bodyBottomDp
                 )
             )
             if (firstMasterPageName != null) {
@@ -157,11 +157,11 @@ object LayoutDump {
             val lastBottom = placed.maxOfOrNull { it.bounds.bottom } ?: pageSpec.bodyTopDp
             val kinds = kindsSummary(placed)
             val blanks = placed.count { isBlankParagraph(it.element) }
-            val endedBy = when {
-                page.pageNumber == result.pages.size -> PageEnd.END
-                last == null -> PageEnd.BREAK
-                nextElementIsBreak(elements, last) -> PageEnd.BREAK
-                else -> PageEnd.OVERFLOW
+            val endedBy = when (page.endReason) {
+                PageEndReason.AUTHORED -> PageEnd.BREAK
+                PageEndReason.OVERFLOW -> PageEnd.OVERFLOW
+                PageEndReason.KEEP -> PageEnd.KEEP
+                PageEndReason.END -> PageEnd.END
             }
             rows.add(
                 PageRow(
@@ -182,7 +182,7 @@ object LayoutDump {
             pageSpec = pageSpec,
             pages = rows,
             elementTotal = elements.size,
-            placedTotal = result.pages.sumOf { it.elements.size },
+            placedTotal = result.pages.flatMap { it.elements }.map { it.elementIndex }.distinct().size,
             breakElements = breakElements,
             blankParagraphs = elements.count { isBlankParagraph(it) },
             pageBreakMarkerParagraphs = elements.count { textOf(it)?.contains(PAGE_BREAK_MARKER) == true },

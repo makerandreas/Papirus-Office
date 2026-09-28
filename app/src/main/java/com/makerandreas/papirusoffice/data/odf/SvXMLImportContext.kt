@@ -80,17 +80,9 @@ class OdfTextBodyContext(
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
             OdfXmlToken.XML_P -> {
-                val styleName = attributes["style-name"]
-                if (importFilter.hasPageBreakBefore(styleName)) {
-                    importFilter.addElement(OfficeDocumentElement.PageBreak)
-                }
                 OdfParagraphContext(importFilter, token, attributes)
             }
             OdfXmlToken.XML_H -> {
-                val styleName = attributes["style-name"]
-                if (importFilter.hasPageBreakBefore(styleName)) {
-                    importFilter.addElement(OfficeDocumentElement.PageBreak)
-                }
                 OdfHeadingContext(importFilter, token, attributes)
             }
             OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
@@ -177,6 +169,12 @@ class OdfParagraphContext(
     private val runs = mutableListOf<TextRun>()
     private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
 
+    override fun onStartElement(token: OdfXmlToken, attributes: Map<String, String>) {
+        if (importFilter.hasPageBreakBefore(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
+    }
+
     override fun onCharacters(text: String) {
         textBuilder.append(text)
         runs.add(TextRun(text = text))
@@ -212,22 +210,23 @@ class OdfParagraphContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         val fullText = textBuilder.toString()
-        if (fullText.isNotEmpty() || runs.isNotEmpty()) {
-            val headingLvl = importFilter.resolveHeadingLevel(styleName)
-            val element = if (headingLvl != null) {
-                OfficeDocumentElement.Heading(
-                    text = fullText,
-                    level = headingLvl,
-                    styleName = styleName
-                )
-            } else {
-                OfficeDocumentElement.Paragraph(
-                    text = fullText,
-                    styleName = styleName,
-                    runs = runs.toList()
-                )
-            }
-            importFilter.addElement(element)
+        val headingLvl = importFilter.resolveHeadingLevel(styleName)
+        val element = if (headingLvl != null) {
+            OfficeDocumentElement.Heading(
+                text = fullText,
+                level = headingLvl,
+                styleName = styleName
+            )
+        } else {
+            OfficeDocumentElement.Paragraph(
+                text = fullText,
+                styleName = styleName,
+                runs = runs.toList()
+            )
+        }
+        importFilter.addElement(element)
+        if (importFilter.hasPageBreakAfter(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
         }
     }
 }
@@ -245,6 +244,12 @@ class OdfHeadingContext(
     private val level: Int = attributes["text:outline-level"]?.toIntOrNull()
         ?: attributes["outline-level"]?.toIntOrNull() ?: 1
     private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
+
+    override fun onStartElement(token: OdfXmlToken, attributes: Map<String, String>) {
+        if (importFilter.hasPageBreakBefore(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
+    }
 
     override fun onCharacters(text: String) {
         textBuilder.append(text)
@@ -264,13 +269,14 @@ class OdfHeadingContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         val headingText = textBuilder.toString()
-        if (headingText.isNotEmpty()) {
-            val heading = OfficeDocumentElement.Heading(
-                text = headingText,
-                level = level,
-                styleName = styleName
-            )
-            importFilter.addElement(heading)
+        val heading = OfficeDocumentElement.Heading(
+            text = headingText,
+            level = level,
+            styleName = styleName
+        )
+        importFilter.addElement(heading)
+        if (importFilter.hasPageBreakAfter(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
         }
     }
 }

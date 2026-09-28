@@ -68,6 +68,29 @@ class TextMetricsTest {
     }
 
     @Test
+    fun odfPercentageIsFontSizeBasedMinimumNotDocxNaturalMultiplier() {
+        val odf = TextMetrics.forStyle(body.copy(lineHeightFactor = 1.15f, lineHeightUsesFontSize = true), TableAdvanceSource)
+        val docx = TextMetrics.forStyle(body.copy(lineHeightFactor = 1.15f), TableAdvanceSource)
+        assertEquals(16f * 1.15f, odf.lineHeightUnits, 0.001f)
+        assertEquals(docx.naturalLineHeightUnits * 1.15f, docx.lineHeightUnits, 0.001f)
+        assertTrue(docx.lineHeightUnits > odf.lineHeightUnits)
+        // A percentage below the natural line height must not shrink the line.
+        val small = TextMetrics.forStyle(body.copy(lineHeightFactor = 0.5f, lineHeightUsesFontSize = true), TableAdvanceSource)
+        assertEquals(small.naturalLineHeightUnits, small.lineHeightUnits, 0.001f)
+    }
+
+    @Test
+    fun minimumAndExactDifferForTallRuns() {
+        val minimum = TextMetrics.forStyle(body.copy(lineHeightMinimumUnits = 20f), TableAdvanceSource)
+        val exact = TextMetrics.forStyle(body.copy(lineHeightExactUnits = 20f), TableAdvanceSource)
+        assertEquals(20f, minimum.lineHeightFor(17f, 16f), 0f)
+        assertEquals(40f, minimum.lineHeightFor(40f, 36f), 0f)
+        assertEquals(20f, exact.lineHeightFor(40f, 36f), 0f)
+        val percent = TextMetrics.forStyle(body.copy(lineHeightFactor = 1.5f, lineHeightUsesFontSize = true), TableAdvanceSource)
+        assertEquals(54f, percent.lineHeightFor(40f, 36f), 0f)
+    }
+
+    @Test
     fun defaultStyleCarriesNoMetricFields() {
         // E-EN-3: the pre-plan-5 shape must stay byte-identical for every consumer.
         assertTrue(!ParagraphStyle("Default", fontSizeSp = 14f).hasMetricFields)

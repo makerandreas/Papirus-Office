@@ -121,7 +121,7 @@ fun InkyModule(
     // --- Inky Core States ---
     var isEditMode by remember { mutableStateOf(false) } // False = Viewer Mode, True = Edit Mode
     var editorMode by remember { mutableStateOf(if (isEditMode) com.example.modules.inky.state.EditorMode.EDIT else com.example.modules.inky.state.EditorMode.VIEW) }
-    var isWebView by remember { mutableStateOf(false) }  // False = Normal View, True = Web View
+    val isWebView = false // Flow view is unavailable until it shares the paginated layout/input pipeline.
     var isDarkDocument by remember { mutableStateOf(false) } // Dark document canvas mode
     var isSaved by remember { mutableStateOf(true) }     // Tracks saved indicator suffix
     var isNewDocument by remember { mutableStateOf(com.example.MainActivity.openedFilePath == null) }
@@ -2083,12 +2083,11 @@ fun InkyModule(
                             if (isEditMode) {
                                 // 3. Mobile view (Edit Mode only)
                                 IconButton(onClick = {
-                                    isWebView = !isWebView
-                                    Toast.makeText(context, if (isWebView) R.string.toast_mobile_view_active else R.string.toast_normal_view_active, Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.inky_flow_view_unavailable, Toast.LENGTH_SHORT).show()
                                 }) {
                                     Icon(
                                         imageVector = if (isWebView) Icons.Rounded.PhoneAndroid else Icons.Rounded.Web,
-                                        contentDescription = stringResource(R.string.cd_document_view_mode)
+                                        contentDescription = stringResource(R.string.inky_flow_view_unavailable)
                                     )
                                 }
 

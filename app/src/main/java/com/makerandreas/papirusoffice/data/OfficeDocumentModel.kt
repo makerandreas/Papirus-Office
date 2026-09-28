@@ -10,13 +10,15 @@ sealed class OfficeDocumentElement {
     data class Paragraph(
         val text: String,
         val styleName: String? = null,
-        val runs: List<TextRun> = emptyList()
+        val runs: List<TextRun> = emptyList(),
+        val pageBreakOffsets: List<Int> = emptyList()
     ) : OfficeDocumentElement()
 
     data class Heading(
         val text: String,
         val level: Int = 1,
-        val styleName: String? = null
+        val styleName: String? = null,
+        val pageBreakOffsets: List<Int> = emptyList()
     ) : OfficeDocumentElement()
 
     data class ListItem(
@@ -60,6 +62,7 @@ data class TextRun(
 )
 
 data class OfficeParsedDocument(
+    val sectionStarts: List<SectionStart> = emptyList(),
     val elements: List<OfficeDocumentElement> = emptyList(),
     val rawXml: String = "",
     val plainText: String = "",

@@ -60,7 +60,12 @@ class BreakSemanticsTest {
         )
         for ((name, count) in expected) {
             val parsed = parseOfficeDoc(name)
-            val breakCount = parsed.elements.count { it is OfficeDocumentElement.PageBreak }
+            val breakCount = parsed.elements.count { it is OfficeDocumentElement.PageBreak } +
+                parsed.elements.sumOf { when (it) {
+                    is OfficeDocumentElement.Paragraph -> it.pageBreakOffsets.size
+                    is OfficeDocumentElement.Heading -> it.pageBreakOffsets.size
+                    else -> 0
+                } } + parsed.sectionStarts.count { it.elementIndex > 0 && it.kind != com.makerandreas.papirusoffice.data.SectionStartKind.CONTINUOUS }
             assertEquals("$name authored break count", count, breakCount)
         }
     }
@@ -78,7 +83,12 @@ class BreakSemanticsTest {
         )
         for ((name, count) in expected) {
             val parsed = parseOfficeDoc(name)
-            val breakCount = parsed.elements.count { it is OfficeDocumentElement.PageBreak }
+            val breakCount = parsed.elements.count { it is OfficeDocumentElement.PageBreak } +
+                parsed.elements.sumOf { when (it) {
+                    is OfficeDocumentElement.Paragraph -> it.pageBreakOffsets.size
+                    is OfficeDocumentElement.Heading -> it.pageBreakOffsets.size
+                    else -> 0
+                } } + parsed.sectionStarts.count { it.elementIndex > 0 && it.kind != com.makerandreas.papirusoffice.data.SectionStartKind.CONTINUOUS }
             assertEquals("$name authored break count", count, breakCount)
         }
     }

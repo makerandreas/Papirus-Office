@@ -74,7 +74,7 @@ class Plan5ElementDumpTest {
             val run = layoutSample(fileName)
             runs += run
             println(run.report.toText())
-            println("window (not asserted until Plan 5e): ${run.window ?: "none"}")
+            println("window (asserted by PaginationFidelityTest): ${run.window ?: "none"}")
             println()
             checkInvariants(run, problems)
         }
@@ -148,7 +148,7 @@ class Plan5ElementDumpTest {
             val last = row.lastElementIndex
             if (first != null && last != null) {
                 if (first > last) problems += "$name page ${row.pageNumber}: first index $first after last $last"
-                if (first <= previousLast) problems += "$name page ${row.pageNumber}: first index $first does not follow previous page's last $previousLast"
+                if (first < previousLast) problems += "$name page ${row.pageNumber}: first index $first precedes previous page's last $previousLast"
                 previousLast = last
             }
             if (row.reservedHeight < 0f || row.leftover < 0f) problems += "$name page ${row.pageNumber}: negative reserved/leftover"

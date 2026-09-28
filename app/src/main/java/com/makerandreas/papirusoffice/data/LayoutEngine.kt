@@ -1,8 +1,5 @@
 package com.makerandreas.papirusoffice.data
 
-import android.graphics.Paint
-import android.graphics.Rect
-import java.io.File
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -18,7 +15,13 @@ data class LineLayout(
     val height: Float = 0f,
     val baseline: Float = 0f,
     val startOffset: Int = 0,
-    val endOffset: Int = 0
+    val endOffset: Int = 0,
+    /** Horizontal line origin relative to the paragraph's body-width box. */
+    val left: Float = 0f,
+    /** Source UTF-16 caret boundaries and their measured positions, relative to left. */
+    val caretOffsets: List<Int> = emptyList(),
+    val caretAdvances: List<Float> = emptyList(),
+    val discretionaryHyphen: Boolean = false
 )
 
 data class ParagraphLayout(
@@ -34,24 +37,33 @@ data class ParagraphLayout(
 // PHASE 5: Pagination Models
 // ==========================================
 
+enum class PageEndReason { END, OVERFLOW, AUTHORED, KEEP }
+
 data class PageLayout(
     val pageNumber: Int,
     val widthDp: Float = 816f,  // standard A4 or Letter ratio approx
     val heightDp: Float = 1056f,
-    val elements: List<PageElementLayout> = emptyList()
+    val elements: List<PageElementLayout> = emptyList(),
+    val endReason: PageEndReason = PageEndReason.END
 )
 
 data class PageElementLayout(
     val element: OfficeElement,
     val paragraphLayout: ParagraphLayout? = null,
     val bounds: OfficeRect = OfficeRect(), // Positioned bounds relative to page top-left
-    val elementIndex: Int = 0
+    val elementIndex: Int = 0,
+    val firstLineIndex: Int = 0,
+    val sourceStart: Int = 0,
+    val sourceEnd: Int = 0,
+    val continuesBefore: Boolean = false,
+    val continuesAfter: Boolean = false
 )
 
 data class DocumentLayoutResult(
     val pages: List<PageLayout> = emptyList(),
     val totalHeightDp: Float = 0f,
-    val elementPageIndex: Map<Int, Int> = emptyMap()
+    val elementPageIndex: Map<Int, Int> = emptyMap(),
+    val elementPages: Map<Int, List<Int>> = emptyMap()
 )
 
 // ==========================================
@@ -120,218 +132,43 @@ object StyleResolver {
  */
 class LayoutEngine(
     private val pageSpec: PageStyleSpec = PageStyleSpec.FALLBACK,
-    private val hyphenator: HyphenationEngine? = null
+    private val hyphenator: HyphenationEngine? = null,
+    private val advanceSource: AdvanceSource = TextMetrics.defaultSource()
 ) {
     private val pageWidthDp: Float = pageSpec.widthDp
     private val pageHeightDp: Float = pageSpec.heightDp
 
-    // Vertical rhythm between stacked elements on the page flow.
-    private val elementGapDp: Float = ELEMENT_GAP_UNITS
+    // A bounded one-entry-per-element cache. Index alone is never an identity.
+    private data class CacheKey(val paragraph: OfficeParagraph, val style: ParagraphStyle,
+        val characterStyles: Map<String, CharacterStyle>, val width: Float)
+    private val paragraphLayoutCache = mutableMapOf<Int, Pair<CacheKey, ParagraphLayout>>()
+    var measuredParagraphCount: Int = 0
+        private set
 
-    companion object {
-        /**
-         * Gap the paginator reserves between two blocks, layout units. The
-         * renderer draws the same gap through its page scale so the sheet
-         * shows the rhythm the page count was computed with. PR 16b replaces
-         * it with the styles' before/after spacing.
-         */
-        const val ELEMENT_GAP_UNITS = 12f
-    }
-
-    // Cache map for Incremental Layout: paragraph index to its paragraph layout
-    private val paragraphLayoutCache = mutableMapOf<Int, ParagraphLayout>()
-
-    // Simple text measurement system using default Android system sizes scaled
-    private val textPaint: Paint? by lazy {
-        try {
-            Paint().apply { isAntiAlias = true }
-        } catch (e: Throwable) {
-            null
-        }
-    }
-
-    private var fallbackTextSize: Float = 14f * 2.5f
-
-    private fun getPaintTextSize(): Float {
-        return textPaint?.textSize ?: fallbackTextSize
-    }
-
-    private fun setPaintTextSize(size: Float) {
-        textPaint?.let { it.textSize = size }
-        fallbackTextSize = size
-    }
-
-    private fun measureTextWidth(text: String): Float {
-        return textPaint?.measureText(text) ?: (text.length * 8.0f)
-    }
-
-    /**
-     * How this engine measured text, for the plan 5 dump ([LayoutDump]): the
-     * Paint size the `2.5f` factor produces for the 14 pt default and two
-     * probe widths at that size. Equal widths for "MMMM" and "iiii" mean the
-     * Paint counts characters (a JVM without native graphics), not glyphs;
-     * that distinction is what makes a CI page count comparable to a device.
-     */
     fun measurementProbe(): String {
-        val paint = textPaint ?: return "no Paint: 8 units per character"
-        val previous = paint.textSize
-        val probeSize = 14f * 2.5f
-        return try {
-            paint.textSize = probeSize
-            val wide = paint.measureText("MMMM")
-            val narrow = paint.measureText("iiii")
-            val kind = if (wide > 0f && wide > narrow * 1.2f) "glyph advances" else "per-character stub"
-            String.format(java.util.Locale.ROOT, "Paint at %.1f px for 14 pt: MMMM=%.1f iiii=%.1f (%s)", probeSize, wide, narrow, kind)
-        } catch (t: Throwable) {
-            "Paint probe failed: ${t.javaClass.simpleName}"
-        } finally {
-            paint.textSize = previous
-        }
+        val metrics = TextMetrics.forStyle(ParagraphStyle("probe", fontSizeSp = 14f), advanceSource)
+        return "${metrics.sourceName} at ${metrics.fontSizeUnits} units for 14 pt: " +
+            "MMMM=${metrics.widthOf("MMMM")} iiii=${metrics.widthOf("iiii")} (${metrics.choice.generic})"
     }
 
-    fun clearCache() {
-        paragraphLayoutCache.clear()
-    }
+    fun clearCache() { paragraphLayoutCache.clear() }
 
-    /**
-     * Compute paragraph layout. Uses caching for incremental updates.
-     */
     fun layoutParagraph(
         paragraphIndex: Int,
         paragraph: OfficeParagraph,
         styles: DocumentStyles,
         forceRebuild: Boolean = false
     ): ParagraphLayout {
-        if (!forceRebuild) {
-            paragraphLayoutCache[paragraphIndex]?.let { return it }
-        }
-
-        val style = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
-        setPaintTextSize(style.fontSizeSp * 2.5f) // rough dp-to-px scaling factor for virtual measuring
-
-        val words = paragraph.text.split(" ")
-        val lines = mutableListOf<LineLayout>()
-        var currentLineText = StringBuilder()
-        var currentLineWidth = 0f
-        var startCharOffset = 0
-
-        val maxLineWidth = pageSpec.contentWidthDp
-
-        for (w in words) {
-            var word = w
-            while (true) {
-                val spaceText = if (currentLineText.isNotEmpty()) " " else ""
-                val testWord = spaceText + word
-                val wordWidth = measureTextWidth(testWord)
-                val overflows = currentLineWidth + wordWidth > maxLineWidth
-
-                if (overflows && currentLineText.isNotEmpty()) {
-                    // A word that does not fit: try a dictionary break before
-                    // pushing it whole onto the next line (off by default).
-                    var broke = false
-                    if (hyphenator != null) {
-                        val spaceWidth = measureTextWidth(spaceText)
-                        val remaining = (maxLineWidth - currentLineWidth - spaceWidth).coerceAtLeast(0f)
-                        val breakAt = hyphenator.firstFittingBreak(word, remaining, ::measureTextWidth)
-                        if (breakAt != null) {
-                            val head = word.substring(0, breakAt)
-                            val lineStr = currentLineText.toString() + spaceText + head
-                            lines.add(
-                                LineLayout(
-                                    text = lineStr,
-                                    runs = paragraph.runs,
-                                    width = currentLineWidth + spaceWidth + measureTextWidth(head),
-                                    height = getPaintTextSize() * 1.2f,
-                                    baseline = getPaintTextSize(),
-                                    startOffset = startCharOffset,
-                                    endOffset = startCharOffset + lineStr.length
-                                )
-                            )
-                            startCharOffset += lineStr.length + 1
-                            word = word.substring(breakAt)
-                            currentLineText = StringBuilder()
-                            currentLineWidth = 0f
-                            broke = true
-                        }
-                    }
-                    if (broke) {
-                        if (word.isEmpty()) break
-                        continue
-                    }
-                    val lineStr = currentLineText.toString()
-                    lines.add(
-                        LineLayout(
-                            text = lineStr,
-                            runs = paragraph.runs,
-                            width = currentLineWidth,
-                            height = getPaintTextSize() * 1.2f,
-                            baseline = getPaintTextSize(),
-                            startOffset = startCharOffset,
-                            endOffset = startCharOffset + lineStr.length
-                        )
-                    )
-                    startCharOffset += lineStr.length + 1
-                    currentLineText = StringBuilder(word)
-                    currentLineWidth = measureTextWidth(word)
-                    break
-                }
-                if (overflows && currentLineText.isEmpty() && hyphenator != null) {
-                    val breakAt = hyphenator.firstFittingBreak(word, maxLineWidth, ::measureTextWidth)
-                    if (breakAt != null && breakAt < word.length) {
-                        val head = word.substring(0, breakAt)
-                        lines.add(
-                            LineLayout(
-                                text = head,
-                                runs = paragraph.runs,
-                                width = measureTextWidth(head),
-                                height = getPaintTextSize() * 1.2f,
-                                baseline = getPaintTextSize(),
-                                startOffset = startCharOffset,
-                                endOffset = startCharOffset + head.length
-                            )
-                        )
-                        startCharOffset += head.length
-                        word = word.substring(breakAt)
-                        continue
-                    }
-                }
-                currentLineText.append(testWord)
-                currentLineWidth += wordWidth
-                break
-            }
-        }
-
-        if (currentLineText.isNotEmpty()) {
-            val lineStr = currentLineText.toString()
-            lines.add(
-                LineLayout(
-                    text = lineStr,
-                    runs = paragraph.runs,
-                    width = currentLineWidth,
-                    height = getPaintTextSize() * 1.2f,
-                    baseline = getPaintTextSize(),
-                    startOffset = startCharOffset,
-                    endOffset = startCharOffset + lineStr.length
-                )
-            )
-        }
-
-        // Calculate total height of lines
-        var totalHeight = 0f
-        for (line in lines) {
-            totalHeight += line.height
-        }
-
-        val layout = ParagraphLayout(
-            paragraphIndex = paragraphIndex,
-            lines = lines,
-            width = maxLineWidth,
-            height = max(totalHeight, getPaintTextSize() * 1.5f),
-            boundingBox = OfficeRect(0f, 0f, maxLineWidth, totalHeight)
-        )
-
-        paragraphLayoutCache[paragraphIndex] = layout
-        return layout
+        val baseStyle = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
+        val style = baseStyle.copy(indentStartUnits = baseStyle.indentStartUnits + paragraph.indent)
+        val key = CacheKey(paragraph.copy(runs = paragraph.runs.toList()), style.copy(tabStops = style.tabStops.toList()),
+            styles.characterStyles.toMap(), pageSpec.contentWidthDp)
+        if (!forceRebuild) paragraphLayoutCache[paragraphIndex]?.takeIf { it.first == key }?.let { return it.second }
+        val result = ParagraphMeasurer(advanceSource, hyphenator).measure(
+            paragraphIndex, paragraph, style, styles, pageSpec.contentWidthDp)
+        measuredParagraphCount++
+        paragraphLayoutCache[paragraphIndex] = key to result
+        return result
     }
 
     /**
@@ -350,130 +187,172 @@ class LayoutEngine(
         }
 
         val pages = mutableListOf<PageLayout>()
-        var currentPageElements = mutableListOf<PageElementLayout>()
-        var currentY = pageSpec.bodyTopDp
-        val maxUsableHeight = pageSpec.bodyBottomDp
-        val elementPageIndex = mutableMapOf<Int, Int>()
-
-        fun flushPage() {
-            if (currentPageElements.isNotEmpty()) {
-                pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                currentPageElements = mutableListOf()
-                currentY = pageSpec.bodyTopDp
+        var placed = mutableListOf<PageElementLayout>()
+        var y = pageSpec.bodyTopDp
+        val top = pageSpec.bodyTopDp
+        val bottom = pageSpec.bodyBottomDp
+        val bodyHeight = (bottom - top).coerceAtLeast(1f)
+        val firstPages = mutableMapOf<Int, Int>()
+        val elementPages = mutableMapOf<Int, MutableList<Int>>()
+        var previousAfter = 0f
+        var previousCollapses = false
+        var trailingAuthoredBreak = false
+        fun flush(reason: PageEndReason, force: Boolean = false) {
+            if (placed.isNotEmpty() || force) {
+                pages += PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, placed, reason)
+                placed = mutableListOf()
             }
+            y = top
+            previousAfter = 0f
         }
-
-        fun ensureRoom(needed: Float) {
-            if (currentY + needed > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                flushPage()
-            }
+        fun register(index: Int) {
+            val page = pages.size + 1
+            firstPages.putIfAbsent(index, page)
+            val range = elementPages.getOrPut(index) { mutableListOf() }
+            if (range.lastOrNull() != page) range += page
         }
-
-        fun place(index: Int, element: OfficeElement, height: Float, width: Float = pageSpec.contentWidthDp, paragraphLayout: ParagraphLayout? = null) {
-            val h = height.coerceAtLeast(8f)
-            ensureRoom(h)
-            val pageNumber = pages.size + 1
-            elementPageIndex[index] = pageNumber
-            val left = pageSpec.marginStartDp
-            val placedWidth = width.coerceAtMost(pageSpec.contentWidthDp)
-            currentPageElements.add(
-                PageElementLayout(
-                    element = element,
-                    paragraphLayout = paragraphLayout,
-                    bounds = OfficeRect(left, currentY, left + placedWidth, currentY + h),
-                    elementIndex = index
-                )
-            )
-            currentY += h + elementGapDp
+        fun paragraph(element: OfficeElement): OfficeParagraph? = when (element) {
+            is OfficeParagraph -> element
+            is OfficeHeading -> OfficeParagraph(element.text, element.styleName ?: "Heading ${element.level}", runs = element.runs, pageBreakOffsets = element.pageBreakOffsets)
+            is OfficeListItem -> OfficeParagraph(element.text, runs = element.runs,
+                indent = TextMetrics.forStyle(StyleResolver.resolveParagraphStyle(null, document.styles), advanceSource).widthOf(element.bullet))
+            is OfficeDocElement.ParagraphElement -> element.paragraph
+            else -> null
         }
-
-        val rawElements = document.body.elements
-
-        rawElements.forEachIndexed { index, element ->
-            if (outlineEngine != null && outlineEngine.isElementHidden(index)) {
-                return@forEachIndexed
+        val elements = document.body.elements
+        paragraphLayoutCache.keys.retainAll(elements.indices.toSet())
+        fun visible(index: Int): Boolean {
+            val e = elements[index]
+            return outlineEngine?.isElementHidden(index) != true &&
+                (showImages || e !is OfficeImage && e !is OfficeDocElement.ImageElement) &&
+                (showTables || e !is OfficeTable && e !is OfficeDocElement.TableElement)
+        }
+        for ((index, element) in elements.withIndex()) {
+            if (!visible(index)) continue
+            if (element is OfficePageBreak) {
+                firstPages[index] = pages.size + 1
+                flush(PageEndReason.AUTHORED, force = true)
+                trailingAuthoredBreak = true
+                continue
             }
-            if (!showImages && (element is OfficeDocElement.ImageElement || element is OfficeImage)) {
-                return@forEachIndexed
+            trailingAuthoredBreak = false
+            val section = document.sectionStarts.firstOrNull { it.elementIndex == index && index > 0 }
+            if (section != null && section.kind != SectionStartKind.CONTINUOUS) {
+                // NEXT_COLUMN advances the single supported column; retain its kind for Plan 8B.
+                flush(PageEndReason.AUTHORED)
+                val nextPage = pages.size + 1
+                if ((section.kind == SectionStartKind.ODD_PAGE && nextPage % 2 == 0) ||
+                    (section.kind == SectionStartKind.EVEN_PAGE && nextPage % 2 != 0)) flush(PageEndReason.AUTHORED, force = true)
             }
-            if (!showTables && (element is OfficeDocElement.TableElement || element is OfficeTable)) {
-                return@forEachIndexed
-            }
-
-            when (element) {
-                is OfficePageBreak -> {
-                    elementPageIndex[index] = pages.size + 1
-                    flushPage()
-                    if (pages.isEmpty()) {
-                        pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
+            val p = paragraph(element)
+            if (p != null) {
+                val style = StyleResolver.resolveParagraphStyle(p.styleName, document.styles)
+                val layout = layoutParagraph(index, p, document.styles, forceRebuildAll)
+                if ((style.pageBreakBefore || !style.masterPageName.isNullOrBlank()) && placed.isNotEmpty()) flush(PageEndReason.AUTHORED)
+                val before = style.spaceBeforeUnits.coerceAtLeast(0f)
+                var gap = if (placed.isEmpty()) 0f else if (style.collapseSpacing || previousCollapses)
+                    maxOf(previousAfter, before) else previousAfter + before
+                // Bounded lookahead. An over-page chain relaxes instead of flushing forever.
+                if (style.keepWithNext || style.keepTogether) {
+                    var needed = layout.height
+                    var currentStyle = style
+                    var next = index + 1
+                    while (currentStyle.keepWithNext && next < elements.size && needed <= bodyHeight) {
+                        if (!visible(next)) { next++; continue }
+                        val following = paragraph(elements[next]) ?: break
+                        val followingStyle = StyleResolver.resolveParagraphStyle(following.styleName, document.styles)
+                        if (followingStyle.pageBreakBefore || !followingStyle.masterPageName.isNullOrBlank()) break
+                        needed += if (currentStyle.collapseSpacing || followingStyle.collapseSpacing)
+                            maxOf(currentStyle.spaceAfterUnits, followingStyle.spaceBeforeUnits)
+                        else currentStyle.spaceAfterUnits + followingStyle.spaceBeforeUnits
+                        needed += layoutParagraph(next, following, document.styles).height
+                        currentStyle = followingStyle
+                        next++
+                    }
+                    if (needed <= bodyHeight && y + gap + needed > bottom && placed.isNotEmpty()) {
+                        flush(PageEndReason.KEEP)
+                        gap = 0f
                     }
                 }
-                is OfficeParagraph -> {
-                    val style = StyleResolver.resolveParagraphStyle(element.styleName, document.styles)
-                    if (style.pageBreakBefore && currentPageElements.isNotEmpty()) {
-                        flushPage()
+                if (y + gap + layout.lines.first().height > bottom && placed.isNotEmpty()) {
+                    flush(PageEndReason.OVERFLOW)
+                    gap = 0f
+                }
+                y += gap
+                val breaks = p.pageBreakOffsets.filter { it in 0..p.text.length }.groupingBy { it }.eachCount().toMutableMap()
+                var lineStart = 0
+                while (lineStart < layout.lines.size) {
+                    val source = layout.lines[lineStart].startOffset
+                    repeat(breaks.remove(source) ?: 0) { flush(PageEndReason.AUTHORED, force = true) }
+                    var lineEnd = lineStart
+                    var height = 0f
+                    while (lineEnd < layout.lines.size && y + height + layout.lines[lineEnd].height <= bottom + 0.001f) {
+                        if (lineEnd > lineStart && layout.lines[lineEnd].startOffset in breaks) break
+                        height += layout.lines[lineEnd++].height
                     }
-                    val pLayout = layoutParagraph(index, element, document.styles, forceRebuildAll)
-                    place(index, element, pLayout.height, pLayout.width, pLayout)
-                }
-                is OfficeHeading -> {
-                    val style = StyleResolver.resolveParagraphStyle(element.styleName, document.styles)
-                    if (style.pageBreakBefore && currentPageElements.isNotEmpty()) {
-                        flushPage()
+                    val remaining = layout.lines.size - lineEnd
+                    if (remaining > 0 && layout.lines[lineEnd].startOffset !in breaks) {
+                        val available = lineEnd - lineStart
+                        if (available < style.orphans && placed.isNotEmpty()) {
+                            flush(PageEndReason.OVERFLOW)
+                            continue
+                        }
+                        if (remaining < style.widows) {
+                            val reducedEnd = layout.lines.size - style.widows
+                            if (reducedEnd - lineStart >= style.orphans) lineEnd = reducedEnd
+                            else if (layout.height <= bodyHeight && placed.isNotEmpty()) {
+                                flush(PageEndReason.OVERFLOW)
+                                continue
+                            }
+                        }
                     }
-                    val asPara = OfficeParagraph(
-                        text = element.text,
-                        styleName = element.styleName ?: "Heading ${element.level}",
-                        runs = element.runs
-                    )
-                    val pLayout = layoutParagraph(index, asPara, document.styles, forceRebuildAll)
-                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                    // One over-height line is consumed even on a too-small page.
+                    if (lineEnd == lineStart) lineEnd++
+                    val lines = layout.lines.subList(lineStart, lineEnd)
+                    height = lines.sumOf { it.height.toDouble() }.toFloat()
+                    val fragment = layout.copy(lines = lines, height = height,
+                        boundingBox = OfficeRect(0f, 0f, layout.width, height))
+                    register(index)
+                    placed += PageElementLayout(element, fragment,
+                        OfficeRect(pageSpec.marginStartDp, y, pageSpec.marginStartDp + layout.width, y + height),
+                        index, lineStart, lines.first().startOffset, lines.last().endOffset,
+                        lineStart > 0, lineEnd < layout.lines.size)
+                    y += height
+                    lineStart = lineEnd
+                    if (lineStart < layout.lines.size && layout.lines[lineStart].startOffset !in breaks) flush(PageEndReason.OVERFLOW)
                 }
-                is OfficeListItem -> {
-                    val asPara = OfficeParagraph(text = "${element.bullet}${element.text}", runs = element.runs)
-                    val pLayout = layoutParagraph(index, asPara, document.styles, forceRebuildAll)
-                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                repeat(breaks.remove(p.text.length) ?: 0) {
+                    flush(PageEndReason.AUTHORED, force = true)
+                    trailingAuthoredBreak = true
                 }
-                is OfficeDocElement.ParagraphElement -> {
-                    val pLayout = layoutParagraph(index, element.paragraph, document.styles, forceRebuildAll)
-                    place(index, element, pLayout.height, pLayout.width, pLayout)
+                previousAfter = style.spaceAfterUnits.coerceAtLeast(0f)
+                previousCollapses = style.collapseSpacing
+                if (style.pageBreakAfter && elements.getOrNull(index + 1) !is OfficePageBreak) {
+                    flush(PageEndReason.AUTHORED)
                 }
-                is OfficeTable -> {
-                    val tableHeight = (element.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    place(index, element, tableHeight)
+            } else {
+                val height = when (element) {
+                    is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    is OfficeImage -> if (element.heightDp > 0) element.heightDp else 180f
+                    is OfficeDocElement.ImageElement -> if (element.image.heightDp > 0) element.image.heightDp else 180f
+                    else -> 30f
                 }
-                is OfficeDocElement.TableElement -> {
-                    val tableHeight = (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    place(index, element, tableHeight)
-                }
-                is OfficeImage -> {
-                    val imgHeight = if (element.heightDp > 0) element.heightDp else 180f
-                    val imgWidth = if (element.widthDp > 0) element.widthDp else pageSpec.contentWidthDp
-                    place(index, element, imgHeight, imgWidth)
-                }
-                is OfficeDocElement.ImageElement -> {
-                    val imgHeight = if (element.image.heightDp > 0) element.image.heightDp else 180f
-                    val imgWidth = if (element.image.widthDp > 0) element.image.widthDp else pageSpec.contentWidthDp
-                    place(index, element, imgHeight, imgWidth)
-                }
-                else -> {
-                    place(index, element, 30f)
-                }
+                val width = when (element) {
+                    is OfficeImage -> element.widthDp
+                    is OfficeDocElement.ImageElement -> element.image.widthDp
+                    else -> pageSpec.contentWidthDp
+                }.takeIf { it > 0f }?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
+                if (y + previousAfter + height > bottom && placed.isNotEmpty()) flush(PageEndReason.OVERFLOW)
+                y += previousAfter
+                previousAfter = 0f
+                register(index)
+                placed += PageElementLayout(element, bounds = OfficeRect(pageSpec.marginStartDp, y, pageSpec.marginStartDp + width, y + height), elementIndex = index)
+                y += height
             }
         }
-
-        if (currentPageElements.isNotEmpty()) {
-            pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-        }
-        if (pages.isEmpty()) {
-            pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
-        }
-
-        return DocumentLayoutResult(
-            pages = pages,
-            totalHeightDp = pages.size * pageHeightDp,
-            elementPageIndex = elementPageIndex
-        )
+        if (placed.isNotEmpty() || pages.isEmpty() || trailingAuthoredBreak) flush(PageEndReason.END, force = true)
+        return DocumentLayoutResult(pages, pages.size * pageHeightDp, firstPages, elementPages)
     }
 
     // ==========================================
@@ -491,23 +370,23 @@ class LayoutEngine(
             val b = elemLayout.bounds
             if (relativeY >= b.top && relativeY <= b.bottom && x >= b.left && x <= b.right) {
                 val element = elemLayout.element
-                if (element is OfficeDocElement.ParagraphElement && elemLayout.paragraphLayout != null) {
+                if (elemLayout.paragraphLayout != null) {
                     val pLayout = elemLayout.paragraphLayout
                     var lineY = b.top
                     for (lineIdx in pLayout.lines.indices) {
                         val line = pLayout.lines[lineIdx]
                         if (relativeY >= lineY && relativeY <= lineY + line.height) {
-                            // Hit this line! Find character offset inside line
-                            val lineRelativeX = x - b.left
-                            val charRatio = if (line.width > 0) lineRelativeX / line.width else 0f
-                            val approxCharOffsetInLine = (line.text.length * charRatio).toInt().coerceIn(0, line.text.length)
-                            val totalOffset = line.startOffset + approxCharOffsetInLine
+                            val lineRelativeX = x - b.left - line.left
+                            val caret = line.caretAdvances.indices.minByOrNull {
+                                kotlin.math.abs(line.caretAdvances[it] - lineRelativeX)
+                            } ?: 0
+                            val totalOffset = line.caretOffsets.getOrElse(caret) { line.startOffset }
 
                             return HitTestResult(
                                 pageIndex = pageIndex,
                                 elementIndex = pLayout.paragraphIndex,
                                 paragraphIndex = pLayout.paragraphIndex,
-                                lineIndex = lineIdx,
+                                lineIndex = elemLayout.firstLineIndex + lineIdx,
                                 characterOffset = totalOffset
                             )
                         }

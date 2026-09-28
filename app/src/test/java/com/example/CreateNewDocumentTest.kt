@@ -13,6 +13,7 @@ import com.example.core.util.TemplateManager
 import com.example.modules.pagella.PagellaPdfCreator
 import com.example.ui.home.NewDocumentScreen
 import com.example.ui.theme.PapirusTheme
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -23,6 +24,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -35,20 +38,41 @@ class CreateNewDocumentTest {
     fun templateManager_extractsUntitledOdtOdsOdp() {
         val context = ApplicationProvider.getApplicationContext<Context>()
 
-        val odtFile = TemplateManager.getInkyNormalTemplateFile(context)
-        assertNotNull("Expected untitled.odt template file", odtFile)
-        assertEquals("untitled.odt", odtFile!!.name)
-        assertTrue(odtFile.exists() && odtFile.length() > 0L)
-
-        val odsFile = TemplateManager.getCalcDefaultTemplateFile(context)
-        assertNotNull("Expected untitled.ods template file", odsFile)
-        assertEquals("untitled.ods", odsFile!!.name)
-        assertTrue(odsFile.exists() && odsFile.length() > 0L)
-
-        val odpFile = TemplateManager.getSlidiaDefaultTemplateFile(context)
-        assertNotNull("Expected untitled.odp template file", odpFile)
-        assertEquals("untitled.odp", odpFile!!.name)
-        assertTrue(odpFile.exists() && odpFile.length() > 0L)
+        val templates = listOf(
+            Triple("odt", "text", TemplateManager::getInkyNormalTemplateFile),
+            Triple("ods", "spreadsheet", TemplateManager::getCalcDefaultTemplateFile),
+            Triple("odp", "presentation", TemplateManager::getSlidiaDefaultTemplateFile)
+        )
+        val office = "urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+        val manifest = "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"
+        val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true }
+        for ((extension, bodyType, extract) in templates) {
+            val expected = context.assets.open("templates/Untitled.$extension").use { it.readBytes() }
+            val file = extract(context)
+            assertNotNull("Expected Untitled.$extension asset", file)
+            assertEquals("untitled.$extension", file!!.name)
+            assertArrayEquals("Must copy the blank, not an unrelated fallback", expected, file.readBytes())
+            ZipFile(file).use { zip ->
+                val mime = "application/vnd.oasis.opendocument.$bodyType"
+                assertEquals(mime, zip.getInputStream(zip.getEntry("mimetype")).bufferedReader().use { it.readText() })
+                val content = zip.getInputStream(zip.getEntry("content.xml")).use { factory.newDocumentBuilder().parse(it) }
+                assertEquals("1.4", content.documentElement.getAttributeNS(office, "version"))
+                assertEquals(1, content.getElementsByTagNameNS(office, bodyType).length)
+                val packageManifest = zip.getInputStream(zip.getEntry("META-INF/manifest.xml")).use { factory.newDocumentBuilder().parse(it) }
+                assertEquals("1.4", packageManifest.documentElement.getAttributeNS(manifest, "version"))
+                val entries = packageManifest.getElementsByTagNameNS(manifest, "file-entry")
+                val root = (0 until entries.length).map { entries.item(it) as org.w3c.dom.Element }
+                    .single { it.getAttributeNS(manifest, "full-path") == "/" }
+                assertEquals(mime, root.getAttributeNS(manifest, "media-type"))
+                when (extension) {
+                    "ods" -> assertEquals(1, content.getElementsByTagNameNS("urn:oasis:names:tc:opendocument:xmlns:table:1.0", "table").length)
+                    "odp" -> assertEquals(1, content.getElementsByTagNameNS("urn:oasis:names:tc:opendocument:xmlns:drawing:1.0", "page").length)
+                }
+            }
+            // New Document must not reuse a stale cache copy after an asset update.
+            file.writeText("stale cache")
+            assertArrayEquals(expected, extract(context)!!.readBytes())
+        }
     }
 
     @Test

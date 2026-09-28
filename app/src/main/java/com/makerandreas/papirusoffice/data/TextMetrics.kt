@@ -172,14 +172,22 @@ class TextMetrics private constructor(
         source.naturalLineHeight(fontSizeUnits, style.isBold, style.isItalic, choice)
             .coerceAtLeast(fontSizeUnits)
 
+    /** See [lineHeightFor] for the format-specific rules, including mixed-size lines. */
+    override val lineHeightUnits: Float = lineHeightFor(naturalLineHeightUnits, fontSizeUnits)
+
     /**
-     * Proportional spacing multiplies the natural single line height, which
-     * is how both Writer (`fo:line-height="115%"`) and Word
-     * (`w:line=276 lineRule=auto`) define it; an exact height replaces it.
+     * [naturalHeight] and [maximumFontSize] describe the largest supported run
+     * on the line, not just the paragraph font. ODF 1.4 section 20.204 defines
+     * percentage as a minimum based on maximum descendant font size. DOCX
+     * auto multiplies normal single spacing; atLeast is a floor, exact is fixed.
      */
-    override val lineHeightUnits: Float =
-        style.lineHeightExactUnits?.takeIf { it > 0f }
-            ?: (naturalLineHeightUnits * style.lineHeightFactor.coerceAtLeast(0.1f))
+    fun lineHeightFor(naturalHeight: Float, maximumFontSize: Float): Float {
+        style.lineHeightExactUnits?.takeIf { it > 0f }?.let { return it }
+        style.lineHeightMinimumUnits?.let { return maxOf(naturalHeight, it) }
+        val factor = style.lineHeightFactor.coerceAtLeast(0.1f)
+        return if (style.lineHeightUsesFontSize) maxOf(naturalHeight, maximumFontSize * factor)
+        else naturalHeight * factor
+    }
 
     val sourceName: String get() = source.name
 

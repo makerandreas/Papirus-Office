@@ -7,6 +7,8 @@ import com.makerandreas.papirusoffice.data.LayoutUnits
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.PageStyleSpec
+import com.makerandreas.papirusoffice.data.ParagraphTabStop
+import com.makerandreas.papirusoffice.data.TabAlignment
 import com.makerandreas.papirusoffice.data.ParagraphStyle
 import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
 import com.makerandreas.papirusoffice.data.util.OdfLength
@@ -59,11 +61,18 @@ data class OdfStyleInfo(
     val spaceAfterUnits: Float? = null,
     val lineHeightFactor: Float? = null,
     val lineHeightExactUnits: Float? = null,
+    val lineHeightUsesFontSize: Boolean? = null,
     val indentStartUnits: Float? = null,
     val indentEndUnits: Float? = null,
     val firstLineIndentUnits: Float? = null,
     val keepWithNext: Boolean? = null,
-    val pageBreakBefore: Boolean? = null
+    val pageBreakBefore: Boolean? = null,
+    val pageBreakAfter: Boolean? = null,
+    val keepTogether: Boolean? = null,
+    val orphans: Int? = null,
+    val widows: Int? = null,
+    val tabStops: List<ParagraphTabStop>? = null,
+    val defaultTabIntervalUnits: Float? = null
 )
 
 /** Bold/italic/underline resolved from a character style, never from the style name. */
@@ -91,11 +100,18 @@ private class StyleDraft(
     var spaceAfterUnits: Float? = null,
     var lineHeightFactor: Float? = null,
     var lineHeightExactUnits: Float? = null,
+    var lineHeightUsesFontSize: Boolean? = null,
     var indentStartUnits: Float? = null,
     var indentEndUnits: Float? = null,
     var firstLineIndentUnits: Float? = null,
     var keepWithNext: Boolean? = null,
-    var pageBreakBefore: Boolean? = null
+    var pageBreakBefore: Boolean? = null,
+    var pageBreakAfter: Boolean? = null,
+    var keepTogether: Boolean? = null,
+    var orphans: Int? = null,
+    var widows: Int? = null,
+    var tabStops: List<ParagraphTabStop>? = null,
+    var defaultTabIntervalUnits: Float? = null
 ) {
     fun toInfo(): OdfStyleInfo = OdfStyleInfo(
         name = name,
@@ -115,11 +131,15 @@ private class StyleDraft(
         spaceAfterUnits = spaceAfterUnits,
         lineHeightFactor = lineHeightFactor,
         lineHeightExactUnits = lineHeightExactUnits,
+        lineHeightUsesFontSize = lineHeightUsesFontSize,
         indentStartUnits = indentStartUnits,
         indentEndUnits = indentEndUnits,
         firstLineIndentUnits = firstLineIndentUnits,
         keepWithNext = keepWithNext,
-        pageBreakBefore = pageBreakBefore
+        pageBreakBefore = pageBreakBefore,
+        pageBreakAfter = pageBreakAfter,
+        keepTogether = keepTogether, orphans = orphans, widows = widows,
+        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits
     )
 }
 
@@ -179,23 +199,46 @@ private fun applyParagraphProperties(draft: StyleDraft, attrs: Map<String, Strin
     attrs["margin-left"]?.let { draft.indentStartUnits = LayoutUnits.parseLength(it) }
     attrs["margin-right"]?.let { draft.indentEndUnits = LayoutUnits.parseLength(it) }
     attrs["text-indent"]?.let { draft.firstLineIndentUnits = LayoutUnits.parseLength(it) }
-    attrs["line-height"]?.let { lhRaw ->
-        val factor = LayoutUnits.parseLineHeightFactor(lhRaw)
-        if (factor != null) {
-            draft.lineHeightFactor = factor
-        } else {
-            val exact = LayoutUnits.parseLength(lhRaw)
-            if (exact > 0f) draft.lineHeightExactUnits = exact
+    attrs["line-height"]?.let { raw ->
+        val factor = LayoutUnits.parseLineHeightFactor(raw)
+        val exact = LayoutUnits.parseLength(raw)
+        when {
+            raw.trim().equals("normal", ignoreCase = true) -> {
+                draft.lineHeightFactor = 1f
+                draft.lineHeightExactUnits = null
+                draft.lineHeightUsesFontSize = false
+            }
+            factor != null -> {
+                draft.lineHeightFactor = factor
+                draft.lineHeightExactUnits = null
+                draft.lineHeightUsesFontSize = true
+            }
+            exact > 0f -> {
+                draft.lineHeightFactor = null
+                draft.lineHeightExactUnits = exact
+                draft.lineHeightUsesFontSize = false
+            }
         }
     }
-    val kwn = attrs["keep-with-next"]
-    if (kwn == "always" || kwn == "true") {
-        draft.keepWithNext = true
+    attrs["orphans"]?.toIntOrNull()?.let { draft.orphans = it.coerceAtLeast(1) }
+    attrs["widows"]?.toIntOrNull()?.let { draft.widows = it.coerceAtLeast(1) }
+    attrs["tab-stop-distance"]?.let { LayoutUnits.parseLength(it).takeIf { n -> n > 0f }?.let { n -> draft.defaultTabIntervalUnits = n } }
+    when (attrs["keep-together"]) {
+        "always" -> draft.keepTogether = true
+        "auto" -> draft.keepTogether = false
     }
-    val bb = attrs["break-before"]
-    val ba = attrs["break-after"]
-    if (bb == "page" || ba == "page") {
-        draft.pageBreakBefore = true
+    // Absence inherits; explicit auto/false resets an inherited declaration.
+    when (attrs["keep-with-next"]) {
+        "always", "true" -> draft.keepWithNext = true
+        "auto", "false" -> draft.keepWithNext = false
+    }
+    when (attrs["break-before"]) {
+        "page" -> draft.pageBreakBefore = true
+        "auto" -> draft.pageBreakBefore = false
+    }
+    when (attrs["break-after"]) {
+        "page" -> draft.pageBreakAfter = true
+        "auto" -> draft.pageBreakAfter = false
     }
 }
 
@@ -215,13 +258,20 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     masterPageName = over.masterPageName ?: base.masterPageName,
     spaceBeforeUnits = over.spaceBeforeUnits ?: base.spaceBeforeUnits,
     spaceAfterUnits = over.spaceAfterUnits ?: base.spaceAfterUnits,
-    lineHeightFactor = over.lineHeightFactor ?: base.lineHeightFactor,
-    lineHeightExactUnits = over.lineHeightExactUnits ?: base.lineHeightExactUnits,
+    lineHeightFactor = if (over.lineHeightExactUnits != null) null else over.lineHeightFactor ?: base.lineHeightFactor,
+    lineHeightExactUnits = if (over.lineHeightFactor != null) null else over.lineHeightExactUnits ?: base.lineHeightExactUnits,
+    lineHeightUsesFontSize = over.lineHeightUsesFontSize ?: base.lineHeightUsesFontSize,
     indentStartUnits = over.indentStartUnits ?: base.indentStartUnits,
     indentEndUnits = over.indentEndUnits ?: base.indentEndUnits,
     firstLineIndentUnits = over.firstLineIndentUnits ?: base.firstLineIndentUnits,
     keepWithNext = over.keepWithNext ?: base.keepWithNext,
-    pageBreakBefore = over.pageBreakBefore ?: base.pageBreakBefore
+    pageBreakBefore = over.pageBreakBefore ?: base.pageBreakBefore,
+    pageBreakAfter = over.pageBreakAfter ?: base.pageBreakAfter,
+    keepTogether = over.keepTogether ?: base.keepTogether,
+    orphans = over.orphans ?: base.orphans,
+    widows = over.widows ?: base.widows,
+    tabStops = over.tabStops ?: base.tabStops,
+    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits
 )
 
 class SvXMLImport(
@@ -269,7 +319,7 @@ class SvXMLImport(
                     // tags; content.xml would otherwise pay this cost per element.
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
-                        "master-page", "text-properties", "paragraph-properties",
+                        "master-page", "text-properties", "paragraph-properties", "tab-stop",
                         "header-footer-properties" -> attrIndex(parser)
                         else -> emptyMap()
                     }
@@ -330,6 +380,17 @@ class SvXMLImport(
                         }
                         "text-properties" -> pendingDraft?.let { applyTextProperties(it, attrs) }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
+                        "tab-stops" -> pendingDraft?.let { it.tabStops = emptyList() }
+                        "tab-stop" -> pendingDraft?.let { draft ->
+                            val position = attrs["position"]?.let { LayoutUnits.parseLength(it) }
+                            val align = when (attrs["type"]) {
+                                "right" -> TabAlignment.RIGHT
+                                "center" -> TabAlignment.CENTER
+                                "char" -> TabAlignment.DECIMAL
+                                else -> TabAlignment.LEFT
+                            }
+                            if (position != null && position >= 0f) draft.tabStops = draft.tabStops.orEmpty() + ParagraphTabStop(position, align)
+                        }
                         "page-layout-properties" -> {
                             val spec = buildPageLayoutSpec(attrs)
                             val pendingName = pendingPageLayoutName
@@ -524,9 +585,13 @@ class SvXMLImport(
     }
 
     fun hasPageBreakBefore(styleName: String?): Boolean {
-        if (styleName.isNullOrBlank()) return false
-        val cascaded = cascadeStyle(styleName, "paragraph") ?: return false
-        return cascaded.pageBreakBefore == true
+        val cascaded = styleName?.let { cascadeStyle(it, "paragraph") } ?: defaultParagraphStyle
+        return cascaded?.pageBreakBefore == true
+    }
+
+    fun hasPageBreakAfter(styleName: String?): Boolean {
+        val cascaded = styleName?.let { cascadeStyle(it, "paragraph") } ?: defaultParagraphStyle
+        return cascaded?.pageBreakAfter == true
     }
 
     /**
@@ -730,11 +795,19 @@ private fun OdfStyleInfo.toParagraphStyle(): ParagraphStyle = ParagraphStyle(
     spaceAfterUnits = spaceAfterUnits ?: 0f,
     lineHeightFactor = lineHeightFactor ?: 1f,
     lineHeightExactUnits = lineHeightExactUnits,
+    lineHeightUsesFontSize = lineHeightUsesFontSize == true,
     indentStartUnits = indentStartUnits ?: 0f,
     indentEndUnits = indentEndUnits ?: 0f,
     firstLineIndentUnits = firstLineIndentUnits ?: 0f,
     keepWithNext = keepWithNext == true,
-    pageBreakBefore = pageBreakBefore == true
+    pageBreakBefore = pageBreakBefore == true,
+    pageBreakAfter = pageBreakAfter == true,
+    keepTogether = keepTogether == true,
+    orphans = orphans ?: 2,
+    widows = widows ?: 2,
+    tabStops = tabStops.orEmpty(),
+    defaultTabIntervalUnits = defaultTabIntervalUnits ?: 48f,
+    masterPageName = masterPageName
 )
 
 private fun OdfStyleInfo.toCharacterStyle(): CharacterStyle = CharacterStyle(

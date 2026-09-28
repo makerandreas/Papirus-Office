@@ -19,26 +19,23 @@ object TemplateManager {
     private const val TAG = "TemplateManager"
 
     /**
-     * Extracts the empty default Inky template file (templates/untitled.odt) from app assets.
+     * Extracts the empty default Inky template file (templates/Untitled.odt) from app assets.
      * This ODT file serves as the base structure whenever a new Inky document is created.
      */
     fun getInkyNormalTemplateFile(context: Context): File? =
-        extractAssetTemplate(context, "templates/untitled.odt", "untitled.odt")
-            ?: extractAssetTemplate(context, "templates/styles/Default.ott", "Default.ott")
+        extractAssetTemplate(context, "templates/Untitled.odt", "untitled.odt")
 
     /**
-     * Extracts the empty default Cellina spreadsheet template file (templates/untitled.ods) from app assets.
+     * Extracts the empty default Cellina spreadsheet template file (templates/Untitled.ods) from app assets.
      */
     fun getCalcDefaultTemplateFile(context: Context): File? =
-        extractAssetTemplate(context, "templates/untitled.ods", "untitled.ods")
-            ?: extractAssetTemplate(context, "templates/wizard/styles/default.ots", "default.ots")
+        extractAssetTemplate(context, "templates/Untitled.ods", "untitled.ods")
 
     /**
-     * Extracts the empty default Slidia presentation template file (templates/untitled.odp) from app assets.
+     * Extracts the empty default Slidia presentation template file (templates/Untitled.odp) from app assets.
      */
     fun getSlidiaDefaultTemplateFile(context: Context): File? =
-        extractAssetTemplate(context, "templates/untitled.odp", "untitled.odp")
-            ?: extractAssetTemplate(context, "templates/slidia/Default.otp", "Default.otp")
+        extractAssetTemplate(context, "templates/Untitled.odp", "untitled.odp")
 
     private fun extractAssetTemplate(context: Context, assetPath: String, targetFileName: String): File? {
         return try {
@@ -47,30 +44,10 @@ object TemplateManager {
                 templateDir.mkdirs()
             }
             val targetFile = File(templateDir, targetFileName)
-            val openedFromAssets = try {
-                context.assets.open(assetPath).use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                true
-            } catch (_: Exception) {
-                false
-            }
-            if (!openedFromAssets) {
-                val fallbackCandidates = listOf(
-                    File("app/src/main/$assetPath"),
-                    File("src/main/$assetPath"),
-                    File("app/src/main/assets/$assetPath"),
-                    File("src/main/assets/$assetPath")
-                )
-                val sourceFile = fallbackCandidates.firstOrNull { it.isFile && it.exists() }
-                    ?: return null
-                sourceFile.inputStream().use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        input.copyTo(output)
-                    }
-                }
+            // Asset paths are case-sensitive. Never substitute a styled gallery
+            // template when a blank is missing: report failure to the caller.
+            context.assets.open(assetPath).use { input ->
+                FileOutputStream(targetFile).use { output -> input.copyTo(output) }
             }
             Log.d(TAG, "Successfully extracted $assetPath template to: ${targetFile.absolutePath}")
             targetFile
@@ -93,19 +70,19 @@ object TemplateManager {
         TemplateItem(
             name = "Official LibreOffice Writer Blank",
             type = "ODT",
-            url = "asset://templates/untitled.odt",
+            url = "asset://templates/Untitled.odt",
             description = "Standard official LibreOffice Writer template (.odt) configured for documents, essays, and letters."
         ),
         TemplateItem(
             name = "Official LibreOffice Calc Blank",
             type = "ODS",
-            url = "asset://templates/untitled.ods",
+            url = "asset://templates/Untitled.ods",
             description = "Standard official LibreOffice Calc template (.ods) configured for tabular sheets, calculations, and financial budgets."
         ),
         TemplateItem(
             name = "Official LibreOffice Slidia Presentation",
             type = "ODP",
-            url = "asset://templates/untitled.odp",
+            url = "asset://templates/Untitled.odp",
             description = "Standard official LibreOffice Impress presentation template (.odp) configured for slides, graphics, and pitch decks."
         ),
 

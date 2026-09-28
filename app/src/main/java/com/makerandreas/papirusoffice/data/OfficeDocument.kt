@@ -26,7 +26,8 @@ data class OfficeDocument(
     val footer: DocumentFooter = DocumentFooter(),
     val footnote: DocumentFootnote = DocumentFootnote(),
     val odtPackageData: OdtPackageData? = null,
-    val isModified: Boolean = false
+    val isModified: Boolean = false,
+    val sectionStarts: List<SectionStart> = emptyList()
 )
 
 fun OfficeDocument.toPlainText(): String {
@@ -93,14 +94,16 @@ data class OfficeParagraph(
     val indent: Float = 0f,
     val outlineLevel: Int = 0,
     val runs: List<OfficeTextRun> = emptyList(),
-    val bookmark: String? = null
+    val bookmark: String? = null,
+    val pageBreakOffsets: List<Int> = emptyList()
 ) : OfficeElement
 
 data class OfficeHeading(
     val text: String,
     val styleName: String? = null,
     val level: Int = 1,
-    val runs: List<OfficeTextRun> = emptyList()
+    val runs: List<OfficeTextRun> = emptyList(),
+    val pageBreakOffsets: List<Int> = emptyList()
 ) : OfficeElement
 
 data class OfficeListItem(
@@ -234,13 +237,14 @@ data class DocumentStyles(
  * Paragraph style as the paginator and the renderer both see it.
  *
  * [fontSizeSp] is the font size in points (the name predates [LayoutUnits]).
- * The metric fields after [parentStyleName] are the plan 5 seam (roadmap
- * E-EN-3): they are in layout units at 96 per inch, or plain factors and
- * flags, and their defaults describe "nothing declared". No parser populates
- * them yet and no consumer reads them yet, so a style built from the first
- * nine fields renders exactly as before; PR 16a fills them from the file and
- * PR 16b makes the paginator use them.
+ * Metric fields are in layout units at 96 per inch. Import resolves the style
+ * cascade before consumers measure it. Plan 5e is making these fields
+ * load-bearing in pagination and rendering; see the implementation ledger.
  */
+enum class TabAlignment { LEFT, RIGHT, CENTER, DECIMAL, CLEAR }
+
+data class ParagraphTabStop(val positionUnits: Float, val alignment: TabAlignment = TabAlignment.LEFT)
+
 data class ParagraphStyle(
     val name: String,
     val fontSizeSp: Float = 12f,
@@ -257,7 +261,7 @@ data class ParagraphStyle(
     val spaceAfterUnits: Float = 0f,
     /** `fo:line-height="115%"` / `w:line=276 lineRule=auto` as 1.15; 1 = single. */
     val lineHeightFactor: Float = 1f,
-    /** Absolute line height (`fo:line-height="0.5cm"`, `lineRule=exact`), layout units; null = use the factor. */
+    /** Absolute line height (`fo:line-height="0.5cm"`, `lineRule=exact`), layout units; null = use the minimum or factor. */
     val lineHeightExactUnits: Float? = null,
     /** `fo:margin-left` / `w:ind w:left`, layout units. */
     val indentStartUnits: Float = 0f,
@@ -268,13 +272,31 @@ data class ParagraphStyle(
     /** `fo:keep-with-next="always"` / `w:keepNext`. */
     val keepWithNext: Boolean = false,
     /** `fo:break-before="page"` / `w:pageBreakBefore`. */
-    val pageBreakBefore: Boolean = false
+    val pageBreakBefore: Boolean = false,
+    /** `fo:break-after="page"`; independent of break-before. */
+    val pageBreakAfter: Boolean = false,
+    /** DOCX `lineRule=atLeast`, a floor rather than a fixed height. */
+    val lineHeightMinimumUnits: Float? = null,
+    /** ODF percentage is a font-size minimum; DOCX auto multiplies natural height. */
+    val lineHeightUsesFontSize: Boolean = false,
+    /** DOCX paragraph spacing collapses to the largest adjacent contribution. */
+    val collapseSpacing: Boolean = false,
+    val keepTogether: Boolean = false,
+    val orphans: Int = 2,
+    val widows: Int = 2,
+    val tabStops: List<ParagraphTabStop> = emptyList(),
+    val defaultTabIntervalUnits: Float = 48f,
+    /** ODF 1.4 master-page assignment starts a new page; per-section geometry is separate. */
+    val masterPageName: String? = null
 ) {
-    /** True when the style carries no metric other than its font size, i.e. the pre-plan-5 shape. */
+    /** True when the style carries paragraph metrics beyond its font size. */
     val hasMetricFields: Boolean
         get() = spaceBeforeUnits != 0f || spaceAfterUnits != 0f || lineHeightFactor != 1f ||
             lineHeightExactUnits != null || indentStartUnits != 0f || indentEndUnits != 0f ||
-            firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore
+            firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore || pageBreakAfter ||
+            lineHeightMinimumUnits != null || lineHeightUsesFontSize || collapseSpacing ||
+            keepTogether || tabStops.isNotEmpty() || defaultTabIntervalUnits != 48f || orphans != 2 || widows != 2 ||
+            !masterPageName.isNullOrBlank()
 }
 
 data class CharacterStyle(
@@ -335,7 +357,8 @@ data class PageStyleSpec(
         get() = bodyBottomDp - bodyTopDp
 
     companion object {
-        const val MIN_CONTENT_DIMENSION_DP = 120f
+        // Progress floor for degenerate files, not an invented minimum text column.
+        const val MIN_CONTENT_DIMENSION_DP = 1f
         val FALLBACK = PageStyleSpec()
     }
 }
@@ -389,6 +412,9 @@ data class DocumentProperties(
     val isReadOnly: Boolean = false
 )
 
+enum class SectionStartKind { NEXT_PAGE, CONTINUOUS, NEXT_COLUMN, ODD_PAGE, EVEN_PAGE }
+data class SectionStart(val elementIndex: Int, val kind: SectionStartKind)
+
 data class DocumentSection(
     val name: String = "",
     val elements: List<OfficeElement> = emptyList()
@@ -422,6 +448,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                 OfficeParagraph(
                     text = elem.text,
                     styleName = elem.styleName,
+                    pageBreakOffsets = elem.pageBreakOffsets,
                     runs = elem.runs.map { run ->
                         OfficeTextRun(
                             text = run.text,
@@ -439,7 +466,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     text = elem.text,
                     level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
-                    runs = emptyList()
+                    runs = emptyList(),
+                    pageBreakOffsets = elem.pageBreakOffsets
                 )
             }
             is OfficeDocumentElement.ListItem -> {
@@ -515,6 +543,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
         metadata = metadata,
         styles = this.styles,
         body = DocumentBody(elements = docElements),
+        sectionStarts = sectionStarts,
         odtPackageData = this.odtPackageData
     )
 }

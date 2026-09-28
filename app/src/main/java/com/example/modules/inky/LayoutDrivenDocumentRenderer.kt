@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -196,10 +198,11 @@ fun LayoutDrivenDocumentRenderer(
         }
     }
 
+    Box(modifier = modifier.padding(vertical = STACK_PADDING_DP)) {
     Column(
         verticalArrangement = Arrangement.spacedBy(PAGE_GAP_DP),
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.padding(vertical = STACK_PADDING_DP)
+        modifier = Modifier.align(Alignment.TopCenter)
     ) {
         if (computed.pages.isEmpty()) {
             Box(
@@ -259,21 +262,13 @@ fun LayoutDrivenDocumentRenderer(
                             }
                         }
                     )
-                    // Margins come from the page style the layout engine wrapped
-                    // against, not from a fixed guess, so the text column on the
-                    // sheet is the column the line breaks were computed for.
-                    .padding(
-                        start = sheet.toDp(pageSpec.marginStartDp).dp,
-                        end = sheet.toDp(pageSpec.marginEndDp).dp,
-                        top = sheet.toDp(pageSpec.marginTopDp).dp,
-                        bottom = sheet.toDp(pageSpec.marginBottomDp).dp
-                    )
             ) {
-                Column(
-                    // The gap the paginator reserved between blocks, on the same scale.
-                    verticalArrangement = Arrangement.spacedBy(sheet.toDp(LayoutEngine.ELEMENT_GAP_UNITS).dp)
-                ) {
-                    page.elements.forEach { elemLayout ->
+                page.elements.filter { it.paragraphLayout == null }.forEach { elemLayout ->
+                    // Bounds already include body origin and declared paragraph spacing.
+                    Box(Modifier.offset(
+                        x = sheet.toDp(elemLayout.bounds.left).dp,
+                        y = sheet.toDp(elemLayout.bounds.top).dp
+                    ).width(sheet.toDp(elemLayout.bounds.right - elemLayout.bounds.left).dp)) {
                         RenderLaidOutElement(
                             elemLayout = elemLayout,
                             zoomScale = textScale,
@@ -298,6 +293,54 @@ fun LayoutDrivenDocumentRenderer(
             }
         }
     }
+        // Group page fragments back into logical paragraphs. Each owns exactly one
+        // BasicTextField and IME composition, even when its display spans many pages.
+        val groups = computed.pages.flatMapIndexed { pageIndex, page ->
+            page.elements.filter { it.paragraphLayout != null }.map { Triple(pageIndex, page, it) }
+        }.groupBy { it.third.elementIndex }
+        for ((elementIndex, fragments) in groups) {
+            key(elementIndex) {
+                val (firstPageIndex, firstPage, first) = fragments.first()
+                val sheet = PageTransform.sheetFor(firstPage.widthDp, firstPage.heightDp, viewportWidthDp, zoomScale)
+                val scale = sheet.pageScale
+                val textScale = PageTransform.textScale(sheet, fontScale)
+                fun pageTop(pageIndex: Int): Float = pageIndex * (firstPage.heightDp * scale + PAGE_GAP_DP.value)
+                val firstTop = pageTop(firstPageIndex) + first.bounds.top * scale
+                val lines = mutableListOf<LineLayout>()
+                val gaps = mutableListOf<Float>()
+                var previousBottom = firstTop
+                for ((pageIndex, _, fragment) in fragments) {
+                    val top = pageTop(pageIndex) + fragment.bounds.top * scale
+                    fragment.paragraphLayout!!.lines.forEachIndexed { lineIndex, line ->
+                        gaps += if (lineIndex == 0) ((top - previousBottom) / scale).coerceAtLeast(0f) else 0f
+                        lines += line
+                    }
+                    previousBottom = pageTop(pageIndex) + fragment.bounds.bottom * scale
+                }
+                val logicalLayout = first.copy(paragraphLayout = first.paragraphLayout!!.copy(lines = lines),
+                    sourceEnd = fragments.last().third.sourceEnd, continuesAfter = false)
+                Box(Modifier.align(Alignment.TopCenter).width(sheet.widthDp.dp).offset(y = firstTop.dp)) {
+                    Box(Modifier.offset(x = (first.bounds.left * scale).dp)
+                        .width(((first.bounds.right - first.bounds.left) * scale).dp)) {
+                        RenderLaidOutElement(
+                            elemLayout = logicalLayout, zoomScale = textScale, pageScale = scale,
+                            styles = document.styles, enableOutlineFolding = enableOutlineFolding,
+                            outlineEngine = outlineEngine, extractedImages = extractedImages,
+                            textColor = textColor, onToggleOutline = { layoutTrigger++ },
+                            editableWindow = textWindows[elementIndex], editorValue = editorValue,
+                            onEditorValueChange = onEditorValueChange,
+                            onViewerSelectionChange = onViewerSelectionChange,
+                            onViewerToolbarRequest = onViewerToolbarRequest,
+                            selectionElementIndex = selectionWindow?.elementIndex,
+                            focusRequester = focusRequesters.getOrPut(elementIndex) { FocusRequester() },
+                            onFieldFocused = { focusedElement = elementIndex }, lineGapsBefore = gaps
+                        )
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 @Composable
@@ -320,7 +363,8 @@ private fun RenderLaidOutElement(
     onViewerToolbarRequest: ((Rect?) -> Unit)?,
     selectionElementIndex: Int?,
     focusRequester: FocusRequester,
-    onFieldFocused: () -> Unit
+    onFieldFocused: () -> Unit,
+    lineGapsBefore: List<Float> = emptyList()
 ) {
     val element = elemLayout.element
     val paragraphIndex = if (element is OfficeDocElement.ParagraphElement) {
@@ -346,7 +390,8 @@ private fun RenderLaidOutElement(
                 zoomScale = zoomScale,
                 textColor = textColor,
                 focusRequester = focusRequester,
-                onFocused = onFieldFocused
+                onFocused = onFieldFocused,
+                lines = elemLayout.paragraphLayout?.lines.orEmpty(), lineGapsBefore = lineGapsBefore
             )
             window != null && value != null && onViewerSelectionChange != null -> ParagraphSelectField(
                 window = window,
@@ -359,7 +404,8 @@ private fun RenderLaidOutElement(
                 styles = styles,
                 leadingPrefix = leadingPrefix,
                 zoomScale = zoomScale,
-                textColor = textColor
+                textColor = textColor,
+                lines = elemLayout.paragraphLayout?.lines.orEmpty(), lineGapsBefore = lineGapsBefore
             )
             else -> ParagraphText(
                 paragraph = paragraph,
@@ -370,7 +416,8 @@ private fun RenderLaidOutElement(
                 outlineEngine = outlineEngine,
                 paragraphIndex = paragraphIndex,
                 textColor = textColor,
-                onToggleOutline = onToggleOutline
+                onToggleOutline = onToggleOutline,
+                lines = elemLayout.paragraphLayout?.lines.orEmpty(), lineGapsBefore = lineGapsBefore
             )
         }
     }
@@ -425,7 +472,9 @@ private fun ParagraphEditField(
     zoomScale: Float,
     textColor: Color,
     focusRequester: FocusRequester,
-    onFocused: () -> Unit
+    onFocused: () -> Unit,
+    lines: List<LineLayout>,
+    lineGapsBefore: List<Float>
 ) {
     val resolved = remember(paragraph.styleName, styles) {
         OfficeRuns.baseStyle(paragraph, styles)
@@ -444,7 +493,7 @@ private fun ParagraphEditField(
     val selEnd = (globalValue.selection.end - window.start).coerceIn(0, window.text.length)
     val localValue = TextFieldValue(
         annotatedString = annotated,
-        selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd)),
+        selection = TextRange(selStart, selEnd),
         composition = globalValue.composition?.let {
             TextRange(
                 (it.start - window.start).coerceIn(0, window.text.length),
@@ -453,18 +502,21 @@ private fun ParagraphEditField(
         }
     )
 
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
             )
         }
         BasicTextField(
             value = localValue,
+            visualTransformation = remember(lines, lineGapsBefore, zoomScale, windowParagraph, styles) {
+                ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles)
+            },
             onValueChange = { newLocal ->
                 val newGlobalText = DocumentTextWindows.applyLocalEdit(globalValue.text, window, newLocal.text)
                 val newSelStart = (newLocal.selection.start + window.start).coerceIn(0, newGlobalText.length)
@@ -482,15 +534,16 @@ private fun ParagraphEditField(
             enabled = true,
             readOnly = false,
             textStyle = TextStyle(
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
                 color = textColor,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
                 textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .focusRequester(focusRequester)
                 .onFocusChanged { if (it.isFocused) onFocused() }
                 .testTag("doc_body_editor_element_${window.elementIndex}")
@@ -519,7 +572,9 @@ private fun ParagraphSelectField(
     styles: DocumentStyles,
     leadingPrefix: String?,
     zoomScale: Float,
-    textColor: Color
+    textColor: Color,
+    lines: List<LineLayout>,
+    lineGapsBefore: List<Float>
 ) {
     val resolved = remember(paragraph.styleName, styles) {
         OfficeRuns.baseStyle(paragraph, styles)
@@ -537,7 +592,7 @@ private fun ParagraphSelectField(
     val hasSelection = selEnd > selStart
     val localValue = TextFieldValue(
         annotatedString = annotated,
-        selection = TextRange(minOf(selStart, selEnd), maxOf(selStart, selEnd))
+        selection = TextRange(selStart, selEnd)
     )
 
     // Exactly one field owns the selection, so two fields can never fight over
@@ -546,10 +601,23 @@ private fun ParagraphSelectField(
     // only a fully collapsed selection hides it.
     val requestToolbar by rememberUpdatedState(onToolbarRequest)
     var fieldBounds by remember { mutableStateOf(Rect.Zero) }
-    LaunchedEffect(isToolbarOwner, anySelectionActive, fieldBounds) {
+    var fieldLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val projection = remember(lines, lineGapsBefore, zoomScale, windowParagraph, styles) {
+        ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT, windowParagraph, styles)
+    }
+    LaunchedEffect(isToolbarOwner, anySelectionActive, fieldBounds, fieldLayout, globalValue.selection) {
         val request = requestToolbar ?: return@LaunchedEffect
         when {
-            isToolbarOwner && fieldBounds != Rect.Zero -> request(fieldBounds)
+            isToolbarOwner && fieldBounds != Rect.Zero -> {
+                val layout = fieldLayout
+                val caret = layout?.let {
+                    val offset = projection.filter(annotated).offsetMapping.originalToTransformed(minOf(selStart, selEnd))
+                    it.getCursorRect(offset.coerceIn(0, it.layoutInput.text.length))
+                }
+                request(if (caret == null) fieldBounds else Rect(
+                    fieldBounds.left + caret.left, fieldBounds.top + caret.top,
+                    fieldBounds.left + caret.right, fieldBounds.top + caret.bottom))
+            }
             !anySelectionActive -> request(null)
             else -> Unit
         }
@@ -558,18 +626,22 @@ private fun ParagraphSelectField(
         onDispose { requestToolbar?.invoke(null) }
     }
 
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
             )
         }
         BasicTextField(
             value = localValue,
+            visualTransformation = projection,
+            onTextLayout = {
+                if (fieldLayout?.layoutInput != it.layoutInput || fieldLayout?.size != it.size) fieldLayout = it
+            },
             onValueChange = { newLocal ->
                 if (newLocal.text == window.text) {
                     onSelectionChange(DocumentTextWindows.toGlobalSelection(window, newLocal.selection))
@@ -578,15 +650,16 @@ private fun ParagraphSelectField(
             enabled = true,
             readOnly = true,
             textStyle = TextStyle(
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
                 color = textColor,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
                 textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .onGloballyPositioned { coordinates -> fieldBounds = coordinates.boundsInWindow() }
                 .testTag("doc_body_viewer_element_${window.elementIndex}")
         )
@@ -603,7 +676,9 @@ private fun ParagraphText(
     outlineEngine: OutlineEngine?,
     paragraphIndex: Int?,
     textColor: Color,
-    onToggleOutline: () -> Unit
+    onToggleOutline: () -> Unit,
+    lines: List<LineLayout>,
+    lineGapsBefore: List<Float>
 ) {
     val isHeading = paragraph.styleName?.contains("Heading", ignoreCase = true) == true ||
         paragraph.styleName?.contains("Judul", ignoreCase = true) == true
@@ -622,7 +697,7 @@ private fun ParagraphText(
         Modifier
     }
 
-    val displayParagraph = if (leadingPrefix != null) paragraph.copy(text = leadingPrefix + paragraph.text) else paragraph
+    val displayParagraph = paragraph
     val resolved = remember(displayParagraph.styleName, styles) {
         OfficeRuns.baseStyle(displayParagraph, styles)
     }
@@ -631,15 +706,23 @@ private fun ParagraphText(
         OfficeRuns.toAnnotatedString(displayParagraph, styles, zoomScale, textColor)
     }
 
+    Box(Modifier.fillMaxWidth()) {
+        if (leadingPrefix != null) Text(text = leadingPrefix,
+            fontSize = (sizeSp * zoomScale).sp, color = textColor,
+            fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily))
     Text(
-        text = annotated,
+        text = ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT,
+            displayParagraph, styles).filter(annotated).text,
+        softWrap = false,
+        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
         fontSize = (sizeSp * zoomScale).sp,
-        lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+        lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
         color = textColor,
         fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
         textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment),
         modifier = Modifier.fillMaxWidth().then(headingModifier)
     )
+    }
 }
 
 @Composable
