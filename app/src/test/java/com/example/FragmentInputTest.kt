@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 class FragmentInputTest {
     @get:Rule val compose = createComposeRule()
 
+    @OptIn(ExperimentalTestApi::class)
     @Test fun multiPageParagraphHasOneInputAndCrossBoundaryEditPreservesGlobalText() {
         val source = "Words for a long paragraph spanning several pages. ".repeat(15)
         val page = PageStyleSpec.FALLBACK.copy(widthDp = 240f, heightDp = 200f,
