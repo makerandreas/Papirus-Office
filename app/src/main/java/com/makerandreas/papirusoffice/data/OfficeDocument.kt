@@ -234,12 +234,9 @@ data class DocumentStyles(
  * Paragraph style as the paginator and the renderer both see it.
  *
  * [fontSizeSp] is the font size in points (the name predates [LayoutUnits]).
- * The metric fields after [parentStyleName] are the plan 5 seam (roadmap
- * E-EN-3): they are in layout units at 96 per inch, or plain factors and
- * flags, and their defaults describe "nothing declared". No parser populates
- * them yet and no consumer reads them yet, so a style built from the first
- * nine fields renders exactly as before; PR 16a fills them from the file and
- * PR 16b makes the paginator use them.
+ * Metric fields are in layout units at 96 per inch. Import resolves the style
+ * cascade before consumers measure it. Plan 5e is making these fields
+ * load-bearing in pagination and rendering; see the implementation ledger.
  */
 data class ParagraphStyle(
     val name: String,
@@ -257,7 +254,7 @@ data class ParagraphStyle(
     val spaceAfterUnits: Float = 0f,
     /** `fo:line-height="115%"` / `w:line=276 lineRule=auto` as 1.15; 1 = single. */
     val lineHeightFactor: Float = 1f,
-    /** Absolute line height (`fo:line-height="0.5cm"`, `lineRule=exact`), layout units; null = use the factor. */
+    /** Absolute line height (`fo:line-height="0.5cm"`, `lineRule=exact`), layout units; null = use the minimum or factor. */
     val lineHeightExactUnits: Float? = null,
     /** `fo:margin-left` / `w:ind w:left`, layout units. */
     val indentStartUnits: Float = 0f,
@@ -268,13 +265,20 @@ data class ParagraphStyle(
     /** `fo:keep-with-next="always"` / `w:keepNext`. */
     val keepWithNext: Boolean = false,
     /** `fo:break-before="page"` / `w:pageBreakBefore`. */
-    val pageBreakBefore: Boolean = false
+    val pageBreakBefore: Boolean = false,
+    /** `fo:break-after="page"`; independent of break-before. */
+    val pageBreakAfter: Boolean = false,
+    /** DOCX `lineRule=atLeast`, a floor rather than a fixed height. */
+    val lineHeightMinimumUnits: Float? = null,
+    /** ODF percentage is a font-size minimum; DOCX auto multiplies natural height. */
+    val lineHeightUsesFontSize: Boolean = false
 ) {
-    /** True when the style carries no metric other than its font size, i.e. the pre-plan-5 shape. */
+    /** True when the style carries paragraph metrics beyond its font size. */
     val hasMetricFields: Boolean
         get() = spaceBeforeUnits != 0f || spaceAfterUnits != 0f || lineHeightFactor != 1f ||
             lineHeightExactUnits != null || indentStartUnits != 0f || indentEndUnits != 0f ||
-            firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore
+            firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore || pageBreakAfter ||
+            lineHeightMinimumUnits != null || lineHeightUsesFontSize
 }
 
 data class CharacterStyle(

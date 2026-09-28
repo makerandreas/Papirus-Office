@@ -15,9 +15,26 @@ Date: 2026-09-28. Scope and gates: [audit-011](audit-011-2026-09-28-plan-5e-read
 
 Baseline failure supplied by owner: run `36370092065`, 204 tests, two failures in `CreateNewDocumentTest` (expected `untitled.odt`, received `Default.ott`). Compilation succeeded. This is the actual baseline failure, not a JNI diagnosis. No local JDK/Android SDK is available; Android compilation and tests must be checked through CI. Validation results will be recorded below when available.
 
+## Gate 0 CI evidence
+
+[Run 36372935809](https://github.com/makerandreas/Papirus-Office/actions/runs/36372935809), PR #19 head `961d4a3` (GitHub test merge `52fecdf`): **205 tests, zero failures/errors/skips**. All three `CreateNewDocumentTest` cases and `FixtureIdentityTest` pass. The Unit Tests job completed in 4m59s. The APK job is still pending at this record point.
+
+The twelve-fixture dump retains baseline ODT pages `[12,22,11,7,14,21]` and DOCX `[12,23,12,11,16,23]`. Its backend is explicitly the legacy Paint per-character stub (`MMMM=iiii=4` at 35 px for 14 pt), not device pagination. These results do not pass all planned fidelity windows; those remain unmodified and are not yet enforced.
+
+## First semantics batch (partial stage 1)
+
+- ODF break-after has its own field and is emitted after the paragraph/heading. Break ownership moved from direct body children to paragraph contexts, covering nested sections. Empty ODF paragraphs/headings are retained.
+- ODF `auto` clears inherited before/after/keep flags. `normal` and percentages clear inherited absolute line height; absolute declarations clear percentage basis.
+- DOCX `atLeast` is a minimum distinct from `exact`, through docDefaults, styles and direct properties. A declared spacing mode replaces the inherited mode; unrelated spacing properties leave it intact.
+- DOCX explicit `0`/`false`/`off` reset keep-next and page-break-before, including inherited docDefaults.
+- `TextMetrics` distinguishes ODF font-size-based percentage minima from DOCX natural-height multiples. Its mixed-line method accepts maximum descendant font size and natural height. This method is tested as a contract, **not yet wired into the paginator or Compose**.
+- Added synthetic style/break/reset tests and deterministic line-height tests. CI for this batch is required before treating it as validated.
+
+This is not all of stage 1: inline DOCX boundaries/sections and keep/widow/orphan/tab settings remain open. No renderer or editing pipeline changes are included here.
+
 ## Remaining gates
 
-1. Break and style semantics: mode-specific line spacing and inheritance, explicit false/zero, ODF before/after, DOCX inline break source ranges and section kinds, tabs, keep/widow/orphan settings, meaningful empty paragraphs.
+1. Finish break and style semantics: DOCX inline break source ranges and section kinds, tabs, keep-together/widow/orphan settings, DOCX empty paragraphs; verify the first batch above.
 2. Load-bearing measurement: injected metrics, mixed runs, lossless wrapping, indents/tabs, content/style/width/backend-aware cache.
 3. Line-fragment pagination with bounded keep/progress rules and stable source/page mappings.
 4. Renderer/input/navigation parity, shared line geometry, fragment-aware editing/selection and an honest Web View state.

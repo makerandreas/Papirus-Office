@@ -47,6 +47,7 @@ data class DocxStyleMeta(
     val spaceAfterUnits: Float? = null,
     val lineHeightFactor: Float? = null,
     val lineHeightExactUnits: Float? = null,
+    val lineHeightMinimumUnits: Float? = null,
     val indentStartUnits: Float? = null,
     val indentEndUnits: Float? = null,
     val firstLineIndentUnits: Float? = null,
@@ -247,6 +248,9 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
+    private fun docxOnOff(value: String?): Boolean =
+        value?.lowercase(Locale.ROOT) !in setOf("0", "false", "off")
+
     private fun extractDocxStyles(file: File): DocxStylesParseResult {
         if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return DocxStylesParseResult()
         try {
@@ -279,9 +283,12 @@ class OfficeDocumentParser(private val context: Context) {
                 var docDefaultAfter: Float? = null
                 var docDefaultLineFactor: Float? = null
                 var docDefaultLineExact: Float? = null
+                var docDefaultLineMinimum: Float? = null
                 var docDefaultIndentStart: Float? = null
                 var docDefaultIndentEnd: Float? = null
                 var docDefaultFirstLine: Float? = null
+                var docDefaultKeepNext: Boolean? = null
+                var docDefaultPageBreakBefore: Boolean? = null
 
                 var inStyle = false
                 var currentStyleType: String? = null
@@ -300,6 +307,7 @@ class OfficeDocumentParser(private val context: Context) {
                 var currentAfter: Float? = null
                 var currentLineFactor: Float? = null
                 var currentLineExact: Float? = null
+                var currentLineMinimum: Float? = null
                 var currentIndentStart: Float? = null
                 var currentIndentEnd: Float? = null
                 var currentFirstLine: Float? = null
@@ -342,13 +350,22 @@ class OfficeDocumentParser(private val context: Context) {
                                     if (lStr != null) {
                                         val lv = lStr.toIntOrNull()
                                         if (lv != null) {
-                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
-                                                docDefaultLineExact = LayoutUnits.twipsToUnits(lv)
-                                            } else {
-                                                docDefaultLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                            docDefaultLineFactor = null
+                                            docDefaultLineExact = null
+                                            docDefaultLineMinimum = null
+                                            when (lrStr.lowercase(Locale.ROOT)) {
+                                                "exact" -> docDefaultLineExact = LayoutUnits.twipsToUnits(lv)
+                                                "atleast" -> docDefaultLineMinimum = LayoutUnits.twipsToUnits(lv)
+                                                else -> docDefaultLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
                                             }
                                         }
                                     }
+                                }
+                                inDocDefaultsPPr && tagName == "keepnext" -> {
+                                    docDefaultKeepNext = docxOnOff(getXmlAttr(parser, "val"))
+                                }
+                                inDocDefaultsPPr && tagName == "pagebreakbefore" -> {
+                                    docDefaultPageBreakBefore = docxOnOff(getXmlAttr(parser, "val"))
                                 }
                                 inDocDefaultsPPr && tagName == "ind" -> {
                                     val lStr = getXmlAttr(parser, "left") ?: getXmlAttr(parser, "start")
@@ -378,6 +395,7 @@ class OfficeDocumentParser(private val context: Context) {
                                     currentAfter = null
                                     currentLineFactor = null
                                     currentLineExact = null
+                                    currentLineMinimum = null
                                     currentIndentStart = null
                                     currentIndentEnd = null
                                     currentFirstLine = null
@@ -430,10 +448,13 @@ class OfficeDocumentParser(private val context: Context) {
                                     if (lStr != null) {
                                         val lv = lStr.toIntOrNull()
                                         if (lv != null) {
-                                            if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
-                                                currentLineExact = LayoutUnits.twipsToUnits(lv)
-                                            } else {
-                                                currentLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                            currentLineFactor = null
+                                            currentLineExact = null
+                                            currentLineMinimum = null
+                                            when (lrStr.lowercase(Locale.ROOT)) {
+                                                "exact" -> currentLineExact = LayoutUnits.twipsToUnits(lv)
+                                                "atleast" -> currentLineMinimum = LayoutUnits.twipsToUnits(lv)
+                                                else -> currentLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
                                             }
                                         }
                                     }
@@ -452,10 +473,10 @@ class OfficeDocumentParser(private val context: Context) {
                                     currentJc = getXmlAttr(parser, "val")
                                 }
                                 inStyle && inPPr && tagName == "keepnext" -> {
-                                    currentKeepNext = true
+                                    currentKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 }
                                 inStyle && inPPr && tagName == "pagebreakbefore" -> {
-                                    currentPageBreakBefore = true
+                                    currentPageBreakBefore = docxOnOff(getXmlAttr(parser, "val"))
                                 }
                             }
                         }
@@ -510,6 +531,7 @@ class OfficeDocumentParser(private val context: Context) {
                                             spaceAfterUnits = currentAfter,
                                             lineHeightFactor = currentLineFactor,
                                             lineHeightExactUnits = currentLineExact,
+                                            lineHeightMinimumUnits = currentLineMinimum,
                                             indentStartUnits = currentIndentStart,
                                             indentEndUnits = currentIndentEnd,
                                             firstLineIndentUnits = currentFirstLine,
@@ -546,11 +568,12 @@ class OfficeDocumentParser(private val context: Context) {
                     var after = docDefaultAfter ?: 0f
                     var lineFactor = docDefaultLineFactor ?: 1f
                     var lineExact = docDefaultLineExact
+                    var lineMinimum = docDefaultLineMinimum
                     var indStart = docDefaultIndentStart ?: 0f
                     var indEnd = docDefaultIndentEnd ?: 0f
                     var firstLine = docDefaultFirstLine ?: 0f
-                    var keepNext = false
-                    var pageBreakBefore = false
+                    var keepNext = docDefaultKeepNext ?: false
+                    var pageBreakBefore = docDefaultPageBreakBefore ?: false
                     var alignment = "Left"
 
                     for (i in chain.lastIndex downTo 0) {
@@ -562,8 +585,13 @@ class OfficeDocumentParser(private val context: Context) {
                         s.isUnderline?.let { underline = it }
                         s.spaceBeforeUnits?.let { before = it }
                         s.spaceAfterUnits?.let { after = it }
-                        s.lineHeightFactor?.let { lineFactor = it }
-                        s.lineHeightExactUnits?.let { lineExact = it }
+                        // A newly declared mode replaces the entire inherited line-spacing
+                        // choice. In particular, auto must clear an inherited exact/minimum.
+                        if (s.lineHeightFactor != null || s.lineHeightExactUnits != null || s.lineHeightMinimumUnits != null) {
+                            lineFactor = s.lineHeightFactor ?: 1f
+                            lineExact = s.lineHeightExactUnits
+                            lineMinimum = s.lineHeightMinimumUnits
+                        }
                         s.indentStartUnits?.let { indStart = it }
                         s.indentEndUnits?.let { indEnd = it }
                         s.firstLineIndentUnits?.let { firstLine = it }
@@ -585,6 +613,7 @@ class OfficeDocumentParser(private val context: Context) {
                         spaceAfterUnits = after,
                         lineHeightFactor = lineFactor,
                         lineHeightExactUnits = lineExact,
+                        lineHeightMinimumUnits = lineMinimum,
                         indentStartUnits = indStart,
                         indentEndUnits = indEnd,
                         firstLineIndentUnits = firstLine,
@@ -619,6 +648,9 @@ class OfficeDocumentParser(private val context: Context) {
                         spaceAfterUnits = docDefaultAfter ?: 0f,
                         lineHeightFactor = docDefaultLineFactor ?: 1f,
                         lineHeightExactUnits = docDefaultLineExact,
+                        lineHeightMinimumUnits = docDefaultLineMinimum,
+                        keepWithNext = docDefaultKeepNext ?: false,
+                        pageBreakBefore = docDefaultPageBreakBefore ?: false,
                         indentStartUnits = docDefaultIndentStart ?: 0f,
                         indentEndUnits = docDefaultIndentEnd ?: 0f,
                         firstLineIndentUnits = docDefaultFirstLine ?: 0f
@@ -1159,6 +1191,7 @@ class OfficeDocumentParser(private val context: Context) {
             var directAfter: Float? = null
             var directLineFactor: Float? = null
             var directLineExact: Float? = null
+            var directLineMinimum: Float? = null
             var directIndentStart: Float? = null
             var directIndentEnd: Float? = null
             var directFirstLine: Float? = null
@@ -1241,6 +1274,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 directAfter = null
                                 directLineFactor = null
                                 directLineExact = null
+                                directLineMinimum = null
                                 directIndentStart = null
                                 directIndentEnd = null
                                 directFirstLine = null
@@ -1292,10 +1326,13 @@ class OfficeDocumentParser(private val context: Context) {
                                 if (lStr != null) {
                                     val lv = lStr.toIntOrNull()
                                     if (lv != null) {
-                                        if (lrStr.equals("exact", ignoreCase = true) || lrStr.equals("atleast", ignoreCase = true)) {
-                                            directLineExact = LayoutUnits.twipsToUnits(lv)
-                                        } else {
-                                            directLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
+                                        directLineFactor = null
+                                        directLineExact = null
+                                        directLineMinimum = null
+                                        when (lrStr.lowercase(Locale.ROOT)) {
+                                            "exact" -> directLineExact = LayoutUnits.twipsToUnits(lv)
+                                            "atleast" -> directLineMinimum = LayoutUnits.twipsToUnits(lv)
+                                            else -> directLineFactor = LayoutUnits.lineTwentiethsToFactor(lv)
                                         }
                                         hasDirectPPr = true
                                     }
@@ -1322,12 +1359,12 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             inPPr && tagLocal == "keepnext" -> {
-                                directKeepNext = true
+                                directKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 hasDirectPPr = true
                             }
 
                             inPPr && tagLocal == "pagebreakbefore" -> {
-                                directPageBreakBefore = true
+                                directPageBreakBefore = docxOnOff(getXmlAttr(parser, "val"))
                                 hasDirectPPr = true
                             }
 
@@ -1480,13 +1517,15 @@ class OfficeDocumentParser(private val context: Context) {
                                             ?: docxDefaultParagraphStyle
                                             ?: ParagraphStyle("Normal")
                                         val syntheticName = "inline-p-${generatedStyles.size + 1}"
+                                        val hasDirectLine = directLineFactor != null || directLineExact != null || directLineMinimum != null
                                         val syntheticStyle = baseStyle.copy(
                                             name = syntheticName,
                                             parentStyleName = currentPStyle ?: baseStyle.name,
                                             spaceBeforeUnits = directBefore ?: baseStyle.spaceBeforeUnits,
                                             spaceAfterUnits = directAfter ?: baseStyle.spaceAfterUnits,
-                                            lineHeightFactor = directLineFactor ?: baseStyle.lineHeightFactor,
-                                            lineHeightExactUnits = directLineExact ?: baseStyle.lineHeightExactUnits,
+                                            lineHeightFactor = if (hasDirectLine) directLineFactor ?: 1f else baseStyle.lineHeightFactor,
+                                            lineHeightExactUnits = if (hasDirectLine) directLineExact else baseStyle.lineHeightExactUnits,
+                                            lineHeightMinimumUnits = if (hasDirectLine) directLineMinimum else baseStyle.lineHeightMinimumUnits,
                                             indentStartUnits = directIndentStart ?: baseStyle.indentStartUnits,
                                             indentEndUnits = directIndentEnd ?: baseStyle.indentEndUnits,
                                             firstLineIndentUnits = directFirstLine ?: baseStyle.firstLineIndentUnits,
