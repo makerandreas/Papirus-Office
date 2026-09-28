@@ -1229,6 +1229,7 @@ class OfficeDocumentParser(private val context: Context) {
         var currentSectionStart = 0
         var sectionKind = SectionStartKind.NEXT_PAGE
         var inSectionProperties = false
+        var inDocxText = false
         val inlinePageBreaks = mutableListOf<Int>()
         val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
         val docxStylesMap = docxStylesResult.stylesMetaMap
@@ -1458,6 +1459,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 hasDirectPPr = true
                             }
 
+                            isDocx && tagLocal == "t" -> { inDocxText = true }
                             tagLocal == "sectpr" -> {
                                 paraHasSectPr = inPPr
                                 inSectionProperties = true
@@ -1577,7 +1579,7 @@ class OfficeDocumentParser(private val context: Context) {
 
                     XmlPullParser.TEXT -> {
                         val txt = parser.text ?: ""
-                        if (txt.isNotEmpty()) {
+                        if (txt.isNotEmpty() && (!isDocx || inDocxText)) {
                             currentText.append(txt)
                             currentRunText.append(txt)
                         }
@@ -1604,6 +1606,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
+                            isDocx && tagLocal == "t" -> { inDocxText = false }
                             tagLocal == "sectpr" -> {
                                 sectionStarts += SectionStart(currentSectionStart, sectionKind)
                                 inSectionProperties = false

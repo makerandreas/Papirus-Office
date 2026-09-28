@@ -123,4 +123,15 @@ class FragmentPaginationTest {
         assertEquals(1, DocumentTextWindows.compute(changed.body.elements, updated.text).size)
     }
 
+    @Test fun masterPageStartsANewPageButNotAnEmptyPageAtDocumentStart() {
+        val styles = DocumentStyles(defaultParagraphStyle = style,
+            paragraphStyles = mapOf("chapter" to style.copy(name = "chapter", masterPageName = "Other")))
+        val document = OfficeDocument(styles = styles, body = DocumentBody(listOf(
+            OfficeParagraph("A", "chapter"), OfficeParagraph("B", "chapter"))))
+        val result = engine().performLayout(document)
+        assertEquals(2, result.pages.size)
+        assertTrue(result.pages.all { it.elements.size == 1 })
+        assertEquals(PageEndReason.AUTHORED, result.pages.first().endReason)
+    }
+
 }

@@ -246,7 +246,7 @@ class LayoutEngine(
             if (p != null) {
                 val style = StyleResolver.resolveParagraphStyle(p.styleName, document.styles)
                 val layout = layoutParagraph(index, p, document.styles, forceRebuildAll)
-                if (style.pageBreakBefore && placed.isNotEmpty()) flush(PageEndReason.AUTHORED)
+                if ((style.pageBreakBefore || !style.masterPageName.isNullOrBlank()) && placed.isNotEmpty()) flush(PageEndReason.AUTHORED)
                 val before = style.spaceBeforeUnits.coerceAtLeast(0f)
                 var gap = if (placed.isEmpty()) 0f else if (style.collapseSpacing || previousCollapses)
                     maxOf(previousAfter, before) else previousAfter + before
@@ -259,7 +259,7 @@ class LayoutEngine(
                         if (!visible(next)) { next++; continue }
                         val following = paragraph(elements[next]) ?: break
                         val followingStyle = StyleResolver.resolveParagraphStyle(following.styleName, document.styles)
-                        if (followingStyle.pageBreakBefore) break
+                        if (followingStyle.pageBreakBefore || !followingStyle.masterPageName.isNullOrBlank()) break
                         needed += if (currentStyle.collapseSpacing || followingStyle.collapseSpacing)
                             maxOf(currentStyle.spaceAfterUnits, followingStyle.spaceBeforeUnits)
                         else currentStyle.spaceAfterUnits + followingStyle.spaceBeforeUnits

@@ -79,7 +79,7 @@ Fragment pagination and source-range-aware input integration are still pending. 
 
 ## Fragment/input integration checkpoint
 
-The measurement batch compiled and ran 227 tests in CI run `36376396772`; one new soft-hyphen test failed. Investigation found Java's character iterator can attach a format-control soft hyphen to its preceding grapheme. Tabs and soft hyphens now explicitly retain independent source slots. No assertion or pagination window was relaxed to conceal this bug.
+The measurement batch compiled and ran 227 tests in CI run `36376396772`; one new soft-hyphen test failed. Initial investigation made tabs and soft hyphens explicit independent source slots. The next run still failed the test: the actual fixture was silently widened from 41 to 120 units by PageStyleSpec. The continuation below corrects that geometry floor instead of weakening the soft-hyphen assertion. No assertion or pagination window was relaxed to conceal this bug.
 
 Next isolated batch, awaiting CI:
 - Line fragments carry original element identity, source/line ranges and continuation flags; element navigation retains both first page and all occupied pages.
@@ -89,3 +89,8 @@ Next isolated batch, awaiting CI:
 - Source-aware windows preserve existing consecutive hard newlines. Single-paragraph edits remap inline boundaries without treating existing hard newlines as paragraph separators.
 - The alternate Web/flow view is explicitly unavailable rather than bypassing the layout pipeline.
 - Added fragment, authored/section-break, projection-offset and 100+ page incremental/full-rebuild tests. Device glyph/Compose parity remains deferred by owner decision, not claimed as verified.
+
+
+CI follow-up (`36376981671`, 242 tests, two failures): all ten fragment-pagination tests and all three projection tests passed. The two failures were the narrow-column soft-hyphen case (legacy 120-unit geometry floor) and DOCX XML indentation being admitted as content after removing paragraph trimming. Valid narrow columns now retain their declared width, and DOCX text is collected from `w:t`, not whitespace between XML elements.
+
+The first measured matrix placed Sample-4 ODT at 8 pages, outside 9..13. Source inspection found five explicit paragraph master-page assignments (`P14/P19/P21/P24/P26`, `Converted1..5`). ODF's master-page semantics (local Part 3, section 16.9 and `style:master-page-name`) require a new page at each assignment. The resolved style now carries this boundary into pagination, without inserting a blank page at the start of the document. This is an authored-structure fix, not a metric/page-count calibration. Per-section geometry remains later-plan work.

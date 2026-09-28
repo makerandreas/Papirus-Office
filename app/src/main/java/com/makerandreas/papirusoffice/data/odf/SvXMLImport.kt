@@ -806,7 +806,8 @@ private fun OdfStyleInfo.toParagraphStyle(): ParagraphStyle = ParagraphStyle(
     orphans = orphans ?: 2,
     widows = widows ?: 2,
     tabStops = tabStops.orEmpty(),
-    defaultTabIntervalUnits = defaultTabIntervalUnits ?: 48f
+    defaultTabIntervalUnits = defaultTabIntervalUnits ?: 48f,
+    masterPageName = masterPageName
 )
 
 private fun OdfStyleInfo.toCharacterStyle(): CharacterStyle = CharacterStyle(

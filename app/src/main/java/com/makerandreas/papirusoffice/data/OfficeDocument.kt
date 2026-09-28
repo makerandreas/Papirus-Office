@@ -285,7 +285,9 @@ data class ParagraphStyle(
     val orphans: Int = 2,
     val widows: Int = 2,
     val tabStops: List<ParagraphTabStop> = emptyList(),
-    val defaultTabIntervalUnits: Float = 48f
+    val defaultTabIntervalUnits: Float = 48f,
+    /** ODF 1.4 master-page assignment starts a new page; per-section geometry is separate. */
+    val masterPageName: String? = null
 ) {
     /** True when the style carries paragraph metrics beyond its font size. */
     val hasMetricFields: Boolean
@@ -354,7 +356,8 @@ data class PageStyleSpec(
         get() = bodyBottomDp - bodyTopDp
 
     companion object {
-        const val MIN_CONTENT_DIMENSION_DP = 120f
+        // Progress floor for degenerate files, not an invented minimum text column.
+        const val MIN_CONTENT_DIMENSION_DP = 1f
         val FALLBACK = PageStyleSpec()
     }
 }

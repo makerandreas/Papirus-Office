@@ -258,4 +258,13 @@ class ParagraphStyleSemanticsTest {
         assertFalse(parsed.elements.any { it is OfficeDocumentElement.PageBreak })
     }
 
+    @Test
+    fun odfMasterPageAssignmentRetainsItsAuthoredPageBoundary() {
+        val styles = """<style:style style:name="Chapter" style:family="paragraph" style:master-page-name="Next"/>"""
+        val parsed = odf(styles, """<text:p>A</text:p><text:p text:style-name="Chapter">B</text:p>""")
+        assertEquals("Next", parsed.styles.paragraphStyles.getValue("Chapter").masterPageName)
+        // This is not a cached soft break or an fo:break-before declaration.
+        assertFalse(parsed.styles.paragraphStyles.getValue("Chapter").pageBreakBefore)
+    }
+
 }
