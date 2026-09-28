@@ -26,7 +26,8 @@ data class OfficeDocument(
     val footer: DocumentFooter = DocumentFooter(),
     val footnote: DocumentFootnote = DocumentFootnote(),
     val odtPackageData: OdtPackageData? = null,
-    val isModified: Boolean = false
+    val isModified: Boolean = false,
+    val sectionStarts: List<SectionStart> = emptyList()
 )
 
 fun OfficeDocument.toPlainText(): String {
@@ -93,14 +94,16 @@ data class OfficeParagraph(
     val indent: Float = 0f,
     val outlineLevel: Int = 0,
     val runs: List<OfficeTextRun> = emptyList(),
-    val bookmark: String? = null
+    val bookmark: String? = null,
+    val pageBreakOffsets: List<Int> = emptyList()
 ) : OfficeElement
 
 data class OfficeHeading(
     val text: String,
     val styleName: String? = null,
     val level: Int = 1,
-    val runs: List<OfficeTextRun> = emptyList()
+    val runs: List<OfficeTextRun> = emptyList(),
+    val pageBreakOffsets: List<Int> = emptyList()
 ) : OfficeElement
 
 data class OfficeListItem(
@@ -405,6 +408,9 @@ data class DocumentProperties(
     val isReadOnly: Boolean = false
 )
 
+enum class SectionStartKind { NEXT_PAGE, CONTINUOUS, NEXT_COLUMN, ODD_PAGE, EVEN_PAGE }
+data class SectionStart(val elementIndex: Int, val kind: SectionStartKind)
+
 data class DocumentSection(
     val name: String = "",
     val elements: List<OfficeElement> = emptyList()
@@ -438,6 +444,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                 OfficeParagraph(
                     text = elem.text,
                     styleName = elem.styleName,
+                    pageBreakOffsets = elem.pageBreakOffsets,
                     runs = elem.runs.map { run ->
                         OfficeTextRun(
                             text = run.text,
@@ -455,7 +462,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     text = elem.text,
                     level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
-                    runs = emptyList()
+                    runs = emptyList(),
+                    pageBreakOffsets = elem.pageBreakOffsets
                 )
             }
             is OfficeDocumentElement.ListItem -> {
@@ -531,6 +539,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
         metadata = metadata,
         styles = this.styles,
         body = DocumentBody(elements = docElements),
+        sectionStarts = sectionStarts,
         odtPackageData = this.odtPackageData
     )
 }

@@ -76,3 +76,16 @@ Work now in progress:
 - Paragraph spacing replaces the fixed inter-block gap; DOCX collapses adjacent before/after contributions. Renderer boxes use computed body bounds, not a second margin-padded flow; line height no longer uses point size plus five.
 
 Fragment pagination and source-range-aware input integration are still pending. In particular, these new keep/widow/orphan fields are preserved but not yet enforced by the live paginator. No completion or Compose-measurement parity claim is made at this checkpoint.
+
+## Fragment/input integration checkpoint
+
+The measurement batch compiled and ran 227 tests in CI run `36376396772`; one new soft-hyphen test failed. Investigation found Java's character iterator can attach a format-control soft hyphen to its preceding grapheme. Tabs and soft hyphens now explicitly retain independent source slots. No assertion or pagination window was relaxed to conceal this bug.
+
+Next isolated batch, awaiting CI:
+- Line fragments carry original element identity, source/line ranges and continuation flags; element navigation retains both first page and all occupied pages.
+- Body-rectangle fitting, widow/orphan constraints, bounded keep chains and oversized-content progress; declared spacing only at logical boundaries, explicit page-end reasons and authored blank pages retained.
+- DOCX inline page breaks stay as offsets within one paragraph instead of appearing before buffered text. Section kinds are retained at the start of the section they describe, including terminal section properties. Continuous sections do not advance pages; parity sections insert only required blanks. Next-column uses the single supported column, with its original kind retained for Plan 8B.
+- One input field per logical paragraph projects measured line breaks and page gaps into display-only text. Source offsets, one IME composition, global edit value and undo callbacks remain unchanged by wrapping. The Viewer uses the same projection. FCT anchoring follows the projected selection caret rather than the whole multi-page field bounds.
+- Source-aware windows preserve existing consecutive hard newlines. Single-paragraph edits remap inline boundaries without treating existing hard newlines as paragraph separators.
+- The alternate Web/flow view is explicitly unavailable rather than bypassing the layout pipeline.
+- Added fragment, authored/section-break, projection-offset and 100+ page incremental/full-rebuild tests. Device glyph/Compose parity remains deferred by owner decision, not claimed as verified.

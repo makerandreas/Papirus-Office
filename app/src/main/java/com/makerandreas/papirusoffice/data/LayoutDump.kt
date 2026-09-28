@@ -16,7 +16,7 @@ import java.util.Locale
  */
 object LayoutDump {
 
-    enum class PageEnd { BREAK, OVERFLOW, END }
+    enum class PageEnd { BREAK, OVERFLOW, KEEP, END }
 
     data class PageRow(
         val pageNumber: Int,
@@ -157,11 +157,11 @@ object LayoutDump {
             val lastBottom = placed.maxOfOrNull { it.bounds.bottom } ?: pageSpec.bodyTopDp
             val kinds = kindsSummary(placed)
             val blanks = placed.count { isBlankParagraph(it.element) }
-            val endedBy = when {
-                page.pageNumber == result.pages.size -> PageEnd.END
-                last == null -> PageEnd.BREAK
-                nextElementIsBreak(elements, last) -> PageEnd.BREAK
-                else -> PageEnd.OVERFLOW
+            val endedBy = when (page.endReason) {
+                PageEndReason.AUTHORED -> PageEnd.BREAK
+                PageEndReason.OVERFLOW -> PageEnd.OVERFLOW
+                PageEndReason.KEEP -> PageEnd.KEEP
+                PageEndReason.END -> PageEnd.END
             }
             rows.add(
                 PageRow(
@@ -182,7 +182,7 @@ object LayoutDump {
             pageSpec = pageSpec,
             pages = rows,
             elementTotal = elements.size,
-            placedTotal = result.pages.sumOf { it.elements.size },
+            placedTotal = result.pages.flatMap { it.elements }.map { it.elementIndex }.distinct().size,
             breakElements = breakElements,
             blankParagraphs = elements.count { isBlankParagraph(it) },
             pageBreakMarkerParagraphs = elements.count { textOf(it)?.contains(PAGE_BREAK_MARKER) == true },

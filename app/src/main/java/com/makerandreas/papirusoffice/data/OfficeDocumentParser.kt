@@ -737,7 +737,8 @@ class OfficeDocumentParser(private val context: Context) {
         } catch (e: Exception) {
             // Graceful fallback
         }
-        return DocxStylesParseResult()
+        return DocxStylesParseResult(defaultParagraphStyle = ParagraphStyle("Normal",
+            collapseSpacing = true, defaultTabIntervalUnits = tabInterval))
     }
 
     private val cacheRepository = com.makerandreas.papirusoffice.data.cache.DocumentCacheRepository(context)
@@ -1224,6 +1225,11 @@ class OfficeDocumentParser(private val context: Context) {
 
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
+        val sectionStarts = mutableListOf<SectionStart>()
+        var currentSectionStart = 0
+        var sectionKind = SectionStartKind.NEXT_PAGE
+        var inSectionProperties = false
+        val inlinePageBreaks = mutableListOf<Int>()
         val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
         val docxStylesMap = docxStylesResult.stylesMetaMap
         val docxParagraphStyles = docxStylesResult.paragraphStyles.toMutableMap()
@@ -1360,6 +1366,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 directTabs = null
                                 directJc = null
                                 paraHasSectPr = false
+                                inlinePageBreaks.clear()
                             }
 
                             tagLocal == "ppr" -> {
@@ -1451,8 +1458,19 @@ class OfficeDocumentParser(private val context: Context) {
                                 hasDirectPPr = true
                             }
 
-                            inPPr && tagLocal == "sectpr" -> {
-                                paraHasSectPr = true
+                            tagLocal == "sectpr" -> {
+                                paraHasSectPr = inPPr
+                                inSectionProperties = true
+                                sectionKind = SectionStartKind.NEXT_PAGE
+                            }
+                            inSectionProperties && tagLocal == "type" -> {
+                                sectionKind = when (getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)) {
+                                    "continuous" -> SectionStartKind.CONTINUOUS
+                                    "nextcolumn" -> SectionStartKind.NEXT_COLUMN
+                                    "oddpage" -> SectionStartKind.ODD_PAGE
+                                    "evenpage" -> SectionStartKind.EVEN_PAGE
+                                    else -> SectionStartKind.NEXT_PAGE
+                                }
                             }
 
                             // Page breaks
@@ -1508,7 +1526,7 @@ class OfficeDocumentParser(private val context: Context) {
                             tagLocal == "line-break" || tagLocal == "br" || tagLocal == "cr" -> {
                                 val brType = getXmlAttr(parser, "type")
                                 if (brType?.equals("page", ignoreCase = true) == true) {
-                                    elements.add(OfficeDocumentElement.PageBreak)
+                                    inlinePageBreaks += currentText.length
                                 } else {
                                     currentText.append("\n")
                                 }
@@ -1586,6 +1604,10 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
+                            tagLocal == "sectpr" -> {
+                                sectionStarts += SectionStart(currentSectionStart, sectionKind)
+                                inSectionProperties = false
+                            }
                             tagLocal == "ppr" -> {
                                 inPPr = false
                             }
@@ -1593,7 +1615,7 @@ class OfficeDocumentParser(private val context: Context) {
                             tagLocal == "p" -> {
                                 inParagraph = false
                                 inPPr = false
-                                val paraText = currentText.toString().trim()
+                                val paraText = currentText.toString()
                                 val resolvedStyleName: String? = when {
                                     hasDirectPPr -> {
                                         val baseStyle = currentPStyle?.let { docxParagraphStyles[it] ?: docxParagraphStyles[it.lowercase(Locale.ROOT)] }
@@ -1634,16 +1656,18 @@ class OfficeDocumentParser(private val context: Context) {
                                         OfficeDocumentElement.Heading(
                                             text = paraText,
                                             level = headingLevel,
-                                            styleName = headingStyle
+                                            styleName = headingStyle,
+                                            pageBreakOffsets = inlinePageBreaks.toList()
                                         )
                                     )
                                     if (paraText.isNotEmpty()) {
                                         plainTextBuilder.append(paraText).append("\n\n")
                                     }
-                                } else if (paraText.isNotEmpty()) {
+                                } else {
                                     val paragraphObj = OfficeDocumentElement.Paragraph(
                                         text = paraText,
                                         styleName = resolvedStyleName,
+                                        pageBreakOffsets = inlinePageBreaks.toList(),
                                         runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
                                             TextRun(paraText, isBold, isItalic, isUnderline)
                                         )
@@ -1656,9 +1680,7 @@ class OfficeDocumentParser(private val context: Context) {
                                     }
                                 }
 
-                                if (paraHasSectPr) {
-                                    elements.add(OfficeDocumentElement.PageBreak)
-                                }
+                                if (paraHasSectPr) currentSectionStart = elements.size
 
                                 inHeading = false
                                 currentText.clear()
@@ -1761,7 +1783,11 @@ class OfficeDocumentParser(private val context: Context) {
                 defaultParagraphStyle = docxDefaultParagraphStyle
             )
         } else DocumentStyles()
+        if (currentSectionStart > 0 && currentSectionStart < elements.size && sectionStarts.none { it.elementIndex == currentSectionStart }) {
+            sectionStarts += SectionStart(currentSectionStart, SectionStartKind.NEXT_PAGE)
+        }
         val parsedDoc = OfficeParsedDocument(
+            sectionStarts = sectionStarts.toList(),
             elements = elements,
             rawXml = xmlContent,
             plainText = if (plainTextResult.isBlank()) "" else plainTextResult,

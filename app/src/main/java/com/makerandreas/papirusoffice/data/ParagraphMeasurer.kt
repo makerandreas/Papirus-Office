@@ -26,19 +26,21 @@ internal class ParagraphMeasurer(
         }
         val glyphs = mutableListOf<Glyph>()
         val chars = BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(text) }
-        var start = chars.first()
-        var end = chars.next()
+        val boundaries = sortedSetOf<Int>()
+        var boundary = chars.first()
+        while (boundary != BreakIterator.DONE) { boundaries += boundary; boundary = chars.next() }
+        // Java's character iterator may attach format controls to a preceding
+        // grapheme. Tabs and discretionary hyphens need their own source slots.
+        text.forEachIndexed { i, ch -> if (ch == '\t' || ch == '\u00ad') { boundaries += i; boundaries += i + 1 } }
         var runIndex = 0
-        while (end != BreakIterator.DONE) {
+        boundaries.zipWithNext().forEach { (start, end) ->
             while (runIndex < runStyles.size && start >= runStyles[runIndex].first) runIndex++
             val runStyle = runStyles.getOrNull(runIndex)?.second ?: style
             glyphs += Glyph(start, end, text.substring(start, end), metricCache.getOrPut(runStyle) { TextMetrics.forStyle(runStyle, source) })
-            start = end
-            end = chars.next()
         }
         val legalBreaks = mutableSetOf<Int>()
         val breaks = BreakIterator.getLineInstance(Locale.ROOT).apply { setText(text) }
-        var boundary = breaks.first()
+        boundary = breaks.first()
         while (boundary != BreakIterator.DONE) {
             legalBreaks += boundary
             boundary = breaks.next()
@@ -86,6 +88,7 @@ internal class ParagraphMeasurer(
             var selectedHyphen = false
             while (to < glyphs.size) {
                 val g = glyphs[to]
+                if (to > from && g.start in paragraph.pageBreakOffsets) break
                 val advance = if (g.text == "\t") tabAdvance(to, origin + x) else widthOf(g)
                 if (x + advance > capacity && to > from) {
                     if (lastBreak > from) {

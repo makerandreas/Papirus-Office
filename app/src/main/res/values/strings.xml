@@ -797,4 +797,5 @@
     <string name="toast_failed_to_save_crash_log_e_message">Failed to save crash log: %1$s</string>
     <string name="toast_failed_to_share_crash_report_e_message">Failed to share crash report: %1$s</string>
     <string name="settings_reset_success">App settings have been reset.</string>
+    <string name="inky_flow_view_unavailable">Flow view is not available yet. Use paginated view.</string>
 </resources>

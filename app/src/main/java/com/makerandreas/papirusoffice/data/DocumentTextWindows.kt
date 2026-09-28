@@ -22,7 +22,9 @@ data class DocumentTextWindow(
 object DocumentTextWindows {
 
     fun compute(elements: List<OfficeElement>, globalText: String): Map<Int, DocumentTextWindow> {
-        val blocks = globalText.split("\n\n")
+        val sourceBlocks = elements.mapNotNull { DocumentTextMerger.textOf(it) }
+        // Consecutive hard newlines inside a paragraph are not paragraph separators.
+        val blocks = if (sourceBlocks.joinToString("\n\n") == globalText) sourceBlocks else globalText.split("\n\n")
         val windows = LinkedHashMap<Int, DocumentTextWindow>(blocks.size)
         var blockIndex = 0
         var offset = 0

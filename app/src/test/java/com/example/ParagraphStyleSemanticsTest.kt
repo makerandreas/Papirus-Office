@@ -237,4 +237,25 @@ class ParagraphStyleSemanticsTest {
         assertEquals(4, child.widows)
     }
 
+    @Test
+    fun docxInlinePageBreaksRetainOneLogicalParagraphAndSourceOffsets() {
+        val parsed = docx("", """<w:p><w:r><w:t xml:space="preserve"> A </w:t><w:br w:type="page"/><w:t>B</w:t><w:br w:type="page"/></w:r></w:p>""")
+        val p = parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().single()
+        assertEquals(" A B", p.text)
+        assertEquals(listOf(3, 4), p.pageBreakOffsets)
+        assertFalse(parsed.elements.any { it is OfficeDocumentElement.PageBreak })
+    }
+
+    @Test
+    fun docxSectionTypeBelongsToTheSectionItDescribesNotTheFollowingOne() {
+        val parsed = docx("", """<w:p><w:pPr><w:sectPr><w:type w:val="oddPage"/></w:sectPr></w:pPr><w:r><w:t>A</w:t></w:r></w:p>
+            <w:p><w:pPr><w:sectPr><w:type w:val="continuous"/></w:sectPr></w:pPr><w:r><w:t>B</w:t></w:r></w:p>
+            <w:p><w:r><w:t>C</w:t></w:r></w:p><w:sectPr><w:type w:val="evenPage"/></w:sectPr>""")
+        assertEquals(listOf(0, 1, 2), parsed.sectionStarts.map { it.elementIndex })
+        assertEquals(listOf(com.makerandreas.papirusoffice.data.SectionStartKind.ODD_PAGE,
+            com.makerandreas.papirusoffice.data.SectionStartKind.CONTINUOUS,
+            com.makerandreas.papirusoffice.data.SectionStartKind.EVEN_PAGE), parsed.sectionStarts.map { it.kind })
+        assertFalse(parsed.elements.any { it is OfficeDocumentElement.PageBreak })
+    }
+
 }

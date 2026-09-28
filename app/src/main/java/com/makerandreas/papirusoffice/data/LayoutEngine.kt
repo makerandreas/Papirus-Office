@@ -37,24 +37,33 @@ data class ParagraphLayout(
 // PHASE 5: Pagination Models
 // ==========================================
 
+enum class PageEndReason { END, OVERFLOW, AUTHORED, KEEP }
+
 data class PageLayout(
     val pageNumber: Int,
     val widthDp: Float = 816f,  // standard A4 or Letter ratio approx
     val heightDp: Float = 1056f,
-    val elements: List<PageElementLayout> = emptyList()
+    val elements: List<PageElementLayout> = emptyList(),
+    val endReason: PageEndReason = PageEndReason.END
 )
 
 data class PageElementLayout(
     val element: OfficeElement,
     val paragraphLayout: ParagraphLayout? = null,
     val bounds: OfficeRect = OfficeRect(), // Positioned bounds relative to page top-left
-    val elementIndex: Int = 0
+    val elementIndex: Int = 0,
+    val firstLineIndex: Int = 0,
+    val sourceStart: Int = 0,
+    val sourceEnd: Int = 0,
+    val continuesBefore: Boolean = false,
+    val continuesAfter: Boolean = false
 )
 
 data class DocumentLayoutResult(
     val pages: List<PageLayout> = emptyList(),
     val totalHeightDp: Float = 0f,
-    val elementPageIndex: Map<Int, Int> = emptyMap()
+    val elementPageIndex: Map<Int, Int> = emptyMap(),
+    val elementPages: Map<Int, List<Int>> = emptyMap()
 )
 
 // ==========================================
@@ -177,125 +186,171 @@ class LayoutEngine(
         }
 
         val pages = mutableListOf<PageLayout>()
-        var currentPageElements = mutableListOf<PageElementLayout>()
-        var currentY = pageSpec.bodyTopDp
-        val maxUsableHeight = pageSpec.bodyBottomDp
-        val elementPageIndex = mutableMapOf<Int, Int>()
-
-        fun flushPage() {
-            if (currentPageElements.isNotEmpty()) {
-                pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-                currentPageElements = mutableListOf()
-                currentY = pageSpec.bodyTopDp
-            }
-        }
-
-        fun ensureRoom(needed: Float) {
-            if (currentY + needed > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                flushPage()
-            }
-        }
-
-        fun place(index: Int, element: OfficeElement, height: Float, width: Float = pageSpec.contentWidthDp, paragraphLayout: ParagraphLayout? = null) {
-            val h = height.coerceAtLeast(8f)
-            ensureRoom(h)
-            val pageNumber = pages.size + 1
-            elementPageIndex[index] = pageNumber
-            val left = pageSpec.marginStartDp
-            val placedWidth = width.coerceAtMost(pageSpec.contentWidthDp)
-            currentPageElements.add(
-                PageElementLayout(
-                    element = element,
-                    paragraphLayout = paragraphLayout,
-                    bounds = OfficeRect(left, currentY, left + placedWidth, currentY + h),
-                    elementIndex = index
-                )
-            )
-            currentY += h
-        }
-
+        var placed = mutableListOf<PageElementLayout>()
+        var y = pageSpec.bodyTopDp
+        val top = pageSpec.bodyTopDp
+        val bottom = pageSpec.bodyBottomDp
+        val bodyHeight = (bottom - top).coerceAtLeast(1f)
+        val firstPages = mutableMapOf<Int, Int>()
+        val elementPages = mutableMapOf<Int, MutableList<Int>>()
         var previousAfter = 0f
         var previousCollapses = false
-        fun placeParagraph(index: Int, element: OfficeElement, paragraph: OfficeParagraph) {
-            val style = StyleResolver.resolveParagraphStyle(paragraph.styleName, document.styles)
-            if (style.pageBreakBefore && currentPageElements.isNotEmpty()) flushPage()
-            val layout = layoutParagraph(index, paragraph, document.styles, forceRebuildAll)
-            val before = style.spaceBeforeUnits.coerceAtLeast(0f)
-            var gap = if (currentPageElements.isEmpty()) 0f else
-                if (style.collapseSpacing || previousCollapses) maxOf(previousAfter, before) else previousAfter + before
-            if (currentY + gap + layout.height > maxUsableHeight && currentPageElements.isNotEmpty()) {
-                flushPage()
-                gap = 0f
+        var trailingAuthoredBreak = false
+        fun flush(reason: PageEndReason, force: Boolean = false) {
+            if (placed.isNotEmpty() || force) {
+                pages += PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, placed, reason)
+                placed = mutableListOf()
             }
-            currentY += gap
-            place(index, element, layout.height, layout.width, layout)
-            previousAfter = style.spaceAfterUnits.coerceAtLeast(0f)
-            previousCollapses = style.collapseSpacing
+            y = top
+            previousAfter = 0f
         }
-        val rawElements = document.body.elements
-        paragraphLayoutCache.keys.retainAll(rawElements.indices.toSet())
-
-        rawElements.forEachIndexed { index, element ->
-            if (outlineEngine != null && outlineEngine.isElementHidden(index)) {
-                return@forEachIndexed
+        fun register(index: Int) {
+            val page = pages.size + 1
+            firstPages.putIfAbsent(index, page)
+            val range = elementPages.getOrPut(index) { mutableListOf() }
+            if (range.lastOrNull() != page) range += page
+        }
+        fun paragraph(element: OfficeElement): OfficeParagraph? = when (element) {
+            is OfficeParagraph -> element
+            is OfficeHeading -> OfficeParagraph(element.text, element.styleName ?: "Heading ${element.level}", runs = element.runs, pageBreakOffsets = element.pageBreakOffsets)
+            is OfficeListItem -> OfficeParagraph(element.bullet + element.text)
+            is OfficeDocElement.ParagraphElement -> element.paragraph
+            else -> null
+        }
+        val elements = document.body.elements
+        paragraphLayoutCache.keys.retainAll(elements.indices.toSet())
+        fun visible(index: Int): Boolean {
+            val e = elements[index]
+            return outlineEngine?.isElementHidden(index) != true &&
+                (showImages || e !is OfficeImage && e !is OfficeDocElement.ImageElement) &&
+                (showTables || e !is OfficeTable && e !is OfficeDocElement.TableElement)
+        }
+        for ((index, element) in elements.withIndex()) {
+            if (!visible(index)) continue
+            if (element is OfficePageBreak) {
+                firstPages[index] = pages.size + 1
+                flush(PageEndReason.AUTHORED, force = true)
+                trailingAuthoredBreak = true
+                continue
             }
-            if (!showImages && (element is OfficeDocElement.ImageElement || element is OfficeImage)) {
-                return@forEachIndexed
+            trailingAuthoredBreak = false
+            val section = document.sectionStarts.firstOrNull { it.elementIndex == index && index > 0 }
+            if (section != null && section.kind != SectionStartKind.CONTINUOUS) {
+                // NEXT_COLUMN advances the single supported column; retain its kind for Plan 8B.
+                flush(PageEndReason.AUTHORED)
+                val nextPage = pages.size + 1
+                if ((section.kind == SectionStartKind.ODD_PAGE && nextPage % 2 == 0) ||
+                    (section.kind == SectionStartKind.EVEN_PAGE && nextPage % 2 != 0)) flush(PageEndReason.AUTHORED, force = true)
             }
-            if (!showTables && (element is OfficeDocElement.TableElement || element is OfficeTable)) {
-                return@forEachIndexed
-            }
-
-            when (element) {
-                is OfficePageBreak -> {
-                    elementPageIndex[index] = pages.size + 1
-                    flushPage()
-                    if (pages.isEmpty()) {
-                        pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
+            val p = paragraph(element)
+            if (p != null) {
+                val style = StyleResolver.resolveParagraphStyle(p.styleName, document.styles)
+                val layout = layoutParagraph(index, p, document.styles, forceRebuildAll)
+                if (style.pageBreakBefore && placed.isNotEmpty()) flush(PageEndReason.AUTHORED)
+                val before = style.spaceBeforeUnits.coerceAtLeast(0f)
+                var gap = if (placed.isEmpty()) 0f else if (style.collapseSpacing || previousCollapses)
+                    maxOf(previousAfter, before) else previousAfter + before
+                // Bounded lookahead. An over-page chain relaxes instead of flushing forever.
+                if (style.keepWithNext || style.keepTogether) {
+                    var needed = layout.height
+                    var currentStyle = style
+                    var next = index + 1
+                    while (currentStyle.keepWithNext && next < elements.size && needed <= bodyHeight) {
+                        if (!visible(next)) { next++; continue }
+                        val following = paragraph(elements[next]) ?: break
+                        val followingStyle = StyleResolver.resolveParagraphStyle(following.styleName, document.styles)
+                        if (followingStyle.pageBreakBefore) break
+                        needed += if (currentStyle.collapseSpacing || followingStyle.collapseSpacing)
+                            maxOf(currentStyle.spaceAfterUnits, followingStyle.spaceBeforeUnits)
+                        else currentStyle.spaceAfterUnits + followingStyle.spaceBeforeUnits
+                        needed += layoutParagraph(next, following, document.styles).height
+                        currentStyle = followingStyle
+                        next++
+                    }
+                    if (needed <= bodyHeight && y + gap + needed > bottom && placed.isNotEmpty()) {
+                        flush(PageEndReason.KEEP)
+                        gap = 0f
                     }
                 }
-                is OfficeParagraph -> placeParagraph(index, element, element)
-                is OfficeHeading -> placeParagraph(index, element, OfficeParagraph(
-                    text = element.text, styleName = element.styleName ?: "Heading ${element.level}", runs = element.runs))
-                is OfficeListItem -> placeParagraph(index, element, OfficeParagraph(
-                    text = "${element.bullet}${element.text}"))
-                is OfficeDocElement.ParagraphElement -> placeParagraph(index, element, element.paragraph)
-                is OfficeTable -> {
-                    val tableHeight = (element.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    place(index, element, tableHeight)
+                if (y + gap + layout.lines.first().height > bottom && placed.isNotEmpty()) {
+                    flush(PageEndReason.OVERFLOW)
+                    gap = 0f
                 }
-                is OfficeDocElement.TableElement -> {
-                    val tableHeight = (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    place(index, element, tableHeight)
+                y += gap
+                val breaks = p.pageBreakOffsets.filter { it in 0..p.text.length }.groupingBy { it }.eachCount().toMutableMap()
+                var lineStart = 0
+                while (lineStart < layout.lines.size) {
+                    val source = layout.lines[lineStart].startOffset
+                    repeat(breaks.remove(source) ?: 0) { flush(PageEndReason.AUTHORED, force = true) }
+                    var lineEnd = lineStart
+                    var height = 0f
+                    while (lineEnd < layout.lines.size && y + height + layout.lines[lineEnd].height <= bottom + 0.001f) {
+                        if (lineEnd > lineStart && layout.lines[lineEnd].startOffset in breaks) break
+                        height += layout.lines[lineEnd++].height
+                    }
+                    val remaining = layout.lines.size - lineEnd
+                    if (remaining > 0 && layout.lines[lineEnd].startOffset !in breaks) {
+                        val available = lineEnd - lineStart
+                        if (available < style.orphans && placed.isNotEmpty()) {
+                            flush(PageEndReason.OVERFLOW)
+                            continue
+                        }
+                        if (remaining < style.widows) {
+                            val reducedEnd = layout.lines.size - style.widows
+                            if (reducedEnd - lineStart >= style.orphans) lineEnd = reducedEnd
+                            else if (layout.height <= bodyHeight && placed.isNotEmpty()) {
+                                flush(PageEndReason.OVERFLOW)
+                                continue
+                            }
+                        }
+                    }
+                    // One over-height line is consumed even on a too-small page.
+                    if (lineEnd == lineStart) lineEnd++
+                    val lines = layout.lines.subList(lineStart, lineEnd)
+                    height = lines.sumOf { it.height.toDouble() }.toFloat()
+                    val fragment = layout.copy(lines = lines, height = height,
+                        boundingBox = OfficeRect(0f, 0f, layout.width, height))
+                    register(index)
+                    placed += PageElementLayout(element, fragment,
+                        OfficeRect(pageSpec.marginStartDp, y, pageSpec.marginStartDp + layout.width, y + height),
+                        index, lineStart, lines.first().startOffset, lines.last().endOffset,
+                        lineStart > 0, lineEnd < layout.lines.size)
+                    y += height
+                    lineStart = lineEnd
+                    if (lineStart < layout.lines.size && layout.lines[lineStart].startOffset !in breaks) flush(PageEndReason.OVERFLOW)
                 }
-                is OfficeImage -> {
-                    val imgHeight = if (element.heightDp > 0) element.heightDp else 180f
-                    val imgWidth = if (element.widthDp > 0) element.widthDp else pageSpec.contentWidthDp
-                    place(index, element, imgHeight, imgWidth)
+                repeat(breaks.remove(p.text.length) ?: 0) {
+                    flush(PageEndReason.AUTHORED, force = true)
+                    trailingAuthoredBreak = true
                 }
-                is OfficeDocElement.ImageElement -> {
-                    val imgHeight = if (element.image.heightDp > 0) element.image.heightDp else 180f
-                    val imgWidth = if (element.image.widthDp > 0) element.image.widthDp else pageSpec.contentWidthDp
-                    place(index, element, imgHeight, imgWidth)
+                previousAfter = style.spaceAfterUnits.coerceAtLeast(0f)
+                previousCollapses = style.collapseSpacing
+                if (style.pageBreakAfter && elements.getOrNull(index + 1) !is OfficePageBreak) {
+                    flush(PageEndReason.AUTHORED)
                 }
-                else -> {
-                    place(index, element, 30f)
+            } else {
+                val height = when (element) {
+                    is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    is OfficeImage -> if (element.heightDp > 0) element.heightDp else 180f
+                    is OfficeDocElement.ImageElement -> if (element.image.heightDp > 0) element.image.heightDp else 180f
+                    else -> 30f
                 }
+                val width = when (element) {
+                    is OfficeImage -> element.widthDp
+                    is OfficeDocElement.ImageElement -> element.image.widthDp
+                    else -> pageSpec.contentWidthDp
+                }.takeIf { it > 0f }?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
+                if (y + previousAfter + height > bottom && placed.isNotEmpty()) flush(PageEndReason.OVERFLOW)
+                y += previousAfter
+                previousAfter = 0f
+                register(index)
+                placed += PageElementLayout(element, bounds = OfficeRect(pageSpec.marginStartDp, y, pageSpec.marginStartDp + width, y + height), elementIndex = index)
+                y += height
             }
         }
-
-        if (currentPageElements.isNotEmpty()) {
-            pages.add(PageLayout(pages.size + 1, pageWidthDp, pageHeightDp, currentPageElements))
-        }
-        if (pages.isEmpty()) {
-            pages.add(PageLayout(1, pageWidthDp, pageHeightDp, emptyList()))
-        }
-
-        return DocumentLayoutResult(
-            pages = pages,
-            totalHeightDp = pages.size * pageHeightDp,
-            elementPageIndex = elementPageIndex
-        )
+        if (placed.isNotEmpty() || pages.isEmpty() || trailingAuthoredBreak) flush(PageEndReason.END, force = true)
+        return DocumentLayoutResult(pages, pages.size * pageHeightDp, firstPages, elementPages)
     }
 
     // ==========================================
@@ -329,7 +384,7 @@ class LayoutEngine(
                                 pageIndex = pageIndex,
                                 elementIndex = pLayout.paragraphIndex,
                                 paragraphIndex = pLayout.paragraphIndex,
-                                lineIndex = lineIdx,
+                                lineIndex = elemLayout.firstLineIndex + lineIdx,
                                 characterOffset = totalOffset
                             )
                         }

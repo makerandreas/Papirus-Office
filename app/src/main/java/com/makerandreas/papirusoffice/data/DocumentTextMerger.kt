@@ -20,6 +20,23 @@ object DocumentTextMerger {
             return document.copy(body = DocumentBody(elements), isModified = true)
         }
 
+        val oldText = original.mapNotNull(::textOf).joinToString("\n\n")
+        if (oldText == editedText) return document
+        val prefix = oldText.commonPrefixWith(editedText).length
+        val suffix = minOf(oldText.commonSuffixWith(editedText).length, oldText.length - prefix, editedText.length - prefix)
+        val inserted = editedText.substring(prefix, editedText.length - suffix)
+        if (!inserted.contains("\n\n")) {
+            val windows = DocumentTextWindows.compute(original, oldText)
+            val window = windows.values.firstOrNull { prefix >= it.start && oldText.length - suffix <= it.end }
+            if (window != null) {
+                val replacement = window.text.substring(0, prefix - window.start) + inserted +
+                    window.text.substring(oldText.length - suffix - window.start)
+                val updated = original.toMutableList()
+                updated[window.elementIndex] = replaceText(original[window.elementIndex], replacement)
+                return document.copy(body = DocumentBody(updated), isModified = true)
+            }
+        }
+
         val blocks = splitBlocks(editedText).toMutableList()
         val result = mutableListOf<OfficeElement>()
 
@@ -74,6 +91,24 @@ object DocumentTextMerger {
         }
     }
 
+    fun textOf(element: OfficeElement): String? = when (element) {
+        is OfficeParagraph -> element.text
+        is OfficeHeading -> element.text
+        is OfficeListItem -> element.text
+        is OfficeDocElement.ParagraphElement -> element.paragraph.text
+        else -> null
+    }
+
+    private fun remapBreaks(oldText: String, newText: String, offsets: List<Int>): List<Int> {
+        val prefix = oldText.commonPrefixWith(newText).length
+        val suffix = minOf(oldText.commonSuffixWith(newText).length, oldText.length - prefix, newText.length - prefix)
+        return offsets.map { when {
+            it <= prefix -> it
+            it >= oldText.length - suffix -> newText.length - (oldText.length - it)
+            else -> newText.length - suffix
+        }.coerceIn(0, newText.length) }
+    }
+
     fun isTextual(element: OfficeElement): Boolean {
         return when (element) {
             is OfficeParagraph,
@@ -89,14 +124,15 @@ object DocumentTextMerger {
     @Suppress("DEPRECATION")
     private fun replaceText(element: OfficeElement, text: String): OfficeElement {
         return when (element) {
-            is OfficeParagraph -> element.copy(text = text, runs = resliceRuns(element.text, element.runs, text))
-            is OfficeHeading -> element.copy(text = text, runs = resliceRuns(element.text, element.runs, text))
+            is OfficeParagraph -> element.copy(text = text, runs = resliceRuns(element.text, element.runs, text), pageBreakOffsets = remapBreaks(element.text, text, element.pageBreakOffsets))
+            is OfficeHeading -> element.copy(text = text, runs = resliceRuns(element.text, element.runs, text), pageBreakOffsets = remapBreaks(element.text, text, element.pageBreakOffsets))
             is OfficeListItem -> element.copy(text = text, runs = resliceRuns(element.text, element.runs, text))
             is OfficeDocElement.ParagraphElement ->
                 OfficeDocElement.ParagraphElement(
                     element.paragraph.copy(
                         text = text,
-                        runs = resliceRuns(element.paragraph.text, element.paragraph.runs, text)
+                        runs = resliceRuns(element.paragraph.text, element.paragraph.runs, text),
+                        pageBreakOffsets = remapBreaks(element.paragraph.text, text, element.paragraph.pageBreakOffsets)
                     )
                 )
             else -> element
