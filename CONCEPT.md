@@ -177,7 +177,7 @@ This phase is a staged compatibility effort, not a statement that a native Libre
 
 #### Task 4: ODF/OOXML compatibility layers (partial Kotlin implementation; continued work)
 - Existing parsers and writers cover selected document structures; this is not a complete C++ compatibility engine or a guarantee of lossless read/write behavior.
-- Follow ODF 1.4 in `docs/html` and ECMA-376; preserve package parts/relationships and test the files in the repo before expanding feature claims.
+- Follow ODF 1.4 in `docs/odf` and ECMA-376; preserve package parts/relationships and test the files in the repo before expanding feature claims.
 - Plans 5–9 track metrics, image/media handling, ODF structures, DOCX styles/fields/numbering/tables/sections and save round-trip integrity.
 
 #### Task 5: Behavioral comparison (planned and evidence-led)

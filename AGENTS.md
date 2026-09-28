@@ -27,7 +27,7 @@ Static Papirus accents (used as seeds/identifiers, not as replacements for seman
 - **Icons**: the shipped dependency is `androidx.compose.material:material-icons-extended`, used mostly as `Icons.Rounded.*` but mixed with `Icons.Default.*`/Filled (e.g. `modules/cellina/CellinaModule.kt:569`, `modules/pagella/PagellaModule.kt:147`). Material Symbols Rounded is the target family and needs its own dependency or font before it can be claimed. Colibre in `app/src/main/share/config/images_colibre.zip` is a possible optional set pending asset and license review.
 - **Material 3 Expressive is the target design system.** The build is on Compose BOM `2024.09.00` (material3 1.3.0), which has no `MaterialExpressiveTheme`, `MotionScheme`, emphasized type styles or the Expressive components; the BOM upgrade is a code-plan prerequisite (Plan 11), not a documentation claim.
 - In product copy and documentation, distinguish a design target from shipped behavior. Do not describe a simulated/native fallback as a fully integrated LibreOffice API, or imply full ODF/OOXML support without tests.
-- **Reference editions**: LibreOffice guides are cited from the 26.2 shelf (`https://books.libreoffice.org/en/`, Writer Guide Chapter 1 at `https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html`); ODF 1.4 from `docs/html`; OOXML from ECMA-376. Older guide editions in historical plan files are not updated retroactively.
+- **Reference editions**: LibreOffice guides are cited from the 26.2 shelf (`https://books.libreoffice.org/en/`, Writer Guide Chapter 1 at `https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html`); ODF 1.4 from `docs/odf`; OOXML from ECMA-376. Older guide editions in historical plan files are not updated retroactively.
 
 ## 🎛️ Key UI Terminologies & Ecosystem
 > This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
@@ -81,8 +81,8 @@ A Material 3 Expressive bottom-sheet command deck. It should start compact on ph
    - **Google Drive shipped (`HomeDashboard.kt:1210-1275`)**: no OAuth, listing, upload or download. The screen currently advertises cloud access and shows a "Connect Google Account" button that only raises a placeholder toast. **Target, Plan 11 home-entry package / Plan 3 copy backlog**: disclose the unavailable connection before the press.
    - **Filter Chips**: All, Inky (Writer), Cellina (Calc), Slidia (Impress), Pagella (PDF).
 2. **Create New Screen** (`ui/home/NewDocumentScreen.kt`, opened by the Start Screen FAB; the WPS-inspired target lives in `DESIGN.md`):
-   - **Shipped**: a two-tab pager. Tab 1 "Create New" holds three module cards (Inky Document, Cellina Spreadsheet, Slidia Presentation) that open the module on the bundled blank package `assets/templates/untitled.od{t,s,p}` with `MainActivity.pendingNewDocument = true`, and a "Create Pagella PDF Document" group with three rows: Create from Image (JPEG/PNG/WebP), Create from Camera (CAMERA permission) and Convert from Document (ODF/OOXML/legacy MS). Tab 2 "Create from Template" has All/ODT/ODS/ODP filter chips, a search field and a download list from `TemplateManager.searchTemplates`.
-   - **Known deltas (code, owned by the Plan 11 home-entry surfaces package and the Plan 3 backlog, not by documentation)**: 9 of the 12 built-in `curatedTemplates` entries are third-party sample files from filesamples.com with invented names, not templates (R-38); the 112 real LibreOffice templates bundled under `assets/templates/` are not surfaced; the blank `untitled.*` packages are non-conformant and open on the Letter fallback (audit-008 §6); the in-editor "Create from Template" dialog injects a fabricated resume (`InkyModule.kt:1157`); two literals and per-type raw hex colours remain on the screen.
+   - **Shipped**: a two-tab pager. Tab 1 "Create New" holds three module cards (Inky Document, Cellina Spreadsheet, Slidia Presentation) that open the module on the bundled blank package `assets/templates/Untitled.od{t,s,p}` with `MainActivity.pendingNewDocument = true`, and a "Create Pagella PDF Document" group with three rows: Create from Image (JPEG/PNG/WebP), Create from Camera (CAMERA permission) and Convert from Document (ODF/OOXML/legacy MS). Tab 2 "Create from Template" has All/ODT/ODS/ODP filter chips, a search field and a download list from `TemplateManager.searchTemplates`.
+   - **Known deltas (code, owned by the Plan 11 home-entry surfaces package and the Plan 3 backlog, not by documentation)**: 9 of the 12 built-in `curatedTemplates` entries are third-party sample files from filesamples.com with invented names, not templates (R-38); the 112 real LibreOffice templates bundled under `assets/templates/` are not surfaced; the blank assets are `Untitled.odt`, `Untitled.ods` and `Untitled.odp` (the extracted cache filenames are lowercase); `TemplateManager` returns `null` if an asset cannot be extracted; the in-editor "Create from Template" dialog injects a fabricated resume (`InkyModule.kt:1157`); two literals and per-type raw hex colours remain on the screen.
    - **First run only**: `WelcomeScreen` (one centered column with a logo tile and full-width "Get Started" button, no permission request) precedes the Start Screen when `papirus_first_run/is_first_run` is true.
 3. **About Screen**:
    - Versioning, LibreOfficeKit core engine attribution, Document Liberation Project credits, open-source licenses.
@@ -102,10 +102,10 @@ A Material 3 Expressive bottom-sheet command deck. It should start compact on ph
 > This section will be updated as the application develops, along with `PROJECT_CONTEXT.md`.
 
 - **Papirus Engine (`com.makerandreas.papirusoffice.data`)**:
-  - Pure Kotlin / Compose parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`, `LayoutEngine`, `TextLayoutManager`).
+  - Kotlin parser and document model (`OfficeDocumentParser`, `DocxDocumentParser`, `SwDocEngine`). `LayoutEngine` paginates through `ParagraphMeasurer` and the injected `TextMetrics` backend; `TextLayoutManager` is used only by the debug formatting inspector (`InkyModule.kt:3897`).
   - **ODF Import System (`data.odf`)**: Context-driven parser paths use `SvXMLImport`, `SvXMLImportContext`, and `OdfXmlToken` across `.odt`, `.ods` and `.odp`; coverage is partial and is checked against ODF 1.4 and repository fixtures.
   - **OpenXML / OOXML Engine**: Kotlin parser paths cover selected `.docx`, `.xlsx` and `.pptx` structures; do not call parsing complete. Writer fidelity plans specify remaining style, numbering, field, table, section, relationship and package work.
-- **LibreOfficeKit (LOKit) JNI Bridge**: native `.so` libraries shipped under `app/src/main/libs/<abi>/` (`liblo-native-code.so` + NSS chain, from LibreOffice Viewer for Android). `LibreOfficeCore` probes them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when absent.
+- **LibreOfficeKit (LOKit) JNI Bridge**: native `.so` libraries are shipped under `app/src/main/libs/<abi>/` (`liblo-native-code.so` + NSS chain, from LibreOffice Viewer for Android). `LibreOfficeCore` probes them at startup; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the Kotlin engine when loading fails. The probe and bundled libraries do not establish that document rendering uses LOKit; the current pagination path is Kotlin (`LayoutEngine`).
 - **DocumentSession & SessionManager**: Tracks active document lifecycle, file path, dirty flags (`isSaved`), autosave timers, and undo/redo stacks.
 - **UndoManager & HistoryManager**: Dual-stack Command Pattern (`UndoAction`). Includes `PendingTypingBuffer`, which owns the debounce → baseline-commit protocol and the flush-then-delete sequence (surfaced via `flushPendingTyping`) before deletions and undo actions to prevent race conditions.
 - **Modular Equation Pipeline**: `EquationParser` converts selected LaTeX-style input to MathML/OMML representations. Writer-side embedding and round-trip support are not yet established; rendered KaTeX/MathJax preview is planned.
@@ -113,15 +113,15 @@ A Material 3 Expressive bottom-sheet command deck. It should start compact on ph
 ---
 
 ## Reference Material 
-### `/docs/html`
-All document format specifications, standards, and schema definitions placed in `/docs/html` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
+### `/docs/odf`
+All document format specifications, standards, and schema definitions placed in `/docs/odf` serve as the authoritative standard for document parsing, serializing, package handling, and rendering:
 - **ODF v1.4 Standards**:
   - `Part 1: Introduction` (architecture, conformance, namespaces, references)
   - `Part 2: Packages` (ZIP container, `mimetype`, `META-INF/manifest.xml`, encryption, signatures)
   - `Part 3: OpenDocument Schema` (elements, styles, XML schema rules for text, spreadsheets, presentations)
   - `Part 4: Recalculated Formula (OpenFormula) Format` (OpenFormula expressions, syntax, evaluators)
 - Whenever implementing or modifying parsers, serializers, or document processors in `com.makerandreas.papirusoffice`:
-  1. Consult the checked-in ODF 1.4 specification files in `docs/html` and ECMA-376 for OOXML.
+  1. Consult the checked-in ODF 1.4 specification files in `docs/odf` and ECMA-376 for OOXML.
   2. Follow the relevant normative rules (namespaces, package parts/relationships, element constraints and MIME requirements); preserve content where supported and verify round trips rather than assuming lossless behavior.
 
 ### `app/src/main/libs`
@@ -148,7 +148,7 @@ If JNI is available on the agent for unit tests, use it. Otherwise, use the GitH
 1. **Target versus shipped.** Every statement about the UI in `AGENTS.md`, `DESIGN.md`, `PROJECT_CONTEXT.md`, release notes and PR bodies is labelled either *shipped* (with `file:line`, a test name or a device screenshot) or *target* (with the plan that owns the code change). An unlabelled UI claim is a defect (R-36, C-5).
 2. **References are patterns, not skins.** The app-to-app map in `DESIGN.md` (Google Workspace, WPS Office, M365 Copilot, Office 365, FlexiPDF, LibreOffice) is bounded by surface and borrows task-level interaction patterns only; no screen may read as a clone of one of them (R-30), and no reference implies Papirus has that product's features.
 3. **Documentation-only deliverables run a reduced Delivery Gate**: R-02, R-15, R-16, R-17, R-36, R-38 and C-5 with evidence; R-26, R-27, R-32, R-34 and R-35 are reported as N/A with the reason "no UI shipped in this deliverable". UI and code deliverables run the full gate.
-4. **Editions are pinned in `DESIGN.md` front matter** (design sources by filename, LibreOffice 26.2 guides, ODF 1.4 in `docs/html`, ECMA-376). A citation to another edition is a doc bug unless the file is a dated historical plan or audit.
+4. **Editions are pinned in `DESIGN.md` front matter** (design sources by filename, LibreOffice 26.2 guides, ODF 1.4 in `docs/odf`, ECMA-376). A citation to another edition is a doc bug unless the file is a dated historical plan or audit.
 
 <!-- antislop:start -->
 ## antislop
