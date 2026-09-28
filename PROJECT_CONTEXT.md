@@ -30,11 +30,11 @@ Default static accent colors (for Android 11 and below, or when Dynamic Color is
 - Standard Bottom Sheet: Microsoft Office 365 command model for Inky, Cellina and Slidia; SoftMaker FlexiPDF for Pagella.
 - General office concepts and layout: LibreOffice, adapted rather than copied from desktop.
 - Icons: shipped dependency `material-icons-extended` is used as both Rounded and Default/Filled (`CellinaModule.kt:569`, `PagellaModule.kt:147`); Material Symbols Rounded is the target family. Colibre is an optional candidate pending asset/license review. A Papirus wallpaper palette (target, not shipped) is distinct from Android 12+ system dynamic color and should use system wallpaper colors directly where available, with a user-selected image fallback if needed.
-- Reference editions: LibreOffice 26.2 guides (`https://books.libreoffice.org/en/`), ODF 1.4 in `docs/html`, ECMA-376 for OOXML; design sources are listed by filename in `DESIGN.md` front matter.
+- Reference editions: LibreOffice 26.2 guides (`https://books.libreoffice.org/en/`), ODF 1.4 in `docs/odf`, ECMA-376 for OOXML; design sources are listed by filename in `DESIGN.md` front matter.
 
-## 🏛️ 2. Core Architecture & Dual-Engine Model
+## 🏛️ 2. Document Engine and Native Bridge
 
-Papirus Office utilizes a **Dual-Engine Architecture** balancing lightweight mobile rendering with desktop-grade document fidelity:
+Papirus currently uses its Kotlin document engine for office-document parsing, editing and layout. LibreOfficeKit libraries are bundled and probed at startup, but a native document-rendering path is not established in the current builds: `LokitEngine` reports its availability and falls back to Kotlin when loading fails.
 
 ### A. The Papirus Engine (`com.makerandreas.papirusoffice.data`)
 A pure Kotlin and Jetpack Compose document engine that directly parses document structures and renders them dynamically in Compose canvas and layout components:
@@ -44,11 +44,11 @@ A pure Kotlin and Jetpack Compose document engine that directly parses document 
     - `.docx`: WordprocessingML parser paths cover selected paragraphs, runs, headings, tables and styles; advanced style resolution, numbering, fields and section behavior remain fidelity work.
     - `.xlsx`: SpreadsheetML paths include shared strings, workbook sheets, cell references and selected table content; feature coverage is not complete.
     - `.pptx`: PresentationML paths include slides, titles, body paragraphs and slide breaks; feature coverage is not complete.
-- **`LayoutEngine` & `TextLayoutManager`**: Calculates line wraps, margins, paragraph indentations, tabs, bullet prefixes, and multi-page layouts.
+- **Pagination and text layout**: `LayoutEngine` owns pagination. `ParagraphMeasurer` produces line fragments using the injected `TextMetrics` measurement backend; `LayoutUnits`, `FontRegistry`, `PageTransform` and `PageEndReason` support measurement, font resolution, page transforms and page-ending decisions. `TextLayoutManager` is used by the debug formatting inspector, not the pagination path (`InkyModule.kt:3897`).
 - **`SwDocEngine` / `EditingEngine`**: Core word processing document model handling character spans, formatting attributes, and cursor selections.
 - **`DocumentSerializer`**: Serialization paths exist; package round-trip integrity and complete ODF/OOXML conformance are not yet established. Save fidelity is tracked separately in the Plan 9 work.
 
-### B. LibreOfficeKit (LOKit) JNI Bridge & C++ OOXML / Equation Layer
+### B. LibreOfficeKit (LOKit) JNI Bridge
 **Status: native libraries bundled in the repository; runtime use is not yet established.** Pre-built LibreOffice Viewer for Android binaries (`liblo-native-code.so` + NSS dependency chain) are tracked with Git LFS under `app/src/main/libs/<abi>/` (`arm64-v8a`: pointer size 196,227,296 bytes; `armeabi-v7a`: 134,699,252 bytes) and packaged through `jniLibs.directories.add("src/main/libs")` in `app/build.gradle.kts`. A checkout without LFS only contains pointer files of about 130 bytes, so size or "stub" statements made from such a checkout (audit-006 §2.1) are not evidence; CI checks out with `lfs: true` and stores `scripts/native-inventory.sh` output with the test reports. `LibreOfficeCore` probes the library at startup; `LokitEngine` reports NATIVE vs SIMULATED to the About screen and diagnostics log and falls back to the pure-Kotlin engine when loading fails. Every rendering path in the current builds is the Kotlin engine.
 - Planned: native C++/JNI bindings to LibreOffice's core rendering engine (`LibreOfficeKit`) for high-fidelity vector tile rendering, complex table layout recalculation, OpenFormula evaluation in spreadsheets, and lossless PDF conversion.
 - Console event logs (`lok::Document::postWindow`, `lok::Document::dispatch`) mirror LOKit dispatch names; entries are tagged `[simulated]` until a native build is bundled.
@@ -81,7 +81,7 @@ Opened from the Start Screen FAB (`HomeDashboard.kt:534-550`, route `create_new_
 
 **Shipped**
 - **Frame**: `TopAppBar` titled "Create New Document" with a back arrow, a two-page `HorizontalPager`, and a bottom `NavigationBar` with the tabs "Create New" and "Create from Template". The pager opens on "Create New", so the shipped flow is module-first. A search icon appears in the app bar only on the template tab.
-- **Tab 1, "Create New Document"**: three equal cards (Inky Document, Cellina Spreadsheet, Slidia Presentation; 48 dp module logo, 16 dp corner radius, 1 dp outline). Each card sets `MainActivity.pendingNewDocument = true` and opens the module on the bundled blank package (`assets/templates/untitled.odt`, `.ods`, `.odp`, extracted by `TemplateManager.get*TemplateFile`).
+- **Tab 1, "Create New Document"**: three equal cards (Inky Document, Cellina Spreadsheet, Slidia Presentation; 48 dp module logo, 16 dp corner radius, 1 dp outline). Each card sets `MainActivity.pendingNewDocument = true` and opens the module on the bundled blank package (`assets/templates/Untitled.odt`, `.ods`, `.odp`, extracted by `TemplateManager.get*TemplateFile`).
 - **Tab 1, "Create Pagella PDF Document"**: a grouped list with three rows: *Create from Image* (JPEG/PNG/WebP through `PagellaPdfCreator.createPdfFromImageUri`), *Create from Camera* (CAMERA permission, FileProvider, `createPdfFromImageFile`) and *Convert from Document* (ODF, OOXML and legacy MS types through `convertDocumentToPdf`). Each row opens Pagella and confirms with a toast.
 - **Tab 2, "Create from Template"**: filter chips All / ODT / ODS / ODP, a search field, and a result list from `TemplateManager.searchTemplates`: the built-in `curatedTemplates` list first, then Google Custom Search (`TemplateSearchRepository`), then a Gemini-generated URL list. Downloads are size-capped and name-sanitized into `getExternalFilesDir("templates")`; a downloaded file opens as an ordinary document. Offline and no-result empty states exist.
 - **New document identity**: a new Inky document is titled "Untitled Document" (`strings.xml:533`) and reports as unsaved until the first Save.
@@ -89,7 +89,7 @@ Opened from the Start Screen FAB (`HomeDashboard.kt:534-550`, route `create_new_
 **Known deltas (code work, owned by the Plan 11 home-entry surfaces package and the Plan 3 backlog)**
 - 9 of the 12 `curatedTemplates` entries point at `filesamples.com` sample documents under invented names and descriptions; they are placeholders, not templates (antislop R-38, R-17). The three remaining entries are the blank `untitled.*` assets.
 - 112 real LibreOffice templates are bundled under `assets/templates/` (`personal/`, `officorr/`, `offimisc/`, `presnt/`, `wizard/`, `styles/`) and none is surfaced in the UI.
-- The blank `untitled.od{t,s,p}` packages are hand-built and non-conformant (no `office:version`, no `meta.xml`, no page layout; `mimetype` is not the first entry in the odt), so a blank Inky document opens on the Letter fallback (audit-008 §6). Regeneration from Collabora 26.04 with a `TemplatePackageTest` is queued.
+- The bundled blank packages `Untitled.odt`, `Untitled.ods` and `Untitled.odp` are Collabora Office 26.04.3.1 resaves. Each has `office:version="1.4"`, a `meta.xml` entry and `mimetype` first in the ZIP; the ODT includes A4 page geometry. `CreateNewDocumentTest.templateManager_extractsUntitledOdtOdsOdp` checks the extracted packages. `TemplateManager` opens the exact asset path and returns `null` if extraction fails. The asset names use an uppercase `U`; extracted cache names remain lowercase (`untitled.*`).
 - The in-editor "Create from Template" dialog (`InkyModule.kt:771,1154-1219`) replaces the body with a fabricated resume text (`InkyModule.kt:1157`).
 - The screen still holds two literals ("Querying ODF repositories...", "Papirus Template • type") and raw per-type hex colours; the Welcome button label "Get Started" is a generic CTA (R-15).
 - No template previews exist.
@@ -216,8 +216,8 @@ A touch-oriented bottom-sheet surface. A compact height around 40% may be a star
 | **Slidia** | Presentation Module | The slide presentation component of Papirus Office (equivalent to LibreOffice Impress / MS PowerPoint). |
 | **Pagella** | PDF & Document Manager | The PDF viewing, annotating, and format conversion component of Papirus Office. |
 | **Start Center / Start Screen** | Document Hub | Top-level dashboard with Recents, Files (device explorer + SAF), the Google Drive placeholder tab, filter chips and the Create New FAB. |
-| **LOKit / LibreOfficeKit** | Native C++ engine (LFS-tracked `.so` under `app/src/main/libs/<abi>/`) | `liblo-native-code.so` + NSS chain from LibreOffice Viewer for Android; `LokitEngine` reports NATIVE vs SIMULATED mode and falls back to the pure-Kotlin engine when loading fails. Current builds run SIMULATED. |
-| **ODF v1.4** | OASIS OpenDocument Format 1.4 | The open international standard format for office documents (`.odt`, `.ods`, `.odp`), with authoritative project copies in `docs/html`. |
+| **LOKit / LibreOfficeKit** | Bundled native libraries and JNI probe (`app/src/main/libs/<abi>/`) | `liblo-native-code.so` + NSS chain from LibreOffice Viewer for Android. `LokitEngine` reports NATIVE or SIMULATED and falls back to Kotlin when loading fails. A probe result does not establish that document rendering uses LOKit; current pagination uses `LayoutEngine`. |
+| **ODF v1.4** | OASIS OpenDocument Format 1.4 | The open international standard format for office documents (`.odt`, `.ods`, `.odp`), with authoritative project copies in `docs/odf/`. |
 | **OOXML** | Office Open XML | Microsoft Office document format standard (`.docx`, `.xlsx`, `.pptx`). |
 | **DocumentSession** | Active Document Session | State container tracking the open document, edit mode, dirty flag, file URI, autosave state, and engine instances. |
 | **UndoManager / HistoryManager** | Undo & Redo Engine | Stack-based command pattern engine tracking `UndoAction` items with multi-step history and synchronous typing flush. |
@@ -231,19 +231,25 @@ A touch-oriented bottom-sheet surface. A compact height around 40% may be a star
 ├── DESIGN.md                                # Design direction: identity, reference map, tokens, surface briefs (target vs shipped)
 ├── PROJECT_CONTEXT.md                       # (This file) Master architecture & context reference
 ├── metadata.json                            # AI Studio application metadata (Name, Description, Capabilities)
-├── docs/html/                               # Authoritative OASIS ODF v1.4 and OpenFormula specifications (HTML)
+├── docs/odf/                               # Authoritative OASIS ODF v1.4 and OpenFormula specifications (HTML)
 │   ├── OpenDocument-v1.4-part1-introduction.html
 │   ├── OpenDocument-v1.4-part2-packages.html
 │   ├── OpenDocument-v1.4-part3-schema.html
 │   └── OpenDocument-v1.4-part4-formula.html
 ├── docs/InkyC1Checklist.md                  # Writer Guide 26.2 Chapter 1 device test checklist
-├── docs/GS262-GettingStarted_compressed.pdf # LibreOffice 26.2 Getting Started guide
-├── docs/WG262-WriterGuide_compressed.pdf    # LibreOffice 26.2 Writer guide
-├── docs/CG262-CalcGuide.pdf                 # LibreOffice 26.2 Calc guide
-├── docs/IG262-ImpressGuide_compressed.pdf   # LibreOffice 26.2 Impress guide
-├── docs/DG262-DrawGuide.pdf                 # LibreOffice 26.2 Draw guide
+├── docs/lo-guides/GS262-GettingStarted_compressed.pdf # LibreOffice 26.2 Getting Started guide
+├── docs/lo-guides/WG262-WriterGuide_compressed.pdf    # LibreOffice 26.2 Writer guide
+├── docs/lo-guides/CG262-CalcGuide.pdf                 # LibreOffice 26.2 Calc guide
+├── docs/lo-guides/IG262-ImpressGuide_compressed.pdf   # LibreOffice 26.2 Impress guide
+├── docs/lo-guides/DG262-DrawGuide.pdf                 # LibreOffice 26.2 Draw guide
+├── docs/design.md-references/                 # Owner-provided design reference summaries
+├── sdk-references/                            # LibreOffice SDK reference examples
+├── tests/                                     # Format fixtures and regression inputs
+├── skills/                                    # Project antislop skills
+├── CONCEPT.md                                 # Product concept and interaction terminology
+├── antislop.md                                # Antislop core rules
 ├── anti-slop/                               # Numbered audits and plans (evidence trail)
-├── app/src/main/assets/templates/           # 115 LibreOffice templates; only untitled.od{t,s,p} are used by Create New
+├── app/src/main/assets/templates/           # 115 template assets; Create New uses Untitled.od{t,s,p}
 ├── app/src/main/libs/                       # Pre-built native .so per ABI (LibreOffice Viewer for Android, Git LFS)
 │   ├── arm64-v8a/                           # liblo-native-code.so + NSS dependency chain
 │   └── armeabi-v7a/                         # liblo-native-code.so + NSS dependency chain
@@ -317,7 +323,7 @@ Papirus Office (codenamed LibreDroid Office during conceptualization) follows a 
 - **Collabora Online**: [github.com/CollaboraOnline/online](https://github.com/CollaboraOnline/online)
 - **ECMA-376 OOXML**: [ecma-international.org](https://ecma-international.org/publications-and-standards/standards/ecma-376/)
 - **Microsoft OpenXML SDK**: [learn.microsoft.com](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) / [github.com/dotnet/Open-XML-SDK](https://github.com/dotnet/Open-XML-SDK)
-- **OASIS OpenDocument (ODF v1.4)**: Authoritative project specification files in `docs/html`
+- **OASIS OpenDocument (ODF v1.4)**: Authoritative project specification files in `docs/odf`
 - **Google Ink API**: [developer.android.com/develop/ui/views/touch-and-input/stylus-input/about-ink-api](https://developer.android.com/develop/ui/views/touch-and-input/stylus-input/about-ink-api)
 - **KaTeX / MathML**: [github.com/KaTeX/KaTeX](https://github.com/KaTeX/KaTeX)
 - **Mermaid.js**: [github.com/mermaid-js/mermaid](https://github.com/mermaid-js/mermaid)
@@ -328,7 +334,7 @@ Papirus Office (codenamed LibreDroid Office during conceptualization) follows a 
 
 ## ⚙️ 9. Engineering Guidelines for Future AI Agents
 
-1. **ODF v1.4 Normative Rule**: When parsing, serializing or modifying OpenDocument structures, consult the checked-in standard files in `docs/html`. Preserve package content where the implementation supports it and verify round trips against LibreOffice and Microsoft Office; do not assume preservation without tests.
+1. **ODF v1.4 Normative Rule**: When parsing, serializing or modifying OpenDocument structures, consult the checked-in standard files in `docs/odf`. Preserve package content where the implementation supports it and verify round trips against LibreOffice and Microsoft Office; do not assume preservation without tests.
 2. **Text Input & Undo Synchronization**: When modifying text editing or Undo/Redo logic, always ensure the active typing buffer is synchronously flushed to `UndoManager` prior to handling deletions, selections, or external undo actions to avoid debounce race conditions.
 3. **Touch Targets & Accessibility**: Every interactive control, toolbar icon, menu item, and button MUST have a minimum touch target size of `48dp x 48dp` with meaningful `contentDescription`.
 4. **Theme & Color Fidelity**:

@@ -15,11 +15,11 @@ reference_files:
     - README.txt
     - OFL.txt
   libreoffice_26_2_guides:
-    - docs/GS262-GettingStarted_compressed.pdf
-    - docs/WG262-WriterGuide_compressed.pdf
-    - docs/CG262-CalcGuide.pdf
-    - docs/IG262-ImpressGuide_compressed.pdf
-    - docs/DG262-DrawGuide.pdf
+    - docs/lo-guides/GS262-GettingStarted_compressed.pdf
+    - docs/lo-guides/WG262-WriterGuide_compressed.pdf
+    - docs/lo-guides/CG262-CalcGuide.pdf
+    - docs/lo-guides/IG262-ImpressGuide_compressed.pdf
+    - docs/lo-guides/DG262-DrawGuide.pdf
   mobile_screenshot_observations: anti-slop/audit-009-2026-09-27-docs-refresh-analysis.md (sections 9.1 and 9.2)
 reference_urls:
   material_3: "https://m3.material.io/"
@@ -30,7 +30,7 @@ reference_urls:
   material_3_sheets: "https://m3.material.io/components/bottom-sheets/overview"
   writer_26_2_chapter_1: "https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html"
   libreoffice_26_2_shelf: "https://books.libreoffice.org/en/"
-  odf_1_4: docs/html
+  odf_1_4: docs/odf
   ooxml: ECMA-376
 ---
 
@@ -157,38 +157,38 @@ Every brief uses the sources in §2 and applies the M3 adoption contract in §3.
 
 ### 9.2 Start Screen tabs
 
-- **Sources:** Google Workspace task map (`CONCEPT.md:27-31`), calm search/navigation hierarchy in `google.com-design.md` Layout/Search, and LibreOffice Start Center module, recent, template and open-file paths (`docs/GS262-GettingStarted_compressed.pdf`, Chapter 1, PDF pp. 24-35). No Workspace mobile screen was supplied.
+- **Sources:** Google Workspace task map (`CONCEPT.md:27-31`), calm search/navigation hierarchy in `google.com-design.md` Layout/Search, and LibreOffice Start Center module, recent, template and open-file paths (`docs/lo-guides/GS262-GettingStarted_compressed.pdf`, Chapter 1, PDF pp. 24-35). No Workspace mobile screen was supplied.
 - **Shipped:** Recents / Files / Google Drive bottom tabs, `HorizontalPager`, a top search field and a 56 dp create FAB (`ui/home/HomeDashboard.kt:475-580`). Recents filters only **file names** plus selected module, not document body or author (`ui/home/HomeDashboard.kt:655-690`). The Google Drive tab is a placeholder, not OAuth/file sync; its promotional copy and "Connect Google Account" button do **not** disclose this until the placeholder toast after a press (`ui/home/HomeDashboard.kt:1210-1275`).
 - **Target, Plan 11 home-entry package:** make the actual recent files and storage paths easy to scan; keep the create action away from the last item and system bar. Use module badges as labels plus colour, visible empty/loading/error states and Drive copy that discloses the unavailable state before a tap (Plan 3 copy backlog). Only claim metadata/full-text search after it works. A rail or list-detail pane on wider widths may supplement the tabs; do not force a Google Search landing page onto a file browser.
 
 ### 9.3 Create New
 
-- **Sources:** WPS entry hierarchy (`wps.com-design.md` Components/Layout); LibreOffice Start Center (`docs/GS262-GettingStarted_compressed.pdf`, Chapter 1, PDF pp. 24-35) and real template definition (Chapter 4, PDF pp. 166-169). Blank, template, open and remote are different tasks.
-- **Shipped:** Start Screen FAB opens `NewDocumentScreen` (`ui/home/HomeDashboard.kt:534-550`, `MainActivity.kt:395`). It starts on tab 1 of a two-page pager: three module cards open blank `assets/templates/untitled.odt|ods|odp` via `TemplateManager` with `pendingNewDocument`, followed by Image / Camera / Convert entries for Pagella. Tab 2 has All / ODT / ODS / ODP filters, search and `TemplateManager.searchTemplates` fallback sources (`ui/home/NewDocumentScreen.kt:71-200`, `core/util/TemplateManager.kt:24-41,90-160`, audit-009 §3.1). It is **module-first**, not template-first. No template preview is implemented (audit-009 §3.1).
+- **Sources:** WPS entry hierarchy (`wps.com-design.md` Components/Layout); LibreOffice Start Center (`docs/lo-guides/GS262-GettingStarted_compressed.pdf`, Chapter 1, PDF pp. 24-35) and real template definition (Chapter 4, PDF pp. 166-169). Blank, template, open and remote are different tasks.
+- **Shipped:** Start Screen FAB opens `NewDocumentScreen` (`ui/home/HomeDashboard.kt:534-550`, `MainActivity.kt:395`). It starts on tab 1 of a two-page pager: three module cards open blank `assets/templates/Untitled.odt|ods|odp` via `TemplateManager` with `pendingNewDocument`, followed by Image / Camera / Convert entries for Pagella. Tab 2 has All / ODT / ODS / ODP filters, search and `TemplateManager.searchTemplates` fallback sources (`ui/home/NewDocumentScreen.kt:71-200`, `core/util/TemplateManager.kt:24-41,90-160`, audit-009 §3.1). It is **module-first**, not template-first. No template preview is implemented (audit-009 §3.1).
 - **Known delta:** the 12 hard-coded gallery entries are three blank assets and nine `filesamples.com` samples presented under invented template names; another 112 bundled files are not surfaced (`core/util/TemplateManager.kt:90-171`, audit-009 §3.1). The `untitled.*` packages do not declare a conformant page layout (`anti-slop/audit-008-2026-09-27-fixture-rebaseline.md` §6); the separate Inky template dialog inserts fake resume copy (`modules/inky/InkyModule.kt:1154-1219`). Those are **not** a usable official template catalogue.
 - **Target, Plan 11 home-entry package / Plan 3 copy backlog / 5d template-default work:** preserve the fast blank route and the distinct Pagella creation tasks. List only installed, attributable templates with a real preview or honest "Preview unavailable" state; otherwise show fewer results. Loading, offline, zero results and download errors need clear language and retry. Opening a template creates a **new** unsaved document without overwriting its source; do not use a sample-file URL as a template. Fix blank defaults in the owning code plan, not in this doc.
 
 ### 9.4 Editor shell and Inky
 
-- **Sources:** M365 Word viewer/editor screenshots (audit-009 §9.1); Writer Guide 26.2 Chapter 1 (`docs/WG262-WriterGuide_compressed.pdf`, PDF pp. 17-40) for page/status, Navigator, save/undo and Sidebar concepts.
+- **Sources:** M365 Word viewer/editor screenshots (audit-009 §9.1); Writer Guide 26.2 Chapter 1 (`docs/lo-guides/WG262-WriterGuide_compressed.pdf`, PDF pp. 17-40) for page/status, Navigator, save/undo and Sidebar concepts.
 - **Shipped:** Inky has viewer/edit modes, `TopAppBar` title and a single 48 dp status area with page/zoom access (`modules/inky/InkyModule.kt:2047-2062,2455-2480`). The keyboard-mode Toolbar Hub and 40%-height command surface are implemented as custom Compose rows/surface (`modules/inky/InkyModule.kt:2582-2608,2931-2949`). Only File and Home have Writer ribbon decks; Insert / Layout / Review / View are declared but unavailable (`modules/inky/WriterRibbonModel.kt:7-44`). These references establish screen structure, not device rendering fidelity.
-- **Target, Plan 11 editor package and later Writer fidelity plans:** preserve the document when chrome changes mode. In viewer mode, put read/navigation/edit actions in one reachable bar. In editor mode, show the active tool state and an explicit expand path to the command deck while leaving text visible. Save/unsaved/error status must reflect the session, not a toast. Re-map Writer Guide 26.2's nine Sidebar decks and accessibility-check field in Plan 1 rather than claiming they already exist in Inky (`docs/WG262-WriterGuide_compressed.pdf`, Chapter 1; audit-009 §2).
+- **Target, Plan 11 editor package and later Writer fidelity plans:** preserve the document when chrome changes mode. In viewer mode, put read/navigation/edit actions in one reachable bar. In editor mode, show the active tool state and an explicit expand path to the command deck while leaving text visible. Save/unsaved/error status must reflect the session, not a toast. Re-map Writer Guide 26.2's nine Sidebar decks and accessibility-check field in Plan 1 rather than claiming they already exist in Inky (`docs/lo-guides/WG262-WriterGuide_compressed.pdf`, Chapter 1; audit-009 §2).
 
 ### 9.5 Cellina
 
-- **Sources:** four M365 Excel screenshots (audit-009 §9.2), Calc Guide 26.2 Chapter 1 (`docs/CG262-CalcGuide.pdf`, PDF pp. 17-50): Formula Bar/Name Box, sheet tabs, cell selection and status aggregation.
+- **Sources:** four M365 Excel screenshots (audit-009 §9.2), Calc Guide 26.2 Chapter 1 (`docs/lo-guides/CG262-CalcGuide.pdf`, PDF pp. 17-50): Formula Bar/Name Box, sheet tabs, cell selection and status aggregation.
 - **Shipped:** a grid, coordinates, `formulaText`, sheet list and status controls exist (`modules/cellina/CellinaModule.kt:95-136,538-589,790-834`), with a custom 40%-height command surface (`:837-852`). The initial grid and `=SUM(B2:C3)` are seeded sample values; the text "100% • Sheet 1 of 3" is hard-coded (`:99-136,809`). Do **not** describe these as calculations or status read from the opened file.
 - **Target, Plan 11 editor package (UI); Calc data work remains unscheduled:** prioritize selected cell, address, formula entry and visible grid. With the keyboard open, keep commit/cancel and formula context reachable; when selection changes, a compact quick-tool row may replace sheet tabs, but the current sheet stays identifiable. If a range has data, a summary row may expose *computed* sum/average/count, not the M365 screenshot's sample numbers. Sheet switching/addition and freeze/scroll behavior must reflect the workbook. No toolbar may cover the cell being edited.
 
 ### 9.6 Slidia
 
-- **Sources:** four M365 PowerPoint screenshots (audit-009 §9.2); Impress Guide 26.2 Chapter 1 (`docs/IG262-ImpressGuide_compressed.pdf`, PDF pp. 20-43): Slides pane, Normal/Outline/Notes/Slide Sorter, selected-object decks, slide show.
+- **Sources:** four M365 PowerPoint screenshots (audit-009 §9.2); Impress Guide 26.2 Chapter 1 (`docs/lo-guides/IG262-ImpressGuide_compressed.pdf`, PDF pp. 20-43): Slides pane, Normal/Outline/Notes/Slide Sorter, selected-object decks, slide show.
 - **Shipped:** Slidia has a slide state list, selected index, top chrome, a custom 40% deck and a viewer-mode Edit FAB (`modules/slidia/SlidiaModule.kt:134-190,982-1007,1367-1381`). The default slide list contains demo marketing text, **not** verified user content (`:135-168`); do not make claims of full format support from those slides.
 - **Target, Plan 11 editor package (UI); Impress data work remains unscheduled:** viewer may stack readable slides with a clear Present/Notes/Edit route; editor fits the active slide above a navigable thumbnail filmstrip. Selection handles indicate the real selected object and switch the quick tools to its context. Expanded commands must leave a route back to slide order, notes and canvas; no fake "insert" action and no FAB covering a slide or status control. On wider screens, use a persistent thumbnail pane, not a 40% sheet stretched across the display.
 
 ### 9.7 Pagella
 
-- **Sources:** FlexiPDF is the bounded PDF-command reference in `CONCEPT.md:27-31`, but no FlexiPDF screen was supplied; M3 sheets and Draw Guide 26.2 Chapter 1 (`docs/DG262-DrawGuide.pdf`, PDF pp. 21-33) provide page/object selection concepts.
+- **Sources:** FlexiPDF is the bounded PDF-command reference in `CONCEPT.md:27-31`, but no FlexiPDF screen was supplied; M3 sheets and Draw Guide 26.2 Chapter 1 (`docs/lo-guides/DG262-DrawGuide.pdf`, PDF pp. 21-33) provide page/object selection concepts.
 - **Shipped:** Android `PdfRenderer` renders one current page from an existing local PDF, with previous/next and zoom buttons; an ink Canvas can hold gesture paths (`modules/pagella/PagellaModule.kt:85-120,132-198,202-299`). A failed/missing render falls back to static text that falsely claims native PDF rendering and export (`:229-253`); the "Export" button at `:195-196` calls a message callback and is not proof a PNG was saved. Continuous multi-page scroll and a FlexiPDF-like bottom deck are **targets**, not shipped behavior.
 - **Target, Plan 11 Pagella package / Plan 3 copy backlog:** page/zoom/ink tools grouped by actual PDF task, with real progress/error/empty states. Only offer export when there is persisted output; distinguish PDF page, ink overlay and file actions. Preserve document contrast in light/dark chrome. Validate continuous paging before promising it. Do not infer a particular FlexiPDF deck layout without a source image.
 
@@ -223,7 +223,7 @@ Every brief uses the sources in §2 and applies the M3 adoption contract in §3.
 
 ## 12. Standards and evidence ledger
 
-- **Normative formats:** ODF 1.4 Parts 1-4 in `docs/html`; ECMA-376 for OOXML. Open XML SDK docs are useful for package/part APIs but not a replacement for the standard (`AGENTS.md` Reference Material). Format compatibility is earned by parse/render/save/reopen tests, not by matching a screenshot.
-- **LibreOffice 26.2 scope:** Getting Started Ch. 1 (Start Center and document lifecycle) and Ch. 4 (styles/templates), `docs/GS262-GettingStarted_compressed.pdf`; Writer Ch. 1 (window, Sidebar, Navigator, views, save), `docs/WG262-WriterGuide_compressed.pdf`, with [online Chapter 1](https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html); Calc Ch. 1 (formula, grid, sheets/status), `docs/CG262-CalcGuide.pdf`; Impress Ch. 1 (slide pane, views, notes), `docs/IG262-ImpressGuide_compressed.pdf`; Draw Ch. 1 (pages, layers, drawing tools), `docs/DG262-DrawGuide.pdf`. Next Writer feature work starts from **Ch. 2, Working with Text: Basics** (Writer PDF p. 41), not from an older edition. Plan 1 owns the historical 24.8 chapter-map update (`anti-slop/plan-11-hybrid-experience-design.md:74`).
+- **Normative formats:** ODF 1.4 Parts 1-4 in `docs/odf`; ECMA-376 for OOXML. Open XML SDK docs are useful for package/part APIs but not a replacement for the standard (`AGENTS.md` Reference Material). Format compatibility is earned by parse/render/save/reopen tests, not by matching a screenshot.
+- **LibreOffice 26.2 scope:** Getting Started Ch. 1 (Start Center and document lifecycle) and Ch. 4 (styles/templates), `docs/lo-guides/GS262-GettingStarted_compressed.pdf`; Writer Ch. 1 (window, Sidebar, Navigator, views, save), `docs/lo-guides/WG262-WriterGuide_compressed.pdf`, with [online Chapter 1](https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html); Calc Ch. 1 (formula, grid, sheets/status), `docs/lo-guides/CG262-CalcGuide.pdf`; Impress Ch. 1 (slide pane, views, notes), `docs/lo-guides/IG262-ImpressGuide_compressed.pdf`; Draw Ch. 1 (pages, layers, drawing tools), `docs/lo-guides/DG262-DrawGuide.pdf`. Next Writer feature work starts from **Ch. 2, Working with Text: Basics** (Writer PDF p. 41), not from an older edition. Plan 1 owns the historical 24.8 chapter-map update (`anti-slop/plan-11-hybrid-experience-design.md:74`).
 - **Plan 5c evidence:** `anti-slop/audit-009-2026-09-27-docs-refresh-analysis.md` §3.1 has the Create New code walk; §9.1-9.2 records the 11 inline M365 screenshots; §9.3 records source limits, local guide pages, font inspection and extra module deltas; §10 indexes files. Website source notes and all five local PDFs are listed in this file's front matter. No screenshot JPEG was added to Git.
 - **Documentation-only Delivery Gate:** the final reduced report is in PR #17. R-02, R-15, R-16, R-17, R-36, R-38 and C-5 require evidence; R-26/27/32/34/35 are N/A **for this doc edit**, not waived for later UI work (`AGENTS.md` antislop project addendum). Code, resources, tests and workflows are unchanged by Plan 5c.
