@@ -1,4 +1,4 @@
-# Plan 11 — Hybrid Experience Design and Design-System Alignment
+# Plan 11: Hybrid Experience Design and Design-System Alignment
 
 **Date:** 2026-09-25
 **Status:** Documentation alignment is in this change; product implementation is split into later PRs.
@@ -63,7 +63,7 @@ A resource in `res/font`, a ZIP in the repository, a composable name, a roadmap 
 
 ## 3. Writer Guide Chapter 1 comparison
 
-Reference: [LibreOffice Writer Guide 7.2, Chapter 1: Introducing Writer](https://documentation.libreoffice.org/assets/Uploads/Documentation/en/WG7.2/WG72-WriterGuide.pdf). The chapter is a functional baseline, not a demand to reproduce a desktop screen.
+**Edition corrected 2026-09-28 (Plan 1, `audit-012` P1-27).** This section originally cited LibreOffice Writer Guide **7.2**. The pinned reference edition for this repository is the **26.2** shelf (`AGENTS.md`, `DESIGN.md` front matter): online [Writer Guide 26.2, Chapter 1](https://books.libreoffice.org/en/WG262/WG26201-IntroducingWriter.html), local `docs/lo-guides/WG262-WriterGuide_compressed.pdf`, Chapter 1 on PDF pages 17 to 40. The 7.2 link is kept below as the historical source of this comparison table; the table's rows were re-checked against 26.2 and none of them changed in a way that alters an owner. Original reference: [LibreOffice Writer Guide 7.2, Chapter 1: Introducing Writer](https://documentation.libreoffice.org/assets/Uploads/Documentation/en/WG7.2/WG72-WriterGuide.pdf). The chapter is a functional baseline, not a demand to reproduce a desktop screen.
 
 | Writer Guide Chapter 1 area | Mobile Papirus treatment / existing evidence |
 |---|---|
@@ -82,7 +82,7 @@ Reference: [LibreOffice Writer Guide 7.2, Chapter 1: Introducing Writer](https:/
 
 ## 4. Sample corpus analysis: ODT and DOCX
 
-The six matched files under `tests/inky/` were inspected as ZIP packages and their main XML parts were counted. The following inventory is a structural guide; it is not a fidelity score. Counts describe literal XML elements, not expanded repeated rows/cells or rendered page counts.
+**Provenance note (2026-09-28, Plan 1).** The six matched files under `tests/inky/` were inspected as ZIP packages and their main XML parts were counted. The inventory below predates the Plan 5b re-baseline (PR #16), in which every `.docx` was re-saved by Microsoft 365 and every `.odt` by Collabora Office 26.04. Treat these counts as a structural guide to the older package versions, not as current measurements: `audit-008` §1 and §4 supersede them, and `tests/inky/fixture-identities.properties` pins the bytes now in the tree. The inventory is not a fidelity score. Counts describe literal XML elements, not expanded repeated rows/cells or rendered page counts.
 
 | Pair | ODT structure observed | DOCX structure observed | Why the pair matters |
 |---|---|---|---|
@@ -99,13 +99,13 @@ The six matched files under `tests/inky/` were inspected as ZIP packages and the
 - Use Sample-3 as a negative/control fixture for styles, text, run spans and tables.
 - Use Sample-6 as the end-to-end convergence fixture, not as the only fixture.
 - Assert XML/package structure as well as visible output: ODT package/manifest/links/styles and DOCX parts/relationships/content types/fields/sections matter even when the first screen looks plausible.
-- Keep ODF interpretation grounded in the checked-in ODF 1.4 Parts 1–4 under `docs/html`. Use ECMA-376 as normative for OOXML; the [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) is a useful package/part model and API reference, not a replacement for ECMA-376.
+- Keep ODF interpretation grounded in the checked-in ODF 1.4 Parts 1 to 4 under `docs/odf`. Use ECMA-376 as normative for OOXML; the [Open XML SDK documentation](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) is a useful package/part model and API reference, not a replacement for ECMA-376.
 
 ---
 
 ## 5. PR sequence and work packages
 
-Plan 3B is treated as complete. The next documentation PR is the existing Plan 3C intent, expanded to align the hybrid design direction. **PR 15–22 remain reserved for the established Plans 5–9 roadmap** in `plan-2026-09-24-remaining-pr-roadmap-v2.md`; this design plan does not renumber or silently replace those fidelity PRs.
+Plan 3B is treated as complete. The next documentation PR is the existing Plan 3C intent, expanded to align the hybrid design direction. **PR slots 15 to 19 have since been used by Plan 5 (5a to 5e), so the first free slot for this plan's packages is #20**; the re-numbered forward schedule lives in `plan-2026-09-24-remaining-pr-roadmap-v2.md` §4.12 and `plan-01-master-index.md` §2 (updated 2026-09-28). This design plan does not renumber or silently replace the fidelity PRs.
 
 | Order | Scope | Exit gate |
 |---|---|---|
@@ -115,12 +115,12 @@ Plan 3B is treated as complete. The next documentation PR is the existing Plan 3
 | **Typography and icon work package** | Validate Google Sans resources/weights and typography mapping, keep Roboto fallback; verify scaling/performance. Inventory Material Symbols Rounded coverage and Colibre ZIP provenance/license; add a selectable icon pack only if rights and accessibility mapping are clear. | Screenshot and text-scale evidence; no missing-font crash; icons have semantic labels; license/provenance recorded before bundling assets. |
 | **Home-entry surfaces work package** | Apply WPS-inspired Welcome/Create New and Google Workspace-inspired Start Screen tab patterns on shared theme. Preserve real SAF/template behavior; Google Drive remains an honest placeholder unless separately implemented. | Compact 320 dp, medium and expanded-width checks; navigation, empty states, strings, TalkBack and theme evidence. |
 | **Settings and About work package** | Android-settings-inspired preference and diagnostic hierarchy; About's paged sections have explicit controls/indicators and an accessible alternative to vertical swiping. Keep diagnostics technical and copy anti-slop compliant. | Back navigation, screen-reader order, reduced motion, text scaling, large screen and persistence checks. |
-| **Editor surfaces work package** | Normalize editor dialogs/sheets across all modules using the Google Workspace-inspired task hierarchy and M3 components. Apply M365-inspired editor hierarchy without importing proprietary functionality; align Toolbar Hub, status bar, viewer/editor controls and general LibreOffice-derived concepts to touch. | Writer Guide/checklist mapping complete; Inky device gate plus representative Calc/Impress/PDF smoke tests. |
+| **Editor surfaces work package** | Normalize editor dialogs/sheets across all modules using the Google Workspace-inspired task hierarchy and M3 components. Apply M365-inspired editor hierarchy without importing proprietary functionality; align Toolbar Hub, status bar, viewer/editor controls and general LibreOffice-derived concepts to touch. **Resolve the Inky mobile-view control**: `InkyModule.kt:2084-2092` renders a Web/mobile-view button whose only behaviour is a toast (`R.string.inky_flow_view_unavailable`), because Plan 5e retired the second renderer. Either give it a real destination through the paginated pipeline or remove it; an honest label does not make a dead control compliant with R-26. | Writer Guide/checklist mapping complete; Inky device gate plus representative Calc/Impress/PDF smoke tests. |
 | **Module ribbon work packages** | Implement Office-365-inspired decks for Inky/Cellina/Slidia and FlexiPDF-inspired Pagella. Split by module/capability; no control may only toast or mutate document state without serializer support. | Each command has a real enabled action or explicit unavailable state; ODF/OOXML round-trip tests for document edits. |
 
 ### Dependency and ordering notes
 
-- The documentation contract is PR 14. The existing PR 15–22 document-fidelity roadmap remains the numbered critical path; design implementation packages should receive actual PR numbers only after that schedule is re-confirmed.
+- The documentation contract is PR 14 (merged). Plans 6 to 9 occupy PR slots #20 to #25 per the re-numbered schedule; design implementation packages take their numbers from the next free slot at the time they start, not from a pre-assigned block.
 - Theme and app-shell work can proceed alongside ODF/DOCX parser work only where they touch separate UI/theme paths. Share anti-slop gates and resolve source conflicts before merge.
 - UI Google Sans work is not a substitute for Plan 5/7/8 document-font metrics and should not block a shell redesign. Conversely, do not change saved document font names to make the UI font path work.
 - Ribbon controls that edit content depend on their model/writer capability, so follow Plans 6–9 or coordinate capability by capability. Design specs may be written early; implementation cannot claim persistence until round-trip evidence passes.
@@ -150,5 +150,5 @@ Every UI PR must report:
 - [SoftMaker FlexiPDF manual](https://www.softmaker.net/down/flexipdf2025_en.pdf) documents a desktop ribbon. FlexiPDF is not treated as a proven Android UI reference; borrow only the user's specified PDF command grouping/ribbon concept and redesign for Papirus's mobile layout.
 - [LibreOffice Writer Guide 7.2, Chapter 1](https://documentation.libreoffice.org/assets/Uploads/Documentation/en/WG7.2/WG72-WriterGuide.pdf).
 - [Open XML SDK documentation — Microsoft Learn](https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk) and [ECMA-376 / OOXML standards](https://ecma-international.org/publications-and-standards/standards/ecma-376/).
-- ODF 1.4 specifications under `docs/html`.
+- ODF 1.4 specifications under `docs/odf`.
 - Project evidence: `anti-slop/audit-001` through `audit-006`, `anti-slop/plan-01` through `plan-10`, `docs/InkyC1Checklist.md`, `CONCEPT.md`, `AGENTS.md`, `PROJECT_CONTEXT.md`, and all 12 ODT/DOCX fixtures in `tests/inky/`.

@@ -141,7 +141,7 @@ IDs are `P1-nn`. "Actual" is what this audit measured at `439ed05`. Owner column
 
 | ID | Location | Finding | Recommendation | Owner |
 |---|---|---|---|---|
-| P1-31 | `plan-2026-09-24-remaining-pr-roadmap-v2.md` (113 em dashes), `plan-04-to-09-writer-fidelity.md` (12) | R-02 forbids the em dash in text the agent writes; both files are active planning documents, not dated audits | do not add new ones; clean the two files in the same PR that edits them. Do not touch the dated `audit-*` files | 1A |
+| P1-31 | `plan-2026-09-24-remaining-pr-roadmap-v2.md` (113 em dashes at scan time), `plan-04-to-09-writer-fidelity.md` (12) | R-02 forbids the em dash in text the agent writes; both files are active planning documents, not dated audits | **done in 1A**: 113 and 12 removed, replaced case by case with a colon, comma, semicolon, period or parenthesis, and empty table cells written as a bare dash became `none`. One occurrence was deliberately kept: `plan-11` line 152 quotes the verbatim external title of the Microsoft Learn Open XML SDK page, which contains an em dash as published; rewriting a cited title would misrepresent the source. Do not touch the dated `audit-*` files | 1A |
 | P1-32 | `InkyModule.kt:2084-2092` | the editor's mobile-view button is a control whose only behaviour is a toast | honest label, but still a dead control under R-26. Record it as a Plan 11 editor-package item (remove it, or give it a real destination) rather than describing it as shipped | 1A ledger |
 | P1-33 | `curatedTemplates` (`TemplateManager.kt:60`, `:70` to `:142`, `:211`) | 12 list entries: 3 blank `asset://templates/Untitled.*` items plus 9 `filesamples.com` downloads. The declaration at line 60 and the parser usage at line 211 are not entries | the docs' "9 of the 12" is still correct; confirm it survives the edit rather than re-deriving it | 1B, verify only |
 
@@ -206,3 +206,19 @@ CI for both is the existing Unit Tests plus Build workflow. Documentation edits 
 | R-03 / R-25 / R-26 / R-27 / R-32 / R-34 / R-35 | N/A: no UI shipped in this deliverable. R-26 is still reported as an open finding against existing app code (P1-32). |
 
 Local evidence collected in this audit: twelve `sha256sum` fixture comparisons; three blank-package ZIP inspections (`mimetype` position, `office:version`, `meta.xml`, page layout, master page); `gh pr list` and `gh run view` reads; 234 unit plus 1 instrumented `@Test` count; `gh` run status for `main`; greps for `docs/html`, `isWebView`, `TextLayoutManager`, `Untitled.od*` and `filesamples.com` across the tree; em-dash counts per document. No Gradle, no JDK, no device, no screenshot.
+
+---
+
+## 8. 1A execution record (2026-09-28)
+
+Applied as one PR on `arena/01a0e7ac-papirus-office`:
+
+| File | Change |
+|---|---|
+| `anti-slop/plan-01-master-index.md` | §1 edition note and ODF path; §2 registry rows 5 to 11 with landed PRs and the next free slot (#20); §3 chapter map re-pinned to 26.2 with the document-views, Go to Page and multiple-views rows corrected; §4 rows 2, 3, 4, 6, 9, 11, 12 plus the deferred-device-pass note; §5 invariants 1, 5, 6; §6 schedule note and next-action entries 6 to 8; audits-consumed paragraph now includes `audit-011` and `audit-012`, plus the PR-numbering note |
+| `anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md` | §4.12 rewritten as a landed table plus a re-numbered forward table; §4.10 and §4.11 dependency references; §5 sequencing table and device-checklist resume points; §6 invariants; Appendix A ODF path correction; em-dash sweep (113) |
+| `anti-slop/plan-04-to-09-writer-fidelity.md` | Plan 5 section gained 5B, 5C, 5D and 5E implementation records and the 2026-09-28 amendment; `docs/html` corrected; em-dash sweep (12) |
+| `anti-slop/plan-5e-progress.md` | status from "started, not complete" to merged, with the merge commit, the CI runs and the explicit not-approved device scope |
+| `anti-slop/plan-11-hybrid-experience-design.md` | §3 edition corrected to 26.2 with the 7.2 citation kept as the historical source; §4 sample inventory marked as pre-5b; §5 PR-slot paragraph and dependency note re-numbered; editor-surfaces row gained the dead mobile-view control (P1-32); `docs/html` corrected at two sites |
+
+No Kotlin, resource, test, fixture or workflow file was touched. 1B (the product-documentation truth pass over `AGENTS.md`, `DESIGN.md`, `PROJECT_CONTEXT.md` and `CONCEPT.md`) is the remaining half of Plan 1 and carries P1-01 to P1-05, P1-08 to P1-13 and P1-33.

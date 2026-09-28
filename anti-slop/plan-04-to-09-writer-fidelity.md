@@ -1,4 +1,4 @@
-# Papirus Office Writer — Fix Strategy, Plans 4 to 9 (was PRs D to I)
+# Papirus Office Writer: Fix Strategy, Plans 4 to 9 (was PRs D to I)
 
 **Date:** 2026-09-24
 **Input:** `anti-slop/audit-005-2026-09-24.md` (findings F-01 … F-20, observations O-01 … O-06) and `anti-slop/audit-006-2026-09-24.md` (screenshot findings F-21 … F-31, compliance sweep)
@@ -9,7 +9,7 @@
 **Baseline:** post-PR-C nightly, `main` d1105ce (PRs #7 A, #8 B1, #9 B2, #10 C)
 **Deliverable of this document:** an ordered, reviewable PR split with scope, root causes closed, files, tests, acceptance criteria, and risk. It changes no code by itself.
 
-> **Read with:** `AGENTS.md` (branch/CI rules, en_US strings, 48 dp targets), `DESIGN.md` (M3 Expressive tokens, dial ENERGY 2 / RHYTHM 1 / MOTION 3), `antislop.md` + the five skills (Modal UI changes must pass the Delivery Gate), `docs/html` ODF 1.4 Part 1 (authoritative for every ODF decision), ECMA-376 §17 (authoritative for every OOXML decision).
+> **Read with:** `AGENTS.md` (branch/CI rules, en_US strings, 48 dp targets), `DESIGN.md` (M3 Expressive tokens, dial ENERGY 2 / RHYTHM 1 / MOTION 3), `antislop.md` + the five skills (Modal UI changes must pass the Delivery Gate), `docs/odf` ODF 1.4 Part 1 (authoritative for every ODF decision), ECMA-376 §17 (authoritative for every OOXML decision). Path corrected 2026-09-28 (Plan 1, `audit-012` P1-06): the ODF parts are under `docs/odf/`, and the LibreOffice guide PDFs are under `docs/lo-guides/`.
 
 ---
 
@@ -40,7 +40,7 @@ These are the seams every later PR plugs into. They belong in E because E is the
 
 ---
 
-## Plan 4 — Viewer/Editor chrome and input fixes (was PR D)
+## Plan 4: Viewer/Editor chrome and input fixes (was PR D)
 
 **Goal:** the app stops *looking* broken before we touch the document engine. Ship first, it is the fastest win and the lowest risk.
 **Closes:** F-01, F-02, F-03, F-04, F-05, F-06.
@@ -73,7 +73,7 @@ Low. The only behavioural trade is removing the Viewer FAB (a UX decision the au
 
 ---
 
-## Plan 5 — Layout metrics and pagination (was PR E, the page-count plan)
+## Plan 5: Layout metrics and pagination (was PR E, the page-count plan)
 
 > **Amended 2026-09-26.** Plan 5 executes as three PRs: **PR 15 (5A)** the measuring stick, **PR 16a (5B)** breaks and defaults, **PR 16b (5C)** metrics and windows; scope per PR is in `plan-2026-09-24-remaining-pr-roadmap-v2.md` §4.3-§4.4, evidence in `audit-007-2026-09-26-sample-matrix.md`. The acceptance lines below that say "for both formats" are superseded: windows are **per format** for all six pairs (audit-007 §11.3; DOCX around the M365 counts 15/23/20/10/18/21, ODT provisional until the Collabora-regenerated fixtures land), and page geometry is honoured as each file declares it. The rest of this section stays as the design record.
 >
@@ -109,9 +109,26 @@ Medium-high: this is the first change that makes pagination *correct* rather tha
 
 **Size:** medium (4–6 days). **Commit plan:** units+metrics → spacing → breaks/widows → windows/tests, one commit each.
 
+> **5B implementation record (PR #16, 2026-09-27).** Fixture re-baseline. Every `tests/inky` `.docx` was re-saved by Microsoft 365 and every `.odt` by Collabora Office 26.04, so the reference page counts now come from `docProps/app.xml` `<Pages>` and `meta.xml` `meta:page-count` instead of a third-party estimate. `SampleMatrix` carries both references and the per-format windows (DOCX 12-18, 18-28, 18-26, 8-12, 15-21, 15-26; ODT 12-18, 18-28, 18-26, 9-13, 15-23, 17-27). Evidence: `audit-008`, which supersedes `audit-007` §1 and §11.3 on every regenerated file. The blank `untitled.od{t,s,p}` packages stayed non-conformant at this point; their replacement is recorded under 5e.
+>
+> **5C implementation record (PR #17, 2026-09-27).** Documentation refresh, no product code. `DESIGN.md` v3.0 with pinned editions in front matter, a Create New truth pass, and the LibreOffice 26.2 re-citation. Evidence: `audit-009`. It assigns two obligations to Plan 1: re-map the historical 24.8 chapter map (`DESIGN.md:227`) and re-map the nine Sidebar decks and the accessibility-check field rather than claiming they exist (`DESIGN.md:175`).
+>
+> **5D implementation record (PR #18, 2026-09-27).** Breaks and defaults. Fake breaks out, authored breaks in; a body rectangle derived from the declared page and margins; a metric style chain so that spacing, indents and line height resolve through the cascade instead of a constant; F-21's defaults now come from the file. Evidence: `audit-010`. Its Sample-3 zero-margin and Sample-4/5 fixed-header examples are **not authoritative** after the 5b re-baseline (`audit-011` §9.2).
+>
+> **5E implementation record (PR #19, merge `439ed05`, 2026-09-28).** Load-bearing measurement, fragment pagination and shared input. Executed in five batches, evidence `audit-011` and the record in `plan-5e-progress.md`:
+> 1. **Baseline repair.** Exact-case `templates/Untitled.od{t,s,p}` lookup with lowercase cache names; the styled-template and host-filesystem fallbacks removed, so a missing asset fails instead of opening a different document. `CreateNewDocumentTest` asserts byte identity, mimetype, content and manifest version 1.4, one body element, the ODS sheet and ODP slide counts, and cache replacement. Twelve fixture hashes, producers and reference counts recorded in `tests/inky/fixture-identities.properties` and guarded by `FixtureIdentityTest`.
+> 2. **Semantics.** ODF `fo:break-after` and master-page assignments become authored boundaries; `auto` clears inherited before/after and keep flags; DOCX `atLeast` is a minimum distinct from `exact`; explicit `0`/`false`/`off` reset `keepNext` and `pageBreakBefore`, including inherited docDefaults; ODF tabs, keep-together, widows and orphans, and DOCX tab settings, keep-lines and widow-control enter the cascade.
+> 3. **Measurement.** `TextMetrics` replaces raw Paint sizing and the character-count fallback. Cache keys include text and runs, resolved paragraph and character styles, and body width; the backend is immutable per engine. Tabs, indents, hyphenation, grapheme boundaries and caret advances are measured, and wrapping is lossless with respect to the source range.
+> 4. **Fragments.** Lines carry element identity, source and line ranges, and continuation flags; pages end for an explicit reason (`END`, `OVERFLOW`, `AUTHORED`, `KEEP`); widow, orphan and bounded keep chains are enforced; navigation keeps both the first page and every occupied page. DOCX inline page breaks stay as offsets inside one paragraph, and section kinds are retained at the start of the section they describe.
+> 5. **Input parity.** Viewer and Editor share one input field per logical paragraph. `ParagraphProjection` is a `VisualTransformation`, so inserted line breaks and page gaps are display-only and never enter the edit value, the undo history or the IME. The alternate flow view is explicitly unavailable (`InkyModule.kt:124`, `R.string.inky_flow_view_unavailable`) instead of bypassing the pipeline.
+>
+> **Acceptance.** CI run 36377627605: 247 tests, zero failures, errors or skips. `PaginationFidelityTest` puts all twelve fixtures inside their windows **and** asserts per-element source coverage and fragment adjacency. Measured ODT 15/23/18/10/18/19 and DOCX 15/24/21/11/19/22 under the table advance backend, against references 15/23/22/11/19/22 (ODT) and 15/23/22/10/18/21 (DOCX). No window was widened, tightened or added, and no hint or spacing constant was used to reach one. Sample-3 ODT (18 against 22) is the weakest pair and is the structural question Plans 7 and 8 must answer. Device glyph and Compose parity is outside this record by the owner's deferral.
+
+**Amended 2026-09-28 (Plan 1).** Plan 5 is complete. The acceptance lines above that say "for both formats" stay as the design record; the enforced reality is the per-format windows in `SampleMatrix` plus the source-coverage assertion. Real Typefaces in Plan 10 will move these counts again, and windows tighten only with measured support.
+
 ---
 
-## Plan 6 — Image pipeline and load performance (was PR F)
+## Plan 6: Image pipeline and load performance (was PR F)
 
 **Goal:** images appear immediately, at the right size, and stay there.
 **Closes:** F-07, F-18, the "never load" half of finding 5.
@@ -141,7 +158,7 @@ Low-medium (Coil behaviour varies with device; the self-heal path is the importa
 
 ---
 
-## Plan 7 — ODF structural fidelity (was PR G)
+## Plan 7: ODF structural fidelity (was PR G)
 
 **Goal:** Sample-6.odt reads like the Writer Guide document it is: numbered headings, real lists, a table with correct columns, a TOC, and hyperlinks that keep their text.
 **Closes:** F-08 (font identity), F-09, F-11, F-12, F-13, F-14, F-15, O-03, O-04, O-05.
@@ -173,7 +190,7 @@ Medium. Numbering is the one place where the model must be general (ODF `num-for
 
 ---
 
-## Plan 8 — OOXML structural fidelity (was PR H)
+## Plan 8: OOXML structural fidelity (was PR H)
 
 **Goal:** close the DOCX fidelity gap that makes the user say the format is "far from perfect" for exactly the right reason: it is proprietary, so our parser must be more careful, not less.
 **Closes:** F-16, F-17, F-19, F-20 and the DOCX half of F-10/F-11.
@@ -207,22 +224,22 @@ Medium-high (biggest parser surface). Mitigation: keep the new reader side-by-si
 
 ---
 
-## Plan 9 (planned, not scheduled here) — save round-trip integrity (was PR I)
+## Plan 9 (planned, not scheduled here): save round-trip integrity (was PR I)
 
 O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` regenerates `word/document.xml` and downgrades images to `"[Image: path]"` text; the ODT side regenerates `content.xml` with a reduced element set, while copying every other zip entry unchanged. Until a format-correct writer exists, a save can silently destroy content. The minimal guard ships **inside Plan 6** (refuse instead of degrade); the full writer (styles, numbering, tables, images, TOC) is a separate PR to plan after G/H, together with F-2's `OfficeDocElement` retirement.
 
 ---
 
-## Appendix A — Sequencing, parallelism, verification
+## Appendix A: Sequencing, parallelism, verification
 
 | Order | PR | Parallel with | Gate to enter the next |
 |---|---|---|---|
 | 1 | **Plan 4** chrome & input | **Plan 6** (image pipeline) | device checklist for findings 1–5, 7; Delivery Gate PASS |
-| 2 | **Plan 5** metrics & pagination | — (touches every test window) | Sample-5 `15..21`, Sample-6 `15..26`, caret/selection suites green |
+| 2 | **Plan 5** metrics & pagination | none (touches every test window) | Sample-5 `15..21`, Sample-6 `15..26`, caret/selection suites green |
 | 3 | **Plan 6** images & performance | **Plan 4** | Recents open: no blank frame, media self-heal proven |
 | 4 | **Plan 7** ODF structure | **Plan 8** style-reader scaffolding (different files) | Sample-6.odt fidelity checklist; hyperlink text-count test |
 | 5 | **Plan 8** OOXML structure | tail of **Plan 7** | Sample-6.docx fidelity checklist; both-format convergence |
-| 6 | **Plan 9** save integrity | — | round-trip test: open → save → reopen preserves text, styles, tables, images |
+| 6 | **Plan 9** save integrity | none | round-trip test: open → save → reopen preserves text, styles, tables, images |
 
 **Verification protocol (per `AGENTS.md`).** No local JDK exists in this environment: every PR is verified through GitHub Actions (`gh run list -L 5`, `gh run watch`), with the unit-test job green before review and the nightly build green before the user retests. Manual device verification uses `docs/InkyC1Checklist.md`; its run has been deliberately postponed and should resume after **Plan 4** (chrome/input items), then again after **E** (zoom, caret, selection, session restore: page 15 at 170 %), and after **G/H** (save compatibility).
 
@@ -239,7 +256,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 
 ---
 
-## Appendix B — What these plans deliberately do not do
+## Appendix B: What these plans deliberately do not do
 
 * No new third-party dependency (no XML/zip library): `ZipSafe` + XmlPullParser + stdlib stay (`AGENTS.md`).
 * No UI copy outside `values/strings.xml`; no Indonesian strings in the app layer (audit-003 P2-2).
@@ -250,7 +267,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 
 ---
 
-## Appendix C — Definition of done
+## Appendix C: Definition of done
 
 1. Sample-6 renders in Papirus within ±20 % of the M365 page count first, ±10 % after Plan 9, with every fidelity item from the user's list resolved or explicitly deferred with a reason.
 2. Sample-1…5 keep their heading, navigation, pagination and image behaviour (windows tightened, never loosened silently).
