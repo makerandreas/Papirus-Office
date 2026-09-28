@@ -259,21 +259,13 @@ fun LayoutDrivenDocumentRenderer(
                             }
                         }
                     )
-                    // Margins come from the page style the layout engine wrapped
-                    // against, not from a fixed guess, so the text column on the
-                    // sheet is the column the line breaks were computed for.
-                    .padding(
-                        start = sheet.toDp(pageSpec.marginStartDp).dp,
-                        end = sheet.toDp(pageSpec.marginEndDp).dp,
-                        top = sheet.toDp(pageSpec.marginTopDp).dp,
-                        bottom = sheet.toDp(pageSpec.marginBottomDp).dp
-                    )
             ) {
-                Column(
-                    // The gap the paginator reserved between blocks, on the same scale.
-                    verticalArrangement = Arrangement.spacedBy(sheet.toDp(LayoutEngine.ELEMENT_GAP_UNITS).dp)
-                ) {
-                    page.elements.forEach { elemLayout ->
+                page.elements.forEach { elemLayout ->
+                    // Bounds already include body origin and declared paragraph spacing.
+                    Box(Modifier.offset(
+                        x = sheet.toDp(elemLayout.bounds.left).dp,
+                        y = sheet.toDp(elemLayout.bounds.top).dp
+                    ).width(sheet.toDp(elemLayout.bounds.right - elemLayout.bounds.left).dp)) {
                         RenderLaidOutElement(
                             elemLayout = elemLayout,
                             zoomScale = textScale,
@@ -458,7 +450,7 @@ private fun ParagraphEditField(
             Text(
                 text = leadingPrefix,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
             )
@@ -484,7 +476,7 @@ private fun ParagraphEditField(
             textStyle = TextStyle(
                 color = textColor,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
                 textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
             ),
@@ -563,7 +555,7 @@ private fun ParagraphSelectField(
             Text(
                 text = leadingPrefix,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
             )
@@ -580,7 +572,7 @@ private fun ParagraphSelectField(
             textStyle = TextStyle(
                 color = textColor,
                 fontSize = (sizeSp * zoomScale).sp,
-                lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+                lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
                 textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment)
             ),
@@ -634,7 +626,7 @@ private fun ParagraphText(
     Text(
         text = annotated,
         fontSize = (sizeSp * zoomScale).sp,
-        lineHeight = ((sizeSp + 5f) * zoomScale).sp,
+        lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
         color = textColor,
         fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
         textAlign = OfficeRuns.composeTextAlign(paragraph.alignment ?: resolved.alignment),

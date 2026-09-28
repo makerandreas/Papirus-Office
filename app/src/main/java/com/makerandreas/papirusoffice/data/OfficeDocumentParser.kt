@@ -53,7 +53,10 @@ data class DocxStyleMeta(
     val firstLineIndentUnits: Float? = null,
     val keepWithNext: Boolean? = null,
     val pageBreakBefore: Boolean? = null,
-    val alignment: String? = null
+    val alignment: String? = null,
+    val keepTogether: Boolean? = null,
+    val widowControl: Boolean? = null,
+    val tabStops: List<ParagraphTabStop>? = null
 )
 
 data class DocxStylesParseResult(
@@ -251,8 +254,44 @@ class OfficeDocumentParser(private val context: Context) {
     private fun docxOnOff(value: String?): Boolean =
         value?.lowercase(Locale.ROOT) !in setOf("0", "false", "off")
 
+    private fun parseDocxTab(parser: XmlPullParser): ParagraphTabStop? {
+        val pos = getXmlAttr(parser, "pos")?.toIntOrNull() ?: return null
+        val alignment = when (getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)) {
+            "clear" -> TabAlignment.CLEAR
+            "right", "end" -> TabAlignment.RIGHT
+            "center" -> TabAlignment.CENTER
+            "decimal" -> TabAlignment.DECIMAL
+            "bar" -> return null // Border tabs are not positional text stops.
+            else -> TabAlignment.LEFT
+        }
+        return ParagraphTabStop(LayoutUnits.twipsToUnits(pos), alignment)
+    }
+
+    private fun mergeTabs(base: List<ParagraphTabStop>, over: List<ParagraphTabStop>?): List<ParagraphTabStop> =
+        if (over == null) base else (base + over).associateBy { it.positionUnits }.values.sortedBy { it.positionUnits }
+
+    private fun docxTabInterval(file: File): Float {
+        return try {
+            java.util.zip.ZipFile(file).use { zip ->
+                val entry = zip.getEntry("word/settings.xml") ?: return 48f
+                val parser = XmlPullParserFactory.newInstance().newPullParser()
+                zip.getInputStream(entry).use { input ->
+                    parser.setInput(input, "UTF-8")
+                    while (parser.eventType != XmlPullParser.END_DOCUMENT) {
+                        if (parser.eventType == XmlPullParser.START_TAG && parser.name.substringAfter(':').equals("defaultTabStop", true)) {
+                            return getXmlAttr(parser, "val")?.toIntOrNull()?.takeIf { it > 0 }?.let { LayoutUnits.twipsToUnits(it) } ?: 48f
+                        }
+                        parser.next()
+                    }
+                }
+            }
+            48f
+        } catch (_: Exception) { 48f }
+    }
+
     private fun extractDocxStyles(file: File): DocxStylesParseResult {
         if (!file.exists() || !file.name.endsWith(".docx", ignoreCase = true)) return DocxStylesParseResult()
+        val tabInterval = docxTabInterval(file)
         try {
             var stylesXmlContent: String? = null
             java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
@@ -289,6 +328,9 @@ class OfficeDocumentParser(private val context: Context) {
                 var docDefaultFirstLine: Float? = null
                 var docDefaultKeepNext: Boolean? = null
                 var docDefaultPageBreakBefore: Boolean? = null
+                var docDefaultKeepTogether: Boolean? = null
+                var docDefaultWidowControl: Boolean? = null
+                var docDefaultTabs: List<ParagraphTabStop>? = null
 
                 var inStyle = false
                 var currentStyleType: String? = null
@@ -313,6 +355,9 @@ class OfficeDocumentParser(private val context: Context) {
                 var currentFirstLine: Float? = null
                 var currentKeepNext: Boolean? = null
                 var currentPageBreakBefore: Boolean? = null
+                var currentKeepTogether: Boolean? = null
+                var currentWidowControl: Boolean? = null
+                var currentTabs: List<ParagraphTabStop>? = null
                 var currentJc: String? = null
 
                 val rawStylesMap = mutableMapOf<String, DocxStyleMeta>()
@@ -361,6 +406,11 @@ class OfficeDocumentParser(private val context: Context) {
                                         }
                                     }
                                 }
+                                inDocDefaultsPPr && tagName == "keeplines" -> { docDefaultKeepTogether = docxOnOff(getXmlAttr(parser, "val")) }
+                                inDocDefaultsPPr && tagName == "widowcontrol" -> { docDefaultWidowControl = docxOnOff(getXmlAttr(parser, "val")) }
+                                inDocDefaultsPPr && tagName == "tab" -> {
+                                    parseDocxTab(parser)?.let { docDefaultTabs = docDefaultTabs.orEmpty() + it }
+                                }
                                 inDocDefaultsPPr && tagName == "keepnext" -> {
                                     docDefaultKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 }
@@ -401,6 +451,9 @@ class OfficeDocumentParser(private val context: Context) {
                                     currentFirstLine = null
                                     currentKeepNext = null
                                     currentPageBreakBefore = null
+                                    currentKeepTogether = null
+                                    currentWidowControl = null
+                                    currentTabs = null
                                     currentJc = null
                                 }
                                 inStyle && tagName == "name" -> {
@@ -472,6 +525,11 @@ class OfficeDocumentParser(private val context: Context) {
                                 inStyle && inPPr && tagName == "jc" -> {
                                     currentJc = getXmlAttr(parser, "val")
                                 }
+                                inStyle && inPPr && tagName == "keeplines" -> { currentKeepTogether = docxOnOff(getXmlAttr(parser, "val")) }
+                                inStyle && inPPr && tagName == "widowcontrol" -> { currentWidowControl = docxOnOff(getXmlAttr(parser, "val")) }
+                                inStyle && inPPr && tagName == "tab" -> {
+                                    parseDocxTab(parser)?.let { currentTabs = currentTabs.orEmpty() + it }
+                                }
                                 inStyle && inPPr && tagName == "keepnext" -> {
                                     currentKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 }
@@ -537,7 +595,8 @@ class OfficeDocumentParser(private val context: Context) {
                                             firstLineIndentUnits = currentFirstLine,
                                             keepWithNext = currentKeepNext,
                                             pageBreakBefore = currentPageBreakBefore,
-                                            alignment = currentJc?.replaceFirstChar { it.uppercase() }
+                                            alignment = currentJc?.replaceFirstChar { it.uppercase() },
+                                            keepTogether = currentKeepTogether, widowControl = currentWidowControl, tabStops = currentTabs
                                         )
                                     }
                                     inStyle = false
@@ -575,6 +634,9 @@ class OfficeDocumentParser(private val context: Context) {
                     var keepNext = docDefaultKeepNext ?: false
                     var pageBreakBefore = docDefaultPageBreakBefore ?: false
                     var alignment = "Left"
+                    var keepTogether = docDefaultKeepTogether ?: false
+                    var widowControl = docDefaultWidowControl ?: true
+                    var tabs = docDefaultTabs.orEmpty()
 
                     for (i in chain.lastIndex downTo 0) {
                         val s = chain[i]
@@ -598,6 +660,9 @@ class OfficeDocumentParser(private val context: Context) {
                         s.keepWithNext?.let { keepNext = it }
                         s.pageBreakBefore?.let { pageBreakBefore = it }
                         s.alignment?.let { alignment = it }
+                        s.keepTogether?.let { keepTogether = it }
+                        s.widowControl?.let { widowControl = it }
+                        tabs = mergeTabs(tabs, s.tabStops)
                     }
 
                     return ParagraphStyle(
@@ -618,7 +683,10 @@ class OfficeDocumentParser(private val context: Context) {
                         indentEndUnits = indEnd,
                         firstLineIndentUnits = firstLine,
                         keepWithNext = keepNext,
-                        pageBreakBefore = pageBreakBefore
+                        pageBreakBefore = pageBreakBefore,
+                        collapseSpacing = true, keepTogether = keepTogether,
+                        orphans = if (widowControl) 2 else 1, widows = if (widowControl) 2 else 1,
+                        tabStops = tabs, defaultTabIntervalUnits = tabInterval
                     )
                 }
 
@@ -653,7 +721,11 @@ class OfficeDocumentParser(private val context: Context) {
                         pageBreakBefore = docDefaultPageBreakBefore ?: false,
                         indentStartUnits = docDefaultIndentStart ?: 0f,
                         indentEndUnits = docDefaultIndentEnd ?: 0f,
-                        firstLineIndentUnits = docDefaultFirstLine ?: 0f
+                        firstLineIndentUnits = docDefaultFirstLine ?: 0f,
+                        collapseSpacing = true, keepTogether = docDefaultKeepTogether ?: false,
+                        orphans = if (docDefaultWidowControl != false) 2 else 1,
+                        widows = if (docDefaultWidowControl != false) 2 else 1,
+                        tabStops = docDefaultTabs.orEmpty(), defaultTabIntervalUnits = tabInterval
                     )
 
                 return DocxStylesParseResult(
@@ -1197,6 +1269,9 @@ class OfficeDocumentParser(private val context: Context) {
             var directFirstLine: Float? = null
             var directKeepNext: Boolean? = null
             var directPageBreakBefore: Boolean? = null
+            var directKeepTogether: Boolean? = null
+            var directWidowControl: Boolean? = null
+            var directTabs: List<ParagraphTabStop>? = null
             var directJc: String? = null
             var paraHasSectPr = false
 
@@ -1280,6 +1355,9 @@ class OfficeDocumentParser(private val context: Context) {
                                 directFirstLine = null
                                 directKeepNext = null
                                 directPageBreakBefore = null
+                                directKeepTogether = null
+                                directWidowControl = null
+                                directTabs = null
                                 directJc = null
                                 paraHasSectPr = false
                             }
@@ -1358,6 +1436,11 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
+                            inPPr && tagLocal == "keeplines" -> { directKeepTogether = docxOnOff(getXmlAttr(parser, "val")); hasDirectPPr = true }
+                            inPPr && tagLocal == "widowcontrol" -> { directWidowControl = docxOnOff(getXmlAttr(parser, "val")); hasDirectPPr = true }
+                            inPPr && tagLocal == "tab" -> {
+                                parseDocxTab(parser)?.let { directTabs = directTabs.orEmpty() + it; hasDirectPPr = true }
+                            }
                             inPPr && tagLocal == "keepnext" -> {
                                 directKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 hasDirectPPr = true
@@ -1419,7 +1502,7 @@ class OfficeDocumentParser(private val context: Context) {
                                 val count = countAttr?.toIntOrNull() ?: 1
                                 repeat(count) { currentText.append(" ") }
                             }
-                            tagLocal == "tab" -> {
+                            tagLocal == "tab" && !inPPr -> {
                                 currentText.append("\t")
                             }
                             tagLocal == "line-break" || tagLocal == "br" || tagLocal == "cr" -> {
@@ -1531,6 +1614,11 @@ class OfficeDocumentParser(private val context: Context) {
                                             firstLineIndentUnits = directFirstLine ?: baseStyle.firstLineIndentUnits,
                                             keepWithNext = directKeepNext ?: baseStyle.keepWithNext,
                                             pageBreakBefore = directPageBreakBefore ?: baseStyle.pageBreakBefore,
+                                            keepTogether = directKeepTogether ?: baseStyle.keepTogether,
+                                            orphans = directWidowControl?.let { if (it) 2 else 1 } ?: baseStyle.orphans,
+                                            widows = directWidowControl?.let { if (it) 2 else 1 } ?: baseStyle.widows,
+                                            tabStops = mergeTabs(baseStyle.tabStops, directTabs),
+                                            collapseSpacing = true,
                                             alignment = directJc?.replaceFirstChar { it.uppercase() } ?: baseStyle.alignment
                                         )
                                         generatedStyles[syntheticName] = syntheticStyle

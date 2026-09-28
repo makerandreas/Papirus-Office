@@ -238,6 +238,10 @@ data class DocumentStyles(
  * cascade before consumers measure it. Plan 5e is making these fields
  * load-bearing in pagination and rendering; see the implementation ledger.
  */
+enum class TabAlignment { LEFT, RIGHT, CENTER, DECIMAL, CLEAR }
+
+data class ParagraphTabStop(val positionUnits: Float, val alignment: TabAlignment = TabAlignment.LEFT)
+
 data class ParagraphStyle(
     val name: String,
     val fontSizeSp: Float = 12f,
@@ -271,14 +275,22 @@ data class ParagraphStyle(
     /** DOCX `lineRule=atLeast`, a floor rather than a fixed height. */
     val lineHeightMinimumUnits: Float? = null,
     /** ODF percentage is a font-size minimum; DOCX auto multiplies natural height. */
-    val lineHeightUsesFontSize: Boolean = false
+    val lineHeightUsesFontSize: Boolean = false,
+    /** DOCX paragraph spacing collapses to the largest adjacent contribution. */
+    val collapseSpacing: Boolean = false,
+    val keepTogether: Boolean = false,
+    val orphans: Int = 2,
+    val widows: Int = 2,
+    val tabStops: List<ParagraphTabStop> = emptyList(),
+    val defaultTabIntervalUnits: Float = 48f
 ) {
     /** True when the style carries paragraph metrics beyond its font size. */
     val hasMetricFields: Boolean
         get() = spaceBeforeUnits != 0f || spaceAfterUnits != 0f || lineHeightFactor != 1f ||
             lineHeightExactUnits != null || indentStartUnits != 0f || indentEndUnits != 0f ||
             firstLineIndentUnits != 0f || keepWithNext || pageBreakBefore || pageBreakAfter ||
-            lineHeightMinimumUnits != null || lineHeightUsesFontSize
+            lineHeightMinimumUnits != null || lineHeightUsesFontSize || collapseSpacing ||
+            keepTogether || tabStops.isNotEmpty() || defaultTabIntervalUnits != 48f || orphans != 2 || widows != 2
 }
 
 data class CharacterStyle(

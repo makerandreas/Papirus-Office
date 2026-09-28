@@ -7,6 +7,8 @@ import com.makerandreas.papirusoffice.data.LayoutUnits
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.PageStyleSpec
+import com.makerandreas.papirusoffice.data.ParagraphTabStop
+import com.makerandreas.papirusoffice.data.TabAlignment
 import com.makerandreas.papirusoffice.data.ParagraphStyle
 import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
 import com.makerandreas.papirusoffice.data.util.OdfLength
@@ -65,7 +67,12 @@ data class OdfStyleInfo(
     val firstLineIndentUnits: Float? = null,
     val keepWithNext: Boolean? = null,
     val pageBreakBefore: Boolean? = null,
-    val pageBreakAfter: Boolean? = null
+    val pageBreakAfter: Boolean? = null,
+    val keepTogether: Boolean? = null,
+    val orphans: Int? = null,
+    val widows: Int? = null,
+    val tabStops: List<ParagraphTabStop>? = null,
+    val defaultTabIntervalUnits: Float? = null
 )
 
 /** Bold/italic/underline resolved from a character style, never from the style name. */
@@ -99,7 +106,12 @@ private class StyleDraft(
     var firstLineIndentUnits: Float? = null,
     var keepWithNext: Boolean? = null,
     var pageBreakBefore: Boolean? = null,
-    var pageBreakAfter: Boolean? = null
+    var pageBreakAfter: Boolean? = null,
+    var keepTogether: Boolean? = null,
+    var orphans: Int? = null,
+    var widows: Int? = null,
+    var tabStops: List<ParagraphTabStop>? = null,
+    var defaultTabIntervalUnits: Float? = null
 ) {
     fun toInfo(): OdfStyleInfo = OdfStyleInfo(
         name = name,
@@ -125,7 +137,9 @@ private class StyleDraft(
         firstLineIndentUnits = firstLineIndentUnits,
         keepWithNext = keepWithNext,
         pageBreakBefore = pageBreakBefore,
-        pageBreakAfter = pageBreakAfter
+        pageBreakAfter = pageBreakAfter,
+        keepTogether = keepTogether, orphans = orphans, widows = widows,
+        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits
     )
 }
 
@@ -206,6 +220,13 @@ private fun applyParagraphProperties(draft: StyleDraft, attrs: Map<String, Strin
             }
         }
     }
+    attrs["orphans"]?.toIntOrNull()?.let { draft.orphans = it.coerceAtLeast(1) }
+    attrs["widows"]?.toIntOrNull()?.let { draft.widows = it.coerceAtLeast(1) }
+    attrs["tab-stop-distance"]?.let { LayoutUnits.parseLength(it).takeIf { n -> n > 0f }?.let { n -> draft.defaultTabIntervalUnits = n } }
+    when (attrs["keep-together"]) {
+        "always" -> draft.keepTogether = true
+        "auto" -> draft.keepTogether = false
+    }
     // Absence inherits; explicit auto/false resets an inherited declaration.
     when (attrs["keep-with-next"]) {
         "always", "true" -> draft.keepWithNext = true
@@ -245,7 +266,12 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     firstLineIndentUnits = over.firstLineIndentUnits ?: base.firstLineIndentUnits,
     keepWithNext = over.keepWithNext ?: base.keepWithNext,
     pageBreakBefore = over.pageBreakBefore ?: base.pageBreakBefore,
-    pageBreakAfter = over.pageBreakAfter ?: base.pageBreakAfter
+    pageBreakAfter = over.pageBreakAfter ?: base.pageBreakAfter,
+    keepTogether = over.keepTogether ?: base.keepTogether,
+    orphans = over.orphans ?: base.orphans,
+    widows = over.widows ?: base.widows,
+    tabStops = over.tabStops ?: base.tabStops,
+    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits
 )
 
 class SvXMLImport(
@@ -293,7 +319,7 @@ class SvXMLImport(
                     // tags; content.xml would otherwise pay this cost per element.
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
-                        "master-page", "text-properties", "paragraph-properties",
+                        "master-page", "text-properties", "paragraph-properties", "tab-stop",
                         "header-footer-properties" -> attrIndex(parser)
                         else -> emptyMap()
                     }
@@ -354,6 +380,17 @@ class SvXMLImport(
                         }
                         "text-properties" -> pendingDraft?.let { applyTextProperties(it, attrs) }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
+                        "tab-stops" -> pendingDraft?.let { it.tabStops = emptyList() }
+                        "tab-stop" -> pendingDraft?.let { draft ->
+                            val position = attrs["position"]?.let { LayoutUnits.parseLength(it) }
+                            val align = when (attrs["type"]) {
+                                "right" -> TabAlignment.RIGHT
+                                "center" -> TabAlignment.CENTER
+                                "char" -> TabAlignment.DECIMAL
+                                else -> TabAlignment.LEFT
+                            }
+                            if (position != null && position >= 0f) draft.tabStops = draft.tabStops.orEmpty() + ParagraphTabStop(position, align)
+                        }
                         "page-layout-properties" -> {
                             val spec = buildPageLayoutSpec(attrs)
                             val pendingName = pendingPageLayoutName
@@ -764,7 +801,12 @@ private fun OdfStyleInfo.toParagraphStyle(): ParagraphStyle = ParagraphStyle(
     firstLineIndentUnits = firstLineIndentUnits ?: 0f,
     keepWithNext = keepWithNext == true,
     pageBreakBefore = pageBreakBefore == true,
-    pageBreakAfter = pageBreakAfter == true
+    pageBreakAfter = pageBreakAfter == true,
+    keepTogether = keepTogether == true,
+    orphans = orphans ?: 2,
+    widows = widows ?: 2,
+    tabStops = tabStops.orEmpty(),
+    defaultTabIntervalUnits = defaultTabIntervalUnits ?: 48f
 )
 
 private fun OdfStyleInfo.toCharacterStyle(): CharacterStyle = CharacterStyle(

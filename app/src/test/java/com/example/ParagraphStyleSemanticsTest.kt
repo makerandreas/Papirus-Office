@@ -107,7 +107,7 @@ class ParagraphStyleSemanticsTest {
         assertEquals(24f, exact.lineHeightExactUnits!!, 0f)
     }
 
-    private fun docx(styles: String, body: String): OfficeParsedDocument = runBlocking {
+    private fun docx(styles: String, body: String, settings: String = ""): OfficeParsedDocument = runBlocking {
         val file = File.createTempFile("style-semantics-", ".docx", context.cacheDir)
         try {
             ZipOutputStream(file.outputStream()).use { zip ->
@@ -116,6 +116,7 @@ class ParagraphStyleSemanticsTest {
                     zip.write(xml.toByteArray(Charsets.UTF_8))
                     zip.closeEntry()
                 }
+                part("word/settings.xml", """<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">$settings</w:settings>""")
                 part("word/styles.xml", """<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">$styles</w:styles>""")
                 part("word/document.xml", """<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>$body</w:body></w:document>""")
             }
@@ -198,4 +199,42 @@ class ParagraphStyleSemanticsTest {
             assertEquals(0f, style.spaceAfterUnits, 0f)
         }
     }
+    @Test
+    fun docxTabDefinitionsDoNotBecomeTextAndCascadeWithClearAndSettings() {
+        val styles = wordStyle("Normal", """<w:tabs><w:tab w:val="left" w:pos="720"/></w:tabs><w:keepLines/><w:widowControl/>""") +
+            wordStyle("Child", """<w:tabs><w:tab w:val="clear" w:pos="720"/><w:tab w:val="right" w:pos="1440"/></w:tabs><w:keepLines w:val="0"/><w:widowControl w:val="false"/>""", "Normal")
+        val parsed = docx(styles, """<w:p><w:pPr><w:pStyle w:val="Child"/><w:tabs><w:tab w:val="center" w:pos="2160"/></w:tabs></w:pPr>
+            <w:r><w:t>A</w:t><w:tab/><w:t>B</w:t></w:r></w:p>""", """<w:defaultTabStop w:val="960"/>""")
+        val p = parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().single()
+        assertEquals("A\tB", p.text)
+        val style = parsed.styles.paragraphStyles.getValue(p.styleName!!)
+        assertEquals(listOf(48f, 96f, 144f), style.tabStops.map { it.positionUnits })
+        assertEquals(com.makerandreas.papirusoffice.data.TabAlignment.CLEAR, style.tabStops.first().alignment)
+        assertEquals(64f, style.defaultTabIntervalUnits, 0f)
+        assertFalse(style.keepTogether)
+        assertEquals(1, style.widows)
+        assertTrue(style.collapseSpacing)
+    }
+
+    @Test
+    fun odfTabStopListAndKeepWidowOrphanDeclarationsAreResolved() {
+        val styles = """<style:style style:name="Base" style:family="paragraph"><style:paragraph-properties
+            fo:keep-together="always" fo:orphans="3" fo:widows="4" style:tab-stop-distance="2cm">
+            <style:tab-stops><style:tab-stop style:position="3cm" style:type="right"/></style:tab-stops>
+            </style:paragraph-properties></style:style>
+            <style:style style:name="Child" style:family="paragraph" style:parent-style-name="Base">
+            <style:paragraph-properties fo:keep-together="auto"><style:tab-stops/></style:paragraph-properties></style:style>"""
+        val parsed = odf(styles)
+        val base = parsed.styles.paragraphStyles.getValue("Base")
+        assertTrue(base.keepTogether)
+        assertEquals(3, base.orphans)
+        assertEquals(4, base.widows)
+        assertEquals(LayoutUnits.cmToUnits(2f), base.defaultTabIntervalUnits, 0.01f)
+        assertEquals(LayoutUnits.cmToUnits(3f), base.tabStops.single().positionUnits, 0.01f)
+        val child = parsed.styles.paragraphStyles.getValue("Child")
+        assertFalse(child.keepTogether)
+        assertTrue(child.tabStops.isEmpty())
+        assertEquals(4, child.widows)
+    }
+
 }
