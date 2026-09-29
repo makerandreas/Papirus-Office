@@ -160,7 +160,7 @@ Low-medium (Coil behaviour varies with device; the self-heal path is the importa
 
 PR #22 merged as `eff150d` (source commit `2ee77e3`) with the DOCX extent path and image-save safety foundation. Its PR Unit Tests and Build checks passed; the post-merge main run also passed. This was the first Plan 6 increment, not Plan 6 completion.
 
-Plan 6B is now implementing F-2: durable media under `filesDir/media`, a per-source manifest, per-document and global byte limits, LRU eviction, unique package-path storage, and repair of missing entries when the document is parsed again, including an in-memory parsed-document cache hit. `DocumentMediaStoreTest` covers persistence/recovery, LRU eviction, source changes, duplicate basenames, and configured image/count/document/store/ZIP-entry limits. This working increment is not yet CI-verified. F-3/F-4 (decode presentation and real loading progress) and the full Plan 6 closeout gate remain open.
+Plan 6B implements F-2: durable media under `filesDir/media`, a per-source manifest, per-document and global byte limits, LRU eviction, unique package-path storage, and repair of missing entries when the document is parsed again, including an in-memory parsed-document cache hit. `DocumentMediaStoreTest` covers persistence/recovery, LRU eviction, source changes, duplicate basenames, and configured image/count/document/store/ZIP-entry limits. PR #23's final GitHub Actions run `36587725933` passed the debug build and all 260 unit tests; an initial missing-return compile error was fixed in commit `63eb3f4`. F-3/F-4 (decode presentation and real loading progress) and the full Plan 6 closeout gate remain open.
 
 ---
 

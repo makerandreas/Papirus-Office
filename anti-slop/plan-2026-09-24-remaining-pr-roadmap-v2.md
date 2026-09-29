@@ -356,11 +356,11 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 18 | 2026-09-27 | row 5 → "5D landed" | § Plan 5 got the 5D breaks and defaults record (audit-010) |
 | 19 | 2026-09-28 | row 5 → "5A to 5E landed" | § Plan 5 got the 5E record; `plan-5e-progress.md` carries the batch-by-batch evidence |
 
-**Forward schedule, updated 2026-09-30.** Plan 1's documentation PRs took #20 and #21. PR #22 then merged the first Plan 6 increment (image extents and fail-safe image saves), but did not complete Plan 6. Plan 6B is active for durable media storage and recovery; local build/test validation is blocked because the sandbox has no Java runtime. Plan IDs remain authoritative; forecast PR slots for Plans 7 to 9 after Plan 6 is complete, since the remaining Plan 6 work may use more than one PR.
+**Forward schedule, updated 2026-09-30.** Plan 1's documentation PRs took #20 and #21. PR #22 then merged the first Plan 6 increment (image extents and fail-safe image saves), but did not complete Plan 6. Plan 6B is active for durable media storage and recovery. PR #23's GitHub Actions run `36587725933` passed the debug build and all 260 unit tests; local Java remains unavailable in the sandbox. Plan IDs remain authoritative; forecast PR slots for Plans 7 to 9 after Plan 6 is complete, since the remaining Plan 6 work may use more than one PR.
 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
-| 6 | #22 foundation merged; 6B active (local validation pending) | row 6 → in progress | plan-04-to-09 § Plan 6 records the PR #22 delta and the current 6B scope |
+| 6 | #22 foundation merged; 6B active (PR #23 CI passed) | row 6 → in progress | plan-04-to-09 § Plan 6 records the PR #22 delta and the current 6B scope |
 | 7A | TBD after Plan 6 | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
 | 7B | TBD after Plan 6 | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
 | 8A | TBD after Plan 7 | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
