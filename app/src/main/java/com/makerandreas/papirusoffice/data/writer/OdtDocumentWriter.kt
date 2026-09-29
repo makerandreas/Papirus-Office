@@ -1,6 +1,7 @@
 package com.makerandreas.papirusoffice.data.writer
 
 import com.makerandreas.papirusoffice.data.*
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import java.io.ByteArrayOutputStream
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
@@ -25,8 +26,10 @@ class OdtDocumentWriter : DocumentFormatWriter {
             val useOriginalContentXml = !document.isModified &&
                 (packageData?.entries?.containsKey("content.xml") == true || packageData?.originalContentXml != null)
 
-            // Resolve embedded images only when regenerating content.xml; a
-            // preserved original already references its own Pictures/ entries.
+            // A preserved original references its own Pictures/ entries. Verify
+            // those entries are present before reusing the XML, otherwise fail
+            // instead of writing a package with dangling image references.
+            if (useOriginalContentXml) validatePreservedPackageImages(document)
             val embeds = if (useOriginalContentXml) emptyList() else collectImages(document)
             val imageHrefs = embeds.associate { it.first to it.second.href }
 
@@ -330,13 +333,55 @@ class OdtDocumentWriter : DocumentFormatWriter {
         return sb.toString().toByteArray(Charsets.UTF_8)
     }
 
+    private fun validatePreservedPackageImages(document: OfficeDocument) {
+        val entries = document.odtPackageData?.entries.orEmpty()
+        if (document.resources.images.isNotEmpty()) {
+            throw IllegalStateException("ODT package contains detached image resources that cannot be verified")
+        }
+        fun images(elements: List<OfficeElement>): List<OfficeImage> = elements.flatMap { element ->
+            when (element) {
+                is OfficeImage -> listOf(element)
+                is OfficeDocElement.ImageElement -> listOf(element.image)
+                is OfficeSection -> images(element.elements)
+                else -> emptyList()
+            }
+        }
+        for (image in images(document.body.elements)) {
+            val payload = entries[image.imagePath]
+                ?: throw IllegalStateException("Original ODT package is missing image media: ${image.imagePath}")
+            if (payload.isEmpty() || payload.size.toLong() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
+                throw IllegalStateException("Original ODT image media is empty or oversized: ${image.imagePath}")
+            }
+        }
+    }
+
     /**
      * Resolves top-level [OfficeImage] elements to embeddable package entries.
-     * Returns pairs of (original imagePath -> embed). Images whose files are
-     * missing or oversized are skipped (logged) rather than embedded.
+     * Returns pairs of (original imagePath -> embed). Missing, unreadable, or
+     * oversized payloads fail the save instead of silently dropping the image.
      */
     private fun collectImages(document: OfficeDocument): List<Pair<String, ImageEmbed>> {
+        if (document.resources.images.isNotEmpty()) {
+            throw IllegalStateException("ODT writer cannot serialize detached image resources")
+        }
+
+        fun containsImage(elements: List<OfficeElement>): Boolean = elements.any { element ->
+            when (element) {
+                is OfficeImage,
+                is OfficeDocElement.ImageElement -> true
+                is OfficeSection -> containsImage(element.elements)
+                else -> false
+            }
+        }
+        fun hasNestedImage(elements: List<OfficeElement>): Boolean = elements.any { element ->
+            element is OfficeSection && containsImage(element.elements)
+        }
+        if (hasNestedImage(document.body.elements)) {
+            throw IllegalStateException("ODT writer cannot safely serialize images nested in sections")
+        }
+
         val result = mutableListOf<Pair<String, ImageEmbed>>()
+        val packageEntries = document.odtPackageData?.entries.orEmpty()
         var counter = 0
         fun unwrap(element: OfficeElement): OfficeImage? = when (element) {
             is OfficeImage -> element
@@ -346,31 +391,56 @@ class OdtDocumentWriter : DocumentFormatWriter {
         for (element in document.body.elements) {
             val image = unwrap(element) ?: continue
             if (result.any { it.first == image.imagePath }) continue
-            try {
-                val source = image.imageFile?.takeIf { it.isFile }
-                    ?: java.io.File(image.imagePath).takeIf { it.isFile }
-                    ?: continue
-                if (source.length() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
-                    PapirusLogger.w("ODT", "Skipping oversized image: ${source.name}")
-                    continue
+            val source = image.imageFile?.takeIf { it.isFile && it.canRead() }
+                ?: java.io.File(image.imagePath).takeIf { it.isFile && it.canRead() }
+            val originalEntry = packageEntries[image.imagePath]
+            val bytes = when {
+                source != null -> {
+                    if (source.length() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
+                        throw IllegalStateException("Embedded image exceeds the ODT image size limit: ${source.name}")
+                    }
+                    source.inputStream().use {
+                        it.readCappedBytes(com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES)
+                    }
                 }
-                val rawExt = source.extension.lowercase().replace("[^a-z0-9]".toRegex(), "")
-                val ext = rawExt.ifEmpty { "png" }
-                val mime = when (ext) {
-                    "png" -> "image/png"
-                    "jpg", "jpeg" -> "image/jpeg"
-                    "gif" -> "image/gif"
-                    "bmp" -> "image/bmp"
-                    "webp" -> "image/webp"
-                    "svg" -> "image/svg+xml"
-                    else -> "image/$ext"
-                }
-                counter++
-                val href = "Pictures/image$counter.$ext"
-                result.add(image.imagePath to ImageEmbed(href, mime, source.readBytes()))
-            } catch (e: Exception) {
-                PapirusLogger.w("ODT", "Skipping unreadable image ${image.imagePath}: ${e.message}")
+                originalEntry != null -> originalEntry
+                else -> throw IllegalStateException("Cannot safely save missing embedded image: ${image.imagePath}")
             }
+            if (bytes.isEmpty() || bytes.size.toLong() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
+                throw IllegalStateException("Embedded image is empty or exceeds the ODT image size limit: ${image.imagePath}")
+            }
+
+            val rawExt = (source?.extension ?: image.imagePath.substringAfterLast('.', "png"))
+                .lowercase()
+                .replace("[^a-z0-9]".toRegex(), "")
+            val ext = rawExt.ifEmpty { "png" }
+            val mime = when (ext) {
+                "png" -> "image/png"
+                "jpg", "jpeg" -> "image/jpeg"
+                "gif" -> "image/gif"
+                "bmp" -> "image/bmp"
+                "webp" -> "image/webp"
+                "svg" -> "image/svg+xml"
+                else -> "image/$ext"
+            }
+            val href = if (source == null) {
+                val entryName = image.imagePath
+                val safePath = entryName.startsWith("Pictures/") &&
+                    entryName.split('/').none { it == ".." || it.isBlank() } &&
+                    !entryName.contains('\\')
+                if (!safePath || originalEntry == null) {
+                    throw IllegalStateException("Cannot safely reuse embedded image entry: $entryName")
+                }
+                entryName
+            } else {
+                var candidate: String
+                do {
+                    counter++
+                    candidate = "Pictures/papirus-image$counter.$ext"
+                } while (candidate in packageEntries || result.any { it.second.href == candidate })
+                candidate
+            }
+            result.add(image.imagePath to ImageEmbed(href, mime, bytes))
         }
         return result
     }

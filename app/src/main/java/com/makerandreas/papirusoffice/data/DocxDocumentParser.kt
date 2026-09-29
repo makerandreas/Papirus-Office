@@ -14,7 +14,6 @@ import java.util.zip.ZipInputStream
 data class DocxParseResult(
     val text: String,
     val extractedImages: Map<String, File> = emptyMap(),
-    val imageExtents: Map<String, Pair<Long, Long>> = emptyMap(),
     val parsedDocument: OfficeParsedDocument? = null
 )
 
@@ -61,7 +60,6 @@ class DocxDocumentParser(private val context: Context) {
     private suspend fun parseDocxFile(docxFile: File): DocxParseResult = withContext(Dispatchers.IO) {
         val extractedImages = imageExtractor.extractImagesFromDocx(docxFile)
         var documentXmlStream: InputStream? = null
-        val extentsMap = mutableMapOf<String, Pair<Long, Long>>()
 
         val textBuilder = StringBuilder()
 
@@ -120,15 +118,6 @@ class DocxDocumentParser(private val context: Context) {
                                 tagLower == "w:tr" || tagLower == "tr" -> {
                                     isFirstCellInRow = true
                                 }
-                                tagLower == "wp:extent" || tagLower == "extent" -> {
-                                    val cxStr = parser.getAttributeValue(null, "cx")
-                                    val cyStr = parser.getAttributeValue(null, "cy")
-                                    val cx = cxStr?.toLongOrNull() ?: 0L
-                                    val cy = cyStr?.toLongOrNull() ?: 0L
-                                    if (cx > 0 && cy > 0) {
-                                        extentsMap["default"] = Pair(cx, cy)
-                                    }
-                                }
                             }
                         }
                         XmlPullParser.TEXT -> {
@@ -178,7 +167,6 @@ class DocxDocumentParser(private val context: Context) {
         return@withContext DocxParseResult(
             text = finalResultText,
             extractedImages = extractedImages,
-            imageExtents = extentsMap
         )
     }
 
@@ -284,6 +272,15 @@ class DocxDocumentParser(private val context: Context) {
     }
 
     suspend fun saveDocument(file: File, document: com.makerandreas.papirusoffice.data.OfficeDocument): Boolean = withContext(Dispatchers.IO) {
+        val saveFileName = file.name.lowercase(Locale.ROOT)
+        if ((saveFileName.endsWith(".docx") || saveFileName.endsWith(".docm")) && document.containsEmbeddedImages()) {
+            PapirusLogger.w(
+                "DocxDocumentParser",
+                "Refusing to save ${file.name}: the DOCX writer cannot preserve embedded images yet"
+            )
+            return@withContext false
+        }
+
         val parsedElements = document.body.elements.mapNotNull { element ->
             when (element) {
                 is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> OfficeDocumentElement.Paragraph(text = element.paragraph.text)

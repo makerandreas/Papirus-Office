@@ -212,7 +212,6 @@ fun InkyModule(
 
     val docxParser = remember { com.makerandreas.papirusoffice.data.DocxDocumentParser(context) }
     var docxImages by remember { mutableStateOf<Map<String, java.io.File>>(emptyMap()) }
-    var docxExtents by remember { mutableStateOf<Map<String, Pair<Long, Long>>>(emptyMap()) }
     var isParsingDoc by remember { mutableStateOf(false) }
 
     val inkyMetadataRepo = remember(context) {
@@ -395,7 +394,6 @@ fun InkyModule(
                             lastTextRecordedValue = parseResult.text
                             initialLoadedText = parseResult.text
                             docxImages = parseResult.extractedImages
-                            docxExtents = parseResult.imageExtents
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
                             if (!isTemplateNew) {
                                 RecentFilesTracker.addFile(context, f.absolutePath, "Inky")
@@ -425,7 +423,6 @@ fun InkyModule(
                     lastTextRecordedValue = parseResult.text
                     initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
-                    docxExtents = parseResult.imageExtents
 
                     // Set active session for the default loaded template
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -971,28 +968,38 @@ fun InkyModule(
                         ).copy(isModified = true)
                 }
                 
+                var tempFile: java.io.File? = null
                 try {
                     val isDocx = currentSaveDefaultFilename.endsWith(".docx", ignoreCase = true)
                     val extension = if (isDocx) ".docx" else ".odt"
-                    val tempFile = java.io.File(context.cacheDir, "temp_uri_save$extension")
-                    if (tempFile.exists()) tempFile.delete()
-                    
-                    val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
+                    val saveTempFile = java.io.File(context.cacheDir, "temp_uri_save$extension")
+                    tempFile = saveTempFile
+                    if (saveTempFile.exists()) saveTempFile.delete()
+
                     val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
-                    val success = serializer.serializeToFormat(documentToSave, if (tempFile.name.endsWith(".docx", ignoreCase = true)) "DOCX" else "ODT", tempFile)
-                    if (success && tempFile.exists()) {
-                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                            tempFile.inputStream().copyTo(outputStream)
+                    val serialized = serializer.serializeToFormat(
+                        documentToSave,
+                        if (isDocx) "DOCX" else "ODT",
+                        saveTempFile
+                    )
+                    if (serialized && saveTempFile.isFile) {
+                        val output = context.contentResolver.openOutputStream(it)
+                        if (output == null) {
+                            actualSuccess = false
+                        } else {
+                            output.use { outputStream -> saveTempFile.inputStream().use { input -> input.copyTo(outputStream) } }
                         }
-                        tempFile.delete()
                     } else {
-                        context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                            outputStream.write(docBodyText.text.toByteArray())
-                        }
+                        // Never replace a failed office-package save with plain text.
+                        // In particular, the image-preservation guard must leave
+                        // the SAF destination untouched and report a save failure.
+                        actualSuccess = false
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                     actualSuccess = false
+                } finally {
+                    tempFile?.delete()
                 }
                 
                 if (actualSuccess) {
@@ -1167,7 +1174,6 @@ fun InkyModule(
                         docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                         lastTextRecordedValue = parseResult.text
                         docxImages = parseResult.extractedImages
-                        docxExtents = parseResult.imageExtents
                         isSaved = true
                         isEditMode = true
                         isNewDocument = true
@@ -1241,7 +1247,6 @@ fun InkyModule(
                     lastTextRecordedValue = parseResult.text
                     initialLoadedText = parseResult.text
                     docxImages = parseResult.extractedImages
-                    docxExtents = parseResult.imageExtents
 
                     // Set active session!
                     val officeDoc = parseResult.parsedDocument?.toOfficeDocument() ?: com.makerandreas.papirusoffice.data.OfficeDocument(
@@ -3652,7 +3657,6 @@ fun InkyModule(
                         lastTextRecordedValue = parseResult.text
                         initialLoadedText = parseResult.text
                         docxImages = parseResult.extractedImages
-                        docxExtents = parseResult.imageExtents
                         isSaved = true
                         isParsingDoc = false
                         updateActiveSession(file, parseResult.parsedDocument)
