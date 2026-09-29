@@ -190,7 +190,7 @@ class DocumentMediaStore(
         removeUntrackedFiles(imagesDir, manifest.entries.values.map { it.fileName }.toSet())
         writeManifest(File(sourceDir, MANIFEST_NAME), manifest)
         sourceDir.setLastModified(System.currentTimeMillis())
-        buildAliases(resolved.values.toList())
+        return buildAliases(resolved.values.toList())
     }
 
     private fun makeRoom(requiredBytes: Long, protectedDir: File): Boolean {
