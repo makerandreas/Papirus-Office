@@ -31,6 +31,12 @@ object ZipSafe {
     /** Max embedded images extracted from one document. */
     const val MAX_IMAGE_COUNT = 200
 
+    /** Aggregate uncompressed image bytes accepted from one package. */
+    const val MAX_DOCUMENT_MEDIA_BYTES = 128L * 1024 * 1024
+
+    /** Aggregate durable media cache size across documents. */
+    const val MAX_STORED_MEDIA_BYTES = 256L * 1024 * 1024
+
     /** Max bytes for a downloaded template / font file. */
     const val MAX_DOWNLOAD_BYTES = 100L * 1024 * 1024
     const val MAX_FONT_BYTES = 30L * 1024 * 1024

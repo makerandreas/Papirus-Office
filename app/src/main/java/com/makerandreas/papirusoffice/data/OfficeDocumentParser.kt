@@ -73,8 +73,14 @@ data class DocxStylesParseResult(
  */
 class OfficeDocumentParser(private val context: Context) {
 
+    private data class ParsedCacheEntry(
+        val lastModified: Long,
+        val fileLength: Long,
+        val document: OfficeParsedDocument
+    )
+
     companion object {
-        private val inMemoryParsedDocCache = ConcurrentHashMap<String, Pair<Long, OfficeParsedDocument>>()
+        private val inMemoryParsedDocCache = ConcurrentHashMap<String, ParsedCacheEntry>()
 
         // Precompiled style-classification patterns (was: recompiled per style).
         private val PARA_STYLE_REGEX = Regex("(?i)para[1-9]")
@@ -94,8 +100,8 @@ class OfficeDocumentParser(private val context: Context) {
 
         fun getCachedDocument(path: String, lastModified: Long): OfficeParsedDocument? {
             val cached = inMemoryParsedDocCache[path] ?: return null
-            if (cached.first == lastModified && !cached.second.isParsingFailed) {
-                return cached.second
+            if (cached.lastModified == lastModified && !cached.document.isParsingFailed) {
+                return cached.document
             }
             return null
         }
@@ -1092,6 +1098,27 @@ class OfficeDocumentParser(private val context: Context) {
         return@withContext ""
     }
 
+    private suspend fun refreshCachedMedia(file: File, document: OfficeParsedDocument): OfficeParsedDocument {
+        if (document.elements.none { it is OfficeDocumentElement.ImageElement }) return document
+
+        val media = if (document.isOdt) {
+            imageExtractor.extractImagesFromOdt(file)
+        } else {
+            imageExtractor.extractImagesFromDocx(file)
+        }
+        val elements = document.elements.map { element ->
+            if (element !is OfficeDocumentElement.ImageElement) return@map element
+            val path = element.imagePath
+            val resolved = media[path]
+                ?: media[path.lowercase(Locale.ROOT)]
+                ?: media[path.substringAfterLast('/')]
+                ?: media[path.substringAfterLast('/').lowercase(Locale.ROOT)]
+            element.copy(imageFile = resolved ?: element.imageFile?.takeIf { it.isFile })
+        }
+        return if (media == document.extractedImages && elements == document.elements) document
+        else document.copy(elements = elements, extractedImages = media)
+    }
+
     /**
      * Parses the ODT, ODS, DOCX, or XLSX file into structured OfficeParsedDocument model
      * mapping paragraphs, headings, list items, tables, and images.
@@ -1100,14 +1127,19 @@ class OfficeDocumentParser(private val context: Context) {
         // Fast path: Check in-memory rich parsed document cache first unless bypassed
         if (!bypassCache) {
             val memCached = inMemoryParsedDocCache[file.absolutePath]
-            if (memCached != null && memCached.first == file.lastModified() && !memCached.second.isParsingFailed) {
+            if (memCached != null && memCached.lastModified == file.lastModified() &&
+                memCached.fileLength == file.length() && !memCached.document.isParsingFailed) {
+                val cachedDocument = refreshCachedMedia(file, memCached.document)
+                if (cachedDocument !== memCached.document) {
+                    inMemoryParsedDocCache[file.absolutePath] = memCached.copy(document = cachedDocument)
+                }
                 val statusMsg = try {
                     context.getString(com.example.R.string.loading_status_cached)
                 } catch (e: Exception) {
                     "Loading document from local cache..."
                 }
                 _parsingProgress.postValue(ParsingProgress(100, statusMsg))
-                return@withContext memCached.second
+                return@withContext cachedDocument
             }
         }
 
@@ -1211,7 +1243,7 @@ class OfficeDocumentParser(private val context: Context) {
                     }
                 }
                 _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
-                inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), finalParsedDoc)
+                inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), finalParsedDoc)
                 cacheRepository.saveCachedDocument(file, finalParsedDoc)
                 return@withContext finalParsedDoc
             }
@@ -1220,7 +1252,7 @@ class OfficeDocumentParser(private val context: Context) {
         if (isXlsx) {
             val parsedDoc = parseXlsxDocument(file, extractedImages)
             _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
-            inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
+            inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
             cacheRepository.saveCachedDocument(file, parsedDoc)
             return@withContext parsedDoc
         }
@@ -1228,7 +1260,7 @@ class OfficeDocumentParser(private val context: Context) {
         if (detectedPptx) {
             val parsedDoc = parsePptxDocument(file, extractedImages)
             _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
-            inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
+            inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
             cacheRepository.saveCachedDocument(file, parsedDoc)
             return@withContext parsedDoc
         }
@@ -1848,7 +1880,7 @@ class OfficeDocumentParser(private val context: Context) {
             pageCount = detectedDocPageCount,
             styles = docxDocumentStyles
         )
-        inMemoryParsedDocCache[file.absolutePath] = Pair(file.lastModified(), parsedDoc)
+        inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
         cacheRepository.saveCachedDocument(file, parsedDoc)
         return@withContext parsedDoc
     }
