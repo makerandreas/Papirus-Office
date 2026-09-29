@@ -137,7 +137,7 @@ Medium-high: this is the first change that makes pagination *correct* rather tha
 ### Scope
 
 1. **F-1 · Extents are parsed for both formats, in the live path.** OOXML: read `wp:extent cx/cy` (and `a:ext` for legacy `v:shape`) inside `OfficeDocumentParser`'s DOCX branch, converted through `emuToUnits`. ODF: keep `svg:width/height` but store layout units (`OdfFrameContext` already does this; align rounding). `ImageElement`/`OfficeImage` carry `widthUnits`/`heightUnits`; `LayoutEngine` reserves exactly that; the renderer scales from it (fixes F-18: 7.735 cm ↔ 2784475 EMU now produce the same 292 dp on both sides). Then **delete** the dead extent plumbing so it cannot mislead again: `DocxDocumentParser.parseDocxFile`, `DocxParseResult.imageExtents`, `InkyModule.docxExtents` (assigned 5 times, read 0 times).
-2. **F-2 · Media store instead of `cacheDir`.** Extract into `filesDir/media/<sha256(path:len:mtime)>/` with a small manifest (name → size, hash), an LRU cap (`ZipSafe.MAX_IMAGE_BYTES` already bounds single files), and a **self-heal** path: if a referenced file is missing at render time (cache trim, cleanup worker), re-extract that one entry from the source package instead of printing `[Image]`. This is the fix for "sometimes the image never loads".
+2. **F-2 · Media store instead of `cacheDir`.** Extract into `filesDir/media/<sha256(path:len:mtime)>/` with a small manifest (package path → size and hash), a 128 MiB per-document media cap, and a 256 MiB global LRU cap; `ZipSafe.MAX_IMAGE_BYTES` remains the per-image limit. If a referenced file is missing when the document is opened or its parsed model is reused, re-extract only that package entry instead of leaving a stale `[Image]` placeholder. This is the fix for "sometimes the image never loads".
 3. **F-3 · Decode without a blank frame.** `DocxEmbeddedImage` gets explicit `size()` from the resolved extent, `ContentScale.Fit`, a low-cost placeholder, and `crossfade(false)`; pre-decode the first pages' images on a background dispatcher while the document is being laid out.
 4. **F-4 · Honest loading progress.** Delete `delay(500)+delay(500)+delay(400)` from `runDocumentLoading`; drive `loadingProgressStatus` from real stages (zip open → styles → body → media → layout). Target: Recents open shows text in one frame after the parse, images within one frame after decode (no ≥500 ms blank).
 5. **F-5 · Save-path guard (O-01, minimal).** Until Plan 9 exists, the DOCX/ODT save must refuse to run when the model contains images it cannot serialise, or must copy original media entries through unchanged. A silent `[Image: path]` replacement is data loss; make it an explicit, logged failure the user sees.
@@ -155,6 +155,12 @@ Recents open renders text then images without a blank frame on the Realme C3 cla
 Low-medium (Coil behaviour varies with device; the self-heal path is the important part).
 
 **Size:** medium (3–4 days).
+
+### Implementation progress (2026-09-30)
+
+PR #22 merged as `eff150d` (source commit `2ee77e3`) with the DOCX extent path and image-save safety foundation. Its PR Unit Tests and Build checks passed; the post-merge main run also passed. This was the first Plan 6 increment, not Plan 6 completion.
+
+Plan 6B implements F-2: durable media under `filesDir/media`, a per-source manifest, per-document and global byte limits, LRU eviction, unique package-path storage, and repair of missing entries when the document is parsed again, including an in-memory parsed-document cache hit. `DocumentMediaStoreTest` covers persistence/recovery, LRU eviction, source changes, duplicate basenames, and configured image/count/document/store/ZIP-entry limits. PR #23's final GitHub Actions run `36587725933` passed the debug build and all 260 unit tests; an initial missing-return compile error was fixed in commit `63eb3f4`. F-3/F-4 (decode presentation and real loading progress) and the full Plan 6 closeout gate remain open.
 
 ---
 
