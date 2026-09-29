@@ -35,7 +35,7 @@ reference_urls:
 ---
 
 # Papirus Office design direction
-
+> This file is a UI design language direction of the app. All design principles of the app must follow this design guide. For more context, refer to other similar `design.md` files at the `docs/design.md-references` repository.
 ## 0. Reading rule
 
 **Target** means a design decision, not available behavior. Every target below names a source pattern and an owning plan. **Shipped (source-inspected 2026-09-27)** means the cited `file:line` exists in the branch; it does not establish that the feature worked on a device. Paths beginning `ui/`, `modules/`, `core/` or `MainActivity.kt` are relative to `app/src/main/java/com/example/`; `res/` and `assets/` are relative to `app/src/main/`. See `PROJECT_CONTEXT.md` for architecture, `CONCEPT.md` for interaction terminology and `anti-slop/audit-009-2026-09-27-docs-refresh-analysis.md` for the evidence and unresolved deltas.

@@ -1,4 +1,5 @@
 # Papirus Office
+> This file is a blueprint or earlier concept of the app. It also act as "the second brain" besides `AGENTS.md` file. All features mentioned here may be changed or deviated as long as development continues.
 
 ## 📘 Application Name
 **Papirus Office** – An Android-first, modular, open-source office suite built around LibreOffice technologies and APIs where available, with ODF as a first-class format and practical OOXML compatibility as a goal. Its design adapts capable office workflows to phones, foldables and tablets.

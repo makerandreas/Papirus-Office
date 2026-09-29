@@ -1,4 +1,5 @@
 # Papirus Office: Project Description Context & Master Architecture Reference
+> This file is a "second brain" of the `AGENTS.md` file. This file contains more context of the project to provide more better understanding while working with other AI agents. On my behalf, this file must be updated periodically as the development continues and when there are some changes in this repository.
 
 ---
 

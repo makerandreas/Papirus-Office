@@ -1,5 +1,7 @@
 # Project Conventions & Specification References
 
+> This file serves as the “brain” of the project, providing important context regarding what instructions you must follow. The content of this file can be updated **Only** on my behalf.
+
 ## 📘 Papirus Office: Description Context & Architecture Summary
 
 **Papirus Office** (originally conceptualized as **LibreDroid Office**) is an Android-first, modular, open-source office suite built around LibreOffice technologies and APIs where available. It treats ODF 1.4 as a first-class format and aims for practical OOXML compatibility. Actual parser, renderer, native-engine and save coverage is feature- and test-dependent; do not describe complete compatibility or full native integration without evidence. The UI direction is Material 3 Expressive with adaptive layouts for phones, foldables and tablets.
