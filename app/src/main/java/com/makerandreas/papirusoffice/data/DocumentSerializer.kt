@@ -52,7 +52,9 @@ class OdtDocumentSerializer : DocumentSerializerContract {
                     true
                 }
                 is DocumentReference.SafUri -> {
-                    context.contentResolver.openOutputStream(destination.uri)?.use { stream ->
+                    val output = context.contentResolver.openOutputStream(destination.uri)
+                        ?: return@withContext false
+                    output.use { stream ->
                         stream.write(bytes)
                         stream.flush()
                     }
@@ -115,12 +117,14 @@ class DocxDocumentSerializer : DocumentSerializerContract {
                 }
                 is DocumentReference.SafUri -> {
                     val tempFile = File.createTempFile("temp_write_docx", ".docx", context.cacheDir)
-                    docxParser.saveDocument(tempFile, document)
-                    context.contentResolver.openOutputStream(destination.uri)?.use { stream ->
-                        tempFile.inputStream().use { input -> input.copyTo(stream) }
+                    try {
+                        if (!docxParser.saveDocument(tempFile, document)) return@withContext false
+                        val output = context.contentResolver.openOutputStream(destination.uri) ?: return@withContext false
+                        output.use { stream -> tempFile.inputStream().use { input -> input.copyTo(stream) } }
+                        true
+                    } finally {
+                        tempFile.delete()
                     }
-                    tempFile.delete()
-                    true
                 }
                 else -> false
             }

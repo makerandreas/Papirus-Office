@@ -251,6 +251,16 @@ class OfficeDocumentParser(private val context: Context) {
         return null
     }
 
+    private fun parseDocxImageExtent(parser: XmlPullParser): Pair<Float, Float>? {
+        val cx = getXmlAttr(parser, "cx")?.toLongOrNull() ?: return null
+        val cy = getXmlAttr(parser, "cy")?.toLongOrNull() ?: return null
+        if (cx <= 0L || cy <= 0L) return null
+        val width = LayoutUnits.emuToUnits(cx)
+        val height = LayoutUnits.emuToUnits(cy)
+        if (!width.isFinite() || !height.isFinite() || width <= 0f || height <= 0f) return null
+        return width to height
+    }
+
     private fun docxOnOff(value: String?): Boolean =
         value?.lowercase(Locale.ROOT) !in setOf("0", "false", "off")
 
@@ -1251,6 +1261,8 @@ class OfficeDocumentParser(private val context: Context) {
             var inTable = false
             var currentTableName: String? = null
             var lastGraphicName: String? = null
+            var pendingDocxImageExtent: Pair<Float, Float>? = null
+            var lastDocxImageElementIndex: Int? = null
             val currentRows = mutableListOf<TableRow>()
             val currentCells = mutableListOf<TableCell>()
             val currentCellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
@@ -1334,6 +1346,28 @@ class OfficeDocumentParser(private val context: Context) {
                         }
 
                         when {
+                            // DOCX drawing sizes are EMUs. wp:extent is the
+                            // authoritative inline/anchor box; a:ext is a
+                            // fallback for legacy drawing markup when present.
+                            isDocx && (tagLocal == "extent" || tagLocal == "ext") -> {
+                                val extent = parseDocxImageExtent(parser)
+                                if (extent != null) {
+                                    val recentIndex = lastDocxImageElementIndex
+                                    val recentImage = recentIndex?.let { elements.getOrNull(it) as? OfficeDocumentElement.ImageElement }
+                                    when {
+                                        tagLocal == "extent" -> pendingDocxImageExtent = extent
+                                        recentImage != null && recentImage.widthDp <= 0f && recentImage.heightDp <= 0f -> {
+                                            elements[recentIndex!!] = recentImage.copy(widthDp = extent.first, heightDp = extent.second)
+                                        }
+                                        recentImage == null && pendingDocxImageExtent == null -> pendingDocxImageExtent = extent
+                                    }
+                                }
+                            }
+
+                            tagLocal == "drawing" || tagLocal == "pict" || tagLocal == "pic" || tagLocal == "shape" -> {
+                                lastDocxImageElementIndex = null
+                            }
+
                             // Headings
                             tagLocal == "h" -> {
                                 inHeading = true
@@ -1344,6 +1378,10 @@ class OfficeDocumentParser(private val context: Context) {
 
                             // Paragraphs
                             tagLocal == "p" -> {
+                                if (isDocx) {
+                                    pendingDocxImageExtent = null
+                                    lastDocxImageElementIndex = null
+                                }
                                 inParagraph = true
                                 inHeading = false
                                 headingLevel = 1
@@ -1564,13 +1602,18 @@ class OfficeDocumentParser(private val context: Context) {
                                     val imgFile = extractedImages[imgName] ?: extractedImages[target] ?: extractedImages[embedId]
                                         ?: extractedImages[nameLower2] ?: extractedImages[targetLower] ?: extractedImages[embedLower]
                                         ?: extractedImages.values.firstOrNull { it.name.equals(imgName, ignoreCase = true) }
+                                    val extent = pendingDocxImageExtent
                                     elements.add(
                                         OfficeDocumentElement.ImageElement(
                                             imagePath = target.ifBlank { embedId },
                                             imageFile = imgFile,
+                                            widthDp = extent?.first ?: 0f,
+                                            heightDp = extent?.second ?: 0f,
                                             name = lastGraphicName
                                         )
                                     )
+                                    lastDocxImageElementIndex = elements.lastIndex
+                                    pendingDocxImageExtent = null
                                     plainTextBuilder.append("\n[Image: ${imgName.ifBlank { embedId }}]\n\n")
                                 }
                             }

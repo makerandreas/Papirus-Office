@@ -186,6 +186,12 @@ class WriterSection7RegressionTest {
     @Test
     fun odtSaveRoundTripKeepsHeadingsTablesImages() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        val imageFile = File(context.cacheDir, "section7-figure.png").apply {
+            writeBytes(android.util.Base64.decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jvL8AAAAASUVORK5CYII=",
+                android.util.Base64.DEFAULT
+            ))
+        }
         val original = OfficeDocument(
             body = DocumentBody(
                 elements = listOf(
@@ -195,7 +201,7 @@ class WriterSection7RegressionTest {
                         rows = listOf(OfficeTableRow(cells = listOf(OfficeTableCell("H1"), OfficeTableCell("H2")))),
                         numColumns = 2
                     ),
-                    OfficeImage(imagePath = "figure.png", widthDp = 40f, heightDp = 40f)
+                    OfficeImage(imagePath = "figure.png", imageFile = imageFile, widthDp = 40f, heightDp = 40f)
                 )
             )
         )
@@ -217,5 +223,9 @@ class WriterSection7RegressionTest {
             "saved ODT must still expose the table",
             restored.body.elements.any { it is OfficeTable } || index.tables.isNotEmpty()
         )
+        assertTrue("saved ODT must contain embedded media", parsed.extractedImages.isNotEmpty())
+        out.delete()
+        imageFile.delete()
+        Unit
     }
 }
