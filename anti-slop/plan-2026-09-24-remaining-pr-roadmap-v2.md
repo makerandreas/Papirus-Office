@@ -356,7 +356,7 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 18 | 2026-09-27 | row 5 → "5D landed" | § Plan 5 got the 5D breaks and defaults record (audit-010) |
 | 19 | 2026-09-28 | row 5 → "5A to 5E landed" | § Plan 5 got the 5E record; `plan-5e-progress.md` carries the batch-by-batch evidence |
 
-**Forward schedule, updated 2026-09-30.** Plan 1's documentation PRs took #20 and #21. PR #22 then merged the first Plan 6 increment (image extents and fail-safe image saves), but did not complete Plan 6. Plan 6B is active for durable media storage and recovery. PR #23's GitHub Actions run `36587725933` passed the debug build and all 260 unit tests; local Java remains unavailable in the sandbox. Plan IDs remain authoritative; forecast PR slots for Plans 7 to 9 after Plan 6 is complete, since the remaining Plan 6 work may use more than one PR.
+**Forward schedule, updated 2026-09-30.** Plan 1's documentation PRs took #20 and #21. PR #22 then merged the first Plan 6 increment (image extents and fail-safe image saves), but did not complete Plan 6. PR #23 merged Plan 6B (durable media storage and recovery); its final head passed Unit Tests and Build in run `36588655662` and the post-merge `main` runs `36589704465`/`36589734261` (run `36587725933` covered the intermediate commit `63eb3f4`, 260 unit tests). Plan 6C (decode presentation, real loading progress) and Plan 6D (closeout) follow; local Java remains unavailable in the sandbox. Plan IDs remain authoritative; forecast PR slots for Plans 7 to 9 after Plan 6 is complete, since the remaining Plan 6 work may use more than one PR.
 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
