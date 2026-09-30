@@ -185,7 +185,6 @@
     <string name="statusbar_object_table">Table</string>
     <string name="statusbar_object_list_item">List item</string>
     <!-- Status bar controls (Plan 2) -->
-    <string name="inky_image_placeholder">[Image]</string>
     <string name="inky_pages_empty">No pages to display</string>
     <string name="inky_status_pages">Pages</string>
     <string name="inky_status_zoom_percent">%1$d%%</string>
@@ -197,9 +196,6 @@
     <string name="loading_module_prefix">Papirus </string>
     <string name="loading_opening_file">Opening %1$s...</string>
     <string name="loading_creating_doc">Creating document...</string>
-    <string name="loading_status_odf">Loading ODF document XML structure...</string>
-    <string name="loading_status_rendering">Rendering page layouts and typography canvas...</string>
-    <string name="loading_status_preparing">Preparing editor workspace...</string>
     <string name="saving_doc_title">Saving Document</string>
     <string name="saving_doc_progress">Saving %1$s to storage...</string>
     <string name="save_as_title">Save as...</string>
@@ -226,13 +222,14 @@
     <string name="doc_open_failed_msg">The document \"%1$s\" could not be opened because it contains invalid or corrupted XML structure.</string>
     <string name="btn_ok">OK</string>
     <string name="btn_view_logs">View Logs</string>
-    <string name="loading_status_initial">Loading document...</string>
-    <string name="loading_status_validating">Validating XML schema integrity...</string>
-    <string name="loading_status_extracting">Extracting document media and resources...</string>
-    <string name="loading_status_processing">Processing document structure...</string>
-    <string name="loading_status_still_processing">Still processing. This may take some time...</string>
-    <string name="loading_status_completed">Document loaded successfully</string>
-    <string name="loading_status_cached">Loading document from local cache...</string>
+    <string name="loading_stage_opening_package">Opening the file package</string>
+    <string name="loading_stage_validating">Checking the document XML</string>
+    <string name="loading_stage_extracting_media">Saving embedded images to storage</string>
+    <string name="loading_stage_reading_styles">Reading styles</string>
+    <string name="loading_stage_reading_body">Reading the document text</string>
+    <string name="loading_stage_cached">Reusing the document already read in this session</string>
+    <string name="loading_stage_layout">Laying out pages</string>
+    <string name="inky_image_unavailable">Image unavailable</string>
     
     <!-- About Screen Strings -->
     <string name="aboutTitle">About Papirus Office</string>
