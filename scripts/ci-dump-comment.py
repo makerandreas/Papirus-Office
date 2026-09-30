@@ -20,6 +20,7 @@ import xml.etree.ElementTree as ET
 
 COMMENT_LIMIT = 60000
 DUMP_CLASS = "com.example.Plan5ElementDumpTest"
+PLAN6C_CLASS = "com.example.Plan6cLoadingProgressTest"
 
 
 def read(path):
@@ -60,7 +61,9 @@ def test_sections(results_dir):
     rows = []
     failures = []
     dump = ""
+    plan6c_out = ""
     total = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+    total_time = 0.0
     for path in sorted(glob.glob(os.path.join(results_dir, "TEST-*.xml"))):
         try:
             root = ET.parse(path).getroot()
@@ -68,9 +71,14 @@ def test_sections(results_dir):
             continue
         name = root.get("name", os.path.basename(path))
         counts = {k: int(root.get(k, "0") or 0) for k in total}
+        try:
+            suite_time = float(root.get("time", "0") or 0.0)
+        except ValueError:
+            suite_time = 0.0
         for k in total:
             total[k] += counts[k]
-        rows.append((name.replace("com.example.", ""), counts))
+        total_time += suite_time
+        rows.append((name.replace("com.example.", ""), counts, suite_time))
         for case in root.iter("testcase"):
             for tag in ("failure", "error"):
                 node = case.find(tag)
@@ -85,7 +93,11 @@ def test_sections(results_dir):
             out = root.find("system-out")
             if out is not None and out.text:
                 dump = out.text
-    return rows, total, failures, dump
+        elif name == PLAN6C_CLASS:
+            out = root.find("system-out")
+            if out is not None and out.text:
+                plan6c_out = out.text
+    return rows, total, total_time, failures, dump, plan6c_out
 
 
 def main():
@@ -99,14 +111,14 @@ def main():
     run_url = f"https://github.com/{repo}/actions/runs/{run_id}" if repo else ""
 
     gradle_md, gradle_ok = gradle_section(gradle_log)
-    rows, total, failures, dump = test_sections(results_dir)
+    rows, total, total_time, failures, dump, plan6c_out = test_sections(results_dir)
 
     head = [f"### CI report for `{sha}` ([run {run_id}]({run_url}))\n"]
     if rows:
         verdict = "all tests passed" if total["failures"] == 0 and total["errors"] == 0 else "there are failing tests"
         head.append(
             f"Unit tests: {total['tests']} run, {total['failures']} failed, {total['errors']} errors, "
-            f"{total['skipped']} skipped; {verdict}.\n"
+            f"{total['skipped']} skipped ({total_time:.2f}s across {len(rows)} suites); {verdict}.\n"
         )
     elif gradle_log:
         head.append("No test results were written" + ("; the Gradle log says why below.\n" if not gradle_ok else ".\n"))
@@ -120,10 +132,14 @@ def main():
         body = "\n\n".join(f"{cls}.{case}\n{msg}" for cls, case, msg in failures)
         sections.append(details(f"Failing tests ({len(failures)})", body))
     if rows:
-        table = ["| class | tests | failed | errors | skipped |", "|---|---|---|---|---|"]
-        for name, c in rows:
-            table.append(f"| {name} | {c['tests']} | {c['failures']} | {c['errors']} | {c['skipped']} |")
+        table = ["| class | tests | failed | errors | skipped | time (s) |", "|---|---|---|---|---|---|"]
+        for name, c, suite_time in rows:
+            table.append(
+                f"| {name} | {c['tests']} | {c['failures']} | {c['errors']} | {c['skipped']} | {suite_time:.2f} |"
+            )
         sections.append(details("Per-class results", "\n".join(table), lang=""))
+    if plan6c_out:
+        sections.append(details("Plan 6C loading & first-layout timing (Plan6cLoadingProgressTest system-out)", plan6c_out))
     if dump:
         sections.append(details("Plan 5 element dump (Plan5ElementDumpTest system-out)", dump))
     if inventory:

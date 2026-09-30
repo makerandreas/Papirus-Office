@@ -128,7 +128,7 @@ Medium-high: this is the first change that makes pagination *correct* rather tha
 
 ---
 
-## Plan 6: Image pipeline and load performance (was PR F)
+## Plan 6: Image pipeline and load performance (was PR F) — COMPLETE
 
 **Goal:** images appear immediately, at the right size, and stay there.
 **Closes:** F-07, F-18, the "never load" half of finding 5.
@@ -156,11 +156,32 @@ Low-medium (Coil behaviour varies with device; the self-heal path is the importa
 
 **Size:** medium (3–4 days).
 
-### Implementation progress (2026-09-30)
+### Implementation record (2026-09-30, Plan 6 COMPLETE)
 
-PR #22 merged as `eff150d` (source commit `2ee77e3`) with the DOCX extent path and image-save safety foundation. Its PR Unit Tests and Build checks passed; the post-merge main run also passed. This was the first Plan 6 increment, not Plan 6 completion.
+Plan 6 shipped across four increments (6A in PR #22, 6B in PR #23, 6C in PR #24, and 6D closeout in PR #25):
 
-Plan 6B implements F-2: durable media under `filesDir/media`, a per-source manifest, per-document and global byte limits, LRU eviction, unique package-path storage, and repair of missing entries when the document is parsed again, including an in-memory parsed-document cache hit. `DocumentMediaStoreTest` covers persistence/recovery, LRU eviction, source changes, duplicate basenames, and configured image/count/document/store/ZIP-entry limits. PR #23's GitHub Actions run `36587725933` passed the debug build and all 260 unit tests on commit `63eb3f4` (which fixed an initial missing-return compile error); the PR's final head `1154465` passed Unit Tests and Build in run `36588655662`, and the post-merge `main` runs `36589704465` and `36589734261` passed both jobs. (Corrected in Plan 6C: `36587725933` was earlier recorded as the final run.) F-3/F-4 (decode presentation and real loading progress) are Plan 6C; the full closeout gate is Plan 6D.
+1. **Plan 6A (PR #22, source `2ee77e3`, merge `eff150d`):**
+   * Implemented F-1 (DOCX `wp:extent` and legacy `a:ext` EMU parsing via `LayoutUnits.emuToUnits` into `OfficeImage` layout units; deleted `DocxParseResult.imageExtents` and `InkyModule.docxExtents`) and F-5 (`EmbeddedImageSaveGuard` refusing DOCX saves with embedded images, `OdtDocumentWriter` failing closed when an image payload is missing or unsafe while reusing verified original package media, and `DocumentSerializer` propagating save failure).
+   * Added `Plan6ImageFoundationTest` (5 tests in 6A).
+   * CI: PR run `36578390234` passed **252 unit tests, 0 failures** (Unit Tests step 3m 49s / job 4m 21s; Build step 5m 47s / job 6m 53s; artifact `11044382829`). Post-merge `main` run `36579308372` passed Unit Tests (step 5m 48s / job 6m 19s) and Build (step 5m 30s / job 6m 25s; artifact `11044710903`).
+2. **Plan 6B (PR #23, commits `042870d`, `63eb3f4`, `1154465`, merge `ac713e4`):**
+   * Implemented F-2: durable media storage under `filesDir/media/<sourceKey>/` with `manifest.properties`, 128 MiB per-document cap, 256 MiB global LRU cap, `ZipSafe.MAX_IMAGE_BYTES` per-image cap, collision-safe package-path storage, and self-healing re-extraction on both fresh parse and in-memory `OfficeParsedDocument` cache hits (`OfficeDocumentParser.ensureExtractedMedia`).
+   * Added `DocumentMediaStoreTest` (8 tests covering persistence, recovery after file deletion, LRU eviction, source changes, duplicate basenames, and configured limits).
+   * CI: intermediate PR run `36587725933` on `63eb3f4` passed **260 unit tests, 0 failures** (Unit Tests step 4m 43s / job 5m 16s; Build step 5m 34s / job 6m 00s; artifact `11047782909`); final PR head `1154465` passed in run `36588655662` (**260 unit tests, 0 failures**; Unit Tests step 5m 43s / job 6m 13s; Build step 4m 37s / job 5m 18s; artifact `11048120534`); post-merge `main` runs `36589704465` (Unit Tests step 3m 50s / job 4m 23s; Build step 5m 35s / job 6m 21s; artifact `11048501207`) and `36589734261` (Unit Tests step 4m 14s / job 4m 51s; Build step 5m 53s / job 6m 43s) passed both jobs.
+3. **Plan 6C (PR #24, commits `8c858b6`, `bfd2ee6`, `5a693b4`, `7f0d05f`, merge `bdd2724`):**
+   * Implemented F-3 (`DocumentImages` single-source box/decode-size/cache-key resolver, `ImagePredecoder` pre-decoding the first two pages' images on `Dispatchers.IO` during layout, `DocxEmbeddedImage` with explicit reserved box, `ContentScale.Fit`, `crossfade(false)`, zoom-independent `decodeSizePx` capped at `2048 px`, and `DocumentImageTags.IMAGE/PENDING/MISSING`) and F-4 (`LoadingStage` enum `OPENING_PACKAGE`, `VALIDATING`, `EXTRACTING_MEDIA`, `READING_STYLES`, `READING_BODY`, `CACHED`, `LAYOUT`, and removal of the `500+500+400 ms` artificial `delay()` calls in `InkyModule.runDocumentLoading`).
+   * Added `DocumentImagesTest` (6 tests), `DocumentImagePresentationTest` (4 tests), and `Plan6cLoadingProgressTest` (5 tests).
+   * CI: PR head `7f0d05f` passed in run `36708650093` (**275 unit tests, 0 failures**; Unit Tests step 3m 53s / job 4m 39s; Build step 5m 38s / job 6m 15s; artifact `11093720666`); post-merge `main` run `36710138324` passed Unit Tests (step 4m 47s / job 5m 31s) and Build (step 3m 31s / job 4m 34s; artifact `11094391272`); `main` run `36724913329` on `1d4afcd` passed **275 unit tests, 0 failures** (Unit Tests step 4m 19s / job 5m 06s; Build step 5m 39s / job 6m 27s; artifact `11101629289`).
+4. **Plan 6D (PR #25, closeout gate):**
+   * Completed the remaining F-1/F-5 dead-code removal in `DocxDocumentParser.kt`: deleted unused private `parseDocxFile`, `parseOdtFile`, and `imageExtractor`, and replaced the unreachable `[Image: path]` branch in `writeDocxElement` with a fail-closed `IllegalStateException`.
+   * Unified `LayoutEngine.kt` image box resolution with `DocumentImages.box(widthDp, heightDp)` so the paginator and `RenderImage` share one source of truth (Cross-plan invariant #1).
+   * Added `tallerThanPageImageStillPaginatesAndUsesDocumentImagesFallback` to `Plan6ImageFoundationTest` (6 tests in `Plan6ImageFoundationTest`, **276 unit tests** total across 48 suites, covering `PaginationImageTest` from the Plan 6 test table).
+   * Updated `scripts/ci-dump-comment.py` to emit per-suite and total JUnit execution times (`time (s)`) and `Plan6cLoadingProgressTest` `<system-out>` open/first-layout timings in PR CI comments.
+   * **Re-confirmed 12-file `SampleMatrix` page-count matrix** (identical across 6A run `36578390234`, 6B run `36588655662`, 6C run `36708650093`, and 6D PR #25, with `0` empty pages in all 12 files):
+     * **ODT measured:** `Sample-1 = 15` (ref 15, window `12..18`), `Sample-2 = 23` (ref 23, `18..28`), `Sample-3 = 18` (ref 22, `18..26`), `Sample-4 = 10` (ref 11, `9..13`), `Sample-5 = 18` (ref 19, `15..23`), `Sample-6 = 19` (ref 22, `17..27`).
+     * **DOCX measured:** `Sample-1 = 15` (ref 15, window `12..18`), `Sample-2 = 25` (ref 23, `18..28`, +1 vs 5E's 24 from 12 parsed `wp:extent` drawings up to `468.1 x 307.1` units), `Sample-3 = 21` (ref 22, `18..26`), `Sample-4 = 11` (ref 10, `8..12`), `Sample-5 = 19` (ref 18, `15..21`), `Sample-6 = 23` (ref 21, `15..26`, +1 vs 5E's 22 from 3 parsed `wp:extent` drawings at `292.3 x 292.3`, `165.0 x 427.0`, `230.9 x 470.9` units).
+   * CI: PR #25 head `efa6fd7` passed in run `36730234004`: **276 unit tests, 0 failures, 0 errors, 0 skipped (28.07 s of JUnit time across 48 suites)**; Unit Tests step 4m 55s / job 5m 45s, Build step 4m 41s / job 5m 20s, artifact `11105575967` (`159,088` B). This is the first run whose PR comment carries the per-suite `time (s)` column and the `Plan6cLoadingProgressTest` stdout: `Sample-6.odt parse=62 ms, layout=34 ms, pages=19, predecodeWindow=0..2, predecodeImages=1` and `Sample-6.docx parse=38 ms, layout=32 ms, pages=23, predecodeWindow=0..2, predecodeImages=1` (CI runner timings, not a device measurement). The busiest suites were `BodyRectTest` 7.14 s, `DocumentImagePresentationTest` 3.97 s, `CreateNewDocumentTest` 2.96 s and `Plan5ElementDumpTest` 2.44 s.
+   * **Reforecasted PR slots:** Plan 7A (`#26`), Plan 7B (`#27`), Plan 8A (`#28`), Plan 8B (`#29`), Plan 9 (`#30`), Plan 10 (`#31`-`#32`), Plan 11 (`#33`-`#37`). Physical-device verification remains scheduled after Plan 11 per the owner's deferral.
 
 ---
 

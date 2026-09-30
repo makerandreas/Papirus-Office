@@ -3,13 +3,16 @@ package com.example
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.DocumentBody
+import com.makerandreas.papirusoffice.data.DocumentImages
 import com.makerandreas.papirusoffice.data.DocumentMetadata
 import com.makerandreas.papirusoffice.data.DocumentSerializer
 import com.makerandreas.papirusoffice.data.DocxDocumentParser
+import com.makerandreas.papirusoffice.data.LayoutEngine
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeImage
 import com.makerandreas.papirusoffice.data.OfficeParagraph
+import com.makerandreas.papirusoffice.data.PageStyleSpec
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -172,5 +175,67 @@ class Plan6ImageFoundationTest {
         assertTrue("original image package entry must survive", entries["Pictures/keep.png"]!!.contentEquals(imageBytes))
         val content = entries["content.xml"]!!.toString(Charsets.UTF_8)
         assertTrue("generated content must still reference the preserved media path", content.contains("Pictures/keep.png"))
+    }
+
+    @Test
+    fun tallerThanPageImageStillPaginatesAndUsesDocumentImagesFallback() {
+        val spec = PageStyleSpec.FALLBACK
+        val tallHeight = spec.bodyHeightDp + 300f
+        val wideWidth = spec.contentWidthDp + 200f
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeParagraph("Intro paragraph before oversized image."),
+                    OfficeImage(imagePath = "Pictures/tall.png", widthDp = wideWidth, heightDp = tallHeight),
+                    OfficeImage(imagePath = "Pictures/unmeasured.png", widthDp = 0f, heightDp = 0f),
+                    OfficeParagraph("Trailing paragraph after images.")
+                )
+            )
+        )
+
+        val result = LayoutEngine(spec).performLayout(document)
+        assertEquals("intro, oversized image and trailing content must split across 3 pages", 3, result.pages.size)
+        assertEquals("intro paragraph stays on page 1", 1, result.elementPageIndex[0])
+        assertEquals("oversized image starts on page 2", 2, result.elementPageIndex[1])
+        assertEquals("unmeasured image follows on page 3", 3, result.elementPageIndex[2])
+        assertEquals("trailing paragraph lands on page 3", 3, result.elementPageIndex[3])
+
+        val tallPlacement = result.pages[1].elements.single()
+        assertEquals(
+            "an image wider than the body must be clamped to the content width",
+            spec.contentWidthDp,
+            tallPlacement.bounds.right - tallPlacement.bounds.left,
+            0.01f
+        )
+        assertEquals(
+            "an image taller than a page keeps its declared height instead of looping",
+            tallHeight,
+            tallPlacement.bounds.bottom - tallPlacement.bounds.top,
+            0.01f
+        )
+
+        val fallbackPlacement = result.pages[2].elements.first()
+        assertEquals(
+            "an image with no extent falls back to DocumentImages' default width",
+            DocumentImages.DEFAULT_WIDTH_UNITS,
+            fallbackPlacement.bounds.right - fallbackPlacement.bounds.left,
+            0.01f
+        )
+        assertEquals(
+            "an image with no extent falls back to DocumentImages' default height",
+            DocumentImages.DEFAULT_HEIGHT_UNITS,
+            fallbackPlacement.bounds.bottom - fallbackPlacement.bounds.top,
+            0.01f
+        )
+
+        val directImageRejection = runCatching {
+            DocxDocumentParser(context).generateDocxXmlFromElements(
+                listOf(OfficeImage(imagePath = "word/media/picture.png", widthDp = 96f, heightDp = 48f))
+            )
+        }
+        assertTrue(
+            "direct DOCX element XML generation must fail closed on OfficeImage",
+            directImageRejection.exceptionOrNull() is IllegalStateException
+        )
     }
 }
