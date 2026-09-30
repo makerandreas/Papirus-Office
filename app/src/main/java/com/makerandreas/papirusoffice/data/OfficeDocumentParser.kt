@@ -23,7 +23,9 @@ data class ParsingProgress(
     val percentage: Int = 0,
     val statusMessage: String = "Loading document...",
     val isFailed: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** Plan 6C: the real open stage this update announces; null for failures. */
+    val stage: LoadingStage? = null
 )
 
 sealed class SchemaValidationResult {
@@ -764,6 +766,21 @@ class OfficeDocumentParser(private val context: Context) {
     val parsingProgress: LiveData<ParsingProgress> get() = _parsingProgress
 
     /**
+     * Synchronous stage hook, called on the parsing thread at the moment each
+     * stage starts. LiveData coalesces rapid posts, so tests and diagnostics
+     * that need the full sequence read it here instead.
+     */
+    @Volatile
+    var stageListener: ((LoadingStage) -> Unit)? = null
+
+    private fun announce(stage: LoadingStage) {
+        stageListener?.invoke(stage)
+        _parsingProgress.postValue(
+            ParsingProgress(stage.percent, context.getString(stage.messageRes), stage = stage)
+        )
+    }
+
+    /**
      * Validates XML structure integrity against ODF/OOXML standard schema expectations.
      * Logs structural anomalies and warnings to crash.log via DocumentParsingLogger.
      */
@@ -1129,21 +1146,16 @@ class OfficeDocumentParser(private val context: Context) {
             val memCached = inMemoryParsedDocCache[file.absolutePath]
             if (memCached != null && memCached.lastModified == file.lastModified() &&
                 memCached.fileLength == file.length() && !memCached.document.isParsingFailed) {
+                announce(LoadingStage.CACHED)
                 val cachedDocument = refreshCachedMedia(file, memCached.document)
                 if (cachedDocument !== memCached.document) {
                     inMemoryParsedDocCache[file.absolutePath] = memCached.copy(document = cachedDocument)
                 }
-                val statusMsg = try {
-                    context.getString(com.example.R.string.loading_status_cached)
-                } catch (e: Exception) {
-                    "Loading document from local cache..."
-                }
-                _parsingProgress.postValue(ParsingProgress(100, statusMsg))
                 return@withContext cachedDocument
             }
         }
 
-        _parsingProgress.postValue(ParsingProgress(10, context.getString(com.example.R.string.loading_status_initial)))
+        announce(LoadingStage.OPENING_PACKAGE)
 
         val isOdt = file.name.endsWith(".odt", ignoreCase = true) || file.name.endsWith(".ott", ignoreCase = true)
         val isOds = file.name.endsWith(".ods", ignoreCase = true) || file.name.endsWith(".ots", ignoreCase = true)
@@ -1156,7 +1168,7 @@ class OfficeDocumentParser(private val context: Context) {
         val detectedPptx = isPptx || xmlContent.contains("<p:sld") || xmlContent.contains("<p:presentation")
         val detectedOdp = isOdp || xmlContent.contains("<office:presentation") || xmlContent.contains("<draw:page")
 
-        _parsingProgress.postValue(ParsingProgress(25, context.getString(com.example.R.string.loading_status_validating)))
+        announce(LoadingStage.VALIDATING)
 
         val validation = validateXmlSchema(
             xmlContent = xmlContent,
@@ -1192,14 +1204,14 @@ class OfficeDocumentParser(private val context: Context) {
             )
         }
 
-        _parsingProgress.postValue(ParsingProgress(45, context.getString(com.example.R.string.loading_status_extracting)))
+        announce(LoadingStage.EXTRACTING_MEDIA)
         val extractedImages = if (isOdt) {
             imageExtractor.extractImagesFromOdt(file)
         } else {
             imageExtractor.extractImagesFromDocx(file)
         }
 
-        _parsingProgress.postValue(ParsingProgress(60, context.getString(com.example.R.string.loading_status_processing)))
+        announce(LoadingStage.READING_STYLES)
 
         if (isOdt || isOds || detectedOdp) {
             val odfImport = com.makerandreas.papirusoffice.data.odf.SvXMLImport(context, extractedImages)
@@ -1210,7 +1222,8 @@ class OfficeDocumentParser(private val context: Context) {
                 stylesXmlContent = stylesXml,
                 isOdt = isOdt,
                 isOds = isOds,
-                isOdp = detectedOdp
+                isOdp = detectedOdp,
+                onStylesParsed = { announce(LoadingStage.READING_BODY) }
             )
             if (!parsedDoc.isParsingFailed) {
                 var finalParsedDoc = parsedDoc
@@ -1242,7 +1255,6 @@ class OfficeDocumentParser(private val context: Context) {
                         // Keep parsedDoc if package entry read fails
                     }
                 }
-                _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
                 inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), finalParsedDoc)
                 cacheRepository.saveCachedDocument(file, finalParsedDoc)
                 return@withContext finalParsedDoc
@@ -1251,7 +1263,6 @@ class OfficeDocumentParser(private val context: Context) {
 
         if (isXlsx) {
             val parsedDoc = parseXlsxDocument(file, extractedImages)
-            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
             inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
             cacheRepository.saveCachedDocument(file, parsedDoc)
             return@withContext parsedDoc
@@ -1259,7 +1270,6 @@ class OfficeDocumentParser(private val context: Context) {
 
         if (detectedPptx) {
             val parsedDoc = parsePptxDocument(file, extractedImages)
-            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
             inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
             cacheRepository.saveCachedDocument(file, parsedDoc)
             return@withContext parsedDoc
@@ -1279,6 +1289,7 @@ class OfficeDocumentParser(private val context: Context) {
         val docxDefaultParagraphStyle = docxStylesResult.defaultParagraphStyle
         val docxRelsMap = if (isDocx) extractDocxRelationships(file) else emptyMap()
         val generatedStyles = mutableMapOf<String, ParagraphStyle>()
+        announce(LoadingStage.READING_BODY)
 
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -1305,7 +1316,6 @@ class OfficeDocumentParser(private val context: Context) {
             var isBold = false
             var isItalic = false
             var isUnderline = false
-            var eventCount = 0
 
             var inPPr = false
             var currentPStyle: String? = null
@@ -1343,18 +1353,6 @@ class OfficeDocumentParser(private val context: Context) {
             )
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
-                eventCount++
-                if (eventCount % 40 == 0) {
-                    if (eventCount > 150) {
-                        _parsingProgress.postValue(
-                            ParsingProgress(85, context.getString(com.example.R.string.loading_status_still_processing))
-                        )
-                    } else {
-                        _parsingProgress.postValue(
-                            ParsingProgress(75, context.getString(com.example.R.string.loading_status_processing))
-                        )
-                    }
-                }
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         val name = parser.name ?: ""
@@ -1815,8 +1813,6 @@ class OfficeDocumentParser(private val context: Context) {
                 }
                 eventType = parser.next()
             }
-
-            _parsingProgress.postValue(ParsingProgress(100, context.getString(com.example.R.string.loading_status_completed)))
 
         } catch (e: Exception) {
             val errorMsg = e.message ?: "Unknown XML parsing error"

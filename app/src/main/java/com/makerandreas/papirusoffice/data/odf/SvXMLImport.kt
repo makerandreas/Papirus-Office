@@ -629,7 +629,8 @@ class SvXMLImport(
         stylesXmlContent: String? = null,
         isOdt: Boolean = true,
         isOds: Boolean = false,
-        isOdp: Boolean = false
+        isOdp: Boolean = false,
+        onStylesParsed: (() -> Unit)? = null
     ): OfficeParsedDocument {
         parsedElements.clear()
         contextStack.clear()
@@ -647,6 +648,7 @@ class SvXMLImport(
             parseOdfStyles(stylesXmlContent)
         }
         parseOdfStyles(xmlContent)
+        onStylesParsed?.invoke()
 
         // Push initial Root document context
         val rootContext = OdfDocumentContentContext(this, OdfXmlToken.XML_DOCUMENT_CONTENT)

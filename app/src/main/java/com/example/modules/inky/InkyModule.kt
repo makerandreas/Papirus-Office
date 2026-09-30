@@ -334,6 +334,14 @@ fun InkyModule(
     var isCreatingDoc by remember { mutableStateOf(false) }
     var loadingDocName by remember { mutableStateOf(docTitle) }
     var loadingProgressStatus by remember { mutableStateOf("") }
+    // Plan 6C (F-4): after a successful parse the loading screen stays up
+    // through the first page layout and closes when that layout exists,
+    // instead of closing on parse and leaving layout to an unannounced frame.
+    var awaitingFirstLayout by remember { mutableStateOf(false) }
+    val beginLayoutStage = {
+        loadingProgressStatus = context.getString(com.makerandreas.papirusoffice.data.LoadingStage.LAYOUT.messageRes)
+        awaitingFirstLayout = true
+    }
     var showDocOpenFailedDialog by remember { mutableStateOf(false) }
     var docOpenFailedError by remember { mutableStateOf<String?>(null) }
 
@@ -354,9 +362,9 @@ fun InkyModule(
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     val parseResult = docxParser.parseDocument(f)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        isLoadingDocument = false
                         isParsingDoc = false
                         if (parseResult.parsedDocument?.isParsingFailed == true) {
+                            isLoadingDocument = false
                             showDocOpenFailedDialog = true
                             docOpenFailedError = parseResult.parsedDocument.failureReason
                         } else {
@@ -399,6 +407,7 @@ fun InkyModule(
                                 RecentFilesTracker.addFile(context, f.absolutePath, "Inky")
                             }
                             updateActiveSession(f, parseResult.parsedDocument)
+                            beginLayoutStage()
                         }
                     }
                 }
@@ -418,7 +427,6 @@ fun InkyModule(
                     com.makerandreas.papirusoffice.data.DocxParseResult("")
                 }
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    isLoadingDocument = false
                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                     lastTextRecordedValue = parseResult.text
                     initialLoadedText = parseResult.text
@@ -435,6 +443,7 @@ fun InkyModule(
                         file = com.makerandreas.papirusoffice.data.OfficeFile(dummyFile)
                     )
                     com.makerandreas.papirusoffice.data.SessionManager.getInstance().setCurrentSession(session)
+                    beginLayoutStage()
                 }
             }
         }
@@ -443,8 +452,13 @@ fun InkyModule(
     DisposableEffect(docxParser) {
         val observer = androidx.lifecycle.Observer<com.makerandreas.papirusoffice.data.ParsingProgress> { progress ->
             run {
-                loadingProgressStatus = progress.statusMessage
+                // LiveData delivers posts late; a parser stage arriving after
+                // the layout stage began must not overwrite it.
+                if (!awaitingFirstLayout || progress.isFailed) {
+                    loadingProgressStatus = progress.statusMessage
+                }
                 if (progress.isFailed) {
+                    awaitingFirstLayout = false
                     isLoadingDocument = false
                     showDocOpenFailedDialog = true
                     docOpenFailedError = progress.errorMessage
@@ -499,6 +513,14 @@ fun InkyModule(
     }
     LaunchedEffect(activeLayoutDocument, documentLayout) {
         navEngine.updateDocument(activeLayoutDocument, documentLayout)
+    }
+    // Effects run after the composition that computed `documentLayout`, so
+    // when this fires the pages for the opened document exist.
+    LaunchedEffect(documentLayout, awaitingFirstLayout) {
+        if (awaitingFirstLayout) {
+            awaitingFirstLayout = false
+            isLoadingDocument = false
+        }
     }
 
     // Go to Page Dialog state
@@ -1130,19 +1152,21 @@ fun InkyModule(
         }
     }
 
-    val runDocumentLoading = { isCreating: Boolean, name: String, onFinished: () -> Unit ->
+    // Plan 6C (F-4): the loading screen covers the real work only. [work]
+    // runs while it is up (parser stages arrive through `parsingProgress`),
+    // then the layout stage closes it once the first layout exists. No timed
+    // steps: a template that needs no parsing opens in the next frame.
+    val runDocumentLoading = { isCreating: Boolean, name: String, work: suspend () -> Unit ->
         coroutineScope.launch {
             isLoadingDocument = true
             isCreatingDoc = isCreating
             loadingDocName = name
-            loadingProgressStatus = context.getString(R.string.loading_status_odf)
-            delay(500)
-            loadingProgressStatus = context.getString(R.string.loading_status_rendering)
-            delay(500)
-            loadingProgressStatus = context.getString(R.string.loading_status_preparing)
-            delay(400)
-            isLoadingDocument = false
-            onFinished()
+            loadingProgressStatus = ""
+            try {
+                work()
+            } finally {
+                beginLayoutStage()
+            }
         }
     }
 
@@ -1166,10 +1190,9 @@ fun InkyModule(
             val filePath = com.example.MainActivity.openedFilePath
             val file = if (filePath != null) java.io.File(filePath) else null
             if (file != null && file.exists()) {
-                isLoadingDocument = true
-                coroutineScope.launch {
+                runDocumentLoading(true, name) {
                     val parseResult = docxParser.parseDocument(file)
-                    runDocumentLoading(true, name) {
+                    run {
                         docTitle = name
                         docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
                         lastTextRecordedValue = parseResult.text
@@ -1237,7 +1260,7 @@ fun InkyModule(
             com.example.core.jni.LibreOfficeCore.createDocument(name)
             runDocumentLoading(true, name) {
                 docTitle = name
-                coroutineScope.launch {
+                run {
                     val parseResult = if (templateFile != null && templateFile.exists()) {
                         docxParser.parseDocument(templateFile)
                     } else {

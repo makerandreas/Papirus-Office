@@ -343,7 +343,7 @@ fun FullPageDocumentLoadingPopup(
     moduleColor: Color = Color(0xFF2563EB),
     isCreating: Boolean = false,
     docName: String = "Document.odt",
-    progressStatus: String = stringResource(R.string.loading_status_odf),
+    progressStatus: String = "",
     onDismissRequest: () -> Unit = {}
 ) {
     androidx.compose.ui.window.Dialog(
