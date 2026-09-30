@@ -261,17 +261,17 @@ The original single PR 16 ("honest pagination", E-2…E-6 + F-21) was rated larg
 **Acceptance:** all twelve windows green; no blank page in any sample; one-page documents stay one page; an empty document stays one page.
 **Size:** large. **Risk:** medium-high (upstream assertions move). Mitigations: windows not exact counts; `forceRebuildAll` spot checks; `TextMetrics` reverts alone; 16a's parsing is already in and green before any metric moves.
 
-### 4.5 PR 17, Plan 6: image pipeline and load performance (unchanged from v1)
+### 4.5 PR 22–25, Plan 6: image pipeline and load performance (COMPLETE 2026-09-30)
 
-Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's minimal guard.
-1. **F-1:** extents parsed in the live path for both formats (`wp:extent` EMU → `emuToUnits`; `svg:width/height` through `LayoutUnits`); `OfficeImage` carries units; dead plumbing deleted (`DocxDocumentParser.parseDocxFile`, `imageExtents`, `InkyModule.docxExtents`).
-2. **F-2:** media store in `filesDir/media/<sha>/` with manifest + LRU cap + self-heal re-extraction on miss.
-3. **F-3:** decode without a blank frame: explicit `size()` from the extent, placeholder, `crossfade(false)`, pre-decode of first pages during layout.
-4. **F-4:** the three `delay()` calls (`InkyModule.kt:1105-1109`) die; `loadingProgressStatus` is driven by real stages (the string resources from Plan 2 stay).
-5. **F-5:** the save guard per §0: refuse with a clear en_US dialog when the model holds images the writer cannot serialise; the `[Image: path]` branch (`DocxDocumentParser.kt:723`) is made unreachable, then deleted.
-**Tests:** `ImageExtentParsingTest` (Sample-6 ODT/DOCX → same dp triple), `MediaStoreTest` (self-heal, cap), `PaginationImageTest` (taller-than-page image still paginates), `OpenLatencyTest` (no artificial delay in the open path).
-**Acceptance:** Recents open shows text in one frame and images within one frame of decode; a cache wipe cannot destroy media; both formats render the same picture the same size.
-**Size:** medium.
+Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's minimal guard. The single "PR 17, Plan 6" row from v1 shipped as four increments, because F-2 (a new durable media store with caps and self-heal) and F-3/F-4 (decode presentation and real loading stages) each moved a different subsystem and could not be reviewed as one diff.
+
+1. **F-1 (6A, PR #22 `eff150d`):** extents parsed in the live path for both formats (`wp:extent` EMU → `emuToUnits`, legacy `a:ext` fallback; `svg:width/height` through `LayoutUnits`); `OfficeImage`/`ImageElement` carry units; dead plumbing deleted (`DocxParseResult.imageExtents`, `InkyModule.docxExtents`). The dead `DocxDocumentParser.parseDocxFile`/`parseOdtFile`/`imageExtractor` and the `[Image: path]` branch were deleted in 6D (PR #25). CI: run `36578390234`, **252 unit tests**, 0 failures.
+2. **F-2 (6B, PR #23 `ac713e4`):** media store in `filesDir/media/<sourceKey>/` with `manifest.properties`, 128 MiB per-document cap, 256 MiB global LRU cap, `ZipSafe.MAX_IMAGE_BYTES` per-image cap, collision-safe package paths, and self-heal re-extraction on a fresh parse or an in-memory parsed-document cache hit. CI: runs `36587725933`/`36588655662`, **260 unit tests**, 0 failures.
+3. **F-3 (6C, PR #24 `bdd2724`):** decode without a blank frame. `DocumentImages` is the single resolver for box size, decode size (zoom-independent, capped at 2048 px) and cache key; `ImagePredecoder` decodes the first two pages' images on `Dispatchers.IO` during layout; `DocxEmbeddedImage` uses the explicit reserved box, `ContentScale.Fit` and `crossfade(false)`, with `DocumentImageTags.IMAGE/PENDING/MISSING`.
+4. **F-4 (6C, PR #24):** the three `delay()` calls (`InkyModule.kt:1105-1109`) are gone; `loadingProgressStatus` is driven by `LoadingStage` (`OPENING_PACKAGE`, `VALIDATING`, `EXTRACTING_MEDIA`, `READING_STYLES`, `READING_BODY`, `CACHED`, `LAYOUT`). CI: run `36708650093`, **275 unit tests**, 0 failures; `Plan6cLoadingProgressTest` prints open/first-layout timings that PR #25's `scripts/ci-dump-comment.py` change now surfaces in the PR comment.
+5. **F-5 (6A PR #22 + 6D PR #25):** the save path refuses instead of silently substituting `[Image: path]` (`EmbeddedImageSaveGuard`, `OdtDocumentWriter` package-media validation, `DocumentSerializer` propagation). 6D made the writer branch itself fail closed (`IllegalStateException`) so no future caller can resurrect the placeholder. CI: run `36708650093` and the PR #25 run, **276 unit tests**, 0 failures.
+**Tests:** `Plan6ImageFoundationTest` (6 tests: the Sample-6 ODT/DOCX dp triple, the DrawingML `a:ext` fallback, DOCX/ODT save refusals, package-media reuse, and `tallerThanPageImageStillPaginatesAndUsesDocumentImagesFallback`, which is the `PaginationImageTest` row of this table), `DocumentMediaStoreTest` (8 tests: persistence, self-heal, LRU, source change, duplicate basenames, limits), `DocumentImagesTest` (6) and `DocumentImagePresentationTest` (4), `Plan6cLoadingProgressTest` (5, including `OpenLatencyTest`'s no-artificial-delay source scan).
+**Acceptance:** text and images render from real stages with no artificial delay and no blank frame; a cache wipe cannot destroy media (self-heal re-extracts); both formats render the same picture the same size; all twelve fixtures stay inside their windows (ODT `15/23/18/10/18/19`, DOCX `15/25/21/11/19/23`, zero empty pages). **Device-class acceptance (the Realme C3 one-frame target) is not claimed here; it belongs to the owner's post-Plan-11 hardware pass.**
 
 ### 4.6 PR 18, Plan 7A: ODF numbering, heading runs, hyperlinks, ⚑ bookmarks
 
@@ -333,12 +333,12 @@ Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F
 
 Closes O-01, the non-destructive-package rule, plan-03 3.13, 3.19, 3.20, 3.26, 3.27, and retires F-2 (`OfficeDocElement`).
 
-Scheduled **after** Plans 6, 7 and 8 land (PR slots #20 to #24), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
+Scheduled **after** Plans 6, 7 and 8 land (**PR slot #30** per the 2026-09-30 reforecast in §4.12), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
 **Acceptance:** open → save → reopen preserves text, styles, numbering, tables, images, TOC for Sample-6 in both formats, verified by a CI round-trip test. **Scope is firmed by a short plan document before this PR starts; do not start it from this paragraph alone.**
 
 ### 4.11 Plan 10: stays parked
 
-Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after PR #24 (8B) converges both formats and the user re-confirms** (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
+Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after PR #29 (8B) converges both formats and the user re-confirms** (forecast slot #31-#32 per the 2026-09-30 reforecast in §4.12) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
 
 ### 4.12 Plan 1: master index updates (living document, per PR)
 
@@ -356,18 +356,20 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 18 | 2026-09-27 | row 5 → "5D landed" | § Plan 5 got the 5D breaks and defaults record (audit-010) |
 | 19 | 2026-09-28 | row 5 → "5A to 5E landed" | § Plan 5 got the 5E record; `plan-5e-progress.md` carries the batch-by-batch evidence |
 
-**Forward schedule, updated 2026-09-30.** Plan 1's documentation PRs took #20 and #21. PR #22 then merged the first Plan 6 increment (image extents and fail-safe image saves), but did not complete Plan 6. PR #23 merged Plan 6B (durable media storage and recovery); its final head passed Unit Tests and Build in run `36588655662` and the post-merge `main` runs `36589704465`/`36589734261` (run `36587725933` covered the intermediate commit `63eb3f4`, 260 unit tests). Plan 6C (decode presentation, real loading progress) and Plan 6D (closeout) follow; local Java remains unavailable in the sandbox. Plan IDs remain authoritative; forecast PR slots for Plans 7 to 9 after Plan 6 is complete, since the remaining Plan 6 work may use more than one PR.
+**Forward schedule, updated 2026-09-30 (Plan 6 complete).** Plan 1's documentation PRs took #20 and #21. Plan 6 then took four PRs instead of the one slot v1 predicted: **#22 (6A, image extents and fail-safe image saves, run `36578390234`, 252 unit tests), #23 (6B, durable media storage and recovery, runs `36587725933`/`36588655662`, 260 unit tests), #24 (6C, decode presentation and real loading progress, run `36708650093`, 275 unit tests), and #25 (6D, closeout gate: dead `DocxDocumentParser` plumbing deleted, `LayoutEngine` unified on `DocumentImages.box`, `PaginationImageTest` added, per-suite JUnit timings and `Plan6cLoadingProgressTest` stdout added to the CI PR comment, 276 unit tests)**. Local Java remains unavailable in the sandbox, so every number below comes from a GitHub Actions run. Plan IDs remain authoritative; the PR slots below are the reforecast promised when Plan 6 was split, and they are expectations, not reservations.
 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
-| 6 | #22 foundation merged; 6B active (PR #23 CI passed) | row 6 → in progress | plan-04-to-09 § Plan 6 records the PR #22 delta and the current 6B scope |
-| 7A | TBD after Plan 6 | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
-| 7B | TBD after Plan 6 | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
-| 8A | TBD after Plan 7 | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
-| 8B | TBD after Plan 7 | row 8 → "8A, 8B landed" | § Plan 8 gets H-3 to H-7 (with b) record plus any tightened window |
-| 9 | TBD after Plans 6-8 | row 9 → landed | § Plan 9 record; plan-01 §4 checklist items 1 and 10 close |
-| 10 resume | TBD | row 10 status change when it starts | plan-10 head note |
-| 11 packages | TBD | row 11 status change per package | plan-11 §5 |
+| 6 | **#22/#23/#24/#25 all merged — COMPLETE** | row 6 → "6a to 6d all landed (COMPLETE)" | plan-04-to-09 § Plan 6 carries the four-increment implementation record, the CI run table and the re-confirmed 12-file matrix |
+
+**Section-number note (2026-09-30).** §4.6 to §4.11 below keep the PR numbers v1 assigned them (18, 19, 20, 21, 22) as **plan-item identifiers**, not as live reservations; the plan IDs in their headings (7A, 7B, 8A, 8B, 9) are authoritative. Their reforecast PR slots are 7A `#26`, 7B `#27`, 8A `#28`, 8B `#29`, 9 `#30`, Plan 10 `#31`–`#32`, Plan 11 `#33`–`#37`.
+| 7A | **#26** | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
+| 7B | **#27** | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
+| 8A | **#28** | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
+| 8B | **#29** | row 8 → "8A, 8B landed" | § Plan 8 gets H-3 to H-7 (with b) record plus any tightened window |
+| 9 | **#30** | row 9 → landed | § Plan 9 record; plan-01 §4 checklist items 1 and 10 close |
+| 10 resume | **#31–#32** | row 10 status change when it starts | plan-10 head note |
+| 11 packages | **#33–#37** | row 11 status change per package | plan-11 §5 |
 
 One-time plan-1 changes made with PR 13's commits (they described state then): registry row 3 status (3A **landed**, not "in review"); §3 WG-mapping gained three owner lines; §3.1's sidebar-deck row lost its "lacks Images" half; §3.1's menu-bar row's "6 of 8 ribbon tabs are empty" became "4 of 6 declared tabs have no deck yet"; §6's "Next actions" item 2 was struck through as done.
 
@@ -379,17 +381,17 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 **Landed 2026-09-24 to 2026-09-28:** 13 (3B), 14 (Plan 3C / Plan 11 docs), 15 (5A), 16 (5B), 17 (5C), 18 (5D), 19 (5E). Plan 5 shipped as five PRs rather than the 16a/16b split predicted below.
 
-**Forward schedule, re-numbered 2026-09-28** (plan IDs first, expected PR slot in parentheses; Plan 1's two documentation PRs took #20 and #21):
+**Forward schedule, re-numbered 2026-09-30 after Plan 6 split into four PRs** (plan IDs first, expected PR slot in parentheses; Plan 1's two documentation PRs took #20 and #21; Plan 6 then took #22–#25):
 
 | Order | Plan | PR slot | Parallel with | Gate to enter the next |
 |---|---|---|---|---|
-| 1 | 6 (images and media) | 22 | 8A scaffolding | no blank frame; unsafe image save refuses |
-| 2 | 7A (ODF numbering, headings, links, TOC) | 23 | 8A scaffolding | ODT numbering fidelity |
-| 3 | 7B (ODT tables, font identity, sections) | 24 | tail of 7A | ODT checklist green |
-| 4 | 8A (DOCX style chain, runs) | 25 | none | DOCX style chain green |
-| 5 | 8B (DOCX numbering, fields, tables, sections) | 26 | none | both-format convergence, then re-measure and tighten only with support |
-| 6 | 9 (save round trip) | 27 | Plan 10 resume decision | round-trip CI test |
-| 7 | 10, 11 packages | TBD | per package | per package gate in plan-11 §5 |
+| - | 6 (images and media) | **#22–#25, merged** | 8A scaffolding | **done:** no artificial delay in the open path, media self-heals after a cache wipe, unsafe image save refuses |
+| 2 | 7A (ODF numbering, headings, links, TOC) | 26 | 8A scaffolding | ODT numbering fidelity |
+| 3 | 7B (ODT tables, font identity, sections) | 27 | tail of 7A | ODT checklist green |
+| 4 | 8A (DOCX style chain, runs) | 28 | none | DOCX style chain green |
+| 5 | 8B (DOCX numbering, fields, tables, sections) | 29 | none | both-format convergence, then re-measure and tighten only with support |
+| 6 | 9 (save round trip) | 30 | Plan 10 resume decision | round-trip CI test |
+| 7 | 10, 11 packages | #31–#37 | per package | per package gate in plan-11 §5 |
 | 8 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
 
 **Device checklist resume points** (`docs/InkyC1Checklist.md`, deliberately postponed; section order = item number):

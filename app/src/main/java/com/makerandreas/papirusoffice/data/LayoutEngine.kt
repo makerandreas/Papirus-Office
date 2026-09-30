@@ -331,18 +331,18 @@ class LayoutEngine(
                     flush(PageEndReason.AUTHORED)
                 }
             } else {
-                val height = when (element) {
-                    is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    is OfficeImage -> if (element.heightDp > 0) element.heightDp else 180f
-                    is OfficeDocElement.ImageElement -> if (element.image.heightDp > 0) element.image.heightDp else 180f
+                val imageBox = when (element) {
+                    is OfficeImage -> DocumentImages.box(element.widthDp, element.heightDp)
+                    is OfficeDocElement.ImageElement -> DocumentImages.box(element.image.widthDp, element.image.heightDp)
+                    else -> null
+                }
+                val height = when {
+                    imageBox != null -> imageBox.heightUnits
+                    element is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
+                    element is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
                     else -> 30f
                 }
-                val width = when (element) {
-                    is OfficeImage -> element.widthDp
-                    is OfficeDocElement.ImageElement -> element.image.widthDp
-                    else -> pageSpec.contentWidthDp
-                }.takeIf { it > 0f }?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
+                val width = imageBox?.widthUnits?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
                 if (y + previousAfter + height > bottom && placed.isNotEmpty()) flush(PageEndReason.OVERFLOW)
                 y += previousAfter
                 previousAfter = 0f

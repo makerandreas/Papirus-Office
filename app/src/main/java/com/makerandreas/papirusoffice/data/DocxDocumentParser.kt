@@ -1,15 +1,10 @@
 package com.makerandreas.papirusoffice.data
 import java.util.Locale
 
-import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
-import android.util.Xml
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.xmlpull.v1.XmlPullParser
 import java.io.File
-import java.io.InputStream
-import java.util.zip.ZipInputStream
 
 data class DocxParseResult(
     val text: String,
@@ -19,7 +14,6 @@ data class DocxParseResult(
 
 class DocxDocumentParser(private val context: Context) {
 
-    private val imageExtractor = DocxImageExtractor(context)
     private val officeParser = OfficeDocumentParser(context)
 
     val parsingProgress: androidx.lifecycle.LiveData<ParsingProgress> get() = officeParser.parsingProgress
@@ -55,220 +49,6 @@ class DocxDocumentParser(private val context: Context) {
         } catch (e: Exception) {
             false
         }
-    }
-
-    private suspend fun parseDocxFile(docxFile: File): DocxParseResult = withContext(Dispatchers.IO) {
-        val extractedImages = imageExtractor.extractImagesFromDocx(docxFile)
-        var documentXmlStream: InputStream? = null
-
-        val textBuilder = StringBuilder()
-
-        try {
-            ZipInputStream(docxFile.inputStream()).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == "word/document.xml") {
-                        val byteArray = zip.readCappedBytes()
-                        documentXmlStream = byteArray.inputStream()
-                        break
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-
-            documentXmlStream?.use { stream ->
-                val parser = Xml.newPullParser()
-                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-                parser.setInput(stream, "UTF-8")
-
-                var eventType = parser.eventType
-                var inParagraph = false
-                var inText = false
-                val currentParagraph = StringBuilder()
-                var isFirstCellInRow = true
-
-                while (eventType != XmlPullParser.END_DOCUMENT) {
-                    when (eventType) {
-                        XmlPullParser.START_TAG -> {
-                            val tagName = parser.name
-                            val tagLower = tagName.lowercase(Locale.ROOT)
-                            when {
-                                tagLower == "w:p" || tagLower == "p" -> {
-                                    inParagraph = true
-                                }
-                                tagLower == "w:numpr" || tagLower == "numpr" -> {
-                                    currentParagraph.append("• ")
-                                }
-                                tagLower == "w:t" || tagLower == "t" -> {
-                                    inText = true
-                                }
-                                tagLower == "w:br" || tagLower == "br" || tagLower == "w:cr" || tagLower == "cr" -> {
-                                    currentParagraph.append("\n")
-                                }
-                                tagLower == "w:tab" || tagLower == "tab" -> {
-                                    currentParagraph.append("\t")
-                                }
-                                tagLower == "w:tc" || tagLower == "tc" -> {
-                                    if (!isFirstCellInRow) {
-                                        currentParagraph.append("\t")
-                                    }
-                                    isFirstCellInRow = false
-                                }
-                                tagLower == "w:tr" || tagLower == "tr" -> {
-                                    isFirstCellInRow = true
-                                }
-                            }
-                        }
-                        XmlPullParser.TEXT -> {
-                            if (inText) {
-                                currentParagraph.append(parser.text)
-                            }
-                        }
-                        XmlPullParser.END_TAG -> {
-                            val tagName = parser.name
-                            val tagLower = tagName.lowercase(Locale.ROOT)
-                            when {
-                                tagLower == "w:t" || tagLower == "t" -> {
-                                    inText = false
-                                }
-                                tagLower == "w:p" || tagLower == "p" -> {
-                                    inParagraph = false
-                                    if (currentParagraph.isNotEmpty()) {
-                                        textBuilder.append(currentParagraph.toString()).append("\n\n")
-                                        currentParagraph.clear()
-                                    }
-                                }
-                                tagLower == "w:tr" || tagLower == "tr" -> {
-                                    if (currentParagraph.isNotEmpty()) {
-                                        textBuilder.append(currentParagraph.toString()).append("\n")
-                                        currentParagraph.clear()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    eventType = parser.next()
-                }
-                if (currentParagraph.isNotEmpty()) {
-                    textBuilder.append(currentParagraph.toString())
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            if (textBuilder.isEmpty()) {
-                textBuilder.append("Failed to parse DOCX document: ").append(e.localizedMessage)
-            }
-        }
-
-        val extractedText = textBuilder.toString().trim()
-        val finalResultText = if (extractedText.isBlank()) "" else extractedText
-
-        return@withContext DocxParseResult(
-            text = finalResultText,
-            extractedImages = extractedImages,
-        )
-    }
-
-    private suspend fun parseOdtFile(odtFile: File): DocxParseResult = withContext(Dispatchers.IO) {
-        val extractedImages = imageExtractor.extractImagesFromOdt(odtFile)
-        val textBuilder = StringBuilder()
-        try {
-            var contentXmlBytes: ByteArray? = null
-            ZipInputStream(odtFile.inputStream()).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == "content.xml") {
-                        contentXmlBytes = zip.readCappedBytes()
-                        break
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-
-            contentXmlBytes?.inputStream()?.use { stream ->
-                val parser = Xml.newPullParser()
-                parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
-                parser.setInput(stream, "UTF-8")
-
-                var eventType = parser.eventType
-                var inTextElement = false
-                val currentPara = StringBuilder()
-                var isFirstCellInRow = true
-
-                while (eventType != XmlPullParser.END_DOCUMENT) {
-                    when (eventType) {
-                        XmlPullParser.START_TAG -> {
-                            val tagName = parser.name
-                            when {
-                                tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h" -> {
-                                    inTextElement = true
-                                }
-                                tagName == "text:list-item" || tagName == "list-item" -> {
-                                    currentPara.append("• ")
-                                }
-                                tagName == "text:line-break" || tagName == "line-break" -> {
-                                    currentPara.append("\n")
-                                }
-                                tagName == "text:tab" || tagName == "tab" -> {
-                                    currentPara.append("\t")
-                                }
-                                tagName == "text:s" || tagName == "s" -> {
-                                    val countAttr = parser.getAttributeValue(null, "c") ?: parser.getAttributeValue(null, "text:c")
-                                    val count = countAttr?.toIntOrNull() ?: 1
-                                    repeat(count) { currentPara.append(" ") }
-                                }
-                                tagName == "table:table-cell" || tagName == "table-cell" -> {
-                                    if (!isFirstCellInRow) {
-                                        currentPara.append("\t")
-                                    }
-                                    isFirstCellInRow = false
-                                }
-                                tagName == "table:table-row" || tagName == "table-row" -> {
-                                    isFirstCellInRow = true
-                                }
-                            }
-                        }
-                        XmlPullParser.TEXT -> {
-                            if (inTextElement || parser.text.trim().isNotEmpty()) {
-                                currentPara.append(parser.text)
-                            }
-                        }
-                        XmlPullParser.END_TAG -> {
-                            val tagName = parser.name
-                            when {
-                                tagName == "text:p" || tagName == "text:h" || tagName == "p" || tagName == "h" -> {
-                                    inTextElement = false
-                                    if (currentPara.isNotEmpty()) {
-                                        textBuilder.append(currentPara.toString()).append("\n\n")
-                                        currentPara.clear()
-                                    }
-                                }
-                                tagName == "table:table-row" || tagName == "table-row" -> {
-                                    if (currentPara.isNotEmpty()) {
-                                        textBuilder.append(currentPara.toString()).append("\n")
-                                        currentPara.clear()
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    eventType = parser.next()
-                }
-                if (currentPara.isNotEmpty()) {
-                    textBuilder.append(currentPara.toString())
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        val resultStr = textBuilder.toString().trim()
-        return@withContext DocxParseResult(
-            text = if (resultStr.isBlank()) "" else resultStr,
-            extractedImages = extractedImages
-        )
     }
 
     suspend fun saveDocument(file: File, document: com.makerandreas.papirusoffice.data.OfficeDocument): Boolean = withContext(Dispatchers.IO) {
@@ -716,15 +496,14 @@ class DocxDocumentParser(private val context: Context) {
                 }
                 sb.append("    </w:tbl>\n")
             }
-            is OfficeImage -> {
-                sb.append("    <w:p><w:r><w:t xml:space=\"preserve\">[Image: ${escapeXml(element.imagePath)}]</w:t></w:r></w:p>\n")
+            is OfficeImage, is OfficeDocElement.ImageElement -> {
+                throw IllegalStateException("DOCX serialization does not support embedded images")
             }
             is OfficePageBreak -> {
                 sb.append("    <w:p><w:r><w:br w:type=\"page\"/></w:r></w:p>\n")
             }
             is OfficeDocElement.ParagraphElement -> writeDocxElement(sb, element.paragraph)
             is OfficeDocElement.TableElement -> writeDocxElement(sb, element.table)
-            is OfficeDocElement.ImageElement -> writeDocxElement(sb, element.image)
             else -> { }
         }
     }
