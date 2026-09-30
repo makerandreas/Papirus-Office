@@ -33,6 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.ui.components.DocxEmbeddedImage
+import com.example.ui.components.LocalPendingImageDecodes
+import com.makerandreas.papirusoffice.data.DocumentImages
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import com.makerandreas.papirusoffice.data.*
 import java.io.File
 
@@ -198,6 +203,37 @@ fun LayoutDrivenDocumentRenderer(
         }
     }
 
+    // Plan 6C (F-3): predecode the first screenful plus one page. Images in
+    // that window hold their placeholder until the decode lands, then compose
+    // from the memory cache; images further down load on their own.
+    val context = LocalContext.current
+    val imageDensity = LocalDensity.current.density
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp.toFloat()
+    val predecodeTargets = remember(computed, extractedImages, viewportWidthDp, zoomScale, screenHeightDp, showImages) {
+        if (!showImages) {
+            emptyList()
+        } else {
+            val heights = computed.pages.map {
+                PageTransform.sheetFor(it.widthDp, it.heightDp, viewportWidthDp, zoomScale).heightDp
+            }
+            val window = DocumentImages.predecodePageWindow(heights, PAGE_GAP_DP.value, screenHeightDp)
+            DocumentImages.predecodeTargets(computed.pages, window, extractedImages)
+        }
+    }
+    var pendingDecodes by remember(predecodeTargets, imageDensity) {
+        mutableStateOf(ImagePredecoder.uncachedKeys(context, predecodeTargets, imageDensity))
+    }
+    LaunchedEffect(predecodeTargets, imageDensity) {
+        if (pendingDecodes.isNotEmpty()) {
+            try {
+                ImagePredecoder.predecode(context, predecodeTargets, imageDensity)
+            } finally {
+                pendingDecodes = emptySet()
+            }
+        }
+    }
+
+    CompositionLocalProvider(LocalPendingImageDecodes provides pendingDecodes) {
     Box(modifier = modifier.padding(vertical = STACK_PADDING_DP)) {
     Column(
         verticalArrangement = Arrangement.spacedBy(PAGE_GAP_DP),
@@ -340,6 +376,7 @@ fun LayoutDrivenDocumentRenderer(
             }
         }
     }
+    }
 
 }
 
@@ -451,11 +488,11 @@ private fun RenderLaidOutElement(
             RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale)
         }
         is OfficeImage -> {
-            RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, zoomScale, pageScale)
+            RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, pageScale)
         }
         is OfficeDocElement.ImageElement -> {
             val img = element.image
-            RenderImage(img.imageFile, img.imagePath, img.widthDp, img.heightDp, extractedImages, zoomScale, pageScale)
+            RenderImage(img.imageFile, img.imagePath, img.widthDp, img.heightDp, extractedImages, pageScale)
         }
         else -> { }
     }
@@ -766,39 +803,23 @@ private fun RenderImage(
     widthDp: Float,
     heightDp: Float,
     extractedImages: Map<String, File>,
-    zoomScale: Float,
     pageScale: Float
 ) {
-    val lower = imagePath.lowercase(java.util.Locale.ROOT)
-    val fileNameLower = imagePath.substringAfterLast('/').lowercase(java.util.Locale.ROOT)
-    val resolved = imageFile?.takeIf { it.exists() }
-        ?: extractedImages[imagePath]
-        ?: extractedImages[lower]
-        ?: extractedImages[imagePath.substringAfterLast('/')]
-        ?: extractedImages[fileNameLower]
-        ?: extractedImages.values.firstOrNull { it.name.equals(imagePath.substringAfterLast('/'), ignoreCase = true) }
+    // The box the paginator reserved (layout units, the default box when the
+    // file declares none), on the sheet's scale. It is drawn whether or not
+    // the file resolves, so a missing image never collapses the page.
+    val resolved = DocumentImages.resolve(imageFile, imagePath, extractedImages)
+    val box = DocumentImages.box(widthDp, heightDp)
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
-        if (resolved != null && resolved.exists()) {
-            // The image box the paginator reserved (layout units, 200 x 150
-            // when the file declares none), on the sheet's scale.
-            val boxWidthUnits = if (widthDp > 0) widthDp else 200f
-            val boxHeightUnits = if (heightDp > 0) heightDp else 150f
-            DocxEmbeddedImage(
-                imageFile = resolved,
-                extentCx = LayoutUnits.unitsToEmu(boxWidthUnits * pageScale),
-                extentCy = LayoutUnits.unitsToEmu(boxHeightUnits * pageScale)
-            )
-        } else {
-            Text(
-                text = stringResource(R.string.inky_image_placeholder),
-                fontSize = (11 * zoomScale).sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        DocxEmbeddedImage(
+            imageFile = resolved,
+            widthDp = (box.widthUnits * pageScale).dp,
+            heightDp = (box.heightUnits * pageScale).dp,
+            widthUnits = box.widthUnits,
+            heightUnits = box.heightUnits
+        )
     }
 }
