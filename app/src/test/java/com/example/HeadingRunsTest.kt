@@ -48,10 +48,20 @@ class HeadingRunsTest {
                 assertEquals(h.text, h.runs.joinToString("") { it.text })
             }
         }
-        val italicHeading = sample5Headings.first { it.text.contains("Supergrup") }
+        // Sample-5 declares four headings whose text is wrapped in the italic
+        // auto-style T2 (Supergrup Excavata / SAR / Archaeplastida / ...); the
+        // first heading merely containing the word "Supergrup" is not one of them.
+        val italicHeadings = sample5Headings.filter { h -> h.runs.any { it.isItalic } }
         assertTrue(
-            "Sample-5 Supergrup heading must preserve italic span run: ${italicHeading.runs}",
-            italicHeading.runs.any { it.isItalic }
+            "Sample-5 must preserve at least one italic heading span: " +
+                sample5Headings.map { it.text to it.runs.map { r -> r.isItalic } }.take(8),
+            italicHeadings.isNotEmpty()
+        )
+        val excava = italicHeadings.firstOrNull { it.text.contains("Excavata") }
+        assertTrue(
+            "Sample-5 Supergrup Excavata heading must carry the T2 italic run: " +
+                sample5Headings.filter { it.text.contains("Supergrup") }.map { it.text to it.runs },
+            excava != null
         )
     }
 

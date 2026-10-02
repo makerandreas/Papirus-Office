@@ -23,6 +23,15 @@ class LokitSubplan12aTest {
         return file.readText()
     }
 
+    /** Code lines only: a comment that names an API must not count as a use of it. */
+    private fun readMainCode(relativePath: String): String =
+        readMainSource(relativePath).lineSequence()
+            .filterNot { line ->
+                val trimmed = line.trim()
+                trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")
+            }
+            .joinToString("\n")
+
     private val expectedJniExports: Map<String, Set<String>> = mapOf(
         "org.libreoffice.kit.LibreOfficeKit" to setOf(
             "getLibreOfficeKitHandle",
@@ -142,8 +151,8 @@ class LokitSubplan12aTest {
      */
     @Test
     fun officeTransportStaysWithinMinSdk24Apis() {
-        val service = readMainSource("com/example/core/jni/OfficeEngineService.kt")
-        val client = readMainSource("com/example/core/jni/OfficeEngineClient.kt")
+        val service = readMainCode("com/example/core/jni/OfficeEngineService.kt")
+        val client = readMainCode("com/example/core/jni/OfficeEngineClient.kt")
         assertTrue("Service must accept jobs through onStartCommand", service.contains("override fun onStartCommand("))
         assertTrue("Service must report through ResultReceiver", service.contains("ResultReceiver"))
         assertTrue("Service must not bind for jobs", service.contains("override fun onBind(intent: Intent?): IBinder? = null"))

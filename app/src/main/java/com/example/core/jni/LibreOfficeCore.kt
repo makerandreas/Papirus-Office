@@ -46,22 +46,32 @@ object LibreOfficeCore {
     /**
      * Native probe: loads the pre-bundled `liblo-native-code.so` first (with
      * its dependency chain, resolved from `app/src/main/libs/<abi>/`), then
-     * the legacy `liblibreoffice-core.so` custom name. Pure probe: any
-     * UnsatisfiedLinkError means "simulated mode".
+     * the legacy `libreoffice-core.so` custom name.
+     *
+     * The probe catches every [Throwable] per library instead of only
+     * `UnsatisfiedLinkError`. On a device a missing dependency surfaces as
+     * `UnsatisfiedLinkError`, but a JVM or Robolectric host can raise an
+     * `ExceptionInInitializerError` (or another `LinkageError` from the class
+     * loader) for the same condition, and "native library unavailable" must
+     * always mean the pure-Kotlin engine rather than a crash. A probe that
+     * returns true still proves the whole chain loaded.
      */
     private fun tryLoadNative(): Boolean {
-        try {
-            LO_NATIVE_LOAD_ORDER.forEach { System.loadLibrary(it) }
-            return true
-        } catch (ignored: UnsatisfiedLinkError) {
-            // Fall through to the legacy/custom soname.
+        for (soname in LO_NATIVE_LOAD_ORDER) {
+            if (!tryLoadOne(soname)) {
+                // Fall through to the legacy/custom soname.
+                return tryLoadOne("libreoffice-core")
+            }
         }
-        return try {
-            System.loadLibrary("libreoffice-core")
-            true
-        } catch (ignored: UnsatisfiedLinkError) {
-            false
-        }
+        return true
+    }
+
+    private fun tryLoadOne(soname: String): Boolean = try {
+        System.loadLibrary(soname)
+        true
+    } catch (t: Throwable) {
+        Log.w(TAG, "Native library '$soname' could not be loaded: ${t.javaClass.simpleName}")
+        false
     }
 
     /**

@@ -199,10 +199,10 @@ class OdtListNumberingTest {
             "Expected arabic ordered bullets 1. .. 4. in $orderedBullets",
             orderedBullets.containsAll(listOf("1. ", "2. ", "3. ", "4. "))
         )
-        assertTrue(
-            "Expected alpha ordered bullets a. .. d. in $orderedBullets",
-            orderedBullets.containsAll(listOf("a. ", "b. ", "c. ", "d. "))
-        )
+        // Sample-6 authors arabic labels in every ordered list; several declare no
+        // num-suffix, so the bare "1 " form is authored too and must survive.
+        assertTrue("Expected a bare arabic label ('1 ') in $orderedBullets", orderedBullets.contains("1 "))
+        assertTrue("Counters must pass nine (expected '10.'): $orderedBullets", orderedBullets.contains("10."))
 
         // Bullet items use the middle dot without doubling the suffix, and carry 10pt label size.
         val bulletItems = listItems.filter { !it.isOrdered }
