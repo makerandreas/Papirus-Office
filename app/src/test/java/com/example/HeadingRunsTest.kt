@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.ui.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import com.makerandreas.papirusoffice.data.OfficeHeading
@@ -73,7 +74,7 @@ class HeadingRunsTest {
             if (item.runs.any { it.isBold }) {
                 boldRunCount++
                 val asPara = OfficeParagraph(text = item.text, styleName = item.styleName, runs = item.runs)
-                val annotated = OfficeRuns.toAnnotatedString(asPara, doc.styles)
+                val annotated = OfficeRuns.toAnnotatedString(asPara, doc.styles, 1f, Color.Black)
                 assertEquals(item.text, annotated.text)
                 assertTrue("AnnotatedString for ListItem with bold run must have SpanStyles", annotated.spanStyles.isNotEmpty())
             }
