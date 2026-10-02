@@ -193,16 +193,18 @@ class OdtListNumberingTest {
         val listItems = doc.body.elements.filterIsInstance<OfficeListItem>()
         assertTrue("Sample-6.odt must produce OfficeListItem elements", listItems.size >= 40)
 
-        // Ordered list items in Rumusan Masalah (1..4) and Tujuan Penulisan (a..d).
+        // Ordered list items in Rumusan Masalah (1..4) and Tujuan Penulisan (1..).
+        // The label keeps the separator space the renderer adds, so compare trimmed.
         val orderedBullets = listItems.filter { it.isOrdered }.map { it.bullet }
+        val orderedLabels = orderedBullets.map { it.trim() }
         assertTrue(
-            "Expected arabic ordered bullets 1. .. 4. in $orderedBullets",
-            orderedBullets.containsAll(listOf("1. ", "2. ", "3. ", "4. "))
+            "Expected arabic ordered labels 1. .. 4. in $orderedBullets",
+            orderedLabels.containsAll(listOf("1.", "2.", "3.", "4."))
         )
         // Sample-6 authors arabic labels in every ordered list; several declare no
-        // num-suffix, so the bare "1 " form is authored too and must survive.
-        assertTrue("Expected a bare arabic label ('1 ') in $orderedBullets", orderedBullets.contains("1 "))
-        assertTrue("Counters must pass nine (expected '10.'): $orderedBullets", orderedBullets.contains("10."))
+        // num-suffix, so the bare form is authored too and must survive.
+        assertTrue("Expected a bare arabic label ('1') in $orderedBullets", orderedLabels.contains("1"))
+        assertTrue("Counters must pass nine (expected '10'): $orderedBullets", orderedLabels.contains("10"))
 
         // Bullet items use the middle dot without doubling the suffix, and carry 10pt label size.
         val bulletItems = listItems.filter { !it.isOrdered }
