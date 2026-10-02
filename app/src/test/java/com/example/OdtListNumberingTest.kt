@@ -206,18 +206,21 @@ class OdtListNumberingTest {
         assertTrue("Expected a bare arabic label ('1') in $orderedBullets", orderedLabels.contains("1"))
         assertTrue("Counters must pass nine (expected '10.'): $orderedBullets", orderedLabels.contains("10."))
 
-        // Bullet items use the middle dot without doubling the suffix, and the level's
-        // text style declares the label font family (Aptos) with no size of its own.
+        // Bullet items use the middle dot without doubling the suffix. The bullet
+        // level's own <style:text-properties> declares the label font family (Symbol,
+        // the authored bullet-glyph face); the numbered levels' ListLabel_* text
+        // styles declare Aptos. Neither declares a size, so the label-font fact is a
+        // family, not a point size.
         val bulletItems = listItems.filter { !it.isOrdered }
         assertTrue("Expected middle-dot bullet items in Sample-6.odt", bulletItems.isNotEmpty())
         assertTrue(
             "Bullet glyph must not double suffix: ${bulletItems.map { it.bullet }.distinct()}",
             bulletItems.none { it.bullet.contains("\u00b7\u00b7") }
         )
+        val bulletLabelFamilies = bulletItems.map { it.labelFontFamily }.distinct()
         assertTrue(
-            "Bullet levels reference ListLabel_* text styles that declare the Aptos family: " +
-                bulletItems.map { it.labelFontFamily }.distinct(),
-            bulletItems.any { it.labelFontFamily == "Aptos" }
+            "Sample-6 bullet levels declare the Symbol label face: $bulletLabelFamilies",
+            bulletLabelFamilies == listOf("Symbol")
         )
     }
 
