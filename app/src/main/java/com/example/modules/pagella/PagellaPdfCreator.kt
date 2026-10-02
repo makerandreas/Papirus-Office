@@ -190,13 +190,16 @@ object PagellaPdfCreator {
         if (!documentFile.exists()) return@withContext null
         try {
             val baseName = sanitizeBaseName(preferredBaseName ?: documentFile.name, "Converted_Document")
+            val targetFile = outputPdfFile(context, baseName)
+            if (com.example.core.jni.OfficeEngineClient.convertToPdf(context, documentFile, targetFile)) {
+                return@withContext targetFile
+            }
             val parser = DocxDocumentParser(context)
             val parseResult = parser.parseDocument(documentFile)
             if (parseResult.parsedDocument?.isParsingFailed == true) {
                 return@withContext null
             }
             val bodyText = parseResult.text.ifBlank { baseName }
-            val targetFile = outputPdfFile(context, baseName)
             val exported = try {
                 FileOutputStream(targetFile).use { out ->
                     InkyPdfExporter.exportToPdf(

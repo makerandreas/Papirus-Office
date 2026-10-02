@@ -68,27 +68,30 @@ inventory() {
   done
 
   echo
-  echo "== JNI seam check: external fun in $(basename "$JNI_SOURCE") vs $JNI_PREFIX* in liblo-native-code.so"
-  if [ ! -f "$JNI_SOURCE" ]; then
-    echo "   source file not found"
-    return
-  fi
+  echo "== JNI seam check: org.libreoffice.kit.* external fun declarations vs liblo-native-code.so"
   local lib
   lib=$(ls "$LIBS"/*/liblo-native-code.so 2>/dev/null | head -1)
   if [ -z "$lib" ] || head -c 64 "$lib" | grep -q "git-lfs" || ! have nm; then
     echo "   binary not inspectable here (LFS pointer or nm missing)"
     return
   fi
-  local symbols fn
-  symbols=$(nm -D --defined-only "$lib" 2>/dev/null | awk '{print $3}')
-  grep -oE 'external fun [A-Za-z0-9_]+' "$JNI_SOURCE" | awk '{print $3}' | sort -u | while read -r fn; do
-    if printf '%s\n' "$symbols" | grep -qx "${JNI_PREFIX}${fn}"; then
-      echo "   present  ${JNI_PREFIX}${fn}"
-    else
-      echo "   MISSING  ${JNI_PREFIX}${fn}"
+  local symbols fn src_file cls prefix
+  symbols=$(nm -D --defined-only "$lib" 2>/dev/null | awk '{print $3}' | sed 's/@@.*$//')
+  for cls in LibreOfficeKit Office Document; do
+    src_file="$ROOT/app/src/main/java/org/libreoffice/kit/${cls}.kt"
+    prefix="Java_org_libreoffice_kit_${cls}_"
+    if [ ! -f "$src_file" ]; then
+      echo "   missing source: $src_file"
+      continue
     fi
+    grep -oE 'external fun [A-Za-z0-9_]+' "$src_file" | awk '{print $3}' | sort -u | while read -r fn; do
+      if printf '%s\n' "$symbols" | grep -qx "${prefix}${fn}"; then
+        echo "   present  ${prefix}${fn}"
+      else
+        echo "   MISSING  ${prefix}${fn}"
+      fi
+    done
   done
-  echo "   (MISSING means the Kotlin side would throw UnsatisfiedLinkError on first call; the loader already treats that as simulated mode)"
 }
 
 inventory | tee "$OUT"

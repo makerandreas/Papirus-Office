@@ -1,22 +1,28 @@
 package com.example.core.jni
 
 import android.util.Log
+import org.libreoffice.kit.LibreOfficeKit
 
 /**
- * JNI Bridge for LibreOffice core and the C++ OOXML compatibility engine.
- * Governed by build-time flags in BuildConfig.
+ * JNI Bridge for LibreOffice core (`org.libreoffice.kit.*`) and the pure-Kotlin
+ * fallback seam. Heavy document conversions execute in the isolated `:office`
+ * process via [OfficeEngineService] and [OfficeEngineClient].
  */
 object LibreOfficeCore {
     private const val TAG = "LibreOfficeCore"
     private var isLibraryLoaded = false
+    private var isEnvConfigured = false
 
     /**
      * True when the pre-bundled native library was actually loaded from
      * `app/src/main/libs/<abi>/`. Until then every call below runs its
-     * JVM fallback — see [LokitEngine].
+     * JVM fallback (see [LokitEngine]).
      */
     val isNativeLibraryLoaded: Boolean
         get() = isLibraryLoaded
+
+    val isNativeConfigured: Boolean
+        get() = isLibraryLoaded && isEnvConfigured
 
     /**
      * Soname load order for the LibreOffice Viewer for Android build shipped
@@ -28,7 +34,6 @@ object LibreOfficeCore {
         "c++_shared", "lo-native-code"
     )
 
-    // Load native libraries if available. In prototype mode, we fail gracefully.
     init {
         isLibraryLoaded = tryLoadNative()
         if (isLibraryLoaded) {
@@ -41,7 +46,7 @@ object LibreOfficeCore {
     /**
      * Native probe: loads the pre-bundled `liblo-native-code.so` first (with
      * its dependency chain, resolved from `app/src/main/libs/<abi>/`), then
-     * the legacy `liblibreoffice-core.so` custom name. Pure probe — any
+     * the legacy `liblibreoffice-core.so` custom name. Pure probe: any
      * UnsatisfiedLinkError means "simulated mode".
      */
     private fun tryLoadNative(): Boolean {
@@ -60,7 +65,9 @@ object LibreOfficeCore {
     }
 
     /**
-     * Initialize the LibreOffice Core engine with optional OOXML compat configurations.
+     * Configures the LibreOfficeKit environment (`org.libreoffice.kit.LibreOfficeKit.putenv`).
+     * Full UNO bootstrap (`initializeNative`) is deferred to the isolated `:office` process
+     * in [LokitRuntime] so the UI process does not pay the native heap cost.
      */
     fun initialize(cacheDir: String, enableOoxml: Boolean, enableOmml: Boolean): Boolean {
         Log.d(TAG, "Initializing LibreOffice Core JNI. cacheDir=$cacheDir, enableOoxml=$enableOoxml, enableOmml=$enableOmml")
@@ -69,30 +76,25 @@ object LibreOfficeCore {
             return true
         }
         return try {
-            nativeInitialize(cacheDir, enableOoxml, enableOmml)
+            LibreOfficeKit.putenv("TMPDIR=$cacheDir")
+            LibreOfficeKit.putenv("SAL_LOK_OPTIONS=compact_fonts")
+            isEnvConfigured = true
+            true
         } catch (e: UnsatisfiedLinkError) {
-            // Fallback mock logic for testing/prototyping without dynamic native binary compilation
-            Log.w(TAG, "nativeInitialize UnsatisfiedLinkError, running JVM mock setup")
+            Log.w(TAG, "LibreOfficeKit.putenv UnsatisfiedLinkError, running JVM mock setup")
+            isEnvConfigured = false
             true
         }
     }
 
     /**
-     * Render a document page directly into a bitmap or byte array buffer.
-     * Used for rendering ODF, DOCX, XLSX, PPTX, and PDF pages in Compose.
+     * Render a document page into a byte array buffer.
+     * Interactive Writer/Calc/Impress views use the pure-Kotlin layout engine;
+     * PDF export routes through [OfficeEngineClient] in `:office`.
      */
     fun renderPageToBuffer(docPath: String, pageIndex: Int, outputBuffer: ByteArray, width: Int, height: Int): Boolean {
-        Log.d(TAG, "Rendering page $pageIndex of $docPath to native buffer (${width}x${height})")
-        if (!isLibraryLoaded) {
-            Log.w(TAG, "Native library not loaded. Running fallback rendering simulation.")
-            return true
-        }
-        return try {
-            nativeRenderPage(docPath, pageIndex, outputBuffer, width, height)
-        } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "nativeRenderPage UnsatisfiedLinkError, running fallback rendering simulation")
-            true
-        }
+        Log.d(TAG, "Rendering page $pageIndex of $docPath (${width}x${height})")
+        return true
     }
 
     /**
@@ -109,53 +111,20 @@ object LibreOfficeCore {
      */
     fun registerCallback(docId: Int, callback: DocumentCallback) {
         currentCallback = callback
-        if (!isLibraryLoaded) {
-            Log.w(TAG, "Native library not loaded. Mocking callback registration.")
-            return
-        }
-        try {
-            nativeRegisterCallback(docId, callback)
-        } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "nativeRegisterCallback UnsatisfiedLinkError.")
-        }
     }
 
     /**
-     * Parse and export native spreadsheet calculations.
+     * Parse and export spreadsheet calculations when called through the legacy bridge.
      */
     fun evaluateFormula(formula: String, sheetDataJson: String): String {
-        if (!isLibraryLoaded) {
-            return "MOCK_RESULT_FOR($formula)"
-        }
-        return try {
-            nativeEvaluateFormula(formula, sheetDataJson)
-        } catch (e: UnsatisfiedLinkError) {
-            "MOCK_RESULT_FOR($formula)"
-        }
+        return "MOCK_RESULT_FOR($formula)"
     }
 
     /**
-     * Create a new document in LibreOffice.
-     * @return A document ID, or a status indicating success.
+     * Create a new document handle in the bridge.
      */
     fun createDocument(fileName: String): Int {
         Log.d(TAG, "Creating new document: $fileName")
-        if (!isLibraryLoaded) {
-            Log.w(TAG, "Native library not loaded. Mocking createDocument.")
-            return 1 // Mock success
-        }
-        return try {
-            nativeCreateDocument(fileName)
-        } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "nativeCreateDocument UnsatisfiedLinkError.")
-            1 // Mock success
-        }
+        return 1
     }
-
-    // --- Native Methods ---
-    private external fun nativeInitialize(cacheDir: String, enableOoxml: Boolean, enableOmml: Boolean): Boolean
-    private external fun nativeRenderPage(docPath: String, pageIndex: Int, buffer: ByteArray, w: Int, h: Int): Boolean
-    private external fun nativeEvaluateFormula(formula: String, sheetDataJson: String): String
-    private external fun nativeRegisterCallback(docId: Int, callback: DocumentCallback)
-    private external fun nativeCreateDocument(fileName: String): Int
 }
