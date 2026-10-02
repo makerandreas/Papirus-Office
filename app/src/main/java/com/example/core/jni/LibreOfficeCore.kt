@@ -37,9 +37,24 @@ object LibreOfficeCore {
     init {
         isLibraryLoaded = tryLoadNative()
         if (isLibraryLoaded) {
-            Log.i(TAG, "Native LibreOffice library loaded successfully.")
+            safeLog { Log.i(TAG, "Native LibreOffice library loaded successfully.") }
         } else {
-            Log.w(TAG, "No native library found (tried lo-native-code chain + libreoffice-core). Running simulated/JVM fallback mode.")
+            safeLog { Log.w(TAG, "No native library found (tried lo-native-code chain + libreoffice-core). Running simulated/JVM fallback mode.") }
+        }
+    }
+
+    /**
+     * `android.util.Log` is the "Stub!" jar on a plain JVM host (the repository's
+     * unit tests run without Robolectric for this seam), and the stub throws
+     * `RuntimeException` from every method. Diagnostics must never decide whether
+     * the native probe or its fallback works, so every log call in this object
+     * passes through here.
+     */
+    private inline fun safeLog(block: () -> Unit) {
+        try {
+            block()
+        } catch (ignored: Throwable) {
+            // Host without a working android.util.Log: drop the diagnostic.
         }
     }
 
@@ -70,7 +85,7 @@ object LibreOfficeCore {
         System.loadLibrary(soname)
         true
     } catch (t: Throwable) {
-        Log.w(TAG, "Native library '$soname' could not be loaded: ${t.javaClass.simpleName}")
+        safeLog { Log.w(TAG, "Native library '$soname' could not be loaded: ${t.javaClass.simpleName}") }
         false
     }
 
@@ -80,9 +95,9 @@ object LibreOfficeCore {
      * in [LokitRuntime] so the UI process does not pay the native heap cost.
      */
     fun initialize(cacheDir: String, enableOoxml: Boolean, enableOmml: Boolean): Boolean {
-        Log.d(TAG, "Initializing LibreOffice Core JNI. cacheDir=$cacheDir, enableOoxml=$enableOoxml, enableOmml=$enableOmml")
+        safeLog { Log.d(TAG, "Initializing LibreOffice Core JNI. cacheDir=$cacheDir, enableOoxml=$enableOoxml, enableOmml=$enableOmml") }
         if (!isLibraryLoaded) {
-            Log.w(TAG, "Native library not loaded. Running JVM mock setup.")
+            safeLog { Log.w(TAG, "Native library not loaded. Running JVM mock setup.") }
             return true
         }
         return try {
@@ -90,8 +105,8 @@ object LibreOfficeCore {
             LibreOfficeKit.putenv("SAL_LOK_OPTIONS=compact_fonts")
             isEnvConfigured = true
             true
-        } catch (e: UnsatisfiedLinkError) {
-            Log.w(TAG, "LibreOfficeKit.putenv UnsatisfiedLinkError, running JVM mock setup")
+        } catch (e: Throwable) {
+            safeLog { Log.w(TAG, "LibreOfficeKit.putenv unavailable (${e.javaClass.simpleName}), running JVM mock setup") }
             isEnvConfigured = false
             true
         }
@@ -103,7 +118,7 @@ object LibreOfficeCore {
      * PDF export routes through [OfficeEngineClient] in `:office`.
      */
     fun renderPageToBuffer(docPath: String, pageIndex: Int, outputBuffer: ByteArray, width: Int, height: Int): Boolean {
-        Log.d(TAG, "Rendering page $pageIndex of $docPath (${width}x${height})")
+        safeLog { Log.d(TAG, "Rendering page $pageIndex of $docPath (${width}x${height})") }
         return true
     }
 
@@ -134,7 +149,7 @@ object LibreOfficeCore {
      * Create a new document handle in the bridge.
      */
     fun createDocument(fileName: String): Int {
-        Log.d(TAG, "Creating new document: $fileName")
+        safeLog { Log.d(TAG, "Creating new document: $fileName") }
         return 1
     }
 }
