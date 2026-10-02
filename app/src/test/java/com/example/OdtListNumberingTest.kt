@@ -204,9 +204,10 @@ class OdtListNumberingTest {
         // Sample-6 authors arabic labels in every ordered list; several declare no
         // num-suffix, so the bare form is authored too and must survive.
         assertTrue("Expected a bare arabic label ('1') in $orderedBullets", orderedLabels.contains("1"))
-        assertTrue("Counters must pass nine (expected '10'): $orderedBullets", orderedLabels.contains("10"))
+        assertTrue("Counters must pass nine (expected '10.'): $orderedBullets", orderedLabels.contains("10."))
 
-        // Bullet items use the middle dot without doubling the suffix, and carry 10pt label size.
+        // Bullet items use the middle dot without doubling the suffix, and the level's
+        // text style declares the label font family (Aptos) with no size of its own.
         val bulletItems = listItems.filter { !it.isOrdered }
         assertTrue("Expected middle-dot bullet items in Sample-6.odt", bulletItems.isNotEmpty())
         assertTrue(
@@ -214,8 +215,9 @@ class OdtListNumberingTest {
             bulletItems.none { it.bullet.contains("\u00b7\u00b7") }
         )
         assertTrue(
-            "Bullet items in Sample-6 declare 10pt label size: ${bulletItems.mapNotNull { it.labelFontSizeSp }.distinct()}",
-            bulletItems.any { it.labelFontSizeSp == 10f }
+            "Bullet levels reference ListLabel_* text styles that declare the Aptos family: " +
+                bulletItems.map { it.labelFontFamily }.distinct(),
+            bulletItems.any { it.labelFontFamily == "Aptos" }
         )
     }
 
