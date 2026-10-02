@@ -413,7 +413,12 @@ private fun RenderLaidOutElement(
     // One synthesized paragraph per textual element: headings resolve through
     // their "Heading N" name so display and pagination share one style source.
     @Composable
-    fun TextOrField(paragraph: OfficeParagraph, leadingPrefix: String? = null) {
+    fun TextOrField(
+        paragraph: OfficeParagraph,
+        leadingPrefix: String? = null,
+        leadingPrefixFontSizeSp: Float? = null,
+        leadingPrefixFontFamily: String? = null
+    ) {
         val window = editableWindow
         val value = editorValue
         when {
@@ -424,6 +429,8 @@ private fun RenderLaidOutElement(
                 paragraph = paragraph,
                 styles = styles,
                 leadingPrefix = leadingPrefix,
+                leadingPrefixFontSizeSp = leadingPrefixFontSizeSp,
+                leadingPrefixFontFamily = leadingPrefixFontFamily,
                 zoomScale = zoomScale,
                 textColor = textColor,
                 focusRequester = focusRequester,
@@ -440,6 +447,8 @@ private fun RenderLaidOutElement(
                 paragraph = paragraph,
                 styles = styles,
                 leadingPrefix = leadingPrefix,
+                leadingPrefixFontSizeSp = leadingPrefixFontSizeSp,
+                leadingPrefixFontFamily = leadingPrefixFontFamily,
                 zoomScale = zoomScale,
                 textColor = textColor,
                 lines = elemLayout.paragraphLayout?.lines.orEmpty(), lineGapsBefore = lineGapsBefore
@@ -447,6 +456,8 @@ private fun RenderLaidOutElement(
             else -> ParagraphText(
                 paragraph = paragraph,
                 leadingPrefix = leadingPrefix,
+                leadingPrefixFontSizeSp = leadingPrefixFontSizeSp,
+                leadingPrefixFontFamily = leadingPrefixFontFamily,
                 styles = styles,
                 zoomScale = zoomScale,
                 enableOutlineFolding = enableOutlineFolding,
@@ -475,7 +486,9 @@ private fun RenderLaidOutElement(
         is OfficeListItem -> {
             TextOrField(
                 OfficeParagraph(text = element.text, runs = element.runs),
-                leadingPrefix = element.bullet
+                leadingPrefix = element.bullet,
+                leadingPrefixFontSizeSp = element.labelFontSizeSp,
+                leadingPrefixFontFamily = element.labelFontFamily
             )
         }
         is OfficeDocElement.ParagraphElement -> {
@@ -506,6 +519,8 @@ private fun ParagraphEditField(
     paragraph: OfficeParagraph,
     styles: DocumentStyles,
     leadingPrefix: String?,
+    leadingPrefixFontSizeSp: Float? = null,
+    leadingPrefixFontFamily: String? = null,
     zoomScale: Float,
     textColor: Color,
     focusRequester: FocusRequester,
@@ -517,6 +532,8 @@ private fun ParagraphEditField(
         OfficeRuns.baseStyle(paragraph, styles)
     }
     val sizeSp = resolved.fontSizeSp
+    val prefixSizeSp = leadingPrefixFontSizeSp ?: sizeSp
+    val prefixFontFamily = leadingPrefixFontFamily ?: resolved.fontFamily
     // Window-scoped view of the paragraph; the field shows window.text so the
     // runs are resliced lazily from the window's block on each re-merge.
     val windowParagraph = remember(window.text, paragraph.styleName, paragraph.alignment, paragraph.runs) {
@@ -543,10 +560,10 @@ private fun ParagraphEditField(
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
-                fontSize = (sizeSp * zoomScale).sp,
+                fontSize = (prefixSizeSp * zoomScale).sp,
                 lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
-                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
+                fontFamily = OfficeRuns.fontFamilyFor(prefixFontFamily)
             )
         }
         BasicTextField(
@@ -608,6 +625,8 @@ private fun ParagraphSelectField(
     paragraph: OfficeParagraph,
     styles: DocumentStyles,
     leadingPrefix: String?,
+    leadingPrefixFontSizeSp: Float? = null,
+    leadingPrefixFontFamily: String? = null,
     zoomScale: Float,
     textColor: Color,
     lines: List<LineLayout>,
@@ -617,6 +636,8 @@ private fun ParagraphSelectField(
         OfficeRuns.baseStyle(paragraph, styles)
     }
     val sizeSp = resolved.fontSizeSp
+    val prefixSizeSp = leadingPrefixFontSizeSp ?: sizeSp
+    val prefixFontFamily = leadingPrefixFontFamily ?: resolved.fontFamily
     val windowParagraph = remember(window.text, paragraph.styleName, paragraph.alignment, paragraph.runs) {
         paragraph.copy(text = window.text)
     }
@@ -667,10 +688,10 @@ private fun ParagraphSelectField(
         if (leadingPrefix != null) {
             Text(
                 text = leadingPrefix,
-                fontSize = (sizeSp * zoomScale).sp,
+                fontSize = (prefixSizeSp * zoomScale).sp,
                 lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits / LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
                 color = textColor,
-                fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily)
+                fontFamily = OfficeRuns.fontFamilyFor(prefixFontFamily)
             )
         }
         BasicTextField(
@@ -707,6 +728,8 @@ private fun ParagraphSelectField(
 private fun ParagraphText(
     paragraph: OfficeParagraph,
     leadingPrefix: String?,
+    leadingPrefixFontSizeSp: Float? = null,
+    leadingPrefixFontFamily: String? = null,
     styles: DocumentStyles,
     zoomScale: Float,
     enableOutlineFolding: Boolean,
@@ -739,14 +762,16 @@ private fun ParagraphText(
         OfficeRuns.baseStyle(displayParagraph, styles)
     }
     val sizeSp = resolved.fontSizeSp
+    val prefixSizeSp = leadingPrefixFontSizeSp ?: sizeSp
+    val prefixFontFamily = leadingPrefixFontFamily ?: resolved.fontFamily
     val annotated = remember(displayParagraph, styles, zoomScale, textColor) {
         OfficeRuns.toAnnotatedString(displayParagraph, styles, zoomScale, textColor)
     }
 
     Box(Modifier.fillMaxWidth()) {
         if (leadingPrefix != null) Text(text = leadingPrefix,
-            fontSize = (sizeSp * zoomScale).sp, color = textColor,
-            fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily))
+            fontSize = (prefixSizeSp * zoomScale).sp, color = textColor,
+            fontFamily = OfficeRuns.fontFamilyFor(prefixFontFamily))
     Text(
         text = ParagraphProjection(lines, lineGapsBefore, zoomScale / LayoutUnits.UNITS_PER_POINT,
             displayParagraph, styles).filter(annotated).text,

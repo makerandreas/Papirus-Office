@@ -27,7 +27,8 @@ data class OfficeDocument(
     val footnote: DocumentFootnote = DocumentFootnote(),
     val odtPackageData: OdtPackageData? = null,
     val isModified: Boolean = false,
-    val sectionStarts: List<SectionStart> = emptyList()
+    val sectionStarts: List<SectionStart> = emptyList(),
+    val bookmarks: List<OfficeBookmark> = emptyList()
 )
 
 fun OfficeDocument.toPlainText(): String {
@@ -95,7 +96,8 @@ data class OfficeParagraph(
     val outlineLevel: Int = 0,
     val runs: List<OfficeTextRun> = emptyList(),
     val bookmark: String? = null,
-    val pageBreakOffsets: List<Int> = emptyList()
+    val pageBreakOffsets: List<Int> = emptyList(),
+    val bookmarks: List<OfficeBookmark> = emptyList()
 ) : OfficeElement
 
 data class OfficeHeading(
@@ -103,13 +105,20 @@ data class OfficeHeading(
     val styleName: String? = null,
     val level: Int = 1,
     val runs: List<OfficeTextRun> = emptyList(),
-    val pageBreakOffsets: List<Int> = emptyList()
+    val pageBreakOffsets: List<Int> = emptyList(),
+    val bookmarks: List<OfficeBookmark> = emptyList()
 ) : OfficeElement
 
 data class OfficeListItem(
     val text: String,
     val bullet: String = "• ",
-    val runs: List<OfficeTextRun> = emptyList()
+    val runs: List<OfficeTextRun> = emptyList(),
+    val level: Int = 1,
+    val isOrdered: Boolean = false,
+    val styleName: String? = null,
+    val labelFontSizeSp: Float? = null,
+    val labelFontFamily: String? = null,
+    val bookmarks: List<OfficeBookmark> = emptyList()
 ) : OfficeElement
 
 data class OfficeTextRun(
@@ -224,7 +233,11 @@ data class DocumentStyles(
      * Root default paragraph style for the document (ODF default-style or DOCX docDefaults / Normal).
      * Used as the metric baseline when styles do not declare their own font size or metrics.
      */
-    val defaultParagraphStyle: ParagraphStyle? = null
+    val defaultParagraphStyle: ParagraphStyle? = null,
+    /** Named ODF `<text:list-style>` definitions keyed by `style:name`. */
+    val listStyles: Map<String, NumberingSpec> = emptyMap(),
+    /** Document-level ODF `<text:outline-style>` definition, if present. */
+    val outlineStyle: NumberingSpec? = null
 ) {
     /** Page box behind an ODF master page, if both the master and its layout were read. */
     fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
@@ -287,7 +300,9 @@ data class ParagraphStyle(
     val tabStops: List<ParagraphTabStop> = emptyList(),
     val defaultTabIntervalUnits: Float = 48f,
     /** ODF 1.4 master-page assignment starts a new page; per-section geometry is separate. */
-    val masterPageName: String? = null
+    val masterPageName: String? = null,
+    /** ODF `style:list-style-name` on a paragraph style (null = unset, "" = explicitly suppress numbering). */
+    val listStyleName: String? = null
 ) {
     /** True when the style carries paragraph metrics beyond its font size. */
     val hasMetricFields: Boolean
@@ -442,18 +457,26 @@ data class OfficeFile(
 // LAYER 8: Rich Adapter (OfficeParsedDocument -> OfficeDocument)
 // ==========================================
 fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
+    val allBookmarkNames = LinkedHashSet<String>()
+    allBookmarkNames.addAll(this.bookmarks.filter { it.isNotBlank() })
+
     val docElements: List<OfficeElement> = this.elements.map { elem ->
         when (elem) {
             is OfficeDocumentElement.Paragraph -> {
+                val elemBookmarks = elem.bookmarks.filter { it.isNotBlank() }
+                allBookmarkNames.addAll(elemBookmarks)
                 OfficeParagraph(
                     text = elem.text,
                     styleName = elem.styleName,
                     pageBreakOffsets = elem.pageBreakOffsets,
+                    bookmark = elemBookmarks.firstOrNull(),
+                    bookmarks = elemBookmarks.map { OfficeBookmark(it) },
                     runs = elem.runs.map { run ->
                         OfficeTextRun(
                             text = run.text,
                             characterStyle = run.styleName,
                             styleName = run.styleName,
+                            hyperlink = run.hyperlink,
                             isBold = run.isBold,
                             isItalic = run.isItalic,
                             isUnderline = run.isUnderline
@@ -462,18 +485,50 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                 )
             }
             is OfficeDocumentElement.Heading -> {
+                val elemBookmarks = elem.bookmarks.filter { it.isNotBlank() }
+                allBookmarkNames.addAll(elemBookmarks)
                 OfficeHeading(
                     text = elem.text,
                     level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
-                    runs = emptyList(),
-                    pageBreakOffsets = elem.pageBreakOffsets
+                    runs = elem.runs.map { run ->
+                        OfficeTextRun(
+                            text = run.text,
+                            characterStyle = run.styleName,
+                            styleName = run.styleName,
+                            hyperlink = run.hyperlink,
+                            isBold = run.isBold,
+                            isItalic = run.isItalic,
+                            isUnderline = run.isUnderline
+                        )
+                    },
+                    pageBreakOffsets = elem.pageBreakOffsets,
+                    bookmarks = elemBookmarks.map { OfficeBookmark(it) }
                 )
             }
             is OfficeDocumentElement.ListItem -> {
-                OfficeParagraph(
-                    text = elem.bullet + elem.text,
-                    runs = listOf(OfficeTextRun(text = elem.bullet + elem.text))
+                val elemBookmarks = elem.bookmarks.filter { it.isNotBlank() }
+                allBookmarkNames.addAll(elemBookmarks)
+                OfficeListItem(
+                    text = elem.text,
+                    bullet = elem.bullet,
+                    level = elem.level,
+                    isOrdered = elem.isOrdered,
+                    styleName = elem.styleName,
+                    labelFontSizeSp = elem.labelFontSizeSp,
+                    labelFontFamily = elem.labelFontFamily,
+                    bookmarks = elemBookmarks.map { OfficeBookmark(it) },
+                    runs = elem.runs.map { run ->
+                        OfficeTextRun(
+                            text = run.text,
+                            characterStyle = run.styleName,
+                            styleName = run.styleName,
+                            hyperlink = run.hyperlink,
+                            isBold = run.isBold,
+                            isItalic = run.isItalic,
+                            isUnderline = run.isUnderline
+                        )
+                    }
                 )
             }
             is OfficeDocumentElement.Table -> {
@@ -486,12 +541,19 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                                 OfficeTableCell(
                                     text = cell.text,
                                     paragraphs = cell.paragraphs.map { cellPara ->
+                                        val cellBookmarks = cellPara.bookmarks.filter { it.isNotBlank() }
+                                        allBookmarkNames.addAll(cellBookmarks)
                                         OfficeParagraph(
                                             text = cellPara.text,
                                             styleName = cellPara.styleName,
+                                            bookmark = cellBookmarks.firstOrNull(),
+                                            bookmarks = cellBookmarks.map { OfficeBookmark(it) },
                                             runs = cellPara.runs.map { cellRun ->
                                                 OfficeTextRun(
                                                     text = cellRun.text,
+                                                    characterStyle = cellRun.styleName,
+                                                    styleName = cellRun.styleName,
+                                                    hyperlink = cellRun.hyperlink,
                                                     isBold = cellRun.isBold,
                                                     isItalic = cellRun.isItalic,
                                                     isUnderline = cellRun.isUnderline
@@ -544,7 +606,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
         styles = this.styles,
         body = DocumentBody(elements = docElements),
         sectionStarts = sectionStarts,
-        odtPackageData = this.odtPackageData
+        odtPackageData = this.odtPackageData,
+        bookmarks = allBookmarkNames.map { OfficeBookmark(it) }
     )
 }
 

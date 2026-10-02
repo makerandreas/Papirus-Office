@@ -26,12 +26,28 @@ open class SvXMLImportContext(
             OdfXmlToken.XML_TEXT, OdfXmlToken.XML_SPREADSHEET, OdfXmlToken.XML_PRESENTATION -> OdfTextBodyContext(importFilter, token)
             OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
             OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
-            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1, attributes)
+            OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
+            OdfXmlToken.XML_TABLE_OF_CONTENT_SOURCE -> OdfIgnoreSubtreeContext(importFilter, token)
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                importFilter.recordBookmark(attributes["text:name"] ?: attributes["name"])
+                SvXMLImportContext(importFilter, token)
+            }
             OdfXmlToken.XML_AUTOMATIC_STYLES, OdfXmlToken.XML_STYLES -> OdfStylesContainerContext(importFilter, token)
             else -> SvXMLImportContext(importFilter, token)
         }
     }
+}
+
+/**
+ * Context that ignores all descendant elements and character data (for example,
+ * `<text:table-of-content-source>` template definitions inside a TOC).
+ */
+class OdfIgnoreSubtreeContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken
+) : SvXMLImportContext(importFilter, token) {
+    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext = this
 }
 
 /**
@@ -85,7 +101,7 @@ class OdfTextBodyContext(
             OdfXmlToken.XML_H -> {
                 OdfHeadingContext(importFilter, token, attributes)
             }
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1, attributes)
             OdfXmlToken.XML_TABLE -> OdfTableContext(importFilter, token, attributes)
             OdfXmlToken.XML_PAGE -> OdfSlidePageContext(importFilter, token, attributes) // Slide page for ODP
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
@@ -123,7 +139,7 @@ class OdfSlidePageContext(
         return when (token) {
             OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
             OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1, attributes)
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
             OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
                 OdfDrawingContainerContext(importFilter, token)
@@ -145,7 +161,7 @@ class OdfDrawingContainerContext(
         return when (token) {
             OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
             OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1, attributes)
             OdfXmlToken.XML_FRAME -> OdfFrameContext(importFilter, token, attributes)
             OdfXmlToken.XML_TEXT_BOX, OdfXmlToken.XML_CUSTOM_SHAPE, OdfXmlToken.XML_G -> {
                 OdfDrawingContainerContext(importFilter, token)
@@ -167,6 +183,7 @@ class OdfParagraphContext(
 
     private val textBuilder = StringBuilder()
     private val runs = mutableListOf<TextRun>()
+    private val bookmarks = LinkedHashSet<String>()
     private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
 
     override fun onStartElement(token: OdfXmlToken, attributes: Map<String, String>) {
@@ -182,9 +199,42 @@ class OdfParagraphContext(
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_SPAN -> OdfSpanContext(importFilter, token, attributes) { spanText, run ->
-                textBuilder.append(spanText)
-                runs.add(run)
+            OdfXmlToken.XML_SPAN -> OdfSpanContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onSpanParsed = { spanText, run ->
+                    textBuilder.append(spanText)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_A -> OdfHyperlinkContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onRunEmitted = { run ->
+                    textBuilder.append(run.text)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_BOOKMARK_END -> {
+                super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
                 textBuilder.append(spaces)
@@ -212,16 +262,26 @@ class OdfParagraphContext(
         val fullText = textBuilder.toString()
         val headingLvl = importFilter.resolveHeadingLevel(styleName)
         val element = if (headingLvl != null) {
+            val paraListStyle = importFilter.resolveParagraphListStyleName(styleName)
+            val label = if (!paraListStyle.isNullOrEmpty() && fullText.isNotBlank()) {
+                importFilter.formatHeadingLabel(styleName = styleName, outlineLevel = headingLvl)
+            } else {
+                null
+            }
+            val (finalText, finalRuns) = prependHeadingLabelIfNeeded(fullText, runs, label)
             OfficeDocumentElement.Heading(
-                text = fullText,
+                text = finalText,
                 level = headingLvl,
-                styleName = styleName
+                styleName = styleName,
+                runs = finalRuns,
+                bookmarks = bookmarks.toList()
             )
         } else {
             OfficeDocumentElement.Paragraph(
                 text = fullText,
                 styleName = styleName,
-                runs = runs.toList()
+                runs = runs.toList(),
+                bookmarks = bookmarks.toList()
             )
         }
         importFilter.addElement(element)
@@ -231,19 +291,55 @@ class OdfParagraphContext(
     }
 }
 
+private fun prependHeadingLabelIfNeeded(
+    rawText: String,
+    rawRuns: List<TextRun>,
+    label: OdfFormattedListLabel?
+): Pair<String, List<TextRun>> {
+    val prefix = label?.bullet?.takeIf { it.isNotEmpty() } ?: return rawText to rawRuns.toList()
+    if (rawText.isBlank()) return rawText to rawRuns.toList()
+    val trimmedPrefix = prefix.trimEnd()
+    if (trimmedPrefix.isNotEmpty() && rawText.trimStart().startsWith(trimmedPrefix)) {
+        return rawText to rawRuns.toList()
+    }
+    val prefixRun = TextRun(
+        text = prefix,
+        isBold = label.isBold == true,
+        isItalic = label.isItalic == true,
+        styleName = label.textStyleName
+    )
+    val baseRuns = if (rawRuns.isEmpty() && rawText.isNotEmpty()) {
+        listOf(TextRun(text = rawText))
+    } else {
+        rawRuns
+    }
+    return (prefix + rawText) to (listOf(prefixRun) + baseRuns)
+}
+
 /**
  * Context for <text:h> headings.
  */
 class OdfHeadingContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
-    attributes: Map<String, String>
+    attributes: Map<String, String>,
+    private val enclosingListStyleName: String? = null,
+    private val enclosingListLevel: Int? = null,
+    private val listStartValueOverride: Int? = null,
+    private val continueListNumbering: Boolean = false,
+    initialBookmarks: Collection<String> = emptyList()
 ) : SvXMLImportContext(importFilter, token) {
 
     private val textBuilder = StringBuilder()
+    private val runs = mutableListOf<TextRun>()
+    private val bookmarks = LinkedHashSet<String>(initialBookmarks)
     private val level: Int = attributes["text:outline-level"]?.toIntOrNull()
         ?: attributes["outline-level"]?.toIntOrNull() ?: 1
     private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
+    private val startValueOverride: Int? = (attributes["text:start-value"] ?: attributes["start-value"])?.toIntOrNull()
+        ?: listStartValueOverride
+    private val isListHeader: Boolean =
+        (attributes["text:is-list-header"] ?: attributes["is-list-header"]) == "true"
 
     override fun onStartElement(token: OdfXmlToken, attributes: Map<String, String>) {
         if (importFilter.hasPageBreakBefore(styleName)) {
@@ -253,15 +349,51 @@ class OdfHeadingContext(
 
     override fun onCharacters(text: String) {
         textBuilder.append(text)
+        runs.add(TextRun(text = text))
     }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_SPAN -> OdfSpanContext(importFilter, token, attributes) { spanText, _ ->
-                textBuilder.append(spanText)
+            OdfXmlToken.XML_SPAN -> OdfSpanContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onSpanParsed = { spanText, run ->
+                    textBuilder.append(spanText)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_A -> OdfHyperlinkContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onRunEmitted = { run ->
+                    textBuilder.append(run.text)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_BOOKMARK_END -> {
+                super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
                 textBuilder.append(spaces)
+                runs.add(TextRun(text = spaces))
             }
             else -> super.createChildContext(token, attributes)
         }
@@ -269,14 +401,99 @@ class OdfHeadingContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         val headingText = textBuilder.toString()
+        val label = if (!isListHeader && headingText.isNotBlank()) {
+            importFilter.formatHeadingLabel(
+                styleName = styleName,
+                outlineLevel = level,
+                enclosingListStyleName = enclosingListStyleName,
+                enclosingListLevel = enclosingListLevel,
+                startValueOverride = startValueOverride,
+                continueNumbering = continueListNumbering
+            )
+        } else {
+            null
+        }
+        val (finalText, finalRuns) = prependHeadingLabelIfNeeded(headingText, runs, label)
         val heading = OfficeDocumentElement.Heading(
-            text = headingText,
+            text = finalText,
             level = level,
-            styleName = styleName
+            styleName = styleName,
+            runs = finalRuns,
+            bookmarks = bookmarks.toList()
         )
         importFilter.addElement(heading)
         if (importFilter.hasPageBreakAfter(styleName)) {
             importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
+    }
+}
+
+/**
+ * Context for <text:a> hyperlinks (ODF 1.4 Part 3 section 6.1.8).
+ * Preserves `xlink:href` across direct character runs, nested `<text:span>` runs,
+ * `<text:s/>`, and `<text:tab/>` (for example in `<text:table-of-content>` entries).
+ */
+class OdfHyperlinkContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken,
+    attributes: Map<String, String>,
+    private val onRunEmitted: (TextRun) -> Unit,
+    private val onBookmarkFound: ((String) -> Unit)? = null
+) : SvXMLImportContext(importFilter, token) {
+
+    private val href: String? = (attributes["xlink:href"] ?: attributes["href"])?.takeIf { it.isNotEmpty() }
+    private val styleName: String? = (attributes["text:style-name"] ?: attributes["style-name"])?.takeIf { it.isNotBlank() }
+
+    private fun emitDirectRun(text: String) {
+        if (text.isEmpty()) return
+        val format = importFilter.resolveSpanFormatting(styleName)
+        onRunEmitted(
+            TextRun(
+                text = text,
+                isBold = format.isBold,
+                isItalic = format.isItalic,
+                isUnderline = format.isUnderline || href != null,
+                styleName = styleName,
+                hyperlink = href
+            )
+        )
+    }
+
+    override fun onCharacters(text: String) {
+        emitDirectRun(text)
+    }
+
+    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+        return when (token) {
+            OdfXmlToken.XML_SPAN -> OdfSpanContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                inheritedHyperlink = href,
+                fallbackStyleName = styleName,
+                onSpanParsed = { _, run -> onRunEmitted(run) },
+                onBookmarkFound = onBookmarkFound
+            )
+            OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
+                emitDirectRun(spaces)
+            }
+            OdfXmlToken.XML_TAB -> {
+                emitDirectRun("\t")
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_LINE_BREAK -> {
+                emitDirectRun("\n")
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    onBookmarkFound?.invoke(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
+            else -> super.createChildContext(token, attributes)
         }
     }
 }
@@ -288,11 +505,33 @@ class OdfSpanContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
     attributes: Map<String, String>,
+    private val inheritedHyperlink: String? = null,
+    private val fallbackStyleName: String? = null,
+    private val onBookmarkFound: ((String) -> Unit)? = null,
     private val onSpanParsed: (String, TextRun) -> Unit
 ) : SvXMLImportContext(importFilter, token) {
 
     private val spanTextBuilder = StringBuilder()
-    private val styleName = attributes["text:style-name"] ?: attributes["style-name"] ?: ""
+    private val styleName = (attributes["text:style-name"] ?: attributes["style-name"])
+        ?.takeIf { it.isNotBlank() }
+        ?: fallbackStyleName
+        ?: ""
+
+    private fun flushAccumulatedSegment() {
+        if (spanTextBuilder.isEmpty()) return
+        val text = spanTextBuilder.toString()
+        spanTextBuilder.setLength(0)
+        val format = importFilter.resolveSpanFormatting(styleName)
+        val run = TextRun(
+            text = text,
+            isBold = format.isBold,
+            isItalic = format.isItalic,
+            isUnderline = format.isUnderline || inheritedHyperlink != null,
+            styleName = styleName.takeIf { it.isNotBlank() },
+            hyperlink = inheritedHyperlink
+        )
+        onSpanParsed(text, run)
+    }
 
     override fun onCharacters(text: String) {
         spanTextBuilder.append(text)
@@ -303,21 +542,50 @@ class OdfSpanContext(
             OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
                 spanTextBuilder.append(spaces)
             }
+            OdfXmlToken.XML_TAB -> {
+                spanTextBuilder.append("\t")
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_LINE_BREAK -> {
+                spanTextBuilder.append("\n")
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_A -> {
+                flushAccumulatedSegment()
+                OdfHyperlinkContext(
+                    importFilter = importFilter,
+                    token = token,
+                    attributes = attributes,
+                    onRunEmitted = { run -> onSpanParsed(run.text, run) },
+                    onBookmarkFound = onBookmarkFound
+                )
+            }
+            OdfXmlToken.XML_SPAN -> {
+                flushAccumulatedSegment()
+                OdfSpanContext(
+                    importFilter = importFilter,
+                    token = token,
+                    attributes = attributes,
+                    inheritedHyperlink = inheritedHyperlink,
+                    fallbackStyleName = styleName.takeIf { it.isNotBlank() },
+                    onBookmarkFound = onBookmarkFound,
+                    onSpanParsed = onSpanParsed
+                )
+            }
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    onBookmarkFound?.invoke(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
             else -> super.createChildContext(token, attributes)
         }
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        val text = spanTextBuilder.toString()
-        val format = importFilter.resolveSpanFormatting(styleName)
-        val run = TextRun(
-            text = text,
-            isBold = format.isBold,
-            isItalic = format.isItalic,
-            isUnderline = format.isUnderline,
-            styleName = styleName.takeIf { it.isNotBlank() }
-        )
-        onSpanParsed(text, run)
+        flushAccumulatedSegment()
     }
 }
 
@@ -346,15 +614,55 @@ class OdfSpaceContext(
 class OdfListContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
-    val listLevel: Int
+    val listLevel: Int,
+    attributes: Map<String, String> = emptyMap(),
+    parentListStyleName: String? = null,
+    parentContinueNumbering: Boolean = false
 ) : SvXMLImportContext(importFilter, token) {
+
+    private val continueNumbering: Boolean =
+        parentContinueNumbering ||
+            (attributes["text:continue-numbering"] ?: attributes["continue-numbering"]) == "true" ||
+            !(attributes["text:continue-list"] ?: attributes["continue-list"]).isNullOrBlank()
+
+    private val listStyleName: String? = importFilter.onListStarted(
+        styleName = (attributes["text:style-name"] ?: attributes["style-name"])?.takeIf { it.isNotBlank() },
+        listLevel = listLevel,
+        continueNumbering = continueNumbering
+    ) ?: parentListStyleName
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_LIST_ITEM, OdfXmlToken.XML_LIST_HEADER -> {
-                OdfListItemContext(importFilter, token, listLevel)
+            OdfXmlToken.XML_LIST_ITEM -> {
+                OdfListItemContext(
+                    importFilter = importFilter,
+                    token = token,
+                    listLevel = listLevel,
+                    attributes = attributes,
+                    listStyleName = listStyleName,
+                    continueNumbering = continueNumbering,
+                    isListHeader = false
+                )
             }
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, listLevel + 1)
+            OdfXmlToken.XML_LIST_HEADER -> {
+                OdfListItemContext(
+                    importFilter = importFilter,
+                    token = token,
+                    listLevel = listLevel,
+                    attributes = attributes,
+                    listStyleName = listStyleName,
+                    continueNumbering = continueNumbering,
+                    isListHeader = true
+                )
+            }
+            OdfXmlToken.XML_LIST -> OdfListContext(
+                importFilter = importFilter,
+                token = token,
+                listLevel = listLevel + 1,
+                attributes = attributes,
+                parentListStyleName = listStyleName,
+                parentContinueNumbering = continueNumbering
+            )
             else -> super.createChildContext(token, attributes)
         }
     }
@@ -366,33 +674,107 @@ class OdfListContext(
 class OdfListItemContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
-    private val listLevel: Int
+    private val listLevel: Int,
+    attributes: Map<String, String> = emptyMap(),
+    private val listStyleName: String? = null,
+    private val continueNumbering: Boolean = false,
+    private val isListHeader: Boolean = false
 ) : SvXMLImportContext(importFilter, token) {
 
-    private val textBuilder = StringBuilder()
+    private val directTextBuilder = StringBuilder()
+    private val pendingBookmarks = LinkedHashSet<String>()
+    private val startValueOverride: Int? =
+        (attributes["text:start-value"] ?: attributes["start-value"])?.toIntOrNull()
+    private var hasChildBlock = false
+    private var hasEmittedFirstBlock = false
 
     override fun onCharacters(text: String) {
-        textBuilder.append(text)
+        directTextBuilder.append(text)
     }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_P -> OdfListItemParagraphContext(importFilter, token) { itemText ->
-                textBuilder.append(itemText)
+            OdfXmlToken.XML_P -> {
+                hasChildBlock = true
+                val isFirst = !hasEmittedFirstBlock
+                hasEmittedFirstBlock = true
+                val inheritedBookmarks = pendingBookmarks.toList()
+                pendingBookmarks.clear()
+                OdfListItemParagraphContext(
+                    importFilter = importFilter,
+                    token = token,
+                    attributes = attributes,
+                    listLevel = listLevel,
+                    listStyleName = listStyleName,
+                    startValueOverride = if (isFirst) startValueOverride else null,
+                    continueNumbering = continueNumbering,
+                    isHeaderOrContinuation = isListHeader || !isFirst,
+                    initialBookmarks = inheritedBookmarks
+                )
             }
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, listLevel + 1)
+            OdfXmlToken.XML_H -> {
+                hasChildBlock = true
+                val isFirst = !hasEmittedFirstBlock
+                hasEmittedFirstBlock = true
+                val inheritedBookmarks = pendingBookmarks.toList()
+                pendingBookmarks.clear()
+                OdfHeadingContext(
+                    importFilter = importFilter,
+                    token = token,
+                    attributes = attributes,
+                    enclosingListStyleName = listStyleName,
+                    enclosingListLevel = listLevel,
+                    listStartValueOverride = if (isFirst) startValueOverride else null,
+                    continueListNumbering = continueNumbering,
+                    initialBookmarks = inheritedBookmarks
+                )
+            }
+            OdfXmlToken.XML_LIST -> {
+                hasChildBlock = true
+                OdfListContext(
+                    importFilter = importFilter,
+                    token = token,
+                    listLevel = listLevel + 1,
+                    attributes = attributes,
+                    parentListStyleName = listStyleName,
+                    parentContinueNumbering = continueNumbering
+                )
+            }
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    pendingBookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
             else -> super.createChildContext(token, attributes)
         }
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        val text = textBuilder.toString()
-        if (text.isNotBlank()) {
-            val bulletSymbol = if (listLevel > 1) "◦ " else "• "
+        val text = directTextBuilder.toString()
+        if (!hasChildBlock && text.isNotBlank()) {
+            val label = if (isListHeader) {
+                OdfFormattedListLabel(bullet = "", isOrdered = false)
+            } else {
+                importFilter.formatListItemLabel(
+                    listStyleName = listStyleName,
+                    paragraphStyleName = null,
+                    listLevel = listLevel,
+                    startValueOverride = startValueOverride,
+                    continueNumbering = continueNumbering
+                )
+            }
             val listItem = OfficeDocumentElement.ListItem(
                 text = text,
                 level = listLevel,
-                bullet = bulletSymbol
+                bullet = label.bullet,
+                isOrdered = label.isOrdered,
+                runs = listOf(TextRun(text = text)),
+                labelFontSizeSp = label.labelFontSizeSp,
+                labelFontFamily = label.labelFontFamily,
+                bookmarks = pendingBookmarks.toList()
             )
             importFilter.addElement(listItem)
         }
@@ -402,29 +784,143 @@ class OdfListItemContext(
 class OdfListItemParagraphContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
-    private val onTextExtracted: (String) -> Unit
+    attributes: Map<String, String> = emptyMap(),
+    private val listLevel: Int = 1,
+    private val listStyleName: String? = null,
+    private val startValueOverride: Int? = null,
+    private val continueNumbering: Boolean = false,
+    private val isHeaderOrContinuation: Boolean = false,
+    initialBookmarks: Collection<String> = emptyList()
 ) : SvXMLImportContext(importFilter, token) {
 
     private val paragraphBuilder = StringBuilder()
+    private val runs = mutableListOf<TextRun>()
+    private val bookmarks = LinkedHashSet<String>(initialBookmarks)
+    private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
+
+    override fun onStartElement(token: OdfXmlToken, attributes: Map<String, String>) {
+        if (importFilter.hasPageBreakBefore(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
+    }
 
     override fun onCharacters(text: String) {
         paragraphBuilder.append(text)
+        runs.add(TextRun(text = text))
     }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_SPAN -> OdfSpanContext(importFilter, token, attributes) { spanText, _ ->
-                paragraphBuilder.append(spanText)
+            OdfXmlToken.XML_SPAN -> OdfSpanContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onSpanParsed = { spanText, run ->
+                    paragraphBuilder.append(spanText)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_A -> OdfHyperlinkContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onRunEmitted = { run ->
+                    paragraphBuilder.append(run.text)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_BOOKMARK_END -> {
+                super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
                 paragraphBuilder.append(spaces)
+                runs.add(TextRun(text = spaces))
+            }
+            OdfXmlToken.XML_TAB -> {
+                paragraphBuilder.append("\t")
+                runs.add(TextRun(text = "\t"))
+                super.createChildContext(token, attributes)
+            }
+            OdfXmlToken.XML_LINE_BREAK -> {
+                paragraphBuilder.append("\n")
+                runs.add(TextRun(text = "\n"))
+                super.createChildContext(token, attributes)
             }
             else -> super.createChildContext(token, attributes)
         }
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        onTextExtracted(paragraphBuilder.toString())
+        val text = paragraphBuilder.toString()
+        val headingLvl = importFilter.resolveHeadingLevel(styleName)
+        if (headingLvl != null && text.isNotBlank()) {
+            val label = if (isHeaderOrContinuation) {
+                null
+            } else {
+                importFilter.formatHeadingLabel(
+                    styleName = styleName,
+                    outlineLevel = headingLvl,
+                    enclosingListStyleName = listStyleName,
+                    enclosingListLevel = listLevel,
+                    startValueOverride = startValueOverride,
+                    continueNumbering = continueNumbering
+                )
+            }
+            val (finalText, finalRuns) = prependHeadingLabelIfNeeded(text, runs, label)
+            importFilter.addElement(
+                OfficeDocumentElement.Heading(
+                    text = finalText,
+                    level = headingLvl,
+                    styleName = styleName,
+                    runs = finalRuns,
+                    bookmarks = bookmarks.toList()
+                )
+            )
+        } else if (text.isNotBlank() || bookmarks.isNotEmpty()) {
+            val label = if (isHeaderOrContinuation || text.isBlank()) {
+                OdfFormattedListLabel(bullet = "", isOrdered = false)
+            } else {
+                importFilter.formatListItemLabel(
+                    listStyleName = listStyleName,
+                    paragraphStyleName = styleName,
+                    listLevel = listLevel,
+                    startValueOverride = startValueOverride,
+                    continueNumbering = continueNumbering
+                )
+            }
+            importFilter.addElement(
+                OfficeDocumentElement.ListItem(
+                    text = text,
+                    level = listLevel,
+                    bullet = label.bullet,
+                    isOrdered = label.isOrdered,
+                    styleName = styleName,
+                    runs = runs.toList(),
+                    labelFontSizeSp = label.labelFontSizeSp,
+                    labelFontFamily = label.labelFontFamily,
+                    bookmarks = bookmarks.toList()
+                )
+            )
+        }
+        if (importFilter.hasPageBreakAfter(styleName)) {
+            importFilter.addElement(OfficeDocumentElement.PageBreak)
+        }
     }
 }
 
@@ -515,10 +1011,10 @@ class OdfTableCellContext(
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_P -> OdfTableCellParagraphContext(importFilter, token) { pText ->
+            OdfXmlToken.XML_P -> OdfTableCellParagraphContext(importFilter, token, attributes) { cellPara ->
                 if (textBuilder.isNotEmpty()) textBuilder.append(" ")
-                textBuilder.append(pText)
-                cellParagraphs.add(OfficeDocumentElement.Paragraph(text = pText))
+                textBuilder.append(cellPara.text)
+                cellParagraphs.add(cellPara)
             }
             else -> super.createChildContext(token, attributes)
         }
@@ -559,29 +1055,73 @@ class OdfTableCellContext(
 class OdfTableCellParagraphContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
-    private val onTextExtracted: (String) -> Unit
+    attributes: Map<String, String> = emptyMap(),
+    private val onParagraphExtracted: (OfficeDocumentElement.Paragraph) -> Unit
 ) : SvXMLImportContext(importFilter, token) {
 
     private val pBuilder = StringBuilder()
+    private val runs = mutableListOf<TextRun>()
+    private val bookmarks = LinkedHashSet<String>()
+    private val styleName: String? = attributes["text:style-name"] ?: attributes["style-name"]
 
     override fun onCharacters(text: String) {
         pBuilder.append(text)
+        runs.add(TextRun(text = text))
     }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_SPAN -> OdfSpanContext(importFilter, token, attributes) { spanText, _ ->
-                pBuilder.append(spanText)
+            OdfXmlToken.XML_SPAN -> OdfSpanContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onSpanParsed = { spanText, run ->
+                    pBuilder.append(spanText)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_A -> OdfHyperlinkContext(
+                importFilter = importFilter,
+                token = token,
+                attributes = attributes,
+                onRunEmitted = { run ->
+                    pBuilder.append(run.text)
+                    runs.add(run)
+                },
+                onBookmarkFound = { name ->
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+            )
+            OdfXmlToken.XML_BOOKMARK, OdfXmlToken.XML_BOOKMARK_START -> {
+                val name = (attributes["text:name"] ?: attributes["name"])?.trim()
+                if (!name.isNullOrEmpty()) {
+                    bookmarks.add(name)
+                    importFilter.recordBookmark(name)
+                }
+                super.createChildContext(token, attributes)
             }
             OdfXmlToken.XML_S -> OdfSpaceContext(importFilter, token, attributes) { spaces ->
                 pBuilder.append(spaces)
+                runs.add(TextRun(text = spaces))
             }
             else -> super.createChildContext(token, attributes)
         }
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        onTextExtracted(pBuilder.toString())
+        onParagraphExtracted(
+            OfficeDocumentElement.Paragraph(
+                text = pBuilder.toString(),
+                styleName = styleName,
+                runs = runs.toList(),
+                bookmarks = bookmarks.toList()
+            )
+        )
     }
 }
 
@@ -606,7 +1146,7 @@ class OdfFrameContext(
             }
             OdfXmlToken.XML_P -> OdfParagraphContext(importFilter, token, attributes)
             OdfXmlToken.XML_H -> OdfHeadingContext(importFilter, token, attributes)
-            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1)
+            OdfXmlToken.XML_LIST -> OdfListContext(importFilter, token, 1, attributes)
             else -> super.createChildContext(token, attributes)
         }
     }

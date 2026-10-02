@@ -214,8 +214,22 @@ class LayoutEngine(
         fun paragraph(element: OfficeElement): OfficeParagraph? = when (element) {
             is OfficeParagraph -> element
             is OfficeHeading -> OfficeParagraph(element.text, element.styleName ?: "Heading ${element.level}", runs = element.runs, pageBreakOffsets = element.pageBreakOffsets)
-            is OfficeListItem -> OfficeParagraph(element.text, runs = element.runs,
-                indent = TextMetrics.forStyle(StyleResolver.resolveParagraphStyle(null, document.styles), advanceSource).widthOf(element.bullet))
+            is OfficeListItem -> {
+                val baseStyle = StyleResolver.resolveParagraphStyle(null, document.styles)
+                val labelStyle = if (element.labelFontSizeSp != null || element.labelFontFamily != null) {
+                    baseStyle.copy(
+                        fontSizeSp = element.labelFontSizeSp ?: baseStyle.fontSizeSp,
+                        fontFamily = element.labelFontFamily ?: baseStyle.fontFamily
+                    )
+                } else {
+                    baseStyle
+                }
+                OfficeParagraph(
+                    text = element.text,
+                    runs = element.runs,
+                    indent = TextMetrics.forStyle(labelStyle, advanceSource).widthOf(element.bullet)
+                )
+            }
             is OfficeDocElement.ParagraphElement -> element.paragraph
             else -> null
         }

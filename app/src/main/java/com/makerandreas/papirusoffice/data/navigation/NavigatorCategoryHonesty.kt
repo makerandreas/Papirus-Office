@@ -64,7 +64,7 @@ object NavigatorCategories {
         // in the tree constructs it, so the limb never gets data on a real
         // file. Owner plan = the PR that makes it readable.
         NavigatorCategory("hyperlinks", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeHyperlink"), "plan-18/20"),
-        NavigatorCategory("bookmarks", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeBookmark"), "plan-18/20"),
+        NavigatorCategory("bookmarks", NavigatorCategoryAvailability.PARSED_DOCUMENT_CLASS, listOf("OfficeBookmark")),
         NavigatorCategory("sections", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeSection"), "plan-19/21"),
         NavigatorCategory("fields", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeField"), "plan-21"),
         // No plan item owns these yet. Recorded as "unassigned" rather than

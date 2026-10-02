@@ -4,6 +4,10 @@ import android.content.Context
 import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.LayoutUnits
+import com.makerandreas.papirusoffice.data.NumberingCounterState
+import com.makerandreas.papirusoffice.data.NumberingFormatter
+import com.makerandreas.papirusoffice.data.NumberingLevelSpec
+import com.makerandreas.papirusoffice.data.NumberingSpec
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.PageStyleSpec
@@ -57,6 +61,8 @@ data class OdfStyleInfo(
     val alignment: String? = null,
     /** `style:master-page-name` on a paragraph (automatic) style: the page style this paragraph starts. */
     val masterPageName: String? = null,
+    /** `style:list-style-name` on a paragraph style (null = inherit, "" = suppress numbering). */
+    val listStyleName: String? = null,
     val spaceBeforeUnits: Float? = null,
     val spaceAfterUnits: Float? = null,
     val lineHeightFactor: Float? = null,
@@ -89,6 +95,7 @@ private class StyleDraft(
     val displayName: String?,
     val outlineLevel: Int?,
     val masterPageName: String? = null,
+    val listStyleName: String? = null,
     var fontFamily: String? = null,
     var fontSizePt: Float? = null,
     var isBold: Boolean? = null,
@@ -127,6 +134,7 @@ private class StyleDraft(
         colorHex = colorHex,
         alignment = alignment,
         masterPageName = masterPageName,
+        listStyleName = listStyleName,
         spaceBeforeUnits = spaceBeforeUnits,
         spaceAfterUnits = spaceAfterUnits,
         lineHeightFactor = lineHeightFactor,
@@ -142,6 +150,82 @@ private class StyleDraft(
         tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits
     )
 }
+
+private class NumberingLevelDraft(
+    val level: Int,
+    val isBullet: Boolean,
+    val numFormat: String,
+    val numPrefix: String,
+    val numSuffix: String,
+    val displayLevels: Int,
+    val startValue: Int,
+    val bulletChar: String,
+    val textStyleName: String?
+) {
+    var fontFamily: String? = null
+    var fontSizeSp: Float? = null
+    var isBold: Boolean? = null
+    var isItalic: Boolean? = null
+    var colorHex: String? = null
+    var indentStartUnits: Float? = null
+    var firstLineIndentUnits: Float? = null
+    var tabStopPositionUnits: Float? = null
+    var labelFollowedBy: String = "listtab"
+
+    fun toSpec(): NumberingLevelSpec = NumberingLevelSpec(
+        level = level,
+        isBullet = isBullet,
+        numFormat = numFormat,
+        numPrefix = numPrefix,
+        numSuffix = numSuffix,
+        displayLevels = displayLevels,
+        startValue = startValue,
+        bulletChar = bulletChar,
+        textStyleName = textStyleName,
+        fontFamily = fontFamily,
+        fontSizeSp = fontSizeSp,
+        isBold = isBold,
+        isItalic = isItalic,
+        colorHex = colorHex,
+        indentStartUnits = indentStartUnits,
+        firstLineIndentUnits = firstLineIndentUnits,
+        tabStopPositionUnits = tabStopPositionUnits,
+        labelFollowedBy = labelFollowedBy
+    )
+}
+
+private fun applyLevelTextProperties(draft: NumberingLevelDraft, attrs: Map<String, String>) {
+    val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
+    parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
+
+    val fontStyle = attrs["font-style"] ?: attrs["font-style-asian"] ?: attrs["font-style-complex"]
+    if (!fontStyle.isNullOrBlank()) {
+        val lowered = fontStyle.lowercase(Locale.ROOT)
+        draft.isItalic = lowered == "italic" || lowered == "oblique"
+    }
+
+    val sizeAttr = attrs["font-size"] ?: attrs["font-size-asian"]
+    parseOdfFontSizePt(sizeAttr)?.let { draft.fontSizeSp = it }
+
+    attrs["color"]?.takeIf { it.isNotBlank() }?.let { draft.colorHex = it }
+
+    val family = attrs["font-name"] ?: attrs["font-family"]
+    if (!family.isNullOrBlank()) {
+        draft.fontFamily = family.trim().trim('\'', '"')
+    }
+}
+
+/** Resolved label and font properties for a list item or numbered heading. */
+data class OdfFormattedListLabel(
+    val bullet: String,
+    val isOrdered: Boolean,
+    val labelFontSizeSp: Float? = null,
+    val labelFontFamily: String? = null,
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val colorHex: String? = null,
+    val textStyleName: String? = null
+)
 
 /** ODF `fo:font-size` like `12pt` stays in points; [LayoutUnits.parsePoints] owns the arithmetic. */
 internal fun parseOdfFontSizePt(raw: String?): Float? = LayoutUnits.parsePoints(raw)
@@ -256,6 +340,7 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     colorHex = over.colorHex ?: base.colorHex,
     alignment = over.alignment ?: base.alignment,
     masterPageName = over.masterPageName ?: base.masterPageName,
+    listStyleName = over.listStyleName ?: base.listStyleName,
     spaceBeforeUnits = over.spaceBeforeUnits ?: base.spaceBeforeUnits,
     spaceAfterUnits = over.spaceAfterUnits ?: base.spaceAfterUnits,
     lineHeightFactor = if (over.lineHeightExactUnits != null) null else over.lineHeightFactor ?: base.lineHeightFactor,
@@ -288,11 +373,25 @@ class SvXMLImport(
     private var standardPageLayoutName: String? = null
     private var firstMasterPageLayoutName: String? = null
     private var defaultParagraphStyle: OdfStyleInfo? = null
+    private val listStyles = LinkedHashMap<String, NumberingSpec>()
+    private var outlineStyle: NumberingSpec? = null
+    private val outlineCounter = NumberingCounterState()
+    private val listCounters = HashMap<String, NumberingCounterState>()
+    private var anonymousListCounter = NumberingCounterState()
+    private var lastListStyleName: String? = null
+    private val documentBookmarks = LinkedHashSet<String>()
 
     val elements: List<OfficeDocumentElement> get() = parsedElements
 
     fun addElement(element: OfficeDocumentElement) {
         parsedElements.add(element)
+    }
+
+    fun recordBookmark(name: String?) {
+        val clean = name?.trim() ?: return
+        if (clean.isNotEmpty()) {
+            documentBookmarks.add(clean)
+        }
     }
 
     fun parseOdfStyles(xml: String?) {
@@ -305,6 +404,12 @@ class SvXMLImport(
         var pendingHeaderFooter: String? = null
         var pendingHeaderHeight = 0f
         var pendingFooterHeight = 0f
+        // text:list-style and text:outline-style level definitions.
+        var pendingListStyleName: String? = null
+        var pendingListDisplayName: String? = null
+        var pendingListIsOutline = false
+        val pendingListLevels = LinkedHashMap<Int, NumberingLevelSpec>()
+        var pendingLevelDraft: NumberingLevelDraft? = null
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -320,7 +425,9 @@ class SvXMLImport(
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
                         "master-page", "text-properties", "paragraph-properties", "tab-stop",
-                        "header-footer-properties" -> attrIndex(parser)
+                        "header-footer-properties", "list-style", "outline-style",
+                        "list-level-style-number", "list-level-style-bullet", "list-level-style-image",
+                        "outline-level-style", "list-level-properties", "list-level-label-alignment" -> attrIndex(parser)
                         else -> emptyMap()
                     }
                     when (localName) {
@@ -335,10 +442,53 @@ class SvXMLImport(
                                     parentName = attrs["parent-style-name"],
                                     displayName = attrs["display-name"],
                                     outlineLevel = attrs["default-outline-level"]?.toIntOrNull(),
-                                    masterPageName = attrs["master-page-name"]?.takeIf { it.isNotBlank() }
+                                    masterPageName = attrs["master-page-name"]?.takeIf { it.isNotBlank() },
+                                    listStyleName = attrs["list-style-name"]
                                 )
                             } else {
                                 null
+                            }
+                        }
+                        "list-style", "outline-style" -> {
+                            pendingLevelDraft?.let { ld -> pendingListLevels[ld.level] = ld.toSpec() }
+                            pendingLevelDraft = null
+                            pendingListIsOutline = localName == "outline-style"
+                            pendingListStyleName = attrs["name"]?.takeIf { it.isNotBlank() }
+                                ?: if (pendingListIsOutline) "Outline" else null
+                            pendingListDisplayName = attrs["display-name"]
+                            pendingListLevels.clear()
+                        }
+                        "list-level-style-number", "list-level-style-bullet", "outline-level-style" -> {
+                            pendingLevelDraft?.let { ld -> pendingListLevels[ld.level] = ld.toSpec() }
+                            val lvl = attrs["level"]?.toIntOrNull() ?: 1
+                            val isBullet = localName == "list-level-style-bullet"
+                            val defaultFmt = if (localName == "outline-level-style") "" else "1"
+                            val numFmt = attrs["num-format"] ?: defaultFmt
+                            pendingLevelDraft = NumberingLevelDraft(
+                                level = lvl,
+                                isBullet = isBullet,
+                                numFormat = numFmt,
+                                numPrefix = attrs["num-prefix"] ?: "",
+                                numSuffix = attrs["num-suffix"] ?: "",
+                                displayLevels = attrs["display-levels"]?.toIntOrNull() ?: 1,
+                                startValue = attrs["start-value"]?.toIntOrNull() ?: 1,
+                                bulletChar = attrs["bullet-char"] ?: "\u2022",
+                                textStyleName = attrs["style-name"]?.takeIf { it.isNotBlank() }
+                            )
+                        }
+                        "list-level-properties" -> {
+                            pendingLevelDraft?.let { ld ->
+                                val margin = attrs["margin-left"] ?: attrs["space-before"]
+                                margin?.let { ld.indentStartUnits = LayoutUnits.parseLength(it) }
+                                attrs["text-indent"]?.let { ld.firstLineIndentUnits = LayoutUnits.parseLength(it) }
+                            }
+                        }
+                        "list-level-label-alignment" -> {
+                            pendingLevelDraft?.let { ld ->
+                                attrs["margin-left"]?.let { ld.indentStartUnits = LayoutUnits.parseLength(it) }
+                                attrs["text-indent"]?.let { ld.firstLineIndentUnits = LayoutUnits.parseLength(it) }
+                                attrs["list-tab-stop-position"]?.let { ld.tabStopPositionUnits = LayoutUnits.parseLength(it) }
+                                attrs["label-followed-by"]?.let { ld.labelFollowedBy = it }
                             }
                         }
                         "page-layout" -> {
@@ -378,7 +528,13 @@ class SvXMLImport(
                                 null
                             }
                         }
-                        "text-properties" -> pendingDraft?.let { applyTextProperties(it, attrs) }
+                        "text-properties" -> {
+                            if (pendingLevelDraft != null) {
+                                applyLevelTextProperties(pendingLevelDraft!!, attrs)
+                            } else {
+                                pendingDraft?.let { applyTextProperties(it, attrs) }
+                            }
+                        }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
                         "tab-stops" -> pendingDraft?.let { it.tabStops = emptyList() }
                         "tab-stop" -> pendingDraft?.let { draft ->
@@ -413,6 +569,32 @@ class SvXMLImport(
                 } else if (eventType == XmlPullParser.END_TAG) {
                     when ((parser.name ?: "").substringAfterLast(':')) {
                         "header-style", "footer-style" -> pendingHeaderFooter = null
+                        "list-level-style-number", "list-level-style-bullet", "outline-level-style" -> {
+                            pendingLevelDraft?.let { ld -> pendingListLevels[ld.level] = ld.toSpec() }
+                            pendingLevelDraft = null
+                        }
+                        "list-style", "outline-style" -> {
+                            pendingLevelDraft?.let { ld -> pendingListLevels[ld.level] = ld.toSpec() }
+                            pendingLevelDraft = null
+                            val name = pendingListStyleName
+                            if (!name.isNullOrBlank() && pendingListLevels.isNotEmpty()) {
+                                val spec = NumberingSpec(
+                                    name = name,
+                                    displayName = pendingListDisplayName,
+                                    isOutline = pendingListIsOutline,
+                                    levels = pendingListLevels.toMap()
+                                )
+                                if (pendingListIsOutline) {
+                                    outlineStyle = spec
+                                } else {
+                                    listStyles[name] = spec
+                                }
+                            }
+                            pendingListStyleName = null
+                            pendingListDisplayName = null
+                            pendingListIsOutline = false
+                            pendingListLevels.clear()
+                        }
                         "page-layout" -> {
                             val layoutName = pendingPageLayoutName
                             if (layoutName != null && (pendingHeaderHeight > 0f || pendingFooterHeight > 0f)) {
@@ -501,6 +683,139 @@ class SvXMLImport(
         )
     }
 
+    fun lookupListStyle(name: String?): NumberingSpec? {
+        if (name.isNullOrBlank()) return null
+        return listStyles[name]
+            ?: listStyles.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+    }
+
+    fun resolveParagraphListStyleName(styleName: String?): String? {
+        if (styleName.isNullOrBlank()) return null
+        return cascadeStyle(styleName, "paragraph")?.listStyleName
+    }
+
+    fun onListStarted(styleName: String?, listLevel: Int, continueNumbering: Boolean): String? {
+        val explicitName = styleName?.takeIf { it.isNotBlank() }
+        if (listLevel <= 1) {
+            val resolvedName = explicitName ?: if (continueNumbering) lastListStyleName else null
+            if (resolvedName != null) {
+                if (!continueNumbering) {
+                    listCounters[resolvedName] = NumberingCounterState()
+                }
+                lastListStyleName = resolvedName
+            } else if (!continueNumbering) {
+                anonymousListCounter = NumberingCounterState()
+            }
+            return resolvedName
+        }
+        return explicitName
+    }
+
+    fun formatListItemLabel(
+        listStyleName: String?,
+        paragraphStyleName: String?,
+        listLevel: Int,
+        startValueOverride: Int? = null,
+        continueNumbering: Boolean = false
+    ): OdfFormattedListLabel {
+        val paraListStyle = resolveParagraphListStyleName(paragraphStyleName)
+        if (listStyleName.isNullOrBlank() && paraListStyle != null && paraListStyle.isEmpty()) {
+            return OdfFormattedListLabel(bullet = "", isOrdered = false)
+        }
+        val effectiveName = listStyleName?.takeIf { it.isNotBlank() }
+            ?: paraListStyle?.takeIf { it.isNotBlank() }
+            ?: if (continueNumbering) lastListStyleName else null
+        if (effectiveName != null && listStyleName.isNullOrBlank()) {
+            lastListStyleName = effectiveName
+        }
+        val spec = lookupListStyle(effectiveName)
+        if (spec != null) {
+            val counter = listCounters.getOrPut(spec.name) { NumberingCounterState() }
+            val raw = counter.advance(spec, listLevel, startValueOverride)
+            val levelSpec = spec.level(listLevel)
+            val charInfo = levelSpec?.textStyleName?.let { cascadeStyle(it, "text") }
+            val bullet = when {
+                raw.isEmpty() -> ""
+                raw.endsWith(" ") || raw.endsWith("\t") -> raw
+                else -> "$raw "
+            }
+            return OdfFormattedListLabel(
+                bullet = bullet,
+                isOrdered = levelSpec?.isBullet == false && raw.isNotEmpty(),
+                labelFontSizeSp = levelSpec?.fontSizeSp ?: charInfo?.fontSizePt,
+                labelFontFamily = levelSpec?.fontFamily ?: charInfo?.fontFamily,
+                isBold = levelSpec?.isBold ?: charInfo?.isBold,
+                isItalic = levelSpec?.isItalic ?: charInfo?.isItalic,
+                colorHex = levelSpec?.colorHex ?: charInfo?.colorHex,
+                textStyleName = levelSpec?.textStyleName
+            )
+        }
+        val fallbackBulletSpec = NumberingLevelSpec(
+            level = listLevel,
+            isBullet = true,
+            bulletChar = if (listLevel > 1) "\u25e6" else "\u2022"
+        )
+        val raw = NumberingFormatter.formatBullet(fallbackBulletSpec)
+        return OdfFormattedListLabel(bullet = "$raw ", isOrdered = false)
+    }
+
+    fun formatHeadingLabel(
+        styleName: String?,
+        outlineLevel: Int,
+        enclosingListStyleName: String? = null,
+        enclosingListLevel: Int? = null,
+        startValueOverride: Int? = null,
+        continueNumbering: Boolean = false
+    ): OdfFormattedListLabel? {
+        if (enclosingListLevel != null) {
+            val label = formatListItemLabel(
+                listStyleName = enclosingListStyleName,
+                paragraphStyleName = styleName,
+                listLevel = enclosingListLevel,
+                startValueOverride = startValueOverride,
+                continueNumbering = continueNumbering
+            )
+            return label.takeIf { it.bullet.isNotEmpty() }
+        }
+        val paraListStyle = resolveParagraphListStyleName(styleName)
+        if (paraListStyle != null) {
+            if (paraListStyle.isEmpty()) return null
+            val spec = lookupListStyle(paraListStyle) ?: return null
+            val counter = listCounters.getOrPut(spec.name) { NumberingCounterState() }
+            val raw = counter.advance(spec, outlineLevel, startValueOverride)
+            if (raw.isEmpty()) return null
+            val levelSpec = spec.level(outlineLevel)
+            val charInfo = levelSpec?.textStyleName?.let { cascadeStyle(it, "text") }
+            val prefix = if (raw.endsWith(" ") || raw.endsWith("\t")) raw else "$raw "
+            return OdfFormattedListLabel(
+                bullet = prefix,
+                isOrdered = true,
+                labelFontSizeSp = levelSpec?.fontSizeSp ?: charInfo?.fontSizePt,
+                labelFontFamily = levelSpec?.fontFamily ?: charInfo?.fontFamily,
+                isBold = levelSpec?.isBold ?: charInfo?.isBold,
+                isItalic = levelSpec?.isItalic ?: charInfo?.isItalic,
+                colorHex = levelSpec?.colorHex ?: charInfo?.colorHex,
+                textStyleName = levelSpec?.textStyleName
+            )
+        }
+        val spec = outlineStyle ?: return null
+        val raw = outlineCounter.advance(spec, outlineLevel, startValueOverride)
+        if (raw.isEmpty()) return null
+        val levelSpec = spec.level(outlineLevel)
+        val charInfo = levelSpec?.textStyleName?.let { cascadeStyle(it, "text") }
+        val prefix = if (raw.endsWith(" ") || raw.endsWith("\t")) raw else "$raw "
+        return OdfFormattedListLabel(
+            bullet = prefix,
+            isOrdered = true,
+            labelFontSizeSp = levelSpec?.fontSizeSp ?: charInfo?.fontSizePt,
+            labelFontFamily = levelSpec?.fontFamily ?: charInfo?.fontFamily,
+            isBold = levelSpec?.isBold ?: charInfo?.isBold,
+            isItalic = levelSpec?.isItalic ?: charInfo?.isItalic,
+            colorHex = levelSpec?.colorHex ?: charInfo?.colorHex,
+            textStyleName = levelSpec?.textStyleName
+        )
+    }
+
     // ODF page lengths are absolute (Part 1 §2.4). When print-orientation
     // declares landscape but the box is still portrait, only the box is
     // swapped; LibreOffice writes pre-swapped dimensions, so margins stay as
@@ -580,7 +895,9 @@ class SvXMLImport(
             defaultPageStyle = defaultPage,
             masterPages = masterPages.toMap(),
             firstMasterPageName = firstBodyMasterPageName(),
-            defaultParagraphStyle = defaultPara
+            defaultParagraphStyle = defaultPara,
+            listStyles = listStyles.toMap(),
+            outlineStyle = outlineStyle
         )
     }
 
@@ -641,6 +958,13 @@ class SvXMLImport(
         standardPageLayoutName = null
         firstMasterPageLayoutName = null
         defaultParagraphStyle = null
+        listStyles.clear()
+        outlineStyle = null
+        outlineCounter.reset()
+        listCounters.clear()
+        anonymousListCounter.reset()
+        lastListStyleName = null
+        documentBookmarks.clear()
 
         // Preload style hierarchies from styles.xml and content.xml automatic-styles
         // without clearing defaults between the two so office:styles survive.
@@ -754,7 +1078,8 @@ class SvXMLImport(
                 isParsingFailed = false,
                 failureReason = null,
                 pageCount = odpSlideCount,
-                styles = toDocumentStyles()
+                styles = toDocumentStyles(),
+                bookmarks = documentBookmarks.toList()
             )
 
         } catch (e: Exception) {
@@ -809,7 +1134,8 @@ private fun OdfStyleInfo.toParagraphStyle(): ParagraphStyle = ParagraphStyle(
     widows = widows ?: 2,
     tabStops = tabStops.orEmpty(),
     defaultTabIntervalUnits = defaultTabIntervalUnits ?: 48f,
-    masterPageName = masterPageName
+    masterPageName = masterPageName,
+    listStyleName = listStyleName
 )
 
 private fun OdfStyleInfo.toCharacterStyle(): CharacterStyle = CharacterStyle(
