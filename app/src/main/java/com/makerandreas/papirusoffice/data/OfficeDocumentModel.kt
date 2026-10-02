@@ -11,20 +11,29 @@ sealed class OfficeDocumentElement {
         val text: String,
         val styleName: String? = null,
         val runs: List<TextRun> = emptyList(),
-        val pageBreakOffsets: List<Int> = emptyList()
+        val pageBreakOffsets: List<Int> = emptyList(),
+        val bookmarks: List<String> = emptyList()
     ) : OfficeDocumentElement()
 
     data class Heading(
         val text: String,
         val level: Int = 1,
         val styleName: String? = null,
-        val pageBreakOffsets: List<Int> = emptyList()
+        val runs: List<TextRun> = emptyList(),
+        val pageBreakOffsets: List<Int> = emptyList(),
+        val bookmarks: List<String> = emptyList()
     ) : OfficeDocumentElement()
 
     data class ListItem(
         val text: String,
         val level: Int = 1,
-        val bullet: String = "• "
+        val bullet: String = "• ",
+        val isOrdered: Boolean = false,
+        val styleName: String? = null,
+        val runs: List<TextRun> = emptyList(),
+        val labelFontSizeSp: Float? = null,
+        val labelFontFamily: String? = null,
+        val bookmarks: List<String> = emptyList()
     ) : OfficeDocumentElement()
 
     data class Table(
@@ -58,7 +67,8 @@ data class TextRun(
     val isBold: Boolean = false,
     val isItalic: Boolean = false,
     val isUnderline: Boolean = false,
-    val styleName: String? = null
+    val styleName: String? = null,
+    val hyperlink: String? = null
 )
 
 data class OfficeParsedDocument(
@@ -77,7 +87,8 @@ data class OfficeParsedDocument(
     val failureReason: String? = null,
     val odtPackageData: OdtPackageData? = null,
     val pageCount: Int = 0,
-    val styles: DocumentStyles = DocumentStyles()
+    val styles: DocumentStyles = DocumentStyles(),
+    val bookmarks: List<String> = emptyList()
 ) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier, XReplaceable {
     
     override val text: XText

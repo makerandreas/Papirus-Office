@@ -371,7 +371,7 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_bookmarks),
                         icon = Icons.Rounded.Bookmark,
-                        count = null,
+                        count = index.bookmarks.size,
                         isExpanded = expandedCategories["bookmarks"] == true,
                         onToggleExpand = {
                             expandedCategories["bookmarks"] = !(expandedCategories["bookmarks"] ?: false)

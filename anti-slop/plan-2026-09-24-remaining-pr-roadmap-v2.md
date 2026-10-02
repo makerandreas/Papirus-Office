@@ -362,6 +362,8 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 |---|---|---|---|
 | 6 | **#22/#23/#24/#25 all merged — COMPLETE** | row 6 → "6a to 6d all landed (COMPLETE)" | plan-04-to-09 § Plan 6 carries the four-increment implementation record, the CI run table and the re-confirmed 12-file matrix |
 
+**2026-10-02 insertion (recorded here, not a reforecast of the rows below).** Three pieces of work landed before 7B and take the next PR slots on the session branch: **Plan 12A** (LOKit JNI seam matching the real `Java_org_libreoffice_kit_*` exports, `:office` process isolation, fontconfig aliases, `PagellaPdfCreator` LOKit-first export), **Plan 7A** (ODF numbering, heading/list-item runs, hyperlinks, bookmarks; see audit-013), and the **documentation sync** the user asked for in the same pass (the `antislop` v3.2.20 pointer block in `AGENTS.md`, the ClearPDF design notes under § Plan 8 and § Plan 9, and `plan-01-master-index.md` §2/§6). The rows below keep their plan IDs; 7B still owns G-2/G-5/G-6/G-7, and Plan 12B / 12C stay parked until after Plan 9. Evidence: `anti-slop/audit-013-2026-10-02-plan-12a-and-7a.md`; the 7A implementation record sits in `plan-04-to-09-writer-fidelity.md` § Plan 7.
+
 **Section-number note (2026-09-30).** §4.6 to §4.11 below keep the PR numbers v1 assigned them (18, 19, 20, 21, 22) as **plan-item identifiers**, not as live reservations; the plan IDs in their headings (7A, 7B, 8A, 8B, 9) are authoritative. Their reforecast PR slots are 7A `#26`, 7B `#27`, 8A `#28`, 8B `#29`, 9 `#30`, Plan 10 `#31`–`#32`, Plan 11 `#33`–`#37`.
 | 7A | **#26** | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
 | 7B | **#27** | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |

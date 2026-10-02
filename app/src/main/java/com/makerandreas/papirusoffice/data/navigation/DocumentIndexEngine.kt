@@ -75,6 +75,7 @@ class DocumentIndexEngine(
         var sectionCounter = 1
         var bookmarkCounter = 1
         var shapeCounter = 1
+        val seenBookmarkNames = LinkedHashSet<String>()
 
         val rawElements = flattenDocumentElements(document)
         val locale = NavigatorStringCatalog.resolveNavigatorLocale(document, preferAppLocale, appLanguageTag)
@@ -84,6 +85,48 @@ class DocumentIndexEngine(
             val trimmed = stored?.trim().orEmpty()
             if (trimmed.isNotEmpty()) return trimmed
             return locale.autoName(kind, index)
+        }
+        fun registerBookmark(rawName: String?, pIndex: Int, elIndex: Int) {
+            val clean = rawName?.trim().orEmpty()
+            if (clean.isEmpty() || !seenBookmarkNames.add(clean)) return
+            bookmarksList.add(
+                BookmarkNode(
+                    id = "bookmark_$clean",
+                    name = clean,
+                    paragraphIndex = pIndex,
+                    elementIndex = elIndex,
+                    pageIndex = pageFor(elIndex)
+                )
+            )
+            bookmarkCounter++
+        }
+        fun indexRuns(runs: List<com.makerandreas.papirusoffice.data.OfficeTextRun>, elIndex: Int) {
+            runs.forEach { run ->
+                if (!run.hyperlink.isNullOrBlank()) {
+                    val linkId = "link_${hyperlinksList.size + 1}"
+                    hyperlinksList.add(
+                        HyperlinkNode(
+                            id = linkId,
+                            text = run.text.ifBlank { run.hyperlink },
+                            url = run.hyperlink,
+                            elementIndex = elIndex,
+                            pageIndex = pageFor(elIndex)
+                        )
+                    )
+                }
+                if (!run.field.isNullOrBlank()) {
+                    val fieldId = "field_${fieldsList.size + 1}"
+                    fieldsList.add(
+                        FieldNode(
+                            id = fieldId,
+                            fieldType = "TextRunField",
+                            value = run.field,
+                            elementIndex = elIndex,
+                            pageIndex = pageFor(elIndex)
+                        )
+                    )
+                }
+            }
         }
 
         rawElements.forEachIndexed { elemIndex, element ->
@@ -108,6 +151,10 @@ class DocumentIndexEngine(
                             layoutNodeId = "layout_p_$paragraphCounter"
                         )
                     )
+                    element.bookmarks.forEach { bm ->
+                        registerBookmark(bm.name, paragraphCounter, elemIndex)
+                    }
+                    indexRuns(element.runs, elemIndex)
                 }
 
                 is OfficeParagraph -> {
@@ -133,45 +180,21 @@ class DocumentIndexEngine(
                     }
 
                     if (!element.bookmark.isNullOrBlank()) {
-                        val bmName = element.bookmark
-                        val bmId = "bookmark_${element.bookmark}"
-                        bookmarksList.add(
-                            BookmarkNode(
-                                id = bmId,
-                                name = bmName,
-                                paragraphIndex = paragraphCounter,
-                                elementIndex = elemIndex,
-                                pageIndex = pageFor(elemIndex)
-                            )
-                        )
+                        registerBookmark(element.bookmark, paragraphCounter, elemIndex)
+                    }
+                    element.bookmarks.forEach { bm ->
+                        registerBookmark(bm.name, paragraphCounter, elemIndex)
                     }
 
-                    element.runs.forEach { run ->
-                        if (!run.hyperlink.isNullOrBlank()) {
-                            val linkId = "link_${hyperlinksList.size + 1}"
-                            hyperlinksList.add(
-                                HyperlinkNode(
-                                    id = linkId,
-                                    text = run.text.ifBlank { run.hyperlink },
-                                    url = run.hyperlink,
-                                    elementIndex = elemIndex,
-                                    pageIndex = pageFor(elemIndex)
-                                )
-                            )
-                        }
-                        if (!run.field.isNullOrBlank()) {
-                            val fieldId = "field_${fieldsList.size + 1}"
-                            fieldsList.add(
-                                FieldNode(
-                                    id = fieldId,
-                                    fieldType = "TextRunField",
-                                    value = run.field,
-                                    elementIndex = elemIndex,
-                                    pageIndex = pageFor(elemIndex)
-                                )
-                            )
-                        }
+                    indexRuns(element.runs, elemIndex)
+                }
+
+                is com.makerandreas.papirusoffice.data.OfficeListItem -> {
+                    paragraphCounter++
+                    element.bookmarks.forEach { bm ->
+                        registerBookmark(bm.name, paragraphCounter, elemIndex)
                     }
+                    indexRuns(element.runs, elemIndex)
                 }
 
                 is OfficeTable -> {
@@ -212,17 +235,7 @@ class DocumentIndexEngine(
 
                 is OfficeBookmark -> {
                     val bmName = storedOrAuto(element.name, NavigatorObjectKind.BOOKMARK, bookmarkCounter)
-                    val id = "bookmark_$bmName"
-                    bookmarksList.add(
-                        BookmarkNode(
-                            id = id,
-                            name = bmName,
-                            paragraphIndex = paragraphCounter,
-                            elementIndex = elemIndex,
-                            pageIndex = pageFor(elemIndex)
-                        )
-                    )
-                    bookmarkCounter++
+                    registerBookmark(bmName, paragraphCounter, elemIndex)
                 }
 
                 is OfficeComment -> {
@@ -316,6 +329,10 @@ class DocumentIndexEngine(
                     // Other elements
                 }
             }
+        }
+
+        document.bookmarks.forEach { bm ->
+            registerBookmark(bm.name, paragraphCounter.coerceAtLeast(0), 0)
         }
 
         document.resources.objects.forEachIndexed { idx, objName ->

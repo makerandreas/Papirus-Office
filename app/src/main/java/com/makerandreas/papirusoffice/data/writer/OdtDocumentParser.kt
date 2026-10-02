@@ -48,10 +48,10 @@ class OdtDocumentParser {
         val docStyles = if (stylesXmlBytes != null) parseStylesXml(stylesXmlBytes) else DocumentStyles()
 
         // Parse automatic styles and elements from content.xml
-        val (automaticStyles, elements) = if (contentXmlBytes != null) {
+        val (automaticStyles, elements, bookmarks) = if (contentXmlBytes != null) {
             parseContentXml(contentXmlBytes, docStyles)
         } else {
-            Pair(DocumentStyles(), listOf(OfficeParagraph("")))
+            Triple(DocumentStyles(), listOf(OfficeParagraph("")), emptyList())
         }
 
         // Merge styles: document styles + automatic styles
@@ -61,9 +61,14 @@ class OdtDocumentParser {
         val mergedCharacterStyles = docStyles.characterStyles.toMutableMap().apply {
             putAll(automaticStyles.characterStyles)
         }
+        val mergedListStyles = docStyles.listStyles.toMutableMap().apply {
+            putAll(automaticStyles.listStyles)
+        }
         val mergedStyles = DocumentStyles(
             paragraphStyles = mergedParagraphStyles,
-            characterStyles = mergedCharacterStyles
+            characterStyles = mergedCharacterStyles,
+            listStyles = mergedListStyles,
+            outlineStyle = automaticStyles.outlineStyle ?: docStyles.outlineStyle
         )
 
         val packageData = OdtPackageData(
@@ -82,7 +87,8 @@ class OdtDocumentParser {
             metadata = metadata,
             styles = mergedStyles,
             body = DocumentBody(elements = elements),
-            odtPackageData = packageData
+            odtPackageData = packageData,
+            bookmarks = bookmarks
         )
     }
 
@@ -137,6 +143,8 @@ class OdtDocumentParser {
     private fun parseStylesFromStream(xmlBytes: ByteArray): DocumentStyles {
         val paragraphStyles = mutableMapOf<String, ParagraphStyle>()
         val characterStyles = mutableMapOf<String, CharacterStyle>()
+        val listStyles = LinkedHashMap<String, NumberingSpec>()
+        var outlineStyle: NumberingSpec? = null
 
         try {
             val factory = XmlPullParserFactory.newInstance()
@@ -148,6 +156,7 @@ class OdtDocumentParser {
             var currentStyleName: String? = null
             var currentFamily: String? = null
             var currentParentStyle: String? = null
+            var currentListStyleAttr: String? = null
 
             var currentIsBold = false
             var currentIsItalic = false
@@ -156,6 +165,12 @@ class OdtDocumentParser {
             var currentColorHex: String? = null
             var currentFontFamily: String? = null
             var currentAlignment = "Left"
+
+            var pendingListStyleName: String? = null
+            var pendingListDisplayName: String? = null
+            var pendingListIsOutline = false
+            val pendingListLevels = LinkedHashMap<Int, NumberingLevelSpec>()
+            var pendingLevelSpec: NumberingLevelSpec? = null
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
@@ -166,6 +181,7 @@ class OdtDocumentParser {
                                 currentStyleName = getAttr(parser, "name") ?: getAttr(parser, "style-name") ?: if (localName == "default-style") "Default" else null
                                 currentFamily = getAttr(parser, "family")
                                 currentParentStyle = getAttr(parser, "parent-style-name")
+                                currentListStyleAttr = getAttr(parser, "list-style-name")
 
                                 currentIsBold = false
                                 currentIsItalic = false
@@ -175,28 +191,61 @@ class OdtDocumentParser {
                                 currentFontFamily = null
                                 currentAlignment = "Left"
                             }
+                            "list-style", "outline-style" -> {
+                                pendingLevelSpec?.let { pendingListLevels[it.level] = it }
+                                pendingLevelSpec = null
+                                pendingListIsOutline = localName == "outline-style"
+                                pendingListStyleName = getAttr(parser, "name")?.takeIf { it.isNotBlank() }
+                                    ?: if (pendingListIsOutline) "Outline" else null
+                                pendingListDisplayName = getAttr(parser, "display-name")
+                                pendingListLevels.clear()
+                            }
+                            "list-level-style-number", "list-level-style-bullet", "outline-level-style" -> {
+                                pendingLevelSpec?.let { pendingListLevels[it.level] = it }
+                                val lvl = getAttr(parser, "level")?.toIntOrNull() ?: 1
+                                val isBullet = localName == "list-level-style-bullet"
+                                val defaultFmt = if (localName == "outline-level-style") "" else "1"
+                                val numFmt = getAttr(parser, "num-format") ?: defaultFmt
+                                pendingLevelSpec = NumberingLevelSpec(
+                                    level = lvl,
+                                    isBullet = isBullet,
+                                    numFormat = numFmt,
+                                    numPrefix = getAttr(parser, "num-prefix") ?: "",
+                                    numSuffix = getAttr(parser, "num-suffix") ?: "",
+                                    displayLevels = getAttr(parser, "display-levels")?.toIntOrNull() ?: 1,
+                                    startValue = getAttr(parser, "start-value")?.toIntOrNull() ?: 1,
+                                    bulletChar = getAttr(parser, "bullet-char") ?: "\u2022",
+                                    textStyleName = getAttr(parser, "style-name")?.takeIf { it.isNotBlank() }
+                                )
+                            }
                             "text-properties" -> {
                                 val fontWeight = getAttr(parser, "font-weight") ?: getAttr(parser, "font-weight-asian") ?: getAttr(parser, "font-weight-complex")
-                                if (fontWeight.equals("bold", ignoreCase = true) || fontWeight.equals("700", ignoreCase = true) || fontWeight.equals("800", ignoreCase = true) || fontWeight.equals("900", ignoreCase = true)) {
-                                    currentIsBold = true
-                                }
+                                val bold = fontWeight.equals("bold", ignoreCase = true) || fontWeight.equals("700", ignoreCase = true) || fontWeight.equals("800", ignoreCase = true) || fontWeight.equals("900", ignoreCase = true)
                                 val fontStyle = getAttr(parser, "font-style") ?: getAttr(parser, "font-style-asian") ?: getAttr(parser, "font-style-complex")
-                                if (fontStyle.equals("italic", ignoreCase = true) || fontStyle.equals("oblique", ignoreCase = true)) {
-                                    currentIsItalic = true
-                                }
+                                val italic = fontStyle.equals("italic", ignoreCase = true) || fontStyle.equals("oblique", ignoreCase = true)
                                 val underline = getAttr(parser, "text-underline-style") ?: getAttr(parser, "text-underline-type")
-                                if (!underline.isNullOrEmpty() && !underline.equals("none", ignoreCase = true)) {
-                                    currentIsUnderline = true
-                                }
+                                val isUnder = !underline.isNullOrEmpty() && !underline.equals("none", ignoreCase = true)
                                 val sizeAttr = getAttr(parser, "font-size") ?: getAttr(parser, "font-size-asian")
-                                if (!sizeAttr.isNullOrEmpty()) {
-                                    val numeric = sizeAttr.filter { it.isDigit() || it == '.' }.toFloatOrNull()
-                                    if (numeric != null && numeric > 0f) {
-                                        currentFontSizeSp = numeric
-                                    }
+                                val parsedSize = sizeAttr?.filter { it.isDigit() || it == '.' }?.toFloatOrNull()?.takeIf { it > 0f }
+                                val color = getAttr(parser, "color")
+                                val family = (getAttr(parser, "font-name") ?: getAttr(parser, "font-family"))?.trim()?.trim('\'', '"')
+
+                                if (pendingLevelSpec != null) {
+                                    pendingLevelSpec = pendingLevelSpec!!.copy(
+                                        fontFamily = family ?: pendingLevelSpec!!.fontFamily,
+                                        fontSizeSp = parsedSize ?: pendingLevelSpec!!.fontSizeSp,
+                                        isBold = if (fontWeight != null) bold else pendingLevelSpec!!.isBold,
+                                        isItalic = if (fontStyle != null) italic else pendingLevelSpec!!.isItalic,
+                                        colorHex = color ?: pendingLevelSpec!!.colorHex
+                                    )
+                                } else {
+                                    if (bold) currentIsBold = true
+                                    if (italic) currentIsItalic = true
+                                    if (isUnder) currentIsUnderline = true
+                                    if (parsedSize != null) currentFontSizeSp = parsedSize
+                                    currentColorHex = color
+                                    currentFontFamily = family
                                 }
-                                currentColorHex = getAttr(parser, "color")
-                                currentFontFamily = getAttr(parser, "font-name") ?: getAttr(parser, "font-family")
                             }
                             "paragraph-properties" -> {
                                 val align = getAttr(parser, "text-align")
@@ -213,36 +262,65 @@ class OdtDocumentParser {
                     }
                     XmlPullParser.END_TAG -> {
                         val localName = getLocalName(parser)
-                        if (localName == "style" || localName == "default-style") {
-                            val name = currentStyleName
-                            if (!name.isNullOrEmpty()) {
-                                if (currentFamily == "paragraph" || currentFamily == null) {
-                                    paragraphStyles[name] = ParagraphStyle(
-                                        name = name,
-                                        fontSizeSp = currentFontSizeSp,
-                                        isBold = currentIsBold,
-                                        isItalic = currentIsItalic,
-                                        isUnderline = currentIsUnderline,
-                                        colorHex = currentColorHex,
-                                        alignment = currentAlignment,
-                                        fontFamily = currentFontFamily,
-                                        parentStyleName = currentParentStyle
-                                    )
-                                }
-                                if (currentFamily == "text" || currentFamily == null) {
-                                    characterStyles[name] = CharacterStyle(
-                                        name = name,
-                                        fontSizeSp = currentFontSizeSp,
-                                        isBold = currentIsBold,
-                                        isItalic = currentIsItalic,
-                                        isUnderline = currentIsUnderline,
-                                        colorHex = currentColorHex,
-                                        fontFamily = currentFontFamily,
-                                        parentStyleName = currentParentStyle
-                                    )
-                                }
+                        when (localName) {
+                            "list-level-style-number", "list-level-style-bullet", "outline-level-style" -> {
+                                pendingLevelSpec?.let { pendingListLevels[it.level] = it }
+                                pendingLevelSpec = null
                             }
-                            currentStyleName = null
+                            "list-style", "outline-style" -> {
+                                pendingLevelSpec?.let { pendingListLevels[it.level] = it }
+                                pendingLevelSpec = null
+                                val name = pendingListStyleName
+                                if (!name.isNullOrBlank() && pendingListLevels.isNotEmpty()) {
+                                    val spec = NumberingSpec(
+                                        name = name,
+                                        displayName = pendingListDisplayName,
+                                        isOutline = pendingListIsOutline,
+                                        levels = pendingListLevels.toMap()
+                                    )
+                                    if (pendingListIsOutline) {
+                                        outlineStyle = spec
+                                    } else {
+                                        listStyles[name] = spec
+                                    }
+                                }
+                                pendingListStyleName = null
+                                pendingListDisplayName = null
+                                pendingListIsOutline = false
+                                pendingListLevels.clear()
+                            }
+                            "style", "default-style" -> {
+                                val name = currentStyleName
+                                if (!name.isNullOrEmpty()) {
+                                    if (currentFamily == "paragraph" || currentFamily == null) {
+                                        paragraphStyles[name] = ParagraphStyle(
+                                            name = name,
+                                            fontSizeSp = currentFontSizeSp,
+                                            isBold = currentIsBold,
+                                            isItalic = currentIsItalic,
+                                            isUnderline = currentIsUnderline,
+                                            colorHex = currentColorHex,
+                                            alignment = currentAlignment,
+                                            fontFamily = currentFontFamily,
+                                            parentStyleName = currentParentStyle,
+                                            listStyleName = currentListStyleAttr
+                                        )
+                                    }
+                                    if (currentFamily == "text" || currentFamily == null) {
+                                        characterStyles[name] = CharacterStyle(
+                                            name = name,
+                                            fontSizeSp = currentFontSizeSp,
+                                            isBold = currentIsBold,
+                                            isItalic = currentIsItalic,
+                                            isUnderline = currentIsUnderline,
+                                            colorHex = currentColorHex,
+                                            fontFamily = currentFontFamily,
+                                            parentStyleName = currentParentStyle
+                                        )
+                                    }
+                                }
+                                currentStyleName = null
+                            }
                         }
                     }
                 }
@@ -252,13 +330,18 @@ class OdtDocumentParser {
             PapirusLogger.e("ODT", "parseStylesFromStream error: ${e.message}", e)
         }
 
-        return DocumentStyles(paragraphStyles = paragraphStyles, characterStyles = characterStyles)
+        return DocumentStyles(
+            paragraphStyles = paragraphStyles,
+            characterStyles = characterStyles,
+            listStyles = listStyles,
+            outlineStyle = outlineStyle
+        )
     }
 
     private fun parseContentXml(
         contentXmlBytes: ByteArray,
         existingStyles: DocumentStyles
-    ): Pair<DocumentStyles, List<OfficeElement>> {
+    ): Triple<DocumentStyles, List<OfficeElement>, List<OfficeBookmark>> {
         val automaticStyles = parseStylesFromStream(contentXmlBytes)
 
         val mergedParagraphStyles = existingStyles.paragraphStyles.toMutableMap().apply {
@@ -267,8 +350,34 @@ class OdtDocumentParser {
         val mergedCharacterStyles = existingStyles.characterStyles.toMutableMap().apply {
             putAll(automaticStyles.characterStyles)
         }
+        val mergedListStyles = existingStyles.listStyles.toMutableMap().apply {
+            putAll(automaticStyles.listStyles)
+        }
+        val effectiveOutlineStyle = automaticStyles.outlineStyle ?: existingStyles.outlineStyle
+
+        fun resolveParaListStyleName(styleName: String?): String? {
+            var curr = styleName
+            var depth = 0
+            while (curr != null && depth < 16) {
+                val ps = mergedParagraphStyles[curr] ?: break
+                if (ps.listStyleName != null) return ps.listStyleName
+                curr = ps.parentStyleName
+                depth++
+            }
+            return null
+        }
+
+        val outlineCounter = NumberingCounterState()
+        val listCounters = HashMap<String, NumberingCounterState>()
+        // MutableList as a stack: kotlin.collections.ArrayDeque's push/peek/pop are
+        // not available in every Kotlin stdlib this project builds against.
+        val listStyleStack = mutableListOf<String>()
+        var lastListStyleName: String? = null
+        var listDepth = 0
 
         val elements = mutableListOf<OfficeElement>()
+        val allBookmarks = LinkedHashSet<String>()
+        val currentElementBookmarks = LinkedHashSet<String>()
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -284,84 +393,136 @@ class OdtDocumentParser {
             var paragraphStyleName: String? = null
 
             var inBody = false
+            var inTocSourceDepth = 0
             var inParagraph = false
             var inHeading = false
             var inTable = false
             var inListItem = false
+            var listItemStartValue: Int? = null
 
             var boldDepth = 0
             var italicDepth = 0
             var underlineDepth = 0
             var spanStyleName: String? = null
+            var currentHyperlink: String? = null
 
             val currentTableRows = mutableListOf<OfficeTableRow>()
             val currentRowCells = mutableListOf<OfficeTableCell>()
+
+            fun appendSynthesizedText(segment: String) {
+                if (segment.isEmpty()) return
+                currentText.append(segment)
+                currentRuns.add(
+                    OfficeTextRun(
+                        text = segment,
+                        styleName = spanStyleName ?: (if (inHeading) headingStyleName else paragraphStyleName),
+                        characterStyle = spanStyleName,
+                        hyperlink = currentHyperlink,
+                        isBold = boldDepth > 0 || inHeading,
+                        isItalic = italicDepth > 0,
+                        isUnderline = underlineDepth > 0 || currentHyperlink != null
+                    )
+                )
+            }
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
                     XmlPullParser.START_TAG -> {
                         val localName = getLocalName(parser)
-                        when (localName) {
-                            "body" -> inBody = true
-                            "p" -> if (inBody) {
-                                inParagraph = true
-                                currentText.clear()
-                                currentRuns.clear()
-                                paragraphStyleName = getAttr(parser, "style-name")
-                            }
-                            "h" -> if (inBody) {
-                                inHeading = true
-                                currentText.clear()
-                                currentRuns.clear()
-                                headingStyleName = getAttr(parser, "style-name")
-                                val levelAttr = getAttr(parser, "outline-level")
-                                headingLevel = levelAttr?.toIntOrNull() ?: 1
-                            }
-                            "list-item" -> if (inBody) {
-                                inListItem = true
-                            }
-                            "table" -> if (inBody) {
-                                inTable = true
-                                currentTableRows.clear()
-                            }
-                            "table-row" -> if (inBody) {
-                                currentRowCells.clear()
-                            }
-                            "table-cell" -> if (inBody) {
-                                currentText.clear()
-                                currentRuns.clear()
-                            }
-                            "span" -> if (inBody) {
-                                spanStyleName = getAttr(parser, "style-name")
-                            }
-                            "s" -> if (inBody && (inParagraph || inHeading || inListItem)) {
-                                val countAttr = getAttr(parser, "c")
-                                val count = countAttr?.toIntOrNull() ?: 1
-                                repeat(count) { currentText.append(" ") }
-                            }
-                            "tab" -> if (inBody && (inParagraph || inHeading || inListItem)) {
-                                currentText.append("\t")
-                            }
-                            "line-break" -> if (inBody && (inParagraph || inHeading || inListItem)) {
-                                currentText.append("\n")
-                            }
-                            "b" -> boldDepth++
-                            "i" -> italicDepth++
-                            "u" -> underlineDepth++
-                            "image" -> if (inBody) {
-                                val href = getAttr(parser, "href")
-                                if (!href.isNullOrEmpty()) {
-                                    elements.add(OfficeImage(imagePath = href))
+                        if (localName == "table-of-content-source") {
+                            inTocSourceDepth++
+                        } else if (inTocSourceDepth > 0) {
+                            // Ignore template contents inside <text:table-of-content-source>
+                        } else {
+                            when (localName) {
+                                "body" -> inBody = true
+                                "p" -> if (inBody) {
+                                    inParagraph = true
+                                    currentText.clear()
+                                    currentRuns.clear()
+                                    if (!inListItem) currentElementBookmarks.clear()
+                                    paragraphStyleName = getAttr(parser, "style-name")
+                                }
+                                "h" -> if (inBody) {
+                                    inHeading = true
+                                    currentText.clear()
+                                    currentRuns.clear()
+                                    if (!inListItem) currentElementBookmarks.clear()
+                                    headingStyleName = getAttr(parser, "style-name")
+                                    val levelAttr = getAttr(parser, "outline-level")
+                                    headingLevel = levelAttr?.toIntOrNull() ?: 1
+                                }
+                                "list" -> if (inBody) {
+                                    listDepth++
+                                    val styleAttr = getAttr(parser, "style-name")?.takeIf { it.isNotBlank() }
+                                    val cont = getAttr(parser, "continue-numbering") == "true" ||
+                                        !getAttr(parser, "continue-list").isNullOrBlank()
+                                    val resolved = styleAttr
+                                        ?: listStyleStack.lastOrNull()
+                                        ?: if (cont) lastListStyleName else null
+                                    if (listDepth == 1 && resolved != null) {
+                                        if (!cont) listCounters[resolved] = NumberingCounterState()
+                                        lastListStyleName = resolved
+                                    }
+                                    listStyleStack.add(resolved.orEmpty())
+                                }
+                                "list-item", "list-header" -> if (inBody) {
+                                    inListItem = true
+                                    currentElementBookmarks.clear()
+                                    listItemStartValue = getAttr(parser, "start-value")?.toIntOrNull()
+                                }
+                                "table" -> if (inBody) {
+                                    inTable = true
+                                    currentTableRows.clear()
+                                }
+                                "table-row" -> if (inBody) {
+                                    currentRowCells.clear()
+                                }
+                                "table-cell" -> if (inBody) {
+                                    currentText.clear()
+                                    currentRuns.clear()
+                                }
+                                "span" -> if (inBody) {
+                                    spanStyleName = getAttr(parser, "style-name")
+                                }
+                                "a" -> if (inBody) {
+                                    currentHyperlink = getAttr(parser, "href")?.takeIf { it.isNotEmpty() }
+                                }
+                                "bookmark", "bookmark-start" -> if (inBody) {
+                                    val bmName = getAttr(parser, "name")?.trim()
+                                    if (!bmName.isNullOrEmpty()) {
+                                        allBookmarks.add(bmName)
+                                        currentElementBookmarks.add(bmName)
+                                    }
+                                }
+                                "s" -> if (inBody && (inParagraph || inHeading || inListItem)) {
+                                    val countAttr = getAttr(parser, "c")
+                                    val count = (countAttr?.toIntOrNull() ?: 1).coerceAtLeast(1)
+                                    appendSynthesizedText(" ".repeat(count))
+                                }
+                                "tab" -> if (inBody && (inParagraph || inHeading || inListItem)) {
+                                    appendSynthesizedText("\t")
+                                }
+                                "line-break" -> if (inBody && (inParagraph || inHeading)) {
+                                    appendSynthesizedText("\n")
+                                }
+                                "b" -> boldDepth++
+                                "i" -> italicDepth++
+                                "u" -> underlineDepth++
+                                "image" -> if (inBody) {
+                                    val href = getAttr(parser, "href")
+                                    if (!href.isNullOrEmpty()) {
+                                        elements.add(OfficeImage(imagePath = href))
+                                    }
                                 }
                             }
                         }
                     }
                     XmlPullParser.TEXT -> {
                         val text = parser.text ?: ""
-                        if (inBody && text.isNotEmpty() && (inParagraph || inHeading || inListItem)) {
+                        if (inBody && inTocSourceDepth == 0 && text.isNotEmpty() && (inParagraph || inHeading || inListItem)) {
                             currentText.append(text)
 
-                            // Resolve formatting from style name and inline tags
                             val matchingCharStyle = spanStyleName?.let { mergedCharacterStyles[it] }
                             val matchingParaStyle = if (inHeading) headingStyleName?.let { mergedParagraphStyles[it] } else paragraphStyleName?.let { mergedParagraphStyles[it] }
 
@@ -377,6 +538,7 @@ class OdtDocumentParser {
                                     spanStyleName?.contains("Italic", ignoreCase = true) == true
 
                             val isU = underlineDepth > 0 ||
+                                    currentHyperlink != null ||
                                     matchingCharStyle?.isUnderline == true ||
                                     matchingParaStyle?.isUnderline == true ||
                                     spanStyleName?.contains("Underline", ignoreCase = true) == true
@@ -386,6 +548,7 @@ class OdtDocumentParser {
                                     text = text,
                                     styleName = spanStyleName ?: (if (inHeading) headingStyleName else paragraphStyleName),
                                     characterStyle = spanStyleName,
+                                    hyperlink = currentHyperlink,
                                     isBold = isB,
                                     isItalic = isI,
                                     isUnderline = isU
@@ -395,58 +558,157 @@ class OdtDocumentParser {
                     }
                     XmlPullParser.END_TAG -> {
                         val localName = getLocalName(parser)
-                        when (localName) {
-                            "body" -> inBody = false
-                            "span" -> spanStyleName = null
-                            "b" -> if (boldDepth > 0) boldDepth--
-                            "i" -> if (italicDepth > 0) italicDepth--
-                            "u" -> if (underlineDepth > 0) underlineDepth--
-                            "p" -> if (inBody) {
-                                val text = currentText.toString()
-                                val runs = ArrayList(currentRuns)
-                                if (inHeading) {
-                                    // inside heading, handled by h end tag
-                                } else if (inTable) {
-                                    // inside table cell, handled by table-cell
-                                } else if (inListItem) {
-                                    elements.add(OfficeListItem(text = text, runs = runs))
-                                } else {
-                                    elements.add(OfficeParagraph(text = text, styleName = paragraphStyleName, runs = runs))
+                        if (localName == "table-of-content-source") {
+                            if (inTocSourceDepth > 0) inTocSourceDepth--
+                        } else if (inTocSourceDepth == 0) {
+                            when (localName) {
+                                "body" -> inBody = false
+                                "span" -> spanStyleName = null
+                                "a" -> currentHyperlink = null
+                                "b" -> if (boldDepth > 0) boldDepth--
+                                "i" -> if (italicDepth > 0) italicDepth--
+                                "u" -> if (underlineDepth > 0) underlineDepth--
+                                "p" -> if (inBody) {
+                                    val text = currentText.toString()
+                                    val runs = ArrayList(currentRuns)
+                                    val bms = currentElementBookmarks.map { OfficeBookmark(it) }
+                                    if (inHeading) {
+                                        // inside heading, handled by h end tag
+                                    } else if (inTable) {
+                                        // inside table cell, handled by table-cell
+                                    } else if (inListItem) {
+                                        val activeListStyle = listStyleStack.lastOrNull()?.takeIf { it.isNotBlank() }
+                                            ?: resolveParaListStyleName(paragraphStyleName)?.takeIf { it.isNotBlank() }
+                                        val spec = activeListStyle?.let { mergedListStyles[it] }
+                                        val lvl = listDepth.coerceAtLeast(1)
+                                        val levelSpec = spec?.level(lvl)
+                                        val bullet = if (spec != null && text.isNotBlank()) {
+                                            val counter = listCounters.getOrPut(spec.name) { NumberingCounterState() }
+                                            val raw = counter.advance(spec, lvl, listItemStartValue)
+                                            listItemStartValue = null
+                                            if (raw.isEmpty()) "" else if (raw.endsWith(" ")) raw else "$raw "
+                                        } else {
+                                            if (lvl > 1) "\u25e6 " else "\u2022 "
+                                        }
+                                        elements.add(
+                                            OfficeListItem(
+                                                text = text,
+                                                bullet = bullet,
+                                                level = lvl,
+                                                isOrdered = levelSpec?.isBullet == false && bullet.isNotBlank(),
+                                                styleName = paragraphStyleName,
+                                                labelFontSizeSp = levelSpec?.fontSizeSp,
+                                                labelFontFamily = levelSpec?.fontFamily,
+                                                runs = runs,
+                                                bookmarks = bms
+                                            )
+                                        )
+                                        currentElementBookmarks.clear()
+                                    } else {
+                                        elements.add(
+                                            OfficeParagraph(
+                                                text = text,
+                                                styleName = paragraphStyleName,
+                                                runs = runs,
+                                                bookmark = currentElementBookmarks.firstOrNull(),
+                                                bookmarks = bms
+                                            )
+                                        )
+                                        currentElementBookmarks.clear()
+                                    }
+                                    inParagraph = false
                                 }
-                                inParagraph = false
-                            }
-                            "h" -> if (inBody) {
-                                val text = currentText.toString()
-                                val runs = ArrayList(currentRuns)
-                                elements.add(OfficeHeading(text = text, level = headingLevel, styleName = headingStyleName, runs = runs))
-                                inHeading = false
-                            }
-                            "list-item" -> if (inBody) {
-                                inListItem = false
-                            }
-                            "table-cell" -> if (inBody) {
-                                val cellText = currentText.toString()
-                                val runs = ArrayList(currentRuns)
-                                val cellParagraphs = if (runs.isNotEmpty()) {
-                                    listOf(OfficeParagraph(text = cellText, runs = runs))
-                                } else {
-                                    emptyList()
+                                "h" -> if (inBody) {
+                                    var text = currentText.toString()
+                                    val runs = ArrayList(currentRuns)
+                                    val bms = currentElementBookmarks.map { OfficeBookmark(it) }
+                                    val paraListStyle = resolveParaListStyleName(headingStyleName)
+                                    val rawPrefix = when {
+                                        text.isBlank() -> ""
+                                        inListItem -> {
+                                            val activeListStyle = listStyleStack.lastOrNull()?.takeIf { it.isNotBlank() }
+                                                ?: paraListStyle?.takeIf { it.isNotBlank() }
+                                            val spec = activeListStyle?.let { mergedListStyles[it] }
+                                            if (spec != null) {
+                                                val counter = listCounters.getOrPut(spec.name) { NumberingCounterState() }
+                                                val r = counter.advance(spec, listDepth.coerceAtLeast(1), listItemStartValue)
+                                                listItemStartValue = null
+                                                r
+                                            } else ""
+                                        }
+                                        paraListStyle != null -> {
+                                            if (paraListStyle.isEmpty()) ""
+                                            else {
+                                                val spec = mergedListStyles[paraListStyle]
+                                                if (spec != null) {
+                                                    val counter = listCounters.getOrPut(spec.name) { NumberingCounterState() }
+                                                    counter.advance(spec, headingLevel)
+                                                } else ""
+                                            }
+                                        }
+                                        effectiveOutlineStyle != null -> {
+                                            outlineCounter.advance(effectiveOutlineStyle, headingLevel)
+                                        }
+                                        else -> ""
+                                    }
+                                    if (rawPrefix.isNotEmpty()) {
+                                        val prefix = if (rawPrefix.endsWith(" ")) rawPrefix else "$rawPrefix "
+                                        if (!text.trimStart().startsWith(prefix.trimEnd())) {
+                                            text = prefix + text
+                                            runs.add(
+                                                0,
+                                                OfficeTextRun(
+                                                    text = prefix,
+                                                    styleName = headingStyleName,
+                                                    isBold = true
+                                                )
+                                            )
+                                        }
+                                    }
+                                    elements.add(
+                                        OfficeHeading(
+                                            text = text,
+                                            level = headingLevel,
+                                            styleName = headingStyleName,
+                                            runs = runs,
+                                            bookmarks = bms
+                                        )
+                                    )
+                                    currentElementBookmarks.clear()
+                                    inHeading = false
                                 }
-                                currentRowCells.add(OfficeTableCell(text = cellText, paragraphs = cellParagraphs))
-                            }
-                            "table-row" -> if (inBody) {
-                                if (currentRowCells.isNotEmpty()) {
-                                    currentTableRows.add(OfficeTableRow(cells = ArrayList(currentRowCells)))
-                                    currentRowCells.clear()
+                                "list-item", "list-header" -> if (inBody) {
+                                    inListItem = false
+                                    listItemStartValue = null
                                 }
-                            }
-                            "table" -> if (inBody) {
-                                if (currentTableRows.isNotEmpty()) {
-                                    val maxCols = currentTableRows.maxOfOrNull { it.cells.size } ?: 0
-                                    elements.add(OfficeTable(rows = ArrayList(currentTableRows), numColumns = maxCols))
-                                    currentTableRows.clear()
+                                "list" -> if (inBody) {
+                                    if (listStyleStack.isNotEmpty()) listStyleStack.removeAt(listStyleStack.lastIndex)
+                                    if (listDepth > 0) listDepth--
                                 }
-                                inTable = false
+                                "table-cell" -> if (inBody) {
+                                    val cellText = currentText.toString()
+                                    val runs = ArrayList(currentRuns)
+                                    val cellParagraphs = if (runs.isNotEmpty()) {
+                                        listOf(OfficeParagraph(text = cellText, runs = runs))
+                                    } else {
+                                        emptyList()
+                                    }
+                                    currentRowCells.add(OfficeTableCell(text = cellText, paragraphs = cellParagraphs))
+                                }
+                                "table-row" -> if (inBody) {
+                                    if (currentRowCells.isNotEmpty()) {
+                                        currentTableRows.add(OfficeTableRow(cells = ArrayList(currentRowCells)))
+                                        currentRowCells.clear()
+                                    }
+                                }
+                                "table" -> if (inBody) {
+                                    if (currentTableRows.isNotEmpty()) {
+                                        val maxCols = currentTableRows.maxOfOrNull { it.cells.size } ?: 0
+                                        elements.add(OfficeTable(rows = ArrayList(currentTableRows), numColumns = maxCols))
+                                        currentTableRows.clear()
+                                    }
+                                    inTable = false
+                                }
                             }
                         }
                     }
@@ -457,7 +719,7 @@ class OdtDocumentParser {
             PapirusLogger.e("ODT", "parseContentXml error: ${e.message}", e)
         }
 
-        return Pair(automaticStyles, elements)
+        return Triple(automaticStyles, elements, allBookmarks.map { OfficeBookmark(it) })
     }
 
     private fun getLocalName(parser: XmlPullParser): String {
