@@ -369,7 +369,9 @@ class OdtDocumentParser {
 
         val outlineCounter = NumberingCounterState()
         val listCounters = HashMap<String, NumberingCounterState>()
-        val listStyleStack = ArrayDeque<String>()
+        // MutableList as a stack: kotlin.collections.ArrayDeque's push/peek/pop are
+        // not available in every Kotlin stdlib this project builds against.
+        val listStyleStack = mutableListOf<String>()
         var lastListStyleName: String? = null
         var listDepth = 0
 
@@ -456,13 +458,13 @@ class OdtDocumentParser {
                                     val cont = getAttr(parser, "continue-numbering") == "true" ||
                                         !getAttr(parser, "continue-list").isNullOrBlank()
                                     val resolved = styleAttr
-                                        ?: listStyleStack.peek()
+                                        ?: listStyleStack.lastOrNull()
                                         ?: if (cont) lastListStyleName else null
                                     if (listDepth == 1 && resolved != null) {
                                         if (!cont) listCounters[resolved] = NumberingCounterState()
                                         lastListStyleName = resolved
                                     }
-                                    listStyleStack.push(resolved ?: "")
+                                    listStyleStack.add(resolved.orEmpty())
                                 }
                                 "list-item", "list-header" -> if (inBody) {
                                     inListItem = true
@@ -575,7 +577,7 @@ class OdtDocumentParser {
                                     } else if (inTable) {
                                         // inside table cell, handled by table-cell
                                     } else if (inListItem) {
-                                        val activeListStyle = listStyleStack.peek()?.takeIf { it.isNotBlank() }
+                                        val activeListStyle = listStyleStack.lastOrNull()?.takeIf { it.isNotBlank() }
                                             ?: resolveParaListStyleName(paragraphStyleName)?.takeIf { it.isNotBlank() }
                                         val spec = activeListStyle?.let { mergedListStyles[it] }
                                         val lvl = listDepth.coerceAtLeast(1)
@@ -624,7 +626,7 @@ class OdtDocumentParser {
                                     val rawPrefix = when {
                                         text.isBlank() -> ""
                                         inListItem -> {
-                                            val activeListStyle = listStyleStack.peek()?.takeIf { it.isNotBlank() }
+                                            val activeListStyle = listStyleStack.lastOrNull()?.takeIf { it.isNotBlank() }
                                                 ?: paraListStyle?.takeIf { it.isNotBlank() }
                                             val spec = activeListStyle?.let { mergedListStyles[it] }
                                             if (spec != null) {
@@ -680,7 +682,7 @@ class OdtDocumentParser {
                                     listItemStartValue = null
                                 }
                                 "list" -> if (inBody) {
-                                    if (listStyleStack.isNotEmpty()) listStyleStack.pop()
+                                    if (listStyleStack.isNotEmpty()) listStyleStack.removeAt(listStyleStack.lastIndex)
                                     if (listDepth > 0) listDepth--
                                 }
                                 "table-cell" -> if (inBody) {
