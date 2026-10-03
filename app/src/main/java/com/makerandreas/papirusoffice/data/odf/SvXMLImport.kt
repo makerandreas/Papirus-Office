@@ -1030,6 +1030,9 @@ class SvXMLImport(
                 }
                 eventType = parser.next()
             }
+            if (contextStack.size != 1) {
+                throw IllegalStateException("Unexpected end of ODF XML with ${contextStack.size - 1} unclosed elements")
+            }
 
             // Build full plain text from parsed elements
             val plainTextBuilder = StringBuilder()

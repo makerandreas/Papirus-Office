@@ -401,7 +401,8 @@ class OdtDocumentWriter : DocumentFormatWriter {
             }
         }
         for (image in images(document.body.elements)) {
-            val payload = entries[image.imagePath]
+            val normalizedPath = image.imagePath.removePrefix("./")
+            val payload = entries[image.imagePath] ?: entries[normalizedPath]
                 ?: throw IllegalStateException("Original ODT package is missing image media: ${image.imagePath}")
             if (payload.isEmpty() || payload.size.toLong() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
                 throw IllegalStateException("Original ODT image media is empty or oversized: ${image.imagePath}")
