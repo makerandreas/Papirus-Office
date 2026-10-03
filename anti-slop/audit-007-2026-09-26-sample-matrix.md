@@ -1,5 +1,8 @@
 # Audit 007 (2026-09-26): the six sample pairs, both formats, and what they change for Plan 5
 
+> **Current Plan 7 sequence (2026-10-03):** 7B canonical model/importer convergence -> 7C authored indexes and named sections -> 7D tables end to end -> 7E font-face aliases/final calibration, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+
 **Baseline:** `main` `5c99072` (PR #14 merged). Branch `arena/01a0dc79-papirus-office`.
 **Scope:** `tests/inky/Sample-{1..6}.{odt,docx}` only. `tests/cellina` and `tests/slidia` stay out of scope (roadmap v2 Appendix B rule).
 **Method:** all twelve packages unzipped; every number below is read from the raw XML with the regexes listed in Appendix A, run on 2026-09-26. Nothing is quoted from another plan without re-deriving it. Where this file and `plan-2026-09-24-remaining-pr-roadmap-v2.md` §2 disagree, the difference is called out and this file wins for the rows it re-measured.

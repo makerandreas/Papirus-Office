@@ -105,7 +105,7 @@ A resource in `res/font`, a ZIP in the repository, a composable name, a roadmap 
 
 ## 5. PR sequence and work packages
 
-Plan 3B is treated as complete. The next documentation PR is the existing Plan 3C intent, expanded to align the hybrid design direction. PRs #15 to #19 were used by Plan 5 (5a to 5e) and Plan 1's two documentation PRs took #20 and #21. **Plan 6 then took four PRs (#22 6A, #23 6B, #24 6C, #25 6D) and is complete as of 2026-09-30**, so the reforecast forward schedule is Plan 7A `#26`, 7B `#27`, 8A `#28`, 8B `#29`, Plan 9 `#30`. **Plan 11 implementation packages are forecast at `#33` to `#37`** (Plan 10 resumes at `#31`–`#32`), taken from the next free slot after the fidelity plans; plan IDs remain the stable key and PR numbers are not reserved. The forward schedule lives in `plan-2026-09-24-remaining-pr-roadmap-v2.md` §4.12 and `plan-01-master-index.md` §2. This design plan does not renumber or silently replace the fidelity PRs.
+Plan 3B is complete. PRs #15 to #19 were used by Plan 5, Plan 1 documentation used #20-#21, Plan 6 used #22-#25, and Plan 7A landed as #26. The 2026-10-03 four-plan ODF split is authoritative: 7B `#27` canonical/import convergence, 7C `#28` indexes/sections/navigation/status, 7D `#29` tables, and 7E `#30` font aliases/calibration, then 8A `#31`, 8B `#32`, and Plan 9 `#33`. **Plan 11 implementation packages are forecast at `#36` to `#40`** after Plan 10 `#34`-`#35`. Plan IDs remain the stable key and PR numbers are forecasts. The forward schedule lives in roadmap v2 §4.12 and `plan-01-master-index.md` §2; `audit-014` records the split.
 
 | Order | Scope | Exit gate |
 |---|---|---|
@@ -120,7 +120,7 @@ Plan 3B is treated as complete. The next documentation PR is the existing Plan 3
 
 ### Dependency and ordering notes
 
-- The documentation contract is PR 14 (merged). Plan 6 completed across PRs #22–#25 on 2026-09-30, which unblocked the reforecast: Plan 7A `#26`, 7B `#27`, 8A `#28`, 8B `#29`, Plan 9 `#30`, Plan 10 `#31`–`#32`. Plan 11 implementation packages take their numbers from the next free slot when they start (**forecast `#33`–`#37` in plan-01 §2 and the roadmap §4.12**), because plan IDs are the stable key and PR numbers are not reserved.
+- The documentation contract is PR 14 (merged). Plan 7A landed as #26. The current dependency schedule is 7B `#27`, 7C `#28`, 7D `#29`, 7E `#30`, 8A `#31`, 8B `#32`, Plan 9 `#33`, and Plan 10 `#34`-`#35`. Plan 11 packages follow from the next free slot (**forecast `#36`-`#40` in plan-01 §2 and roadmap v2 §4.12**); plan IDs are stable and PR numbers are not reserved.
 - Theme and app-shell work can proceed alongside ODF/DOCX parser work only where they touch separate UI/theme paths. Share anti-slop gates and resolve source conflicts before merge.
 - UI Google Sans work is not a substitute for Plan 5/7/8 document-font metrics and should not block a shell redesign. Conversely, do not change saved document font names to make the UI font path work.
 - Ribbon controls that edit content depend on their model/writer capability, so follow Plans 6–9 or coordinate capability by capability. Design specs may be written early; implementation cannot claim persistence until round-trip evidence passes.

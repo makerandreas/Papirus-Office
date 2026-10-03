@@ -1,5 +1,8 @@
 # Plan 3 — Compliance Sweep
 
+> **Current Plan 7 sequence (2026-10-03):** 7B canonical model/importer convergence -> 7C authored indexes and named sections -> 7D tables end to end -> 7E font-face aliases/final calibration, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+
 **Date:** 2026-09-24; documentation scope updated 2026-09-25
 **Status:** 3A and 3B complete (3B per its implementation record and user confirmation). 3C is the current documentation alignment, expanded in `anti-slop/plan-11-hybrid-experience-design.md`; this branch records the docs update, not a claim that a separate PR has merged.
 **Evidence:** `anti-slop/audit-006-2026-09-24.md` §2 (project documents) and §3 (format specifications). Counts quoted there are reproducible greps. Design-source decisions from 2026-09-25 are recorded in Plan 11.

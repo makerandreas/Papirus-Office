@@ -1,5 +1,8 @@
 # Audit 008 (2026-09-27): the regenerated fixtures, re-measured (Plan 5b)
 
+> **Plan split note (2026-10-03):** Historical references here to a combined Plan 7B package or its old downstream PR schedule are superseded. The authoritative sequence is 7B canonical model/importer convergence, 7C authored indexes and named sections, 7D tables end to end, and 7E font-face aliases/final calibration, with exactly one PR per plan. See `audit-014-2026-10-03-plan-7b-convergence.md`; plan IDs, not forecast PR numbers, are authoritative.
+
+
 **Baseline:** `main` `afb5f77` ("Replacing Sample-1.docx"), on top of `366530b`. Branch `arena/01a0e1a6-papirus-office`.
 **Scope:** `tests/inky/Sample-{1..6}.{odt,docx}` and the three `app/src/main/assets/templates/untitled.od{t,s,p}` new-document templates. `tests/cellina` and `tests/slidia` were re-saved too but stay out of scope (roadmap v2 Appendix B).
 **Method:** all twelve packages unzipped; every number below is read from the raw XML by a script that mirrors the rules in `SampleMatrixTest.kt` (same regexes, same "last `w:sectPr`", same "first body paragraph's style chain" walk), run on 2026-09-27. Nothing is copied over from audit-007.
@@ -158,7 +161,7 @@ The ±10 % tightening still waits until Plans 7/8 (roadmap §0).
 | 5d · fake breaks out | Sample-2 dominated (22 `lastRenderedPageBreak` + 10 soft breaks) | Now in **all twelve files**: 3–25 `lastRenderedPageBreak` per DOCX, 3–21 soft breaks per ODT (§3.3, §3.4). The dump in `Plan5ElementDumpTest` prints the new parse-level counts |
 | 5d · style chain metrics | `docDefaults` + `basedOn` | Also read the default paragraph style's own `pPr` (Sample-1/3, finding H) |
 | PR 20 (8A) · heading detection | `heading[1-9]` regexes are "sample-tuned" | The id regexes now match **no** DOCX heading style (`Judul1..4`); detection rests entirely on the `w:name` catalog lookup and `w:outlineLvl`, which already exist. Retiring the regexes (PR 20) is therefore safe, and the fixtures prove it |
-| PR 19 (7B) ⚑G-7 · ODT sections | Sample-6 had 5 sections | No ODT fixture has a section. G-7 needs a synthetic fixture or is deferred; the DOCX side still has 5–6 `w:sectPr` per file |
+| Plan 7C G-7 · ODT sections (reassigned 2026-10-03) | Sample-6 had 5 sections | No current ODT fixture has a section. G-7 requires synthetic ODF coverage; the DOCX side still has 5-6 `w:sectPr` per file |
 | Roadmap §2.4.6 · Sample-3 has zero `text:h` | special case | gone |
 | audit-007 finding F · ODT twins not metric-identical | per-format windows justified by metrics | Twins are metric-identical now; per-format windows are still justified by the observed 0–1 page LibreOffice/Word gap (§1) |
 

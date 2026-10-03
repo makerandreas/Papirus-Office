@@ -5,6 +5,7 @@ import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import android.content.Context
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentParser
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
+import com.makerandreas.papirusoffice.data.odf.AndroidOdfImportDiagnostics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -22,7 +23,6 @@ interface DocumentSerializerContract {
 }
 
 class OdtDocumentSerializer : DocumentSerializerContract {
-    private val parser = OdtDocumentParser()
     private val writer = OdtDocumentWriter()
 
     override suspend fun read(source: DocumentReference, context: Context): OfficeDocument = withContext(Dispatchers.IO) {
@@ -36,7 +36,7 @@ class OdtDocumentSerializer : DocumentSerializerContract {
             else -> ByteArray(0)
         }
         if (bytes.isEmpty()) return@withContext OfficeDocument()
-        return@withContext parser.parse(bytes)
+        return@withContext OdtDocumentParser(AndroidOdfImportDiagnostics(context)).parse(bytes)
     }
 
     override suspend fun write(
@@ -166,15 +166,35 @@ class DocumentSerializer(private val context: Context) {
     }
 }
 
-private fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsedDocument {
+internal fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsedDocument {
     val parsedElements = body.elements.mapNotNull { element ->
         when (element) {
-            is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> OfficeDocumentElement.Paragraph(text = element.paragraph.text)
-            is com.makerandreas.papirusoffice.data.OfficeParagraph -> OfficeDocumentElement.Paragraph(text = element.text)
-            is com.makerandreas.papirusoffice.data.OfficeHeading -> OfficeDocumentElement.Heading(text = element.text, level = element.level)
-            is com.makerandreas.papirusoffice.data.OfficeListItem -> OfficeDocumentElement.ListItem(text = element.text, bullet = element.bullet)
-            is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement -> OfficeDocumentElement.Table(rows = element.table.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.table.numColumns)
-            is com.makerandreas.papirusoffice.data.OfficeTable -> OfficeDocumentElement.Table(rows = element.rows.map { r -> TableRow(cells = r.cells.map { c -> TableCell(text = c.text, paragraphs = emptyList()) }) }, numColumns = element.numColumns, name = element.name)
+            is OfficeDocElement.ParagraphElement -> element.paragraph.toParsedParagraph()
+            is OfficeParagraph -> element.toParsedParagraph()
+            is OfficeHeading -> OfficeDocumentElement.Heading(
+                text = element.text,
+                level = element.level,
+                styleName = element.styleName,
+                runs = element.runs.map { it.toParsedRun() },
+                pageBreakOffsets = element.pageBreakOffsets,
+                bookmarks = element.bookmarks.map { it.name }
+            )
+            is OfficeListItem -> OfficeDocumentElement.ListItem(
+                text = element.text,
+                bullet = element.bullet,
+                level = element.level,
+                isOrdered = element.isOrdered,
+                styleName = element.styleName,
+                runs = element.runs.map { it.toParsedRun() },
+                labelFontSizeSp = element.labelFontSizeSp,
+                labelFontFamily = element.labelFontFamily,
+                bookmarks = element.bookmarks.map { it.name }
+            )
+            is OfficeDocElement.TableElement -> element.table.toParsedTable()
+            is OfficeTable -> element.toParsedTable()
+            is OfficeDocElement.ImageElement -> element.image.toParsedImage()
+            is OfficeImage -> element.toParsedImage()
+            is OfficePageBreak -> OfficeDocumentElement.PageBreak
             else -> null
         }
     }
@@ -189,7 +209,67 @@ private fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsedD
         isXlsx = format.equals("XLSX", ignoreCase = true),
         isOdp = format.equals("ODP", ignoreCase = true),
         isPptx = format.equals("PPTX", ignoreCase = true),
-        isParsingFailed = false
+        isParsingFailed = false,
+        styles = styles,
+        metadata = metadata,
+        bookmarks = bookmarks.map { it.name },
+        authoredIndexes = authoredIndexes,
+        namedSectionRanges = namedSectionRanges
     )
 }
+
+private fun OfficeParagraph.toParsedParagraph(): OfficeDocumentElement.Paragraph =
+    OfficeDocumentElement.Paragraph(
+        text = text,
+        styleName = styleName,
+        runs = runs.map { it.toParsedRun() },
+        pageBreakOffsets = pageBreakOffsets,
+        bookmarks = (bookmarks.map { it.name } + listOfNotNull(bookmark)).distinct()
+    )
+
+private fun OfficeTextRun.toParsedRun(): TextRun = TextRun(
+    text = text,
+    isBold = isBold,
+    isItalic = isItalic,
+    isUnderline = isUnderline,
+    styleName = styleName ?: characterStyle,
+    hyperlink = hyperlink
+)
+
+private fun OfficeImage.toParsedImage(): OfficeDocumentElement.ImageElement =
+    OfficeDocumentElement.ImageElement(
+        imagePath = imagePath,
+        imageFile = imageFile,
+        widthDp = widthDp,
+        heightDp = heightDp,
+        name = name
+    )
+
+private fun OfficeTable.toParsedTable(): OfficeDocumentElement.Table = OfficeDocumentElement.Table(
+    rows = rows.map { row ->
+        TableRow(
+            cells = row.cells.map { cell ->
+                TableCell(
+                    text = cell.text,
+                    paragraphs = cell.paragraphs.map { it.toParsedParagraph() },
+                    startColumn = cell.startColumn,
+                    columnSpan = cell.columnSpan,
+                    rowSpan = cell.rowSpan,
+                    occupancy = cell.occupancy,
+                    repeatCount = cell.repeatCount,
+                    styleName = cell.styleName,
+                    boxStyle = cell.boxStyle
+                )
+            },
+            styleName = row.styleName,
+            isHeader = row.isHeader,
+            repeatCount = row.repeatCount,
+            rowStyle = row.rowStyle
+        )
+    },
+    numColumns = numColumns,
+    name = name,
+    columns = columns,
+    styleName = styleName
+)
 

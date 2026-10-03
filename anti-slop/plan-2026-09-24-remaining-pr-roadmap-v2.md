@@ -3,6 +3,7 @@
 **Date:** 2026-09-24 (v2.2: every ⚑ item re-verified against the samples and the specs; corrections listed in §7.12)
 **Amended:** 2026-09-26 (v2.4, baseline `5c99072`, PR #14 merged). PR 16 is split into **PR 16a (Plan 5B)** and **PR 16b (Plan 5C)**; page-count windows are **per format**; PR 15 gains a sample-matrix test, the E-0 dump over all six pairs and header/footer heights in `PageStyleSpec`. Evidence and the user's decisions of 2026-09-26 are in `audit-007-2026-09-26-sample-matrix.md`; deltas in §7.17.
 **Amended:** 2026-09-27 (v2.5). Plan 5 is renumbered 5a–5e: **5b** = fixture re-baseline (PR #16), **5c** = documentation refresh, **5d** = the former PR 16a / Plan 5B (breaks and defaults), **5e** = the former PR 16b / Plan 5C (metrics and windows). The regenerated fixtures (all DOCX from M365, all ODT from Collabora 26.04) replace the sample facts of audit-007 §1–§5 and the windows of §11.3; see `audit-008-2026-09-27-fixture-rebaseline.md`, which wins over this file wherever they disagree about the samples.
+**Amended:** 2026-10-03 (v2.6). The former combined Plan 7B is split into four plans and exactly four PRs: **7B** canonical semantic model/importer convergence, **7C** authored indexes and named sections, **7D** tables end to end, and **7E** font-face aliases/final calibration. This amendment supersedes every older combined-7B ownership or downstream PR forecast in this file. Evidence and boundaries: `audit-014-2026-10-03-plan-7b-convergence.md`.
 **Supersedes:** `plan-2026-09-24-remaining-pr-roadmap.md` (v1, baseline `e10f956`). v1 is kept as the record of the pre-PR-12 schedule; where this file and v1 conflict, this file wins.
 **Baseline:** `main` `55a9a97` (PR #12 merged), branch convention `arena/<session>-papirus-office`, CI is the only compile/test evidence (no local JDK; `./gradlew testDebugUnitTest` + the build job in `.github/workflows/build.yml`).
 **Relationship to plan 1:** `plan-01-master-index.md` keeps the WG-chapter mapping, the checklist mapping and the finding registry; this file keeps the PR order and the per-PR scope. Plan 1's update rule (§6) is executed per PR as tabulated in §4.12.
@@ -16,15 +17,15 @@ From v1 §0 (audit-005 §6 / audit-006 §5 answers) and plan-03 §0:
 
 | Decision | Consequence carried into this file |
 |---|---|
-| Page-count tolerance = **staged windows, per format** (amended 2026-09-26, audit-007 §11.3). DOCX windows around the M365 references 15/23/20/10/18/21: `12..18`, `18..28`, `16..24`, `8..12`, `15..21`, `15..26`. ODT windows are provisional until the user regenerates the six `.odt` fixtures with Collabora Office: `9..18`, `15..22`, `12..20`, `7..12`, `12..21`, `15..26`. Tighten to ±10 % of the references after Plans 7/8, never below. Geometry is honoured **as each file declares it** (no repairing an ODT from its DOCX twin). | PR 16b lands the windows; PR 16a may only widen; the tightening commit sits inside PR 21 (or 22), not in a metrics PR. |
-| Font supply = **display the bundled metric-compatible faces** (TNR→Liberation Serif, Calibri→Carlito, Cambria→Caladea, Arial/Helvetica→Liberation Sans, Courier New→Liberation Mono, Symbol/Wingdings→OpenSymbol) in both pagination and painting from the moment `FontRegistry` exists | PR 15 wires the mapping, PR 19 makes the renderer consume it, Plan 10 A1 upgrades loading to real `Typeface`s. |
-| ODT TOC = **authored snapshot** (no "Update Index" stub); regeneration is a later feature after a field model exists | PR 19 G-2; PR 21's DOCX TOC handling mirrors it (the DOCX samples carry the same authored snapshots, §2.2). |
+| Page-count tolerance = **staged windows, per format** (amended 2026-09-26, audit-007 §11.3). DOCX windows around the M365 references 15/23/20/10/18/21: `12..18`, `18..28`, `16..24`, `8..12`, `15..21`, `15..26`. ODT windows are provisional until the user regenerates the six `.odt` fixtures with Collabora Office: `9..18`, `15..22`, `12..20`, `7..12`, `12..21`, `15..26`. Tighten to ±10 % of the references after Plans 7/8, never below. Geometry is honoured **as each file declares it** (no repairing an ODT from its DOCX twin). | Plan 5E landed the windows. Plan 7E performs the ODT post-structure remeasurement; Plan 8B performs cross-format convergence. Tightening requires measured support, not a metrics-only forecast. |
+| Font supply = **display the bundled metric-compatible faces** (TNR→Liberation Serif, Calibri→Carlito, Cambria→Caladea, Arial/Helvetica→Liberation Sans, Courier New→Liberation Mono, Symbol/Wingdings→OpenSymbol) in both pagination and painting from the moment `FontRegistry` exists | Plan 5A wired the mapping seam; Plan 7E parses ODF aliases and makes metrics/display agree; Plan 10 A1 upgrades broader loading to real `Typeface`s. |
+| ODT TOC = **authored snapshot** (no "Update Index" stub); regeneration is a later feature after a field model exists | Plan 7C owns G-2; Plan 8B's DOCX TOC handling mirrors it (the DOCX samples carry authored snapshots, §2.2). |
 | Save with unserialisable images = **refuse with a clear en_US message**, no `[Image: path]` placeholders | PR 17 F-5; PR 22 removes the need. |
 | en_US everywhere in the UI; `values-in` frozen at its 27 keys; document content (style names) is data | PR 12 landed the sweep; the guard enforces it mechanically from `55a9a97` on. |
 | Disabled ribbon tabs get an honest visible note (not silent decks) | PR 13 3.6. |
 | antislop runs **Mode 1 (during the work)**: the standing project default recorded in `plan-2026-09-22-remaining-writer-fixes.md` §5 | Every PR below is written to the rules rather than audited after them; the Delivery Gate report is attached per PR. |
 
-**New in v2, recorded here for the user to strike:** items ⚑3.32 and ⚑3.33 (PR 13: Navigator category honesty, status-bar object information), ⚑G-4b (PR 18/20: bookmark parsing) and ⚑G-7 (PR 19/21: section identity). Each is additive, small, and unblocks an existing checklist item or a verified sample fact rather than inventing a feature. They are numbered **above** plan-03's existing range because 3.13–3.31 are already taken by the ODF/OOXML conformance and documentation rows (§5–§6 of that file).
+**New in v2, recorded here for the user to strike:** items ⚑3.32 and ⚑3.33 (PR 13: Navigator category honesty, status-bar object information), ⚑G-4b (historically forecast as PR 18/20; ODF half shipped in 7A) and ⚑G-7 (now owned by 7C for ODF and 8B for DOCX). Each is additive, small, and unblocks an existing checklist item or a verified sample fact rather than inventing a feature. They are numbered **above** plan-03's existing range because 3.13–3.31 are already taken by the ODF/OOXML conformance and documentation rows (§5–§6 of that file).
 
 ---
 
@@ -63,16 +64,16 @@ From v1 §0 (audit-005 §6 / audit-006 §5 answers) and plan-03 §0:
 | `StyleResolver` 14 sp default on null/miss (F-21) | ✅ `LayoutEngine.kt:61` | 16a (5B) |
 | Text scales with `renderScale` while paper maps with `pageScale` | ✅ `LayoutDrivenDocumentRenderer.kt:149-150,243-245` | 15 (5A) |
 | Renderer line height = `(sizeSp + 5f)` magic constant | ✅ `LayoutDrivenDocumentRenderer.kt:474,500,579,596,650` | 16b (5C, E-2) |
-| Table height `rows * 35 + 10`, all cells `10.sp` | ✅ `LayoutEngine.kt` | 19 (7B) / 21 (8B) |
+| Table height `rows * 35 + 10`, all cells `10.sp` | ✅ `LayoutEngine.kt` | **7D** (ODF) / **8B** (DOCX) |
 | Ribbon: 8 tabs declared, only File+Home have content, literal "…will be implemented soon." | ✅ `InkyModule.kt:2936`, `:3383-3390` (pre-13 numbering) | 13 (3B) |
 | Toolbar hub image/table/link/comment toast-only (TODOs landed in 12) | ✅ `InkyModule.kt:2790-2811` | 13 (3B) |
 | ⚑ Navigator: 13 categories rendered, ~20 `EmptyCategoryRow` rows, no "hyperlinks" category | ✅ `UniversalNavigatorSheet.kt` (categories: bookmarks, comments, fields, footnotes, frames, headings, images, ole, pages, sections, shapes, tables; each renders `R.string.no_objects_to_navigate` when empty) | 13 (3B) + 15/17/18/19/20/21 fill |
 | ⚑ No bookmark parsing anywhere (tokens exist, unconsumed; DOCX `w:bookmarkStart/End` unhandled) | ✅ `OdfXmlToken.kt:39-41` has `XML_BOOKMARK*`, no context arm; no `bookmark` handling in the ODT/DOCX parsers | 18 (ODF) / 20 (DOCX) |
-| ⚑ ODT `text:section` identity unparsed (5 sections in Sample-6; children still parse, the name/style do not) | ✅ no section token in `OdfXmlToken.kt` | 19 (7B, ⚑G-7) |
+| ⚑ ODT `text:section` identity unparsed (the current six-fixture corpus has none; synthetic/schema cases are required; children already flow through generic contexts) | ✅ no section token in `OdfXmlToken.kt` | **7C (G-7)** |
 | 1.4 s artificial delay (`delay(500)+delay(500)+delay(400)`) in the open path | ✅ `InkyModule.kt:1105-1109` | 17 (6) |
 | `docxExtents` dead state (writes, no reads) | ✅ `InkyModule.kt:212` | 17 (6) |
 | DOCX save writes `[Image: <device path>]` | ✅ `DocxDocumentParser.kt:723` | 17 (6) refuses; 22 (9) fixes |
-| ODF TOC/list/hyperlink structure unread (G-1…G-4) | ✅ `OdfXmlToken.kt` (no list-style or index tokens; `XML_A` unconsumed), `SvXMLImportContext.kt` (hard-coded `• `/`◦ `) | 18 (7A) / 19 (7B) |
+| ODF authored index snapshot still unread (G-2); list styles, heading/list runs, hyperlinks, and bookmarks shipped in 7A | ✅ PR #26 / `audit-013`; index source/body still needs a canonical sidecar producer | **7C (G-2)** |
 | DOCX style chain names-only (`w:docDefaults`/`w:basedOn` unread) | ✅ `OfficeDocumentParser.kt:218` `extractDocxStyles` → `DocxStyleMeta(styleId, name, outlineLvl, isHeading, headingLevel)` only | 20 (8A) |
 | DOCX heading detection is sample-tuned regexes | ✅ `OfficeDocumentParser.kt:55-57` `PARA_STYLE_REGEX=para[1-9]`, `HEADING_STYLE_REGEX=heading[1-9]` | 20 (8A) retires them |
 | `currentRuns` declared but never populated (every DOCX paragraph = one flat run) | ✅ `OfficeDocumentParser.kt:800` (dead writes at :873/:1069/:1083) | 20 (8A) |
@@ -95,16 +96,16 @@ Method: every count below is `grep -o` with an explicit tag boundary (`<text:lis
 
 | # | `text:h` (levels) | `text:p` | lists / items | list-style defs (content / styles) | tables | TOC | sections | frames / images | `text:a` | bookmark-start/-end | soft-page-break |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 28 (1:4, 2:6, 3:16, 4:2) | 183 | 70 / 84 | 0 / 11 (`WWNum1…11`) | 3 | – | – | 6 / 6 | 0 | 0 / 0 | 8 |
-| 2 | 30 (1:6, 2:9, 3:15) | 308 | 41 / 103 | 0 / 26 | 2 | **1** (15 entries / 15 links) | – | 11 / 11 | 15 | 15 / 15 | 10 |
-| 3 | 0 | 170 | 0 / 0 | 0 / 0 | 1 | – | – | 0 / 0 | 0 | 0 / 0 | 0 |
-| 4 | 7 (all level 1) | 112 | 15 / 18 | 0 / 5 | 0 | 1 (22 / 21) | – | 1 / 1 | 23 | 22 / 22 | 2 |
-| 5 | 0 (headings are styled `text:p`) | 218 | 123 / 186 | 0 / 18 | 0 | 1 (15 / 14) | – | 2 / 1 | 14 | 14 / 14 | 2 |
-| 6 | 45 (1:6, 2:11, 3:28) | 322 | 115 / 180 | **19 / 1** (`Makalah_20_Default` in `styles.xml`) | 1 | 1 (45 / 45) | 5 | 3 / 3 | 45 | 46 / 46 | 0 |
+| 1 | 28 (1:4, 2:6, 3:16, 4:2) | 183 | 12 / 26 | 0 / 10 | 3 | - | - | 6 / 6 | 0 | 0 / 0 | 14 |
+| 2 | 30 (1:6, 2:9, 3:15) | 308 | 41 / 103 | 0 / 25 | 2 | **1** (15 entries / 15 links) | - | 11 / 11 | 15 | 15 / 15 | 16 |
+| 3 | 27 (1:7, 2:20) | 143 | 0 / 0 | 0 / 1 (`No_20_List`) | 1 | - | - | 0 / 0 | 0 | 0 / 0 | 21 |
+| 4 | 25 (1:11, 2:14) | 87 | 15 / 18 | 0 / 6 | 0 | 1 (authored snapshot) | - | 1 / 1 | 2 | 22 / 22 (5 point + 17 ranged) | 3 |
+| 5 | 38 (1:6, 2:8, 3:9, 4:15) | 175 | 26 / 72 | 0 / 18 | 0 | 1 (14 links) | - | 2 / 2 | 14 | 14 / 14 | 12 |
+| 6 | 45 (1:6, 2:11, 3:28) | 322 | 23 / 88 | 0 / 21 | 1 | 1 (45 entries / 45 links) | - | 3 / 3 | 45 | 46 / 46 (1 point + 45 ranged) | 15 |
 
 Cross-format checks that make the pairs provably the same documents: ODT `text:a` counts equal DOCX `w:hyperlink` counts per sample (15/23/14/45, samples 2/4/5/6), ODT `text:h` level distribution equals the DOCX `pStyle para1/2/3` distribution in Sample-6 (6/11/28), and Sample-6's list style is `Makalah_20_Default` (display name "Makalah Default") while its DOCX twin's `abstractNum 15` is `w:name="Makalah Default"`, the same style spelled per format.
 
-Fidelity references verified in the raw XML: Sample-6's chapter numbering (`style:num-prefix="BAB "`, `display-levels="1"` at level 1, `display-levels="2"` at level 2) lives **only in `styles.xml`**; its 19 sibling list styles are automatic styles in `content.xml`. The `Subbab_*` styles declare levels **2 and 3** with `style:num-format=""` (the "no number" edge). The Sample-6 TOC carries `text:a xlink:href="#_TOC…"` anchors (45 of them) and roman page numbers (ii/iii) for the front matter. Sample-5's page style is A4 with `margin-top 0cm`/`margin-bottom 1cm`; its default paragraph is Aptos 12 pt.
+Fidelity references verified in the raw XML, corrected by `audit-013` and rechecked 2026-10-03: Sample-6's chapter numbering (`style:num-prefix="BAB "`, `display-levels="1"` at level 1, `display-levels="2"` at level 2) lives in `styles.xml`; all 21 list-style definitions are there, while `content.xml` contains zero definitions and 23 list instances. Empty `style:num-format` and `style:list-style-name=""` are the no-number cases. The Sample-6 TOC carries 45 `text:a xlink:href="#_TOC…"` anchors and roman page numbers (ii/iii) for the front matter. Sample-5's page style is A4 with `margin-top 0cm`/`margin-bottom 1cm`; its default paragraph is Aptos 12 pt.
 
 ### 2.2 DOCX (`word/document.xml`, `word/styles.xml`, `word/numbering.xml`)
 
@@ -144,7 +145,7 @@ This is the single most important structural fact the DOCX plans must encode. Th
 4. **Sample-3 is the control file** for both structure plans (no lists, numbering, TOC or fields; one table; pure paragraph/run/style-chain behaviour): every structural PR asserts "nothing new appears, nothing old disappears".
 5. **The heaviest TOC case is Sample-6** (45 entries/45 links, 19.7 KB of index body), then Sample-4 (22/21), Sample-2 (15/15), Sample-5 (15/14), not Sample-2 "six instances" as v1 stated.
 6. **Sample-5's headings are `text:p` with auto-styles parenting `Judul1`** (zero `text:h`). The style cascade already handles them; G-1 must not regress it.
-7. **⚑ Sample-6 is the cross-format convergence case end to end:** identical 45-heading distribution in both formats, the same chapter numbering expressed two ways (ODT list style ↔ DOCX style-inherited `numId 15`), the same roman front-matter pages (ODT TOC entry pages ↔ DOCX `pgNumType lowerRoman`), the same five sections (ODT `text:section` ↔ DOCX `sectPr`). PR 21's acceptance uses it to prove ODT and DOCX of one file paginate identically.
+7. **⚑ Sample-6 is the cross-format convergence case for headings, numbering, TOC snapshots, and front-matter page labels:** it has the identical 45-heading distribution in both formats, the same chapter numbering expressed two ways (ODT outline/list style ↔ DOCX style-inherited `numId 15`), and the same roman TOC page labels (ODT literal entry pages ↔ DOCX `pgNumType lowerRoman`). The current ODT fixture has **no** `text:section`; DOCX has five `sectPr`. Section identity therefore needs synthetic/schema coverage in 7C and remains a format-semantic difference rather than a fabricated one-to-one fixture claim. Plan 8B owns cross-format pagination convergence.
 8. `tests/cellina` and `tests/slidia` stay out of scope (Appendix B rule).
 
 ---
@@ -162,14 +163,17 @@ Sub-item IDs keep their plan identity (E = Plan 5, F = 6, G = 7, H = 8, I = 9). 
 | 16a | 5B | Breaks and defaults: fake breaks out, real breaks and section starts in, body rect from margins + header/footer, metric-only style chain, document defaults replace the 14/24/20/16 sp constants | 15 | medium | dump shows no fake breaks; windows only widened |
 | 16b | 5C | Metrics and windows: `TextMetrics` load-bearing, fudge and gap constants deleted, widows/orphans, tab stops, per-format windows for all six pairs | 16a | large | audit-007 §11.3 windows green, both formats |
 | 17 | 6 | Image pipeline: extents in both formats, media store, no fake delays, save refusal | 15 | medium | no blank frame; self-heal; refusal dialog |
-| 18 | 7A | ODF numbering, heading runs, hyperlinks, ⚑ bookmarks | 16b | large | BAB/2.1 labels render; no link text lost |
-| 19 | 7B | ODF TOC snapshot, table geometry, font identity, ⚑ sections | 18 | large | Sample-6 ODT fidelity checklist |
-| 20 | 8A | DOCX style chain + run formatting (⚑ char-link convention, numId-suppression flag) | 15 | large | heading/body sizes from the file, no leak |
-| 21 | 8B | DOCX numbering, fields, tables, sections, ⚑ TOC snapshot | 20 (+19 shared geometry) | large | Sample-6 DOCX checklist; Sample-6's formats converge, per-format windows hold |
-| 22 | 9 | Save round-trip integrity (pre-change gate first) | 17, 19, 21 | large | open → save → reopen preserves structure |
-| 10 | none | Font engine + design language, **parked** | 21 + user decision | none | resume trigger §4.11 |
+| 26 | 7A | ODF numbering, heading/list runs, hyperlinks, bookmarks | 5E | large | **landed**: BAB/2.1 labels render; no link text lost |
+| 27 | 7B | Canonical semantic model and ODT importer convergence | 7A | medium | one package/import path; facade parity; unsupported modified save fails closed |
+| 28 | 7C | Authored indexes, named section ranges, Navigator, status context | 7B | large | snapshots/ranges are navigable without duplicate body flow |
+| 29 | 7D | Table structure, measurement, pagination, rendering, cell hit-testing | 7C | large | one table geometry from parser through interaction |
+| 30 | 7E | ODF font-face aliases and final pagination calibration | 7D | medium | declared face drives metrics/display; ODT fixture evidence refreshed |
+| 31 | 8A | DOCX style chain + run formatting (char-link convention, numId-suppression flag) | 7E | large | heading/body sizes from the file, no leak |
+| 32 | 8B | DOCX numbering, fields, tables, sections, TOC snapshot | 8A (+7D shared geometry) | large | Sample-6 DOCX checklist; both formats converge; windows hold |
+| 33 | 9 | Save round-trip integrity (pre-change gate first) | 6, 7E, 8B | large | open → save → reopen preserves structure |
+| 34-35 | 10 | Font engine + design language, **parked** | 8B + user decision | - | resume trigger §4.11 |
 
-Parallelism: 13 and 14 share no code with 15/16 (they touch `InkyModule`'s ribbon/hub regions, not the layout path) and can run in a parallel session. 20's reader scaffolding (the `styles.xml`/`numbering.xml` part readers) starts while 18 is in review, in different files; note that 16a already lands the *metric-only* part of that chain (size, spacing, line height, indents, keep/break), so 20 extends a reader rather than creating one. Everything else is sequential. Plan 11's UI packages are a separate track (chrome only) and need their own Compose BOM bump PR first (BOM `2024.09.00` has no Material 3 Expressive API).
+Historical parallelism for Plans 3-5 is unchanged. From 7B forward the semantic dependency chain is sequential: **7B -> 7C -> 7D -> 7E -> 8A -> 8B -> 9**. Research may overlap, but implementation PRs do not: 8A must consume the settled canonical model, and 8B must consume 7D's shared geometry. Plan 11's UI packages remain a separate track (chrome only) and need their own Compose BOM bump PR first (BOM `2024.09.00` has no Material 3 Expressive API).
 
 ---
 
@@ -254,7 +258,7 @@ The original single PR 16 ("honest pagination", E-2…E-6 + F-21) was rated larg
 1. **E-2:** `layoutParagraph` measures through `TextMetrics` at `ptToUnits(fontSize)` with the family `FontRegistry` resolved; line height = `max(ascent+descent, fontSizeUnits * lineHeightFactor)`, which also deletes the renderer's `(sizeSp + 5f)` magic line-height constant in favour of style-driven line height (Sample-6 `Normal` = 116 %). The `2.5f` fudge and `fallbackTextSize` are deleted.
 2. **E-3c:** `currentY += h + spaceAfter(prev) + spaceBefore(next)` from the fields 16a populated; `elementGapDp` dies.
 3. **E-5:** widow/orphan floor of 2 where the style declares it (Sample-1/2 `Standard`, Sample-6 `Normal`).
-4. **⚑ E-5b · Tab stops enough for line-count honesty:** default tab distance (`style:tab-stop-distance`, `w:defaultTabStop`/`w:tabs defTabSz`) and paragraph-level `w:tabs`/`style:tab-stops` (Sample-6: 167 `w:tab`, Sample-4: 35; the TOC entries wrap differently if tab widths are wrong). Leaders are painted by PR 19/21, not here.
+4. **⚑ E-5b · Tab stops enough for line-count honesty:** default tab distance (`style:tab-stop-distance`, `w:defaultTabStop`/`w:tabs defTabSz`) and paragraph-level `w:tabs`/`style:tab-stops` (Sample-6: 167 `w:tab`, Sample-4: 35; the TOC entries wrap differently if tab widths are wrong). Leaders are painted by Plan 7C/8B, not here.
 5. **E-6 · Windows, per format, all six pairs** (§0 as amended; audit-007 §11.3): DOCX `12..18`, `18..28`, `16..24`, `8..12`, `15..21`, `15..26`; ODT provisional `9..18`, `15..22`, `12..20`, `7..12`, `12..21`, `15..26`, re-derived from Collabora's page counts when the regenerated `.odt` fixtures land. `Sample5UnifiedPaginationTest` becomes the Sample-5 rows of `PaginationFidelityTest`. The ±10 % tightening is a later commit after 7/8.
 **Files:** `LayoutEngine.kt`, `TextMetrics.kt` (now load-bearing), `LayoutDrivenDocumentRenderer.kt` (line heights), `OfficeDocument.kt` (tab stops on `ParagraphStyle`), the parsers for tab stops only.
 **Tests:** `ParagraphMetricsTest` (Sample-6 `Normal`: 116 % line height, 0.282 cm after; Sample-1 `Standard`: 115 %, 0.111 in), `PaginationFidelityTest` (twelve rows), the dump re-run showing no page with fewer than three elements unless the document authors one, caret/selection/undo suites unchanged.
@@ -286,59 +290,95 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 **Acceptance:** Sample-6 headings numbered, list labels at the level's own font size, no hyperlink text lost, bookmarks listed in the Navigator; page windows still hold.
 **Size:** large.
 
-### 4.7 PR 19, Plan 7B: ODF TOC snapshot, table geometry, font identity, ⚑ sections
+### 4.7a PR #27, Plan 7B: canonical semantic model and ODT importer convergence
 
-Closes G-2, G-5, G-6, ⚑G-7 (new), F-08, F-09, F-11, F-14, F-23.
+**Goal:** establish one semantic boundary and one authoritative ODT import path before adding new semantics. This is G-0 foundation work, not G-2/G-5/G-6/G-7 behavior.
 
-1. **G-2:** tokens for `text:table-of-content` / `-source` / `text:index-body` / `text:index-title` / `-entry-template`; the authored snapshot parses into a `TableOfContent` element (level, text, page number, anchor) and renders with the right tab stop and `TOC 1/2/3` styles, roman pages included. Per §0: snapshot only; regeneration is a later feature. **Stress case: Sample-6 (45 entries/45 links), then Sample-4 (22/21), Sample-2 (15/15), Sample-5 (15/14)** (§2.1).
-2. **G-5:** column widths from `table:table-column` styles (Sample-6's widths live in the column auto-styles); cell properties (padding, borders, background, v-align, spans); `OfficeTable` carries column weights; height from real cell metrics (the `rows*35+10` dies); rows paginate across pages. **The F-23 parse trace lands first** (header-row-as-paragraphs mechanism), per audit-006 §1.3.
-3. **G-6:** renderer consumes `FontRegistry` so Times New Roman body text paints as Liberation Serif with Liberation Serif metrics (per §0; real `Typeface` loading is Plan 10 A1).
-4. **⚑ G-7 (new) · Sections.** A `text:section` token + context capturing the section name and its style (Sample-6: five sections). The children already parse through the base context, so this is identity, not content. Model shape is settled at implementation: a lightweight `OfficeSection` (name, styleName) wrapping the child element list, or a named attribute on the first paragraph, whichever the `SvXMLImportContext` nesting makes mechanical; either way it exposes the section name to the Navigator's sections category (PR 13 stub), the status-bar object info (PR 13 slot), and gives PR 21's DOCX `sectPr` handling a structural counterpart (ODT section ↔ DOCX section, §2.4.7).
-**Files:** `data/odf/OdfXmlToken.kt`, `data/odf/SvXMLImport*.kt`, `data/OfficeDocument.kt`, `LayoutEngine.kt` (table metrics), `LayoutDrivenDocumentRenderer.kt` (font + TOC render).
-**Tests:** `OdtTocTest` (Samples 2/4/5/6: entries present, none empty, page numbers from the file including roman), `OdtTableGeometryTest` (Sample-6 declared widths, header row inside the table), `OdtSectionTest` (Sample-6: 5 named sections), `FontRegistryTest` (TNR body renders through the substitute; heading sizes equal the style sheet), Sample-3 unchanged.
-**Acceptance:** Sample-6.odt fidelity checklist green.
-**Size:** large.
+1. Add format-neutral authored-index and named-section range sidecars, richer table value types, font-face metadata storage, and ODT source-feature provenance to the canonical and parsed models.
+2. Preserve metadata, styles, bookmarks, runs, images, page breaks, sidecars, and table values in both adapter directions.
+3. Replace `SvXMLImport`'s Android `Context` dependency with `OdfImportDiagnostics`, retaining an Android logger adapter and a pure implementation.
+4. Add one `OdtImportPipeline` for bounded ZIP reading, styles/content/meta import, media mappings, exact package entries/XML parts, source-feature inventory, and failure state.
+5. Route runtime ODT open and serializer/public compatibility entry points through that pipeline. Reduce `writer.OdtDocumentParser` to delegation and prevent a second XML parser from returning.
+6. Add `OdtDocumentWriter.saveCapability`; unmodified imported packages preserve exact `content.xml`, while modified authored indexes, named sections, or source/advanced table structure are refused before bytes are written. Plan 9 still owns regeneration.
 
-### 4.8 PR 20, Plan 8A: DOCX style chain + run formatting (⚑ scope added)
+**Tests:** all six ODT fixtures produce the same normalized semantics through runtime and compatibility entry points; metadata/reference page counts and package entries survive; malformed package failure works without Android `Context`; sidecar/table adapters preserve values; unmodified content is byte-exact; unsupported modified save reports and throws; source assertion proves the facade contains no parser.
+
+**Not in 7B:** no index/section XML producer, Navigator row, status behavior, table layout/rendering, or font alias resolution. Audit and implementation record: `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+### 4.7b PR #28, Plan 7C: authored indexes, named section ranges, Navigator, and status context
+
+**Goal:** populate and consume the sidecars 7B introduced without creating nested duplicate body trees.
+
+1. **G-2 authored snapshots.** Parse ODF table-of-content/index source, title, body, entry level/text/literal page label, tab/leader, and anchor into `DocumentIndexRange` over the ordinary body elements. Preserve roman labels and authored order; no regeneration or Update Index control.
+2. **G-7 named sections.** Parse `text:section` name/style/condition/display/protection and nested range depth into `DocumentSectionRange`. Current fixtures have no `text:section`, so synthetic ODF 1.4 cases are mandatory; do not invent sections from DOCX twins.
+3. Feed index and section categories to `DocumentIndexEngine`/Navigator with stable jump targets. Fill the existing status context slot from canonical range identity at the caret.
+4. Keep index-body paragraphs in normal flow and prove each is represented once. No wrapper subtree may duplicate layout or editable text.
+
+**Tests:** Samples 2/4/5/6 authored TOC entries and page labels; synthetic nested/named/protected sections; exact ranges and jump targets; status context; no duplicate body text; all page windows hold.
+
+### 4.7c PR #29, Plan 7D: table structure, measurement, pagination, rendering, and cell hit-testing
+
+**Goal:** make one format-neutral table geometry load-bearing end to end.
+
+1. **G-5 import.** Parse table columns and repeats, row/header-row/repeats, cell repeats, spans, covered cells/occupancy, widths, row heights, padding, borders, background, vertical alignment, style names, and table identity from ODF styles/content.
+2. Resolve a rectangular logical grid with origin/covered occupancy. Reject impossible spans safely; do not duplicate covered-cell text.
+3. Measure cell paragraphs with `TextMetrics`; derive intrinsic and declared column widths; compute row heights from the heaviest cell.
+4. Paginate by rows with explicit over-height-row behavior and repeated semantic header rows. No `rows * 35 + 10` estimate remains.
+5. Render from the same geometry and add cell-aware hit-testing/context so caret/status/table tools identify row and column accurately.
+
+**Tests:** all source tables in Samples 1/2/3/6; synthetic repeats/spans/covered cells/header rows/borders; measurement-render parity; multi-page row pagination; cell hit tests; no regressions for zero-table fixtures.
+
+### 4.7d PR #30, Plan 7E: ODF font-face aliases and final pagination calibration
+
+**Goal:** resolve the document's declared font identities through one metrics/display path, then measure the complete ODT structure.
+
+1. **G-6 declarations.** Parse `office:font-face-decls` from `content.xml` and `styles.xml`, including `style:name`, `svg:font-family`, generic family, pitch, and charset into `DocumentStyles.fontFaces`.
+2. Resolve style alias -> declared family -> `FontRegistry` substitution. Metrics and renderer must receive the same final family; no renderer-only alias map.
+3. Cover Times New Roman/Liberation Serif and the fixture corpus's generated aliases without confusing style alias names with actual family names.
+4. Re-run the full six-ODT element dump/page matrix after 7C/7D are load-bearing. Explain every shift, tighten only with evidence, and record the final windows before 8A starts.
+
+**Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages.
+
+### 4.8 PR #31, Plan 8A: DOCX style chain + run formatting
 
 Closes H-1, H-2, F-16, F-20, the DOCX half of F-10.
 
 1. **H-1:** parse `w:docDefaults` (`rPrDefault`/`pPrDefault`) and every `w:style` with its `basedOn` chain and full `w:rPr`/`w:pPr`; `pStyle` keeps the DOCX style id. `para1` resolves to 20 pt Aptos Display `#0f4761` via the chain (§2.3 item 2); body resolves to docDefaults' 12 pt, not the 24/20/16 fallback or 14 sp.
 2. **⚑ H-1b (new) · Character-style linkage.** Resolution precedence: explicit `w:link` wins (Sample-4: 27 of them); then Word's **naming convention** (paragraph style `X` ↔ character style `X Char`, case-insensitive, trailing-space tolerant); if neither matches, the paragraph style's own `w:rPr` applies unchanged; Sample-6 has no `w:link` attribute at all (§2.3 item 2), so convention-only files must resolve. The resolved character properties (font, size, colour, bold) merge into the paragraph's default run properties; a direct run `w:rPr` always overrides both.
-3. **⚑ H-1c (new) · Numbering state per paragraph.** While numbering *rendering* is PR 21, the style-chain work must record per paragraph one of: **inherited** (`numId`/`ilvl` from the style chain, walked through `w:basedOn` (Sample-6 headings: `numId 15` inside `w:style/w:pPr`), **explicit** (a direct `w:numPr`, 42 paragraphs), or **suppressed** (direct `w:numId 0`, ECMA-376 §17.9.18, 3 paragraphs). PR 20 resolves; PR 21 renders. This is why H-1 must read `w:numPr` inside styles at all.
+3. **⚑ H-1c (new) · Numbering state per paragraph.** While numbering *rendering* is Plan 8B, the style-chain work must record per paragraph one of: **inherited** (`numId`/`ilvl` from the style chain, walked through `w:basedOn` (Sample-6 headings: `numId 15` inside `w:style/w:pPr`), **explicit** (a direct `w:numPr`, 42 paragraphs), or **suppressed** (direct `w:numId 0`, ECMA-376 §17.9.18, 3 paragraphs). Plan 8A resolves; Plan 8B renders. This is why H-1 must read `w:numPr` inside styles at all.
 4. **H-2:** `TextRun`s built per `w:r` from resolved character properties; `w:val="0"|"false"` is an explicit negative (negative-flag support in `OfficeRuns.mergeRun`); run flags stop leaking past their run (reset at run end, not at `</w:p>`); **`currentRuns` actually reaches the paragraph** (today it is declared at `OfficeDocumentParser.kt:800` and never populated, so every DOCX paragraph is one flat run).
 5. **⚑ H-2b (new) · Retire the sample-tuned regexes.** `PARA_STYLE_REGEX` (`para[1-9]`), `HEADING_STYLE_REGEX` (`heading[1-9]`) and the `SINGLE_DIGIT` heuristic (`OfficeDocumentParser.kt:55-57` and the `w:pStyle` arm) are replaced by the real style-table lookup (H-1); a styleId absent from the file's own style table resolves to the Normal-based default (not a heading). The regexes were tuned to the samples' styleId shape; the lookup is what the spec says.
-**Files:** `OfficeDocumentParser.kt` (new `word/styles.xml` reader + run path), `data/OfficeDocument.kt` (run + numbering-state fields), `data/DocxDocumentParser.kt` (nothing, since the save path is PR 22).
+**Files:** `OfficeDocumentParser.kt` (new `word/styles.xml` reader + run path), `data/OfficeDocument.kt` (run + numbering-state fields), `data/DocxDocumentParser.kt` (nothing, since the save path is Plan 9).
 **Tests:** `DocxStyleChainTest` (Sample-6: `para1` → 20 pt Aptos Display `#0f4761`; `para2` → 16 pt; `para3` → 14 pt with inherited font; docDefaults → 12 pt; Sample-3 as control), `DocxRunFormattingTest` (no leak; explicit unbold via `w:val="0"`), `DocxHeadingNumberingStateTest` (6/11/28 distribution; 42 explicit + 3 suppressed flagged), `DocxCharLinkTest` (Sample-4 resolves via `w:link`; Sample-6 resolves via the name convention), Sample-3.docx unchanged.
 **Acceptance:** heading/body sizes and fonts come from the file in every sample; no run-flag leak; Sample-3 control green.
 **Size:** large.
 
-### 4.9 PR 21, Plan 8B: DOCX numbering, fields, tables, sections, ⚑ TOC snapshot
+### 4.9 PR #32, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
 
 Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F-26, F-27, F-28 tail, O-03, O-02 remaining.
 
 1. **H-3:** `word/numbering.xml` reader (`abstractNum`/`num`/`lvl` with `start`, `numFmt`, `lvlText`, `lvlJc`, `suff`, `ind`, `isLgl` (45 levels in Sample-4), `lvlOverride`/`startOverride`) resolved per paragraph into `NumberingSpec`, honouring H-1c's precedence: direct `w:numPr` (including `numId=0`) → `pStyle` chain walked through `w:basedOn` → none: Sample-6's 42 headings get `BAB N` from `abstractNum 15` (`BAB %1`, `%1.%2`, …), and its 3 `numId=0` headings (KATA PENGANTAR, DAFTAR ISI, +1) render **without** a prefix. Five of six samples exercise the reader (§2.2).
 2. **H-4:** the field model: `w:fldSimple` **and** `w:fldChar` complex fields (begin/separate/end) with `TOC`, `PAGEREF`, `SEQ` handling (§2.4.3); instructions never reach body text (`SEQ` count in parsed Sample-1 = 0).
-3. **⚑ H-4b (new) · TOC snapshot, DOCX half.** The authored TOC renders as the ODT half does (G-2): entries styled `toc 1/2/3`, each entry's **paragraph-level** `w:tabs` right-aligned dot leader (Sample-6: `pos 9027`, `leader="dot"`; §2.3 item 5), literal page numbers, and `w:hyperlink w:anchor="_TOCxxxxx"` preserved as anchors (bookmarks from PR 20's DOCX arm). The ` TOC \o "1 - 9" \z ` instruction never appears in output. Entry detection is by **toc-styled paragraph, regardless of whether it sits inside a field-result run** (the samples author the snapshot as plain paragraphs). The test asserts the verified sizes (Sample-2: 15, Sample-4: 21, Sample-5: 14, Sample-6: 45; §2.2), handles the `&quot;`-escaped field instruction (Sample-4), and does not list the unused `toc 3…9`/`TOC Heading` *style definitions* (Sample-4) as entries.
+3. **⚑ H-4b (new) · TOC snapshot, DOCX half.** The authored TOC renders as the ODT half does (G-2): entries styled `toc 1/2/3`, each entry's **paragraph-level** `w:tabs` right-aligned dot leader (Sample-6: `pos 9027`, `leader="dot"`; §2.3 item 5), literal page numbers, and `w:hyperlink w:anchor="_TOCxxxxx"` preserved as anchors (bookmarks from Plan 8A's DOCX arm). The ` TOC \o "1 - 9" \z ` instruction never appears in output. Entry detection is by **toc-styled paragraph, regardless of whether it sits inside a field-result run** (the samples author the snapshot as plain paragraphs). The test asserts the verified sizes (Sample-2: 15, Sample-4: 21, Sample-5: 14, Sample-6: 45; §2.2), handles the `&quot;`-escaped field instruction (Sample-4), and does not list the unused `toc 3…9`/`TOC Heading` *style definitions* (Sample-4) as entries.
 4. **H-5:** `w:tblGrid`/`w:tblW`/`w:tcW` → column weights; `gridSpan`/`vMerge` parsed into the span fields (none in the samples, but the model exists); `tcPr`/`trPr` (`tblHeader` repeat); shared geometry with G-5.
 5. **H-6:** per-paragraph governing `w:sectPr` (`w:pPr/w:sectPr` starts a section; body-level closes the last); Sample-6's five sections paginate with their own geometry.
-6. **⚑ H-6b (new) · Section page numbering.** The section model carries `w:pgNumType` (fmt/start) and `w:titlePg` (§2.3 item 6): front matter lowerRoman (ii/iii), body decimal restarting at 1. This is the data behind the status bar's page-number-vs-sequence-number field (WG Ch.1) and the Navigator's "Page" category sequence numbers. `w:headerReference`/`w:footerReference` are recorded in the model but **not rendered**: page furniture has no plan item, and PR 21 must not grow it.
+6. **⚑ H-6b (new) · Section page numbering.** The section model carries `w:pgNumType` (fmt/start) and `w:titlePg` (§2.3 item 6): front matter lowerRoman (ii/iii), body decimal restarting at 1. This is the data behind the status bar's page-number-vs-sequence-number field (WG Ch.1) and the Navigator's "Page" category sequence numbers. `w:headerReference`/`w:footerReference` are recorded in the model but **not rendered**: page furniture has no plan item, and Plan 8B must not grow it.
 7. **H-7:** `w:lastRenderedPageBreak` excluded from pagination and editable text (Sample-2's 22 occurrences are the regression case).
-**Files:** `OfficeDocumentParser.kt` (numbering/field/section readers + run path completion), `data/OfficeDocument.kt`, `data/DocxDocumentParser.kt` (TOC rendering only; save is PR 22), `LayoutEngine.kt` (section-aware pagination).
+**Files:** `OfficeDocumentParser.kt` (numbering/field/section readers + run path completion), `data/OfficeDocument.kt`, `data/DocxDocumentParser.kt` (TOC rendering only; save is Plan 9), `LayoutEngine.kt` (section-aware pagination).
 **Tests:** `DocxNumberingTest` (Sample-6: `BAB 1…3` on the 42 numbered headings, none on the 3 suppressed; Sample-4 legal-numbered list; Sample-3: zero labels), `DocxFieldTest` (no `SEQ`/`TOC \`/`PAGEREF` instruction text in parsed output for Samples 1/2/6), `DocxTocTest` (entries, dot leaders, literal pages, `_TOC` anchors), `DocxTableGeometryTest`, `DocxSectionGeometryTest` (5 sections → 5 geometry boxes; pgNumType recorded), and **the convergence test: Sample-6 ODT and DOCX paginate into the same page windows** (§2.4.7).
 **Acceptance:** Sample-6.docx fidelity checklist; Sample-6's two formats (the one metric-identical pair, audit-007 §1) converge on the same page window, the other pairs hold their per-format windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of the audit-007 §1 references, never below).
 **Size:** large.
 
-### 4.10 PR 22, Plan 9: save round-trip integrity (unchanged from v1, pre-change gate first)
+### 4.10 PR #33, Plan 9: save round-trip integrity (pre-change gate first)
 
 Closes O-01, the non-destructive-package rule, plan-03 3.13, 3.19, 3.20, 3.26, 3.27, and retires F-2 (`OfficeDocElement`).
 
-Scheduled **after** Plans 6, 7 and 8 land (**PR slot #30** per the 2026-09-30 reforecast in §4.12), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
+Scheduled **after** Plans 6, 7E and 8B land (**forecast PR slot #33** per the 2026-10-03 split), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
 **Acceptance:** open → save → reopen preserves text, styles, numbering, tables, images, TOC for Sample-6 in both formats, verified by a CI round-trip test. **Scope is firmed by a short plan document before this PR starts; do not start it from this paragraph alone.**
 
 ### 4.11 Plan 10: stays parked
 
-Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after PR #29 (8B) converges both formats and the user re-confirms** (forecast slot #31-#32 per the 2026-09-30 reforecast in §4.12) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
+Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after Plan 8B (forecast #32) converges both formats and the user re-confirms** (forecast slots #34-#35 after the 2026-10-03 split) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
 
 ### 4.12 Plan 1: master index updates (living document, per PR)
 
@@ -362,16 +402,24 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 |---|---|---|---|
 | 6 | **#22/#23/#24/#25 all merged — COMPLETE** | row 6 → "6a to 6d all landed (COMPLETE)" | plan-04-to-09 § Plan 6 carries the four-increment implementation record, the CI run table and the re-confirmed 12-file matrix |
 
-**2026-10-02 insertion (recorded here, not a reforecast of the rows below).** Three pieces of work landed before 7B and take the next PR slots on the session branch: **Plan 12A** (LOKit JNI seam matching the real `Java_org_libreoffice_kit_*` exports, `:office` process isolation, fontconfig aliases, `PagellaPdfCreator` LOKit-first export), **Plan 7A** (ODF numbering, heading/list-item runs, hyperlinks, bookmarks; see audit-013), and the **documentation sync** the user asked for in the same pass (the `antislop` v3.2.20 pointer block in `AGENTS.md`, the ClearPDF design notes under § Plan 8 and § Plan 9, and `plan-01-master-index.md` §2/§6). The rows below keep their plan IDs; 7B still owns G-2/G-5/G-6/G-7, and Plan 12B / 12C stay parked until after Plan 9. Evidence: `anti-slop/audit-013-2026-10-02-plan-12a-and-7a.md`; the 7A implementation record sits in `plan-04-to-09-writer-fidelity.md` § Plan 7.
+**2026-10-02 insertion.** Plan 12A and Plan 7A landed together in PR #26: the LOKit JNI/process seam and ODF numbering, heading/list runs, hyperlinks, and bookmarks. Evidence: `audit-013-2026-10-02-plan-12a-and-7a.md`.
 
-**Section-number note (2026-09-30).** §4.6 to §4.11 below keep the PR numbers v1 assigned them (18, 19, 20, 21, 22) as **plan-item identifiers**, not as live reservations; the plan IDs in their headings (7A, 7B, 8A, 8B, 9) are authoritative. Their reforecast PR slots are 7A `#26`, 7B `#27`, 8A `#28`, 8B `#29`, 9 `#30`, Plan 10 `#31`–`#32`, Plan 11 `#33`–`#37`.
-| 7A | **#26** | row 7 → "7A landed" | § Plan 7 gets G-1/G-3/G-4 and G-4b record |
-| 7B | **#27** | row 7 → "7A, 7B landed" | § Plan 7 gets G-2/G-5/G-6 and G-7 record |
-| 8A | **#28** | row 8 → "8A landed" | § Plan 8 gets H-1 (with b/c) and H-2 (with b) record |
-| 8B | **#29** | row 8 → "8A, 8B landed" | § Plan 8 gets H-3 to H-7 (with b) record plus any tightened window |
-| 9 | **#30** | row 9 → landed | § Plan 9 record; plan-01 §4 checklist items 1 and 10 close |
-| 10 resume | **#31–#32** | row 10 status change when it starts | plan-10 head note |
-| 11 packages | **#33–#37** | row 11 status change per package | plan-11 §5 |
+**2026-10-03 Plan 7 split.** The old combined 7B row is void. Exactly one PR belongs to each of 7B, 7C, 7D, and 7E. The current forecast is:
+
+| Plan | PR slot | plan-01 registry change | plan file line |
+|---|---|---|---|
+| 7A | **#26 landed** | row 7 -> "7A landed" | Plan 7 records G-1/G-3/G-4/G-4b |
+| 7B | **#27** | row 7 -> "7B importer/model convergence" | Plan 7 G-0 implementation record + `audit-014` |
+| 7C | **#28** | row 7 -> "7C indexes/sections landed" | Plan 7 records G-2/G-7 and navigation/status |
+| 7D | **#29** | row 7 -> "7D tables landed" | Plan 7 records G-5 end to end |
+| 7E | **#30** | row 7 -> "Plan 7 complete" | Plan 7 records G-6 aliases and final ODT matrix |
+| 8A | **#31** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
+| 8B | **#32** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
+| 9 | **#33** | row 9 -> landed | Plan 9 structural round-trip record |
+| 10 resume | **#34-#35** | row 10 status change when it starts | plan-10 head note |
+| 11 packages | **#36-#40** | row 11 status change per package | plan-11 §5 |
+
+Plan IDs remain authoritative and slots are forecasts. Plan 12B/12C stay after Plan 9.
 
 One-time plan-1 changes made with PR 13's commits (they described state then): registry row 3 status (3A **landed**, not "in review"); §3 WG-mapping gained three owner lines; §3.1's sidebar-deck row lost its "lacks Images" half; §3.1's menu-bar row's "6 of 8 ribbon tabs are empty" became "4 of 6 declared tabs have no deck yet"; §6's "Next actions" item 2 was struck through as done.
 
@@ -383,24 +431,27 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 **Landed 2026-09-24 to 2026-09-28:** 13 (3B), 14 (Plan 3C / Plan 11 docs), 15 (5A), 16 (5B), 17 (5C), 18 (5D), 19 (5E). Plan 5 shipped as five PRs rather than the 16a/16b split predicted below.
 
-**Forward schedule, re-numbered 2026-09-30 after Plan 6 split into four PRs** (plan IDs first, expected PR slot in parentheses; Plan 1's two documentation PRs took #20 and #21; Plan 6 then took #22–#25):
+**Forward schedule, amended 2026-10-03 for the four-plan ODF split** (plan IDs first; PR slots are forecasts):
 
 | Order | Plan | PR slot | Parallel with | Gate to enter the next |
 |---|---|---|---|---|
-| - | 6 (images and media) | **#22–#25, merged** | 8A scaffolding | **done:** no artificial delay in the open path, media self-heals after a cache wipe, unsafe image save refuses |
-| 2 | 7A (ODF numbering, headings, links, TOC) | 26 | 8A scaffolding | ODT numbering fidelity |
-| 3 | 7B (ODT tables, font identity, sections) | 27 | tail of 7A | ODT checklist green |
-| 4 | 8A (DOCX style chain, runs) | 28 | none | DOCX style chain green |
-| 5 | 8B (DOCX numbering, fields, tables, sections) | 29 | none | both-format convergence, then re-measure and tighten only with support |
-| 6 | 9 (save round trip) | 30 | Plan 10 resume decision | round-trip CI test |
-| 7 | 10, 11 packages | #31–#37 | per package | per package gate in plan-11 §5 |
-| 8 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
+| - | 6 (images and media) | **#22-#25, merged** | - | **done:** media self-heals; unsafe image save refuses |
+| - | 7A (numbering, runs, links, bookmarks) | **#26, merged** | - | **done:** ODT numbering fidelity |
+| 1 | 7B (canonical model/import convergence) | **#27** | research only | runtime/facade parity; save capability closed |
+| 2 | 7C (indexes/sections/navigation/status) | **#28** | research only | sidecars populated and navigable |
+| 3 | 7D (tables end to end) | **#29** | research only | shared geometry through cell hit-testing |
+| 4 | 7E (font aliases/calibration) | **#30** | research only | metrics/display parity; final ODT matrix |
+| 5 | 8A (DOCX style chain/runs) | **#31** | none | DOCX style chain green |
+| 6 | 8B (DOCX numbering/fields/tables/sections) | **#32** | none | both-format convergence |
+| 7 | 9 (save round trip) | **#33** | Plan 10 resume decision | structural round-trip CI matrix |
+| 8 | 10 and 11 packages | **#34-#40** | per package | per-package gate in plan-11 §5 |
+| 9 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
 
 **Device checklist resume points** (`docs/InkyC1Checklist.md`, deliberately postponed; section order = item number):
 
 1. **Now (before PR 15):** install the latest nightly (≥ PR 12), run plan-02 §5 acceptance and checklist items 5 (Selection), 8 (Reminder), 9 (Zoom), plus the `[needs run]` device log for the Viewer FCT platform-menu question.
 2. **After Plan 5 (merged):** items 2 (editing stages), 4 (Caret), 6 (Go To with believable counts), 9 re-run, 11 (Session Restore: page 15 at 170 %, migrated zoom semantics). All of these are code-complete and await hardware.
-3. **After Plan 7B and Plan 8B:** item 7 (Navigator categories, now including the Images, Hyperlinks, Bookmarks and Sections data those plans feed), item 10 (Save Compatibility), and the item 12 stress test after Plan 6 lands media memory.
+3. **After Plans 7C, 7D, and 8B:** item 7 (Navigator categories, including parser-backed indexes, bookmarks, tables, hyperlinks, and sections) and item 12's structural stress portion. **After Plan 9:** item 10 (Save Compatibility). Plan 6 media-memory coverage is already landed.
 4. **After Plan 11:** the full twelve-section pass, recorded with APK, commit, device and Android version. This is the gate before Chapter 2 work starts. The owner deferred it to this point on 2026-09-28.
 
 ---
@@ -431,15 +482,17 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 16. **⚑3.32 implementation additions (recorded in PR 13, v2.3):** the Indexes filter (`NavigateBy.INDEX`) was the same class of lie as the twelve categories in the All view: it fell through to the generic "There are no objects to navigate" row although a TOC/index is authored document content that plans 19/21 read, so `indexes` joined the not-yet-readable set in `NavigatorCategories` (key `indexes`, element classes hand-checked like `frames`/`ole`, owner `plan-19/21`). The "Pages" and "Reminders" Navigate-By labels became plural so the verified-absent sentence ("No %1$s in this document.") reads correctly for them; `values-in` is untouched. The Hyperlinks category carries no rows and no `Navigate-By` filter option in this PR: `NavigationEngine` has no hyperlink jump yet, so the rows and their jump land together with the parser in 18/20.
 17. **⚑ v2.4 (2026-09-26, audit-007):** (a) **PR 16 split** into 16a (Plan 5B, parsing: fake breaks out, real breaks and section starts in, body rect from margins + header/footer heights, metric-only style chain, F-21 defaults) and 16b (Plan 5C, measurement: `TextMetrics` load-bearing, constants deleted, widows/orphans, tab stops, windows); 17 still depends on 15, 18 now depends on 16b. (b) **Windows are per format** and cover all six pairs; the "Sample-5 `15..21` both formats" wording is withdrawn because the OnlyOffice ODT exports of Sample-3/4/5 lost Word's `pPrDefault` (single-spaced, 0 after) and Sample-3.odt declares 0 cm top/bottom margins; geometry is honoured as declared (user decision), and the ODT column is provisional until the user regenerates the `.odt` fixtures with Collabora Office. (c) **DOCX references completed** from M365 Copilot: Sample-1 15, Sample-3 20, Sample-4 10 (Sample-2 23 and Sample-5 18 from `app.xml`, Sample-6 21 as before). (d) **PR 15 gains** the dump over all six pairs, `SampleMatrixTest`, header/footer heights in `PageStyleSpec`, and the §8 font corpus. (e) **Corrections to the record:** §2's counts are confirmed; Sample-4/5 ODT's "margin-top 0" (§2.1's Sample-5 note) is a fixed-height header carrying the margin (equivalent to the DOCX), not a defect, while Sample-3.odt's 0 cm margins are; the "double break makes a blank page" theory (plan-02 item 7) is refuted by `flushPage()`'s guard, so E-0 is confirmation, not diagnosis. (f) **Native libraries:** the checked-in `.so` files are LFS pointers to a 196 MB (arm64) / 135 MB (v7a) `liblo-native-code.so` plus the NSS/NSPR set; the "~60 KB stub" wording in earlier audits is withdrawn (audit-007 §10).
 
+18. **v2.6 (2026-10-03):** the old combined 7B package and its downstream PR forecast are superseded by 7B canonical/import convergence, 7C indexes/sections/navigation/status, 7D tables end to end, and 7E font declarations/aliases/calibration. The ODT matrix was re-read from the current ZIPs: Sample-6 has no `text:section`, list-style definitions are in `styles.xml`, and current list/heading/soft-break counts replace the pre-regeneration rows. `audit-014` records the implementation boundary.
+
 ---
 
 ## 8. What still needs the user (nothing blocks)
 
 1. The on-device passes at the three resume points in §5; the first one gates only checklist credit, not PR 13/15.
 2. A re-check of post-fix screenshots after PR 13 (the R-26 surfaces change).
-3. The plan-9 pre-change gate when PR 21 nears (its scope paragraph is a seed, not a commitment).
-4. The staged-window tightening decision is already recorded (§0) and executes inside PR 21; no action needed, listed for completeness.
-5. **⚑ The new scope items (3.32, 3.33 in PR 13; ⚑G-4b bookmarks in PR 18/20; ⚑G-7 sections in PR 19/21; ⚑H-1b/H-1c/H-2b and ⚑H-3/H-4b/H-6b in PR 20/21)** are additive and each unblocks an existing checklist item or a verified sample fact; strike any of them and the owning PR simply drops that bullet; nothing else depends on them.
+3. The Plan 9 pre-change gate when Plan 8B nears completion (its scope paragraph is a seed, not a commitment).
+4. The staged-window decision is recorded (§0): Plan 7E remeasures ODT after structure, and Plan 8B owns cross-format convergence; no action is needed now.
+5. New ownership is fixed: G-2/G-7 in 7C, G-5 in 7D, G-6 in 7E, and H-1/H-2 in 8A with H-3 to H-7 in 8B. Removing an item requires amending its owning plan rather than silently moving it back into 7B.
 6. **⚑ From audit-007 §12 (2026-09-26):** the Aptos stand-in for `FontRegistry` (Carlito, Liberation Sans, or system default; cosmetic for pagination); whether to add a read-only native-library inventory step to the CI `test` job; whether Sample-1's ODT keeps the bridging window `9..18` or has no ODT assertion until the Collabora count exists; and the Collabora regeneration itself (drop the six `.odt` files in place, record the six status-bar page counts, update `SampleMatrixTest` and the ODT window column in one commit).
 
 ---

@@ -39,8 +39,14 @@ sealed class OfficeDocumentElement {
     data class Table(
         val rows: List<TableRow>,
         val numColumns: Int = 0,
-        val name: String? = null
-    ) : OfficeDocumentElement()
+        val name: String? = null,
+        val columns: List<OfficeTableColumnSpec> = emptyList(),
+        val styleName: String? = null
+    ) : OfficeDocumentElement() {
+        init {
+            require(numColumns >= 0) { "Table column count must be non-negative" }
+        }
+    }
 
     data class ImageElement(
         val imagePath: String,
@@ -54,13 +60,34 @@ sealed class OfficeDocumentElement {
 }
 
 data class TableRow(
-    val cells: List<TableCell>
-)
+    val cells: List<TableCell>,
+    val styleName: String? = null,
+    val isHeader: Boolean = false,
+    val repeatCount: Int = 1,
+    val rowStyle: TableRowStyle = TableRowStyle()
+) {
+    init {
+        require(repeatCount > 0) { "Table row repeat count must be positive" }
+    }
+}
 
 data class TableCell(
     val text: String,
-    val paragraphs: List<OfficeDocumentElement.Paragraph> = emptyList()
-)
+    val paragraphs: List<OfficeDocumentElement.Paragraph> = emptyList(),
+    val startColumn: Int = 0,
+    val columnSpan: Int = 1,
+    val rowSpan: Int = 1,
+    val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
+    val repeatCount: Int = 1,
+    val styleName: String? = null,
+    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
+) {
+    init {
+        require(startColumn >= 0) { "Table cell start column must be non-negative" }
+        require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
+        require(repeatCount > 0) { "Table cell repeat count must be positive" }
+    }
+}
 
 data class TextRun(
     val text: String,
@@ -88,7 +115,10 @@ data class OfficeParsedDocument(
     val odtPackageData: OdtPackageData? = null,
     val pageCount: Int = 0,
     val styles: DocumentStyles = DocumentStyles(),
-    val bookmarks: List<String> = emptyList()
+    val bookmarks: List<String> = emptyList(),
+    val metadata: DocumentMetadata = DocumentMetadata(),
+    val authoredIndexes: List<DocumentIndexRange> = emptyList(),
+    val namedSectionRanges: List<DocumentSectionRange> = emptyList()
 ) : BaseOfficeModel(url = "", args = emptyList()), XTextDocument, XDocumentPropertiesSupplier, XReplaceable {
     
     override val text: XText

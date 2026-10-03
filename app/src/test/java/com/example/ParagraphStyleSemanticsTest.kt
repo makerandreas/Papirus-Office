@@ -32,7 +32,7 @@ class ParagraphStyleSemanticsTest {
             <office:automatic-styles>$styles</office:automatic-styles>
             <office:body><office:text>$body</office:text></office:body>
             </office:document-content>"""
-        return SvXMLImport(context).parseOdfXml(xml, "semantics.odt").also {
+        return SvXMLImport().parseOdfXml(xml, "semantics.odt").also {
             assertFalse(it.failureReason, it.isParsingFailed)
         }
     }

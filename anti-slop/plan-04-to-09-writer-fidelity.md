@@ -181,7 +181,7 @@ Plan 6 shipped across four increments (6A in PR #22, 6B in PR #23, 6C in PR #24,
      * **ODT measured:** `Sample-1 = 15` (ref 15, window `12..18`), `Sample-2 = 23` (ref 23, `18..28`), `Sample-3 = 18` (ref 22, `18..26`), `Sample-4 = 10` (ref 11, `9..13`), `Sample-5 = 18` (ref 19, `15..23`), `Sample-6 = 19` (ref 22, `17..27`).
      * **DOCX measured:** `Sample-1 = 15` (ref 15, window `12..18`), `Sample-2 = 25` (ref 23, `18..28`, +1 vs 5E's 24 from 12 parsed `wp:extent` drawings up to `468.1 x 307.1` units), `Sample-3 = 21` (ref 22, `18..26`), `Sample-4 = 11` (ref 10, `8..12`), `Sample-5 = 19` (ref 18, `15..21`), `Sample-6 = 23` (ref 21, `15..26`, +1 vs 5E's 22 from 3 parsed `wp:extent` drawings at `292.3 x 292.3`, `165.0 x 427.0`, `230.9 x 470.9` units).
    * CI: PR #25 head `efa6fd7` passed in run `36730234004`: **276 unit tests, 0 failures, 0 errors, 0 skipped (28.07 s of JUnit time across 48 suites)**; Unit Tests step 4m 55s / job 5m 45s, Build step 4m 41s / job 5m 20s, artifact `11105575967` (`159,088` B). This is the first run whose PR comment carries the per-suite `time (s)` column and the `Plan6cLoadingProgressTest` stdout: `Sample-6.odt parse=62 ms, layout=34 ms, pages=19, predecodeWindow=0..2, predecodeImages=1` and `Sample-6.docx parse=38 ms, layout=32 ms, pages=23, predecodeWindow=0..2, predecodeImages=1` (CI runner timings, not a device measurement). The busiest suites were `BodyRectTest` 7.14 s, `DocumentImagePresentationTest` 3.97 s, `CreateNewDocumentTest` 2.96 s and `Plan5ElementDumpTest` 2.44 s.
-   * **Reforecasted PR slots:** Plan 7A (`#26`), Plan 7B (`#27`), Plan 8A (`#28`), Plan 8B (`#29`), Plan 9 (`#30`), Plan 10 (`#31`-`#32`), Plan 11 (`#33`-`#37`). Physical-device verification remains scheduled after Plan 11 per the owner's deferral.
+   * **Reforecast superseded 2026-10-03:** Plan 7A used `#26`. The current sequence is Plan 7B (`#27`), 7C (`#28`), 7D (`#29`), 7E (`#30`), 8A (`#31`), 8B (`#32`), Plan 9 (`#33`), Plan 10 (`#34`-`#35`), and Plan 11 (`#36`-`#40`). Plan IDs remain authoritative. Physical-device verification remains scheduled after Plan 11 per the owner's deferral.
 
 ---
 
@@ -191,7 +191,20 @@ Plan 6 shipped across four increments (6A in PR #22, 6B in PR #23, 6C in PR #24,
 **Closes:** F-08 (font identity), F-09, F-11, F-12, F-13, F-14, F-15, O-03, O-04, O-05.
 **Depends on:** E (E-EN-4 numbering model, E-EN-5 font registry).
 
-### Scope
+### Authoritative four-PR continuation (2026-10-03)
+
+The earlier combined Plan 7B package is superseded. After 7A, this plan proceeds through exactly four plans and four PRs:
+
+| Plan | Item ownership | Gate |
+|---|---|---|
+| **7B - canonical semantic model and ODT importer convergence** | G-0: format-neutral sidecars/value types; one `OdtImportPipeline`; `writer.OdtDocumentParser` delegation; context-independent diagnostics; metadata/package/source-feature preservation; fail-closed modified-save capability | all ODT entry points produce one semantic result for all six fixtures; no duplicate XML parser remains |
+| **7C - authored indexes, named section ranges, Navigator, status** | G-2 and G-7 | authored snapshots and section identities populate sidecars and Navigator/status context without duplicating body flow |
+| **7D - tables end to end** | G-5 | table grid, repeats, spans, styles, intrinsic measurement, row pagination, rendering, and cell hit-testing share one geometry model |
+| **7E - font faces and final calibration** | G-6 plus ODF font-face declaration/alias parsing and the post-structure pagination remeasurement | metrics and display resolve the same declared face; fixture windows are recalibrated from evidence |
+
+Detailed split evidence and non-goals are in `audit-014-2026-10-03-plan-7b-convergence.md`. Structural regeneration remains Plan 9; 7B refuses a modified save when the current writer would discard indexes, sections, or source table structure.
+
+### Scope (cumulative through 7E; ownership fixed by the table above)
 
 1. **G-1 · List styles become real numbering (F-13, F-12).** New tokens + parser for `text:list-style`, `text:list-level-style-number`, `text:list-level-style-bullet` (`text:num-format`, `style:num-prefix`, `style:num-suffix`, `text:display-levels`, `text:start-value`, `text:bullet-char`, per-level `style:text-properties` and `style:list-level-properties`). Paragraph styles keep `style:list-style-name`; `text:list` keeps `text:style-name`; `text:list-item` keeps `text:start-value`; `text:continue-numbering` is honoured. Output goes through E-EN-4, so Sample-6 renders `BAB I`, `BAB II`, `2.1`, `2.1.1` with the level's own font size, and bullets use the bullet level's font (fixes the size anomaly). `OdfListItemContext` stops hard-coding `"• "` / `"◦ "`.
 2. **G-2 · TOC and index (F-14).** Tokens for `text:table-of-content`, `text:index-body`, `text:index-title`, `text:index-source-styles`; parse the authored snapshot into a `TableOfContent` element (entries with level, text, page number, link anchor) and render it with a right-aligned tab stop and the `TOC 1/2/3` styles. Default is the authored snapshot (fast, page numbers match the file); regeneration from the Navigator index is a follow-up feature (open question 4 in the audit).
@@ -215,7 +228,7 @@ Medium. Numbering is the one place where the model must be general (ODF `num-for
 
 **Size:** large (1.5–2 weeks, 6 commits as above).
 
-### Implementation record (2026-10-02, Plan 7A shipped; 7B remains)
+### Implementation record (2026-10-02, Plan 7A shipped; 7B-7E follow)
 
 Plan 7A landed on the session branch in five commits, after `audit-013`'s measurements were re-derived from the raw package XML (`styles.xml` list/outline styles, `content.xml` structure). What shipped, item by item:
 
@@ -224,11 +237,24 @@ Plan 7A landed on the session branch in five commits, after `audit-013`'s measur
 3. **G-3 · Hyperlinks.** `OdfHyperlinkContext` preserves `xlink:href` across direct characters, nested `<text:span>`, `<text:s>` and `<text:tab/>`, and marks the runs underlined; `OdfSpanContext` gained `inheritedHyperlink`/`fallbackStyleName` so a span inside `text:a` keeps both the link and its own formatting. `OfficeTextRun.hyperlink` is now populated by `toOfficeDocument()` and reaches the Navigator's hyperlinks arm (still classified not-yet-readable in 7A, see item 6).
 4. **G-4 · Heading and list-item runs.** `OdfHeadingContext` collects runs (with the same span/hyperlink/bookmark arms as paragraphs); `OfficeDocumentElement.Heading` and `.ListItem` carry `runs`; `toOfficeDocument()` maps them instead of writing `emptyList()`/one synthetic run. `ListItem` also carries `styleName`, `labelFontSizeSp`, `labelFontFamily` and `level`, and the renderer and paginator use the label font for the prefix (`LayoutEngine.paragraph()`, `ParagraphText`, `ParagraphEditField`, `ParagraphSelectField`).
 5. **G-4b · Bookmarks.** `text:bookmark`, `-start` and `-end` are consumed at paragraph, heading, list-item, span, hyperlink **and** table-cell depth; names are de-duplicated per element and per document. `OfficeDocument.bookmarks`, `OfficeDocumentElement.*.bookmarks`, `OfficeDocument.bookmarks` and `OdtDocumentParser` (writer path) all expose them. `NavigatorCategories` reclassifies `"bookmarks"` as `PARSED_DOCUMENT_CLASS` and `DocumentIndexEngine` registers one row per unique anchor (including `OfficeParagraph.bookmark`), so the Navigator renders real counts and the existing `NavigatorCategoryHonestyTest` now enforces the new classification (its readable-category arm demands a producer, and the sheet renders the count instead of `null`).
-6. **Deliberately not in 7A:** the hyperlinks category stays `NOT_READABLE_YET` because `OfficeHyperlink` is still never constructed by a parser arm (only runs carry links); G-2 (TOC snapshot), G-5, G-6 and G-7 remain 7B. The TOC snapshot's `<text:table-of-content-source>` template is ignored through a new `OdfIgnoreSubtreeContext` so its placeholder paragraphs cannot leak into the body.
+6. **Deliberately not in 7A:** the hyperlinks category stays `NOT_READABLE_YET` because `OfficeHyperlink` is still never constructed by a parser arm (only runs carry links). G-2 moves to 7C, G-5 to 7D, G-6 to 7E, and G-7 to 7C. The TOC snapshot's `<text:table-of-content-source>` template is ignored through a new `OdfIgnoreSubtreeContext` so its placeholder paragraphs cannot leak into the body.
 7. **Tests added (pure JVM + Robolectric, no device claims):** `OdtListNumberingTest` (counter arithmetic incl. deeper-level resets; a synthetic auto-style chain producing `BAB I PENDAHULUAN`, `1.1`, `1.2`, `BAB II`, `2.1`, `2.1.1`; Sample-6 normalized headings `BAB 1 PENDAHULUAN`, `1.1`, `1.2`, `BAB 2 PEMBAHASAN`, `2.1.1`, `BAB 3 PENUTUP`, `3.1`, `3.2.1` with the three unnumbered headings intact; Sample-6 ordered labels `1.`-`10.` plus the bare `num-suffix`-less `1`-`4` form, bullet labels without `··` doubling and with the level's declared label family (`Symbol` on the bullet level, `Aptos` on the `ListLabel_*` styles the numbered levels reference, neither declaring a size; corrected in audit-013 after the first reading claimed 10 pt); Sample-4 `A.`/`B.`/`C.` list-wrapped headings), `HyperlinkFidelityTest` (`text:a` with a nested bold span and a tab keeps one href and underlines; Samples 2/4/5/6 expose at least 15/2/14/45 linked elements with run/text synchronization, plus `OdtDocumentParser` parity), `HeadingRunsTest` (Sample-4/5 inline italic heading runs; Sample-6's 12 bold-span list items render through `OfficeRuns`), `OdtBookmarkTest` (all six ODT files: 0/15/0/22/14/46 anchors in `OfficeDocument`, the Navigator index and `OdtDocumentParser`).
 8. **CI evidence:** recorded in the PR body and in the `scripts/ci-dump-comment.py` comment on the pull request (unit-test count, per-suite times, the twelve-fixture page-count matrix and the `SampleMatrix` windows). No local JDK exists in the sandbox, so the GitHub Actions run is the compile and test evidence.
 
-**Sample-4 numbering note (recorded so 7B does not "fix" it).** Sample-4's list-wrapped headings use `WWNum1` level 1 (`A`, `1`, `a` for levels 1 to 3): the outer `<text:list>` sits at level 1 for the heading even though the heading is `text:outline-level="2"`, and the nested question lists advance level 2. That is the authored structure, so the headings read `A. Latar Belakang`, `B. Rumusan Masalah`, `C. Tujuan` (`OdtListNumberingTest`). Sample-6's sub-headings come from `<text:outline-style>` instead, because they are not inside `<text:list>` at all: `display-levels` on levels 2 and 3 produce `1.1` and `2.1.1` (audit-013 §3).
+**Sample-4 numbering note (recorded so later Plan 7 work does not "fix" it).** Sample-4's list-wrapped headings use `WWNum1` level 1 (`A`, `1`, `a` for levels 1 to 3): the outer `<text:list>` sits at level 1 for the heading even though the heading is `text:outline-level="2"`, and the nested question lists advance level 2. That is the authored structure, so the headings read `A. Latar Belakang`, `B. Rumusan Masalah`, `C. Tujuan` (`OdtListNumberingTest`). Sample-6's sub-headings come from `<text:outline-style>` instead, because they are not inside `<text:list>` at all: `display-levels` on levels 2 and 3 produce `1.1` and `2.1.1` (audit-013 §3).
+
+### Implementation record (2026-10-03, Plan 7B)
+
+Plan 7B establishes the boundary the next three plans consume without implementing their behavior:
+
+1. `DocumentSemantics.kt` defines half-open body ranges for authored indexes and named sections, table geometry/style value types, font-face metadata, and ODT source-feature provenance. `OfficeParsedDocument`, `OfficeDocument`, and both conversion directions preserve those values, metadata, styles, bookmarks, runs, images, and page breaks.
+2. `OdfImportDiagnostics` removes Android `Context` from `SvXMLImport`'s semantic contract. `AndroidOdfImportDiagnostics` retains file-backed runtime logging; pure and compatibility callers use the silent or injected implementation.
+3. `OdtImportPipeline` is the one ODT ZIP/package and semantic path. It preserves all package entries, original XML parts, metadata/statistics, extracted media mappings, styles, bookmarks, parser failure state, and `OdtSourceFeatures`.
+4. Runtime ODT open delegates to the pipeline. ODS/ODP behavior is unchanged. The 741-line duplicate `writer.OdtDocumentParser` becomes a small compatibility facade with no XML semantics.
+5. `OdtDocumentWriter.saveCapability` reports and enforces a closed decision for modified unsupported authored indexes, named sections, and source/advanced table structure. Unmodified package preservation remains exact; Plan 9 still owns regeneration.
+6. `Plan7bSemanticImportTest` gates all six ODT fixtures for runtime/facade parity, package metadata and feature preservation, pure diagnostics/failure behavior, canonical sidecar/table adaptation, exact unmodified `content.xml`, modified-save refusal, and source architecture. Full CI evidence is recorded in `audit-014` and the PR.
+
+Explicitly deferred: populating/rendering index and section sidecars (7C), populating and consuming table geometry (7D), and parsing/resolving font faces plus pagination calibration (7E).
 
 ---
 
@@ -273,7 +299,7 @@ Medium-high (biggest parser surface). Mitigation: keep the new reader side-by-si
 
 ## Plan 9 (planned, not scheduled here): save round-trip integrity (was PR I)
 
-O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` regenerates `word/document.xml` and downgrades images to `"[Image: path]"` text; the ODT side regenerates `content.xml` with a reduced element set, while copying every other zip entry unchanged. Until a format-correct writer exists, a save can silently destroy content. The minimal guard ships **inside Plan 6** (refuse instead of degrade); the full writer (styles, numbering, tables, images, TOC) is a separate PR to plan after G/H, together with F-2's `OfficeDocElement` retirement.
+O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` regenerates `word/document.xml` and downgrades images to `"[Image: path]"` text; the ODT side regenerates `content.xml` with a reduced element set, while copying every other zip entry unchanged. Until a format-correct writer exists, a save can silently destroy content. The image guard shipped **inside Plan 6**; Plan 7B extends the closed capability boundary to unsupported authored indexes, named sections, and source table structure. The full writer (styles, numbering, tables, images, TOC) is a separate PR to plan after G/H, together with F-2's `OfficeDocElement` retirement.
 
 ### Side-quest design note (2026-10-02, ClearPDF analysis for Plan 9 pre-change gate)
 
@@ -289,9 +315,13 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 | 1 | **Plan 4** chrome & input | **Plan 6** (image pipeline) | device checklist for findings 1–5, 7; Delivery Gate PASS |
 | 2 | **Plan 5** metrics & pagination | none (touches every test window) | Sample-5 `15..21`, Sample-6 `15..26`, caret/selection suites green |
 | 3 | **Plan 6** images & performance | **Plan 4** | Recents open: no blank frame, media self-heal proven |
-| 4 | **Plan 7** ODF structure | **Plan 8** style-reader scaffolding (different files) | Sample-6.odt fidelity checklist; hyperlink text-count test |
-| 5 | **Plan 8** OOXML structure | tail of **Plan 7** | Sample-6.docx fidelity checklist; both-format convergence |
-| 6 | **Plan 9** save integrity | none | round-trip test: open → save → reopen preserves text, styles, tables, images |
+| 4 | **Plan 7A** ODF numbering/runs/links/bookmarks | none | shipped in PR #26 |
+| 5 | **Plan 7B** canonical/import convergence | none | every ODT entry point agrees; unsupported modified saves fail closed |
+| 6 | **Plan 7C** indexes/sections/navigation/status | none | authored snapshots and named ranges are navigable |
+| 7 | **Plan 7D** tables end to end | none | one table geometry reaches layout, rendering, pagination, and hit-testing |
+| 8 | **Plan 7E** fonts/calibration | none | declared aliases drive metrics/display; fixtures remeasured |
+| 9 | **Plan 8** OOXML structure | after **Plan 7E** | Sample-6.docx fidelity checklist; both-format convergence |
+| 10 | **Plan 9** save integrity | none | round-trip test: open → save → reopen preserves text, styles, tables, images |
 
 **Verification protocol (per `AGENTS.md`).** No local JDK exists in this environment: every PR is verified through GitHub Actions (`gh run list -L 5`, `gh run watch`), with the unit-test job green before review and the nightly build green before the user retests. Manual device verification uses `docs/InkyC1Checklist.md`; its run has been deliberately postponed and should resume after **Plan 4** (chrome/input items), then again after **E** (zoom, caret, selection, session restore: page 15 at 170 %), and after **G/H** (save compatibility).
 
@@ -304,7 +334,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 | 3 | 186 paragraph styles, footnote, chapters | `style1..` heading sizes, footnote |
 | 4 | TOC, 7 master pages, 23 links | 191 styles, heading 6..9, 2 footnotes |
 | 5 | 123 lists, 2583 spans, TOC, Object 1 | `Judul1..`, 75 `w:numPr`, 5 sections |
-| 6 | 45 headings, 115 lists, 1 table, TOC, 5 sections, 3 images | 371 paragraphs, TOC, 133 `w:numPr`, 5 `sectPr`, 3 images |
+| 6 | 45 headings, 23 `text:list` elements, 1 table, TOC, no `text:section`, 3 images | 371 paragraphs, TOC, 133 `w:numPr`, 5 `sectPr`, 3 images |
 
 ---
 

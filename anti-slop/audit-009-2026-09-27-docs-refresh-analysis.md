@@ -1,5 +1,8 @@
 # Papirus Office: Plan 5c pre-write analysis (documentation refresh)
 
+> **Current Plan 7 sequence (2026-10-03):** 7B canonical model/importer convergence -> 7C authored indexes and named sections -> 7D tables end to end -> 7E font-face aliases/final calibration, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+
 **Date:** 2026-09-27
 **Plan:** 5c, documentation only. No app code, resources, tests or workflow files change in this plan.
 **Input:** read-only sweep of `AGENTS.md`, `DESIGN.md` (v2.0), `PROJECT_CONTEXT.md`, `CONCEPT.md`, `antislop.md` + `skills/antislop-*`, `anti-slop/plan-*` and `audit-001..008`, PR #1..#16 on GitHub, the Create New / Welcome / theme / options code, `assets/templates`, `app/src/main/libs`, `tests/`, `docs/`, and the online LibreOffice Writer Guide 26.2 Chapter 1.

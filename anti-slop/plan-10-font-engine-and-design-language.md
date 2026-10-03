@@ -1,7 +1,10 @@
 # Plan 10 — Font Rendering Engine and UI Design Language
 
+> **Current Plan 7 sequence (2026-10-03):** 7B canonical model/importer convergence -> 7C authored indexes and named sections -> 7D tables end to end -> 7E font-face aliases/final calibration, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+
 **Date:** 2026-09-24; scope note updated 2026-09-25
-**Status:** **document-font thread parked on purpose.** The user's decision: prioritize document fidelity, with old PR D (bundled Typeface and substitution) and old PR E (Font Style UI, SAF/user fonts, curated Google Fonts) held for later. The broader hybrid UI source map is now defined in `anti-slop/plan-11-hybrid-experience-design.md` and supersedes this plan's narrower Thread B framing. Plan 11 does not authorize the UI implementation by itself; re-scope before coding.
+**Status:** **document-font thread parked on purpose.** Plan 7E owns only ODF `font-face-decls`, document alias resolution through the existing registry, and the immediate final ODT pagination calibration. It does not absorb this plan's broader real-`Typeface` loading, policy, Font Style UI, SAF/user-font, or curated-font work. Those Plan 10 items remain parked until 7E and 8B converge. The broader hybrid UI source map is defined in `plan-11-hybrid-experience-design.md` and supersedes this plan's narrower Thread B framing; re-scope before coding.
 **Why the document-font thread remains separate:** Plan 5 introduces `FontRegistry` as a substitute-or-system map, and Plans 7/8 preserve imported family identity. Actual document-face loading and metrics parity still need the document fidelity dependencies. This must not block independent UI shell/theme work.
 **Evidence:** `anti-slop/audit-004-2026-09-24.md` (D/E recorded as later bonus work), `anti-slop/audit-006-2026-09-24.md` §2.2 (design-system compliance), F-08/F-09 in `audit-005` (document family fidelity), and Plan 11 (updated product UI direction).
 
