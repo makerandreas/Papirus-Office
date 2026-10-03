@@ -59,7 +59,7 @@ Unmodified imported ODTs still reuse the exact original `content.xml` and preser
 2. title/author/statistics and the reference page count survive `meta.xml` import;
 3. source-feature inventory is derived from the package once;
 4. canonical index/section sidecars, font-face storage, and rich table values survive the adapter;
-5. malformed ZIP input fails through a pure diagnostics implementation without Android `Context`;
+5. truncated/malformed `content.xml` retains package-level failure state, a styles-only template remains valid, and package failures report through pure diagnostics without Android `Context`;
 6. unmodified save preserves exact `content.xml`, while modified unsupported structure is reported and refused;
 7. a source-architecture assertion prevents `writer.OdtDocumentParser` from regrowing an XML parser.
 
@@ -74,4 +74,24 @@ Existing ODT list, hyperlink, heading-run, bookmark, package-preservation, write
 
 ## 7. Verification record
 
-Local static checks: `git diff --check`, constructor/call-site searches, and raw fixture ZIP/XML inventories. The local JDK is unavailable, as recorded by `AGENTS.md`; compilation and tests therefore run through GitHub Actions. Final run IDs, counts, and any remediation belong here and in the PR body once CI completes.
+Local static checks passed: `git diff --check`, constructor/call-site searches, raw fixture ZIP/XML inventories, and checks for unsafe or duplicate archive paths. The local JDK is unavailable, as recorded by `AGENTS.md`; compilation and tests therefore ran through GitHub Actions.
+
+### First CI pass and remediation
+
+[Run `37112663868`](https://github.com/makerandreas/Papirus-Office/actions/runs/37112663868) compiled the implementation at `18c9b26`. Its Build job passed in 5m38s. The Unit Tests job ran 301 tests across 55 suites in 30.98 aggregate test seconds: 299 passed, 2 failed, 0 errored, and 0 skipped. Both failures were new 7B regressions rather than pre-existing suites:
+
+1. Android's tolerant pull parser emitted end-of-document for a truncated `content.xml` without throwing. `SvXMLImport` now validates that only its sentinel context remains after parsing, so unclosed element stacks fail explicitly while the original truncated-input regression remains intact.
+2. An imported object replacement used the valid package-relative href `./ObjectReplacements/Object 1`, while the ZIP entry is `ObjectReplacements/Object 1`. Preserved-package image validation now normalizes a leading `./` only for entry lookup; it continues to preserve the original href, XML, and package bytes.
+
+The remediation is commit `3336d56` (`Harden malformed XML and relative media handling`). It does not weaken either regression or remove the package-media integrity check.
+
+### Passing implementation-head evidence
+
+[Run `37113461800`](https://github.com/makerandreas/Papirus-Office/actions/runs/37113461800) verified `3336d56` after restoring the exact truncated-XML input that exposed the tolerant-parser behavior:
+
+| Job | Result | Evidence |
+|---|---|---|
+| Unit Tests (`111175658032`) | **Pass**, 5m47s | 301 run, 301 passed, 0 failed, 0 errors, 0 skipped; 32.02 aggregate test seconds across 55 suites; all 7 `Plan7bSemanticImportTest` cases passed |
+| Build (SemVer & Nightly) (`111175657933`) | **Pass**, 6m10s | Debug APK build completed; release-only publication steps were correctly skipped for the PR event |
+
+The run completed successfully, both required PR checks are green, and PR [#27](https://github.com/makerandreas/Papirus-Office/pull/27) reports `CLEAN`/mergeable at the verified implementation head. The only commit after this evidence record is the documentation-only commit that records these results; its resulting checks are also linked in the PR.
