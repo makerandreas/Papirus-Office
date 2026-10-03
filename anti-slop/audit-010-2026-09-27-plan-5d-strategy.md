@@ -1,5 +1,8 @@
 # Audit 010 (2026-09-27): Plan 5d Strategy, Fixture Audit, and Roadmap Blueprint
 
+> **Plan split note (2026-10-03):** Historical references here to a combined Plan 7B package or its old downstream PR schedule are superseded. The authoritative sequence is 7B canonical model/importer convergence, 7C authored indexes and named sections, 7D tables end to end, and 7E font-face aliases/final calibration, with exactly one PR per plan. See `audit-014-2026-10-03-plan-7b-convergence.md`; plan IDs, not forecast PR numbers, are authoritative.
+
+
 **Baseline:** `main` `d0ca06e` (PR #17 merged: Plan 5c documentation refresh). Branch `arena/01a0e40a-papirus-office`.  
 **Scope:** Technical verification across all test fixtures (`tests/inky`, `tests/cellina`, `tests/slidia`), bundled template assets (`assets/templates`), LibreOffice 26.2 Writer Guide Chapter 1 compliance vs codebase, ODF 1.4 / OOXML / Java SDK references, Plan 5d technical architecture (breaks and defaults), and the multi-plan roadmap (5d -> 5e -> Plan 1 -> Plans 6-11 -> Device Pass -> Chapter 2).  
 **Method:** Read-only inspection of XML internals, AST/parser structures, LayoutEngine, and test suites. Maintained under antislop Mode 1 (During). Zero em dash characters used.

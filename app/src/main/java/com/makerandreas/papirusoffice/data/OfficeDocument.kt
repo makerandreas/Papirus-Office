@@ -11,7 +11,8 @@ data class OdtPackageData(
     val originalStylesXml: String? = null,
     val originalManifestXml: String? = null,
     val originalMetaXml: String? = null,
-    val originalSettingsXml: String? = null
+    val originalSettingsXml: String? = null,
+    val sourceFeatures: OdtSourceFeatures = OdtSourceFeatures()
 )
 
 data class OfficeDocument(
@@ -28,7 +29,9 @@ data class OfficeDocument(
     val odtPackageData: OdtPackageData? = null,
     val isModified: Boolean = false,
     val sectionStarts: List<SectionStart> = emptyList(),
-    val bookmarks: List<OfficeBookmark> = emptyList()
+    val bookmarks: List<OfficeBookmark> = emptyList(),
+    val authoredIndexes: List<DocumentIndexRange> = emptyList(),
+    val namedSectionRanges: List<DocumentSectionRange> = emptyList()
 )
 
 fun OfficeDocument.toPlainText(): String {
@@ -136,17 +139,44 @@ data class OfficeTextRun(
 data class OfficeTable(
     val rows: List<OfficeTableRow>,
     val numColumns: Int = 0,
-    val name: String? = null
-) : OfficeElement
+    val name: String? = null,
+    val columns: List<OfficeTableColumnSpec> = emptyList(),
+    val styleName: String? = null
+) : OfficeElement {
+    init {
+        require(numColumns >= 0) { "Table column count must be non-negative" }
+    }
+}
 
 data class OfficeTableRow(
-    val cells: List<OfficeTableCell>
-)
+    val cells: List<OfficeTableCell>,
+    val styleName: String? = null,
+    val isHeader: Boolean = false,
+    val repeatCount: Int = 1,
+    val rowStyle: TableRowStyle = TableRowStyle()
+) {
+    init {
+        require(repeatCount > 0) { "Table row repeat count must be positive" }
+    }
+}
 
 data class OfficeTableCell(
     val text: String,
-    val paragraphs: List<OfficeParagraph> = emptyList()
-)
+    val paragraphs: List<OfficeParagraph> = emptyList(),
+    val startColumn: Int = 0,
+    val columnSpan: Int = 1,
+    val rowSpan: Int = 1,
+    val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
+    val repeatCount: Int = 1,
+    val styleName: String? = null,
+    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
+) {
+    init {
+        require(startColumn >= 0) { "Table cell start column must be non-negative" }
+        require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
+        require(repeatCount > 0) { "Table cell repeat count must be positive" }
+    }
+}
 
 data class OfficeImage(
     val imagePath: String,
@@ -237,7 +267,9 @@ data class DocumentStyles(
     /** Named ODF `<text:list-style>` definitions keyed by `style:name`. */
     val listStyles: Map<String, NumberingSpec> = emptyMap(),
     /** Document-level ODF `<text:outline-style>` definition, if present. */
-    val outlineStyle: NumberingSpec? = null
+    val outlineStyle: NumberingSpec? = null,
+    /** ODF font-face declarations keyed by their style:name alias. Populated by Plan 7E. */
+    val fontFaces: Map<String, OfficeFontFace> = emptyMap()
 ) {
     /** Page box behind an ODF master page, if both the master and its layout were read. */
     fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
@@ -535,11 +567,24 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                 OfficeTable(
                     numColumns = elem.numColumns,
                     name = elem.name,
+                    columns = elem.columns,
+                    styleName = elem.styleName,
                     rows = elem.rows.map { row ->
                         OfficeTableRow(
+                            styleName = row.styleName,
+                            isHeader = row.isHeader,
+                            repeatCount = row.repeatCount,
+                            rowStyle = row.rowStyle,
                             cells = row.cells.map { cell ->
                                 OfficeTableCell(
                                     text = cell.text,
+                                    startColumn = cell.startColumn,
+                                    columnSpan = cell.columnSpan,
+                                    rowSpan = cell.rowSpan,
+                                    occupancy = cell.occupancy,
+                                    repeatCount = cell.repeatCount,
+                                    styleName = cell.styleName,
+                                    boxStyle = cell.boxStyle,
                                     paragraphs = cell.paragraphs.map { cellPara ->
                                         val cellBookmarks = cellPara.bookmarks.filter { it.isNotBlank() }
                                         allBookmarkNames.addAll(cellBookmarks)
@@ -592,22 +637,29 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
         else -> "TXT"
     }
 
-    val metadata = DocumentMetadata(
-        title = "Document",
-        creator = "Papirus Office",
-        wordCount = this.plainText.split(Regex("\\s+")).count { it.isNotBlank() },
-        paragraphCount = this.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().size,
-        characterCount = this.plainText.length,
-        pageCount = this.pageCount
+    val metadata = this.metadata.copy(
+        title = this.metadata.title.ifBlank { "Document" },
+        creator = this.metadata.creator.ifBlank { "Papirus Office" },
+        wordCount = this.metadata.wordCount.takeIf { it > 0 }
+            ?: this.plainText.split(Regex("\\s+")).count { it.isNotBlank() },
+        paragraphCount = this.metadata.paragraphCount.takeIf { it > 0 }
+            ?: this.elements.count {
+                it is OfficeDocumentElement.Paragraph || it is OfficeDocumentElement.Heading
+            },
+        characterCount = this.metadata.characterCount.takeIf { it > 0 } ?: this.plainText.length,
+        pageCount = this.pageCount.takeIf { it > 0 } ?: this.metadata.pageCount
     )
 
     return OfficeDocument(
         metadata = metadata,
         styles = this.styles,
         body = DocumentBody(elements = docElements),
+        parserReport = ParserReport(format = formatStr),
         sectionStarts = sectionStarts,
         odtPackageData = this.odtPackageData,
-        bookmarks = allBookmarkNames.map { OfficeBookmark(it) }
+        bookmarks = allBookmarkNames.map { OfficeBookmark(it) },
+        authoredIndexes = authoredIndexes,
+        namedSectionRanges = namedSectionRanges
     )
 }
 

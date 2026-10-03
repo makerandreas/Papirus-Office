@@ -1,5 +1,8 @@
 # Plan 2 — Screenshots Verification and UI/UX Backlog
 
+> **Current Plan 7 sequence (2026-10-03):** 7B canonical model/importer convergence -> 7C authored indexes and named sections -> 7D tables end to end -> 7E font-face aliases/final calibration, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`.
+
+
 **Date:** 2026-09-24
 **Status:** ready to start. Lowest risk, highest visibility, unblocks the manual test loop for Plans 5-9.
 **Evidence:** `anti-slop/audit-006-2026-09-24.md` §1 (screenshot verification, F-21…F-31) and `anti-slop/audit-005-2026-09-24.md` (F-01…F-07).

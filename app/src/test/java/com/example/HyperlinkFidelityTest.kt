@@ -25,8 +25,7 @@ class HyperlinkFidelityTest {
 
     @Test
     fun textAPreservesHrefAcrossDirectCharactersNestedSpansAndTabs() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val importer = SvXMLImport(context)
+        val importer = SvXMLImport()
         val stylesXml = """
             <?xml version="1.0" encoding="UTF-8"?>
             <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"

@@ -7,6 +7,18 @@ import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/** Closed capability result for the current document state and structural writer. */
+data class OdtSaveCapability(
+    val isSupported: Boolean,
+    val blockingFeatures: List<String> = emptyList()
+)
+
+class UnsupportedOdtStructureException(
+    val features: List<String>
+) : IllegalStateException(
+    "Modified ODT serialization does not support: ${features.joinToString(", ")}"
+)
+
 class OdtDocumentWriter : DocumentFormatWriter {
 
     /** An image resolved to embeddable package bytes. */
@@ -23,6 +35,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
 
         try {
             val packageData = document.odtPackageData
+            rejectUnsupportedStructuralRewrite(document)
             val useOriginalContentXml = !document.isModified &&
                 (packageData?.entries?.containsKey("content.xml") == true || packageData?.originalContentXml != null)
 
@@ -123,6 +136,47 @@ class OdtDocumentWriter : DocumentFormatWriter {
         } catch (e: Exception) {
             PapirusLogger.e("ODT", "WRITE_FAILED reason=${e.message}", e)
             throw e
+        }
+    }
+
+    fun saveCapability(document: OfficeDocument): OdtSaveCapability {
+        if (!document.isModified) return OdtSaveCapability(isSupported = true)
+        val source = document.odtPackageData?.sourceFeatures ?: OdtSourceFeatures()
+        val unsupported = buildList {
+            if (source.hasAuthoredIndexes || document.authoredIndexes.isNotEmpty()) add("authored indexes")
+            if (source.hasNamedSections || document.namedSectionRanges.isNotEmpty()) add("named sections")
+            if (source.hasAdvancedTables || document.body.elements.any { it.hasUnsupportedTableSemantics() }) {
+                add("source table structure")
+            }
+        }
+        return OdtSaveCapability(
+            isSupported = unsupported.isEmpty(),
+            blockingFeatures = unsupported
+        )
+    }
+
+    private fun rejectUnsupportedStructuralRewrite(document: OfficeDocument) {
+        val capability = saveCapability(document)
+        if (!capability.isSupported) {
+            throw UnsupportedOdtStructureException(capability.blockingFeatures)
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun OfficeElement.hasUnsupportedTableSemantics(): Boolean {
+        val table = when (this) {
+            is OfficeTable -> this
+            is OfficeDocElement.TableElement -> this.table
+            is OfficeSection -> return elements.any { it.hasUnsupportedTableSemantics() }
+            else -> return false
+        }
+        return table.columns.isNotEmpty() || table.styleName != null || table.rows.any { row ->
+            row.styleName != null || row.isHeader || row.repeatCount != 1 || row.rowStyle != TableRowStyle() ||
+                row.cells.any { cell ->
+                    cell.startColumn != 0 || cell.columnSpan != 1 || cell.rowSpan != 1 ||
+                        cell.occupancy != TableCellOccupancy.ORIGIN || cell.repeatCount != 1 ||
+                        cell.styleName != null || cell.boxStyle != TableCellBoxStyle()
+                }
         }
     }
 
@@ -347,7 +401,8 @@ class OdtDocumentWriter : DocumentFormatWriter {
             }
         }
         for (image in images(document.body.elements)) {
-            val payload = entries[image.imagePath]
+            val normalizedPath = image.imagePath.removePrefix("./")
+            val payload = entries[image.imagePath] ?: entries[normalizedPath]
                 ?: throw IllegalStateException("Original ODT package is missing image media: ${image.imagePath}")
             if (payload.isEmpty() || payload.size.toLong() > com.makerandreas.papirusoffice.data.util.ZipSafe.MAX_IMAGE_BYTES) {
                 throw IllegalStateException("Original ODT image media is empty or oversized: ${image.imagePath}")

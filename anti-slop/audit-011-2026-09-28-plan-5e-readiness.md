@@ -1,5 +1,8 @@
 # Audit 011: Plan 5e readiness and the next implementation sequence
 
+> **Plan split note (2026-10-03):** Historical references here to a combined Plan 7B package or its old downstream PR schedule are superseded. The authoritative sequence is 7B canonical model/importer convergence, 7C authored indexes and named sections, 7D tables end to end, and 7E font-face aliases/final calibration, with exactly one PR per plan. See `audit-014-2026-10-03-plan-7b-convergence.md`; plan IDs, not forecast PR numbers, are authoritative.
+
+
 **Date:** 2026-09-28
 
 **Baseline:** `0f7fc99dec5a214248d343668eb976a4e0a3f709`, branch `arena/01a0e5ed-papirus-office`.
@@ -279,7 +282,7 @@ Passing the project's twelve-section checklist completes the **agreed Chapter 1 
 |---|---|
 | **1, after 5e** | Synchronize actual merged PR numbers, completed/open findings, 26.2 mapping, latest fixture references, test/backend/device status and ownership. Use stable Plan IDs for future work; old PR 17-22 predictions collide with the now-merged 5c/5d PRs. |
 | **6** | Live-path image extents, bounded persistent/self-healing media, decode sizing and real progress; no artificial loading delays. Refuse unsafe image saves until round-trip support exists. |
-| **7A/7B** | ODF numbering, heading runs, links/bookmarks, authored TOC snapshots, table geometry, font identity and sections. Use synthetic section cases where regenerated fixtures no longer contain the old structures. |
+| **7A-7E** | 7A ODF numbering/runs/links/bookmarks; 7B canonical/import convergence; 7C authored indexes + named sections (synthetic section cases required); 7D table geometry through hit-testing; 7E font identity and final calibration. |
 | **8A/8B** | Extend the existing DOCX metric cascade, not replace it; add run/character formatting, numbering, fields/TOC snapshots, tables, relationships and section geometry. Preserve section-type information introduced in 5e. |
 | **9** | Pre-change package/relationship/style/media integrity gate, non-destructive save, untouched-part preservation and safe failures. Test open -> edit -> save -> reopen in Papirus and the originating applications. |
 | **10** | Actual document Typeface loading and measured paint/layout parity; retain original document font identities. A substitution map is not proof a bundled file is used. Recheck pagination after real fonts load; do not force earlier counts by scaling. |

@@ -5,6 +5,8 @@ import com.makerandreas.papirusoffice.data.util.BudgetedInputStream
 import com.makerandreas.papirusoffice.data.util.ZipSafe
 import com.makerandreas.papirusoffice.data.util.ZipScanBudget
 import com.makerandreas.papirusoffice.data.util.nextEntryBudgeted
+import com.makerandreas.papirusoffice.data.odf.AndroidOdfImportDiagnostics
+import com.makerandreas.papirusoffice.data.odf.OdtImportPipeline
 import java.util.Locale
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -1213,51 +1215,35 @@ class OfficeDocumentParser(private val context: Context) {
 
         announce(LoadingStage.READING_STYLES)
 
-        if (isOdt || isOds || detectedOdp) {
-            val odfImport = com.makerandreas.papirusoffice.data.odf.SvXMLImport(context, extractedImages)
-            val stylesXml = if (isOdt) extractOdtStylesXml(file) else null
+        if (isOdt) {
+            val parsedDoc = OdtImportPipeline(AndroidOdfImportDiagnostics(context)).parse(
+                file = file,
+                extractedImages = extractedImages,
+                onStylesParsed = { announce(LoadingStage.READING_BODY) }
+            )
+            if (!parsedDoc.isParsingFailed) {
+                inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
+                cacheRepository.saveCachedDocument(file, parsedDoc)
+            }
+            return@withContext parsedDoc
+        } else if (isOds || detectedOdp) {
+            val odfImport = com.makerandreas.papirusoffice.data.odf.SvXMLImport(
+                extractedImages,
+                AndroidOdfImportDiagnostics(context)
+            )
             val parsedDoc = odfImport.parseOdfXml(
                 xmlContent = xmlContent,
                 fileName = file.name,
-                stylesXmlContent = stylesXml,
-                isOdt = isOdt,
+                stylesXmlContent = null,
+                isOdt = false,
                 isOds = isOds,
                 isOdp = detectedOdp,
                 onStylesParsed = { announce(LoadingStage.READING_BODY) }
             )
             if (!parsedDoc.isParsingFailed) {
-                var finalParsedDoc = parsedDoc
-                val odtPageCount = if (isOdt) extractOdtPageCount(file) else null
-                if (odtPageCount != null && odtPageCount > 0) {
-                    finalParsedDoc = finalParsedDoc.copy(pageCount = odtPageCount)
-                }
-                if (isOdt) {
-                    try {
-                        val packageEntries = mutableMapOf<String, ByteArray>()
-                        java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
-                            var entry = zip.nextEntry
-                            while (entry != null) {
-                                packageEntries[entry.name] = zip.readCappedBytes()
-                                zip.closeEntry()
-                                entry = zip.nextEntry
-                            }
-                        }
-                        val packageData = OdtPackageData(
-                            entries = packageEntries,
-                            originalContentXml = packageEntries["content.xml"]?.toString(Charsets.UTF_8),
-                            originalStylesXml = packageEntries["styles.xml"]?.toString(Charsets.UTF_8),
-                            originalManifestXml = packageEntries["META-INF/manifest.xml"]?.toString(Charsets.UTF_8),
-                            originalMetaXml = packageEntries["meta.xml"]?.toString(Charsets.UTF_8),
-                            originalSettingsXml = packageEntries["settings.xml"]?.toString(Charsets.UTF_8)
-                        )
-                        finalParsedDoc = finalParsedDoc.copy(odtPackageData = packageData)
-                    } catch (e: Exception) {
-                        // Keep parsedDoc if package entry read fails
-                    }
-                }
-                inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), finalParsedDoc)
-                cacheRepository.saveCachedDocument(file, finalParsedDoc)
-                return@withContext finalParsedDoc
+                inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
+                cacheRepository.saveCachedDocument(file, parsedDoc)
+                return@withContext parsedDoc
             }
         }
 

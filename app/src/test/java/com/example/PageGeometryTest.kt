@@ -86,7 +86,6 @@ class PageGeometryTest {
      */
     @Test
     fun fixedHeaderHeightWinsOverMinHeight() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
         val stylesXml = """
             <?xml version="1.0" encoding="UTF-8"?>
             <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -117,7 +116,7 @@ class PageGeometryTest {
               <office:body><office:text><text:p>body</text:p></office:text></office:body>
             </office:document-content>
         """.trimIndent()
-        val parsed = SvXMLImport(context).parseOdfXml(contentXml, "fixed-header.odt", stylesXmlContent = stylesXml)
+        val parsed = SvXMLImport().parseOdfXml(contentXml, "fixed-header.odt", stylesXmlContent = stylesXml)
         assertFalse(parsed.isParsingFailed)
         val spec = parsed.styles.pageStyleForMaster("Standard")
         assertNotNull("Mpm1 must be readable through its master page", spec)

@@ -1,6 +1,5 @@
 package com.makerandreas.papirusoffice.data.odf
 
-import android.content.Context
 import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.LayoutUnits
@@ -14,7 +13,6 @@ import com.makerandreas.papirusoffice.data.PageStyleSpec
 import com.makerandreas.papirusoffice.data.ParagraphTabStop
 import com.makerandreas.papirusoffice.data.TabAlignment
 import com.makerandreas.papirusoffice.data.ParagraphStyle
-import com.makerandreas.papirusoffice.data.util.DocumentParsingLogger
 import com.makerandreas.papirusoffice.data.util.OdfLength
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
@@ -360,10 +358,9 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
 )
 
 class SvXMLImport(
-    private val context: Context,
-    val extractedImages: Map<String, File> = emptyMap()
+    val extractedImages: Map<String, File> = emptyMap(),
+    private val diagnostics: OdfImportDiagnostics = SilentOdfImportDiagnostics
 ) {
-
     private val contextStack = ArrayDeque<SvXMLImportContext>()
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
     private val styleMap = mutableMapOf<String, OdfStyleInfo>()
@@ -1010,12 +1007,7 @@ class SvXMLImport(
                         childContext.onStartElement(token, attributes)
 
                         if (token == OdfXmlToken.XML_UNKNOWN && rawTagName.isNotBlank()) {
-                            DocumentParsingLogger.logUnsupportedTag(
-                                context = context,
-                                fileName = fileName,
-                                tagName = rawTagName,
-                                attributes = attributes
-                            )
+                            diagnostics.unsupportedTag(fileName, rawTagName, attributes)
                         }
                     }
 
@@ -1037,6 +1029,9 @@ class SvXMLImport(
                     }
                 }
                 eventType = parser.next()
+            }
+            if (contextStack.size != 1) {
+                throw IllegalStateException("Unexpected end of ODF XML with ${contextStack.size - 1} unclosed elements")
             }
 
             // Build full plain text from parsed elements
@@ -1084,12 +1079,7 @@ class SvXMLImport(
 
         } catch (e: Exception) {
             val errorMsg = "ODF SAX Import Error: ${e.localizedMessage ?: "Failed parsing XML"}"
-            DocumentParsingLogger.logMalformedXml(
-                context = context,
-                fileName = fileName,
-                errorMsg = errorMsg,
-                cause = e
-            )
+            diagnostics.malformedXml(fileName, errorMsg, e)
             return OfficeParsedDocument(
                 elements = emptyList(),
                 rawXml = xmlContent,

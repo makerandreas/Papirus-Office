@@ -1,5 +1,8 @@
 # Papirus Office — PR Roadmap for the Remaining Plans
 
+> **Plan split note (2026-10-03):** Historical references here to a combined Plan 7B package or its old downstream PR schedule are superseded. The authoritative sequence is 7B canonical model/importer convergence, 7C authored indexes and named sections, 7D tables end to end, and 7E font-face aliases/final calibration, with exactly one PR per plan. See `audit-014-2026-10-03-plan-7b-convergence.md`; plan IDs, not forecast PR numbers, are authoritative.
+
+
 > **SUPERSEDED (2026-09-24).** This is v1, written at baseline `e10f956` before PR #12 landed. The active execution schedule is **`plan-2026-09-24-remaining-pr-roadmap-v2.md`** (baseline `55a9a97`), which re-verified every citation, re-derived the sample matrix with explicit tag boundaries, corrected the Sample-2 TOC count and the grey-allowance arithmetic, and added the Sample-6 DOCX heading-architecture findings (⚑ items). Where the two conflict, v2 wins. Keep this file as the pre-PR-12 record.
 
 **Date:** 2026-09-24
