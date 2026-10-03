@@ -58,6 +58,7 @@ Implementation and PR sequencing are in `anti-slop/plan-11-hybrid-experience-des
   - Main repo: https://gerrit.libreoffice.org/
   - Alternative: https://github.com/LibreOffice/core
 - Collabora Online GitHub: https://github.com/CollaboraOnline/online
+- ClearPDF: https://github.com/Chethan616/ClearPDF.git
 - HarfBuzz: https://github.com/harfbuzz/harfbuzz
 - Microsoft OpenXML SDK Documentation: https://learn.microsoft.com/en-us/office/open-xml/open-xml-sdk
 - OpenXML SDK Repository: https://github.com/dotnet/Open-XML-SDK
