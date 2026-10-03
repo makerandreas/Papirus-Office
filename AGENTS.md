@@ -141,6 +141,9 @@ When necessary, translate all strings to `en_US` and add to `strings.xml`
 ## Notice on JNI
 If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
+## Online Resources
+For other online resources, check the `CONCEPT.md` file on the **Links Used** section. All handful resources are available there for inspiration.
+
 ## Handling `build.yml`
 - Before creating a new build, delete all old assets in the `nightly` tag, delete **all** old releases with their tag (`gh release delete nightly --yes --cleanup-tag`) and force-push the `nightly` tag to the active commit (`${{ github.sha }}`).
 - Add `target_commitish: ${{ github.sha }}` and `make_latest: false` on the `Drop Papirus Nightly Release` step so each release is fresh: current timestamp, tag pointed exactly at the current commit, no old files retained.
