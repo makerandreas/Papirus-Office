@@ -52,6 +52,8 @@ Implementation and PR sequencing are in `anti-slop/plan-11-hybrid-experience-des
 ---
 
 ## 🔗 Links used:
+> Use this as a reference. For `github.com` repos, a `git clone` command can be executed if needed.
+
 - LibreOffice Gerrit:
   - Main repo: https://gerrit.libreoffice.org/
   - Alternative: https://github.com/LibreOffice/core
