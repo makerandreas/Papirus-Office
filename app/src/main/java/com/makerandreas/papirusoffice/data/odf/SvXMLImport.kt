@@ -244,7 +244,11 @@ private class NumberingLevelDraft(
     )
 }
 
-private fun applyLevelTextProperties(draft: NumberingLevelDraft, attrs: Map<String, String>) {
+private fun applyLevelTextProperties(
+    draft: NumberingLevelDraft,
+    attrs: Map<String, String>,
+    fontFaces: Map<String, OfficeFontFace> = emptyMap()
+) {
     val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
     parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
 
@@ -261,9 +265,26 @@ private fun applyLevelTextProperties(draft: NumberingLevelDraft, attrs: Map<Stri
 
     val family = attrs["font-name"] ?: attrs["font-family"]
     if (!family.isNullOrBlank()) {
-        draft.fontFamily = family.trim().trim('\'', '"')
+        draft.fontFamily = resolveFontFamily(family, fontFaces)
     }
 }
+
+/**
+ * The single resolution point for an ODF family value: `style:font-name`
+ * (ODF 1.4 Part 3 20.277) is looked up in the document's declaration table,
+ * and any other spelling falls through to the raw, quote-trimmed name so the
+ * registry still classifies it.
+ *
+ * Resolution happens while the style is read, which is sound because both
+ * `office:document-content` and `office:document-styles` place
+ * `office:font-face-decls` before their style elements; that order was
+ * checked in all twelve fixture parts on 2026-10-04 (audit-017 section 4.1).
+ * `styles.xml` is also parsed before `content.xml`
+ * (`SvXMLImport.parseOdfXml`), so an alias declared in either part is in the
+ * table before any style that uses it is read.
+ */
+private fun resolveFontFamily(raw: String, fontFaces: Map<String, OfficeFontFace>): String =
+    FontFaceResolver.familyFor(raw, fontFaces) ?: raw.trim().trim('\'', '"')
 
 /** Resolved label and font properties for a list item or numbered heading. */
 data class OdfFormattedListLabel(
@@ -412,7 +433,11 @@ private fun applyTableProperties(draft: StyleDraft, family: String, attrs: Map<S
     }
 }
 
-private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
+private fun applyTextProperties(
+    draft: StyleDraft,
+    attrs: Map<String, String>,
+    fontFaces: Map<String, OfficeFontFace> = emptyMap()
+) {
     val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
     parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
 
@@ -434,7 +459,7 @@ private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
 
     val family = attrs["font-name"] ?: attrs["font-family"]
     if (!family.isNullOrBlank()) {
-        draft.fontFamily = family.trim().trim('\'', '"')
+        draft.fontFamily = resolveFontFamily(family, fontFaces)
     }
 }
 
@@ -759,9 +784,9 @@ class SvXMLImport(
                         }
                         "text-properties" -> {
                             if (pendingLevelDraft != null) {
-                                applyLevelTextProperties(pendingLevelDraft!!, attrs)
+                                applyLevelTextProperties(pendingLevelDraft!!, attrs, fontFaces)
                             } else {
-                                pendingDraft?.let { applyTextProperties(it, attrs) }
+                                pendingDraft?.let { applyTextProperties(it, attrs, fontFaces) }
                             }
                         }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
