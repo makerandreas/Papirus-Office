@@ -84,6 +84,19 @@ object DocumentRanges {
         else -> null
     }
 
+    /**
+     * Like [nearestOutside], but also steps over every other hidden range, so a
+     * hidden section nested in (or adjacent to) another hidden one never
+     * resolves into hidden content. Null when everything is hidden.
+     */
+    fun nearestVisible(range: BodyElementRange, hidden: List<BodyElementRange>, size: Int): Int? {
+        if (size <= 0) return null
+        fun isHidden(i: Int) = i in range || hidden.any { i in it }
+        for (i in range.endExclusive until size) if (!isHidden(i)) return i
+        for (i in minOf(range.startInclusive, size) - 1 downTo 0) if (!isHidden(i)) return i
+        return null
+    }
+
     fun nearestValidIndex(index: Int, size: Int): Int? = if (size <= 0) null else index.coerceIn(0, size - 1)
 
     /** Smallest index range containing [elementIndex]; nested indexes resolve to the inner one. */

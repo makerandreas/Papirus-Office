@@ -94,10 +94,19 @@ data class CommentNode(
 data class SectionNode(
     val id: String,
     val sectionName: String, // e.g. "Section1"
+    /** Jump target: first navigable element, or the nearest visible one for a hidden section. */
     val elementIndex: Int,
     val pageIndex: Int = 1,
     val isProtected: Boolean = false,
-    val visibility: VisibilityState = VisibilityState.VISIBLE
+    val visibility: VisibilityState = VisibilityState.VISIBLE,
+    /** Plan 7C: nesting from [com.makerandreas.papirusoffice.data.DocumentSectionRange]. */
+    val parentId: String? = null,
+    val depth: Int = 0,
+    /** Half-open body range; legacy marker sections cover only their own element. */
+    val rangeStart: Int = elementIndex,
+    val rangeEnd: Int = elementIndex + 1,
+    /** `text:display="condition"`: listed as visible because the condition is not evaluated. */
+    val isConditional: Boolean = false
 )
 
 /**
@@ -179,6 +188,40 @@ data class ReminderNode(
 )
 
 /**
+ * Plan 7C: one entry of an authored index. The entry paragraph stays in body
+ * flow at [elementIndex]; [pageLabel] is the page number text as authored
+ * (roman labels stay strings) and [targetBookmarkId] is set only when the
+ * entry's link anchor resolves to a bookmark the index engine registered.
+ */
+data class IndexEntryNode(
+    val id: String,
+    val text: String,
+    val level: Int?,
+    val pageLabel: String?,
+    val targetAnchor: String?,
+    val elementIndex: Int,
+    val pageIndex: Int = 1,
+    val targetBookmarkId: String? = null
+)
+
+/**
+ * Plan 7C: an authored index (table of contents, alphabetical index and the
+ * other ODF index kinds). [elementIndex] is the jump target (first navigable
+ * element of the index), [rangeStart]/[rangeEnd] the half-open body range.
+ */
+data class IndexNode(
+    val id: String,
+    val name: String?,
+    val kind: com.makerandreas.papirusoffice.data.DocumentIndexKind,
+    val elementIndex: Int,
+    val pageIndex: Int = 1,
+    val isProtected: Boolean = false,
+    val entries: List<IndexEntryNode> = emptyList(),
+    val rangeStart: Int = elementIndex,
+    val rangeEnd: Int = elementIndex
+)
+
+/**
  * Complete Indexed Document Object Tree.
  */
 data class DocumentIndex(
@@ -194,20 +237,24 @@ data class DocumentIndex(
     val hyperlinks: List<HyperlinkNode> = emptyList(),
     val shapes: List<ShapeNode> = emptyList(),
     val oleObjects: List<OleNode> = emptyList(),
-    val reminders: List<ReminderNode> = emptyList()
+    val reminders: List<ReminderNode> = emptyList(),
+    /** Plan 7C: authored indexes with their entries. */
+    val authoredIndexes: List<IndexNode> = emptyList(),
+    /** Parser format ("ODT", "DOCX", ...) used to word empty states honestly. */
+    val sourceFormat: String = ""
 ) {
     fun isEmpty(): Boolean =
         headings.isEmpty() && tables.isEmpty() && images.isEmpty() &&
                 bookmarks.isEmpty() && comments.isEmpty() && sections.isEmpty() &&
                 frames.isEmpty() && fields.isEmpty() && footnotes.isEmpty() &&
                 hyperlinks.isEmpty() && shapes.isEmpty() && oleObjects.isEmpty() &&
-                reminders.isEmpty()
+                reminders.isEmpty() && authoredIndexes.isEmpty()
 
     fun totalItemsCount(): Int =
         headings.size + tables.size + images.size + bookmarks.size +
                 comments.size + sections.size + frames.size + fields.size +
                 footnotes.size + hyperlinks.size + shapes.size + oleObjects.size +
-                reminders.size
+                reminders.size + authoredIndexes.size
 }
 
 // ==========================================

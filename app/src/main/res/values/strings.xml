@@ -156,6 +156,8 @@
     <string name="fct_copy">Copy</string>
     <string name="fct_paste">Paste</string>
     <string name="fct_select_all">Select All</string>
+    <!-- Plan 7C: FCT Compact action on a linked table-of-contents entry. -->
+    <string name="fct_go_to_entry">Go to entry…</string>
     <string name="fct_format">Format</string>
     <string name="fct_more">More</string>
     <string name="fct_back">Back</string>
@@ -184,6 +186,16 @@
     <string name="statusbar_object_heading">Heading %1$d: %2$s</string>
     <string name="statusbar_object_table">Table</string>
     <string name="statusbar_object_list_item">List item</string>
+    <!-- Plan 7C: status bar inside an authored index shows the index type (LO Writer index type names). -->
+    <string name="statusbar_index_table_of_contents">Table of Contents</string>
+    <string name="statusbar_index_alphabetical">Alphabetical Index</string>
+    <string name="statusbar_index_illustrations">Table of Figures</string>
+    <string name="statusbar_index_tables">Index of Tables</string>
+    <string name="statusbar_index_user_defined">User-Defined</string>
+    <string name="statusbar_index_objects">Table of Objects</string>
+    <string name="statusbar_index_bibliography">Bibliography</string>
+    <!-- Plan 7C: section name joined with the heading, table or list detail (LO sStatusDelim). -->
+    <string name="statusbar_object_joined">%1$s : %2$s</string>
     <!-- Status bar controls (Plan 2) -->
     <string name="inky_pages_empty">No pages to display</string>
     <string name="inky_status_pages">Pages</string>
@@ -275,6 +287,10 @@
     <string name="nav_previous">Previous</string>
     <string name="nav_next">Next</string>
     <string name="object_is_hidden">This object is hidden</string>
+    <string name="navigator_notice_hidden_section">This section is hidden. Moved to the nearest visible text.</string>
+    <string name="navigator_notice_no_items">Nothing to go to in this category.</string>
+    <string name="navigator_index_entry_with_page">%1$s, page %2$s</string>
+    <string name="navigator_index_unnamed">%1$s %2$d</string>
     <string name="open_navigation_bar">Open Navigation Bar</string>
     <string name="navigator_page_item">Page %1$d</string>
     <string name="navigator_footnote_item">Footnote %1$s</string>

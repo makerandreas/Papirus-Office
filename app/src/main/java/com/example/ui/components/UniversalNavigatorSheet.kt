@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.makerandreas.papirusoffice.data.DocumentIndexKind
 import com.makerandreas.papirusoffice.data.navigation.*
 
 /**
@@ -47,12 +49,17 @@ fun NavigatorSheetContent(
     val context = LocalContext.current
     val navState by navEngine.state.collectAsState()
 
-    // Handle toast notifications from engine (e.g. "This object is hidden")
-    LaunchedEffect(navState.notificationMessage) {
-        val msg = navState.notificationMessage
-        if (msg != null) {
-            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-            navEngine.clearNotificationMessage()
+    // Engine notices are typed; the strings live in strings.xml (audit-015 F-11).
+    LaunchedEffect(navState.notice) {
+        val notice = navState.notice
+        if (notice != null) {
+            val res = when (notice) {
+                NavigatorNotice.HIDDEN_ITEM -> R.string.object_is_hidden
+                NavigatorNotice.HIDDEN_SECTION_NEAREST_VISIBLE -> R.string.navigator_notice_hidden_section
+                NavigatorNotice.NO_ITEMS_IN_MODE, NavigatorNotice.NO_ITEMS_IN_CATEGORY -> R.string.navigator_notice_no_items
+            }
+            Toast.makeText(context, context.getString(res), Toast.LENGTH_SHORT).show()
+            navEngine.clearNotice()
         }
     }
 
@@ -380,7 +387,6 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["bookmarks"] == true) {
                     if (index.bookmarks.isEmpty()) {
-                        // TODO(plan-18/20): bookmark parsing makes this readable.
                         item { NavigatorEmptyRow("bookmarks", R.string.navigate_by_bookmarks) }
                     } else {
                         items(index.bookmarks) { bm ->
@@ -427,7 +433,10 @@ fun NavigatorSheetContent(
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_sections),
                         icon = Icons.Rounded.ViewAgenda,
-                        count = null,
+                        count = index.sections.size.takeIf {
+                            NavigatorCategories.of("sections").availabilityFor(index.sourceFormat) !=
+                                NavigatorCategoryAvailability.NOT_READABLE_YET
+                        },
                         isExpanded = expandedCategories["sections"] == true,
                         onToggleExpand = {
                             expandedCategories["sections"] = !(expandedCategories["sections"] ?: false)
@@ -436,23 +445,9 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["sections"] == true) {
                     if (index.sections.isEmpty()) {
-                        // TODO(plan-19/21): section identity makes this readable.
-                        item { NavigatorEmptyRow("sections", R.string.navigate_by_sections) }
+                        item { NavigatorEmptyRow("sections", R.string.navigate_by_sections, index.sourceFormat) }
                     } else {
-                        items(index.sections) { sec ->
-                            LeafItemRow(
-                                name = sec.sectionName,
-                                icon = Icons.Rounded.ViewAgenda,
-                                isSelected = navState.activeItemId == sec.id,
-                                isHidden = sec.visibility == VisibilityState.HIDDEN,
-                                onClick = {
-                                    if (sec.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                    }
-                                    navEngine.goToSection(sec.id)
-                                }
-                            )
-                        }
+                        sectionRows(index.sections, navState.activeItemId, baseIndent = 40.dp) { navEngine.goToSection(it) }
                     }
                 }
 
@@ -460,9 +455,9 @@ fun NavigatorSheetContent(
                 //
                 // The category AGENTS.md's Navigator Deck list calls for and this
                 // strip never had. No parser constructs OfficeHyperlink yet, so it
-                // opens in the not-yet-readable shape; the jump arrives with the
-                // parser (plan 18/20).
-                // TODO(plan-18/20): hyperlink parsing and its jump make this readable.
+                // opens in the not-yet-readable shape. Table of contents links are
+                // listed under their index instead (Plan 7C, owner decision 3).
+                // TODO(unassigned): no plan item owns hyperlink elements yet.
                 item {
                     CategoryHeaderRow(
                         title = stringResource(R.string.navigate_by_hyperlinks),
@@ -476,6 +471,36 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["hyperlinks"] == true) {
                     item { NavigatorEmptyRow("hyperlinks", R.string.navigate_by_hyperlinks) }
+                }
+
+                // 9b. Indexes (Plan 7C): authored tables of contents and other
+                // ODF indexes, each with its entries as indented child rows.
+                item {
+                    CategoryHeaderRow(
+                        title = stringResource(R.string.navigate_by_indexes),
+                        icon = Icons.AutoMirrored.Rounded.Toc,
+                        count = index.authoredIndexes.size.takeIf {
+                            NavigatorCategories.of("indexes").availabilityFor(index.sourceFormat) !=
+                                NavigatorCategoryAvailability.NOT_READABLE_YET
+                        },
+                        isExpanded = expandedCategories["indexes"] == true,
+                        onToggleExpand = {
+                            expandedCategories["indexes"] = !(expandedCategories["indexes"] ?: false)
+                        }
+                    )
+                }
+                if (expandedCategories["indexes"] == true) {
+                    if (index.authoredIndexes.isEmpty()) {
+                        item { NavigatorEmptyRow("indexes", R.string.navigate_by_indexes, index.sourceFormat) }
+                    } else {
+                        authoredIndexRows(
+                            indexes = index.authoredIndexes,
+                            activeId = navState.activeItemId,
+                            baseIndent = 40.dp,
+                            onIndexClick = { navEngine.goToIndex(it) },
+                            onEntryClick = { navEngine.goToIndexEntry(it) }
+                        )
+                    }
                 }
 
                 // 10. Fields
@@ -492,7 +517,7 @@ fun NavigatorSheetContent(
                 }
                 if (expandedCategories["fields"] == true) {
                     if (index.fields.isEmpty()) {
-                        // TODO(plan-21): the field model makes this readable.
+                        // TODO(plan-8B): the field model makes this readable.
                         item { NavigatorEmptyRow("fields", R.string.navigate_by_fields) }
                     } else {
                         items(index.fields) { f ->
@@ -727,23 +752,9 @@ fun NavigatorSheetContent(
                     }
                     NavigateBy.SECTION -> {
                         if (index.sections.isEmpty()) {
-                            item { NavigatorEmptyRow("sections", R.string.navigate_by_sections) }
+                            item { NavigatorEmptyRow("sections", R.string.navigate_by_sections, index.sourceFormat) }
                         } else {
-                            items(index.sections) { sec ->
-                                LeafItemRow(
-                                    name = sec.sectionName,
-                                    icon = Icons.Rounded.ViewAgenda,
-                                    isSelected = navState.activeItemId == sec.id,
-                                    isHidden = sec.visibility == VisibilityState.HIDDEN,
-                                    startPadding = 16.dp,
-                                    onClick = {
-                                        if (sec.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
-                                        }
-                                        navEngine.goToSection(sec.id)
-                                    }
-                                )
-                            }
+                            sectionRows(index.sections, navState.activeItemId, baseIndent = 16.dp) { navEngine.goToSection(it) }
                         }
                     }
                     NavigateBy.FIELD -> {
@@ -827,9 +838,18 @@ fun NavigatorSheetContent(
                             }
                         }
                     }
-                    // TODO(plan-19/21): the TOC/index snapshot makes this readable.
                     NavigateBy.INDEX -> {
-                        item { NavigatorEmptyRow("indexes", R.string.navigate_by_indexes) }
+                        if (index.authoredIndexes.isEmpty()) {
+                            item { NavigatorEmptyRow("indexes", R.string.navigate_by_indexes, index.sourceFormat) }
+                        } else {
+                            authoredIndexRows(
+                                indexes = index.authoredIndexes,
+                                activeId = navState.activeItemId,
+                                baseIndent = 16.dp,
+                                onIndexClick = { navEngine.goToIndex(it) },
+                                onEntryClick = { navEngine.goToIndexEntry(it) }
+                            )
+                        }
                     }
                     else -> {
                         item { EmptyCategoryRow() }
@@ -1142,20 +1162,97 @@ private fun EmptyCategoryRow() {
  *
  * The caller only reaches this row when the category's list is empty. What may
  * be said about that emptiness depends on whether a parser can see the class at
- * all: "No images in this document" is a fact, "No bookmarks in this document"
- * would be a guess, because no parser builds OfficeBookmark yet (plan-03 3.32).
+ * all: "No images in this document" is a fact, "No comments in this document"
+ * would be a guess, because no parser builds OfficeComment yet (plan-03 3.32).
+ * Some categories are readable for one format only ([sourceFormat]): Plan 7C
+ * reads ODF sections and indexes, so a DOCX file keeps the not-yet wording.
  * [NavigatorCategories] is the single source for that split, and
  * [NavigatorCategoryHonestyTest] keeps the split in step with the source tree.
  */
 @Composable
-private fun NavigatorEmptyRow(key: String, labelRes: Int) {
+private fun NavigatorEmptyRow(key: String, labelRes: Int, sourceFormat: String? = null) {
     val category = NavigatorCategories.of(key)
-    val text = if (category.availability == NavigatorCategoryAvailability.NOT_READABLE_YET) {
+    val text = if (category.availabilityFor(sourceFormat) == NavigatorCategoryAvailability.NOT_READABLE_YET) {
         stringResource(R.string.navigator_not_yet_available)
     } else {
         stringResource(R.string.navigator_none_in_document, stringResource(labelRes))
     }
     CategoryEmptyRow(text)
+}
+
+/** String resource naming an index kind, as LO Writer names index types. */
+fun indexKindLabelRes(kind: DocumentIndexKind): Int = when (kind) {
+    DocumentIndexKind.TABLE_OF_CONTENT -> R.string.statusbar_index_table_of_contents
+    DocumentIndexKind.ALPHABETICAL_INDEX -> R.string.statusbar_index_alphabetical
+    DocumentIndexKind.ILLUSTRATION_INDEX -> R.string.statusbar_index_illustrations
+    DocumentIndexKind.TABLE_INDEX -> R.string.statusbar_index_tables
+    DocumentIndexKind.USER_INDEX -> R.string.statusbar_index_user_defined
+    DocumentIndexKind.OBJECT_INDEX -> R.string.statusbar_index_objects
+    DocumentIndexKind.BIBLIOGRAPHY -> R.string.statusbar_index_bibliography
+}
+
+/**
+ * Plan 7C section rows: nested sections indent by depth; hidden sections are
+ * listed greyed out and still jump (to the nearest visible position, owner
+ * decision 2). The engine raises the notice, so no toast is shown here.
+ */
+private fun LazyListScope.sectionRows(
+    sections: List<SectionNode>,
+    activeId: String?,
+    baseIndent: Dp,
+    onClick: (String) -> Unit
+) {
+    items(sections, key = { it.id }) { sec ->
+        LeafItemRow(
+            name = sec.sectionName,
+            icon = Icons.Rounded.ViewAgenda,
+            isSelected = activeId == sec.id,
+            isHidden = sec.visibility == VisibilityState.HIDDEN,
+            startPadding = baseIndent + (sec.depth * 16).dp,
+            onClick = { onClick(sec.id) }
+        )
+    }
+}
+
+/**
+ * Plan 7C index rows: the index jumps to its start; each entry is an indented
+ * child row (by entry level) that jumps to the entry paragraph and shows a
+ * link icon when its target resolves to a bookmark.
+ */
+private fun LazyListScope.authoredIndexRows(
+    indexes: List<IndexNode>,
+    activeId: String?,
+    baseIndent: Dp,
+    onIndexClick: (String) -> Unit,
+    onEntryClick: (String) -> Unit
+) {
+    indexes.forEachIndexed { ordinal, node ->
+        item(key = node.id) {
+            val kindLabel = stringResource(indexKindLabelRes(node.kind))
+            LeafItemRow(
+                name = node.name?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.navigator_index_unnamed, kindLabel, ordinal + 1),
+                icon = Icons.AutoMirrored.Rounded.Toc,
+                isSelected = activeId == node.id,
+                startPadding = baseIndent,
+                onClick = { onIndexClick(node.id) }
+            )
+        }
+        items(node.entries, key = { it.id }) { entry ->
+            val label = entry.pageLabel
+            LeafItemRow(
+                name = if (label != null) {
+                    stringResource(R.string.navigator_index_entry_with_page, entry.text, label)
+                } else {
+                    entry.text
+                },
+                icon = if (entry.targetBookmarkId != null) Icons.Rounded.Link else Icons.AutoMirrored.Rounded.Notes,
+                isSelected = activeId == entry.id,
+                startPadding = baseIndent + 16.dp + (((entry.level ?: 1) - 1).coerceIn(0, 9) * 12).dp,
+                onClick = { onEntryClick(entry.id) }
+            )
+        }
+    }
 }
 
 @Composable

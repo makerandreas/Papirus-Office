@@ -1,6 +1,9 @@
 package com.makerandreas.papirusoffice.data.navigation
 
+import com.makerandreas.papirusoffice.data.BodyElementRange
 import com.makerandreas.papirusoffice.data.DocumentLayoutResult
+import com.makerandreas.papirusoffice.data.DocumentRanges
+import com.makerandreas.papirusoffice.data.SectionDisplay
 import com.makerandreas.papirusoffice.data.OfficeBookmark
 import com.makerandreas.papirusoffice.data.OfficeComment
 import com.makerandreas.papirusoffice.data.OfficeDocument
@@ -80,7 +83,30 @@ class DocumentIndexEngine(
         val rawElements = flattenDocumentElements(document)
         val locale = NavigatorStringCatalog.resolveNavigatorLocale(document, preferAppLocale, appLanguageTag)
 
-        fun pageFor(elemIndex: Int): Int = layoutPageMap[elemIndex] ?: currentPages
+        // Page by page-break count, so ranges resolved after the body loop get
+        // the same fallback page as elements visited inside it.
+        val breakPages = IntArray(rawElements.size)
+        run {
+            var page = 1
+            rawElements.forEachIndexed { i, el ->
+                if (el is OfficePageBreak) page++
+                breakPages[i] = page
+            }
+        }
+        fun pageFor(elemIndex: Int): Int =
+            layoutPageMap[elemIndex] ?: breakPages.getOrNull(elemIndex) ?: currentPages
+
+        // Plan 7C: paragraphs inside an authored index are index content, never
+        // headings (audit-015 F-1), and TOC entry links are grouped under their
+        // index rather than listed as hyperlinks (owner decision 3).
+        val sidecarsFit = document.authoredIndexes.all { it.bodyRange.endExclusive <= rawElements.size }
+        val indexRanges = if (sidecarsFit) document.authoredIndexes else emptyList()
+        val inIndex = BooleanArray(rawElements.size)
+        val linkedEntryElements = HashSet<Int>()
+        indexRanges.forEach { range ->
+            for (i in range.bodyRange.startInclusive until range.bodyRange.endExclusive) inIndex[i] = true
+            range.entries.forEach { if (it.targetAnchor != null) linkedEntryElements.add(it.elementIndex) }
+        }
         fun storedOrAuto(stored: String?, kind: NavigatorObjectKind, index: Int): String {
             val trimmed = stored?.trim().orEmpty()
             if (trimmed.isNotEmpty()) return trimmed
@@ -102,7 +128,8 @@ class DocumentIndexEngine(
         }
         fun indexRuns(runs: List<com.makerandreas.papirusoffice.data.OfficeTextRun>, elIndex: Int) {
             runs.forEach { run ->
-                if (!run.hyperlink.isNullOrBlank()) {
+                val groupedUnderIndex = elIndex in linkedEntryElements && run.hyperlink?.startsWith("#") == true
+                if (!run.hyperlink.isNullOrBlank() && !groupedUnderIndex) {
                     val linkId = "link_${hyperlinksList.size + 1}"
                     hyperlinksList.add(
                         HyperlinkNode(
@@ -160,7 +187,7 @@ class DocumentIndexEngine(
                 is OfficeParagraph -> {
                     paragraphCounter++
                     val pText = element.text
-                    val headingLevel = resolveParagraphHeadingLevel(element)
+                    val headingLevel = if (inIndex.getOrElse(elemIndex) { false }) 0 else resolveParagraphHeadingLevel(element)
 
                     if (headingLevel > 0) {
                         val id = "heading_$paragraphCounter"
@@ -350,6 +377,64 @@ class DocumentIndexEngine(
             )
         }
 
+        val authoredIndexNodes = indexRanges.mapNotNull { range ->
+            val jump = DocumentRanges.firstNavigableIndex(range.bodyRange, rawElements) ?: return@mapNotNull null
+            IndexNode(
+                id = "authored_${range.id}",
+                name = range.name,
+                kind = range.kind,
+                elementIndex = jump,
+                pageIndex = pageFor(jump),
+                isProtected = range.isProtected,
+                entries = range.entries.mapIndexed { entryIndex, entry ->
+                    IndexEntryNode(
+                        id = "authored_${range.id}_entry_${entryIndex + 1}",
+                        text = entry.text,
+                        level = entry.level,
+                        pageLabel = entry.displayedPageLabel,
+                        targetAnchor = entry.targetAnchor,
+                        elementIndex = entry.elementIndex,
+                        pageIndex = pageFor(entry.elementIndex),
+                        targetBookmarkId = entry.targetAnchor?.let { anchor ->
+                            bookmarksList.firstOrNull { it.name == anchor }?.id
+                        }
+                    )
+                },
+                rangeStart = range.bodyRange.startInclusive,
+                rangeEnd = range.bodyRange.endExclusive
+            )
+        }
+
+        val sectionRanges = document.namedSectionRanges.filter { it.bodyRange.endExclusive <= rawElements.size }
+        val hiddenRanges: List<BodyElementRange> = sectionRanges
+            .filter { it.display == SectionDisplay.HIDDEN }
+            .map { it.bodyRange }
+        val rangeSectionNodes = sectionRanges.mapNotNull { range ->
+            val id = "section_range_${range.id}"
+            val hidden = range.display == SectionDisplay.HIDDEN ||
+                objectVisibilities[id] == VisibilityState.HIDDEN
+            val jump = (if (hidden) DocumentRanges.nearestVisible(range.bodyRange, hiddenRanges, rawElements.size) else null)
+                ?: DocumentRanges.firstNavigableIndex(range.bodyRange, rawElements)
+                ?: return@mapNotNull null
+            SectionNode(
+                id = id,
+                sectionName = range.name,
+                elementIndex = jump,
+                pageIndex = pageFor(jump),
+                isProtected = range.isProtected,
+                visibility = if (hidden) VisibilityState.HIDDEN else VisibilityState.VISIBLE,
+                parentId = range.parentId?.let { "section_range_$it" },
+                depth = range.depth,
+                rangeStart = range.bodyRange.startInclusive,
+                rangeEnd = range.bodyRange.endExclusive,
+                isConditional = range.display == SectionDisplay.CONDITIONAL
+            )
+        }
+        val allSections = (sectionsList + rangeSectionNodes)
+            .withIndex()
+            .sortedWith(compareBy({ it.value.rangeStart }, { it.value.depth }, { it.index }))
+            .map { it.value }
+
         val hierarchicalHeadings = buildHeadingTree(headingsList)
 
         currentIndex = DocumentIndex(
@@ -358,14 +443,16 @@ class DocumentIndexEngine(
             images = imagesList,
             bookmarks = bookmarksList,
             comments = commentsList,
-            sections = sectionsList,
+            sections = allSections,
             frames = framesList,
             fields = fieldsList,
             footnotes = footnotesList,
             hyperlinks = hyperlinksList,
             shapes = shapesList,
             oleObjects = oleList,
-            reminders = remindersList
+            reminders = remindersList,
+            authoredIndexes = authoredIndexNodes,
+            sourceFormat = document.parserReport.format
         )
 
         return currentIndex
@@ -440,19 +527,12 @@ class DocumentIndexEngine(
         }
     }
 
-    private fun flattenDocumentElements(doc: OfficeDocument): List<OfficeElement> {
-        val result = mutableListOf<OfficeElement>()
-        doc.sections.forEach { section ->
-            result.add(OfficeSection(name = section.name))
-            section.elements.forEach { elem ->
-                result.add(elem)
-            }
-        }
-        doc.body.elements.forEach { elem ->
-            result.add(elem)
-        }
-        return result
-    }
+    /**
+     * Body elements in order. Indices must equal body positions: layout page
+     * maps, caret windows and the Plan 7C range sidecars all address the body
+     * directly, so nothing may be prepended here (audit-015 F-7).
+     */
+    private fun flattenDocumentElements(doc: OfficeDocument): List<OfficeElement> = doc.body.elements
 
     override fun getBookmarks(): List<BookmarkNode> = currentIndex.bookmarks
     override fun getTextTables(): List<TableNode> = currentIndex.tables

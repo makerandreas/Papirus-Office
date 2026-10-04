@@ -686,25 +686,47 @@ fun InkyModule(
     // level and text (resolved by the Navigator index, which is also the only
     // resolver that follows style parents, so Sample-5's paragraph-styled
     // headings count), the element kind for tables and list items, and the
-    // hyphen placeholder elsewhere. Table row/column, section names and image
-    // geometry are not guessed: they arrive with plans 19/21.
+    // hyphen placeholder elsewhere. Plan 7C adds authored ranges: inside an
+    // index only the index type is shown, otherwise the innermost section name
+    // joins the detail (StatusObjectResolver). Table row/column and image
+    // geometry are still not guessed.
     var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
+    // Plan 7C: anchor offered by FCT Compact "Go to entry…" for the caret's
+    // table-of-contents entry; null hides the action.
+    var fctGoToEntryAnchor by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
         val elements = activeLayoutDocument.body.elements
         if (elements.isEmpty()) {
             statusBarObjectInfo = null
+            fctGoToEntryAnchor = null
             return@LaunchedEffect
         }
         val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
         val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
         val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
         val caretElementIndex = hit?.elementIndex ?: layoutCursor.elementIndex
-        statusBarObjectInfo = resolveStatusBarObjectInfo(
+        val statusDetail = resolveStatusBarObjectInfo(
             context = context,
             caretElementIndex = caretElementIndex,
             elements = elements,
             headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings)
+        )
+        val statusRanges = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.resolve(
+            indexes = activeLayoutDocument.authoredIndexes,
+            sections = activeLayoutDocument.namedSectionRanges,
+            elementIndex = caretElementIndex
+        )
+        statusBarObjectInfo = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.compose(
+            context = statusRanges,
+            detail = statusDetail,
+            indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
+            join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
+        )
+        fctGoToEntryAnchor = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.goToEntryAnchor(
+            indexes = activeLayoutDocument.authoredIndexes,
+            bookmarkNames = navEngineState.index.bookmarks.mapTo(HashSet()) { it.name },
+            elementIndex = caretElementIndex
         )
         val element = hit?.let { elements.getOrNull(it.elementIndex) }
             ?: elements.getOrNull(layoutCursor.elementIndex)
@@ -3796,6 +3818,9 @@ fun InkyModule(
         },
         onSetReminderClick = {
             showSetReminderDialog = true
+        },
+        onGoToEntryClick = fctGoToEntryAnchor?.let { anchor ->
+            { navEngine.goToIndexEntryTarget(anchor); Unit }
         }
     )
 

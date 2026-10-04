@@ -45,6 +45,22 @@ data class NavTargetSignal(
 )
 
 /**
+ * Typed Navigator notices. The engine has no Android context, so the sheet
+ * maps each value to an en_US string resource (audit-015 F-11) instead of the
+ * engine carrying English literals.
+ */
+enum class NavigatorNotice {
+    /** The target is hidden and the jump was refused. */
+    HIDDEN_ITEM,
+    /** The target section is hidden; the jump landed on the nearest visible position. */
+    HIDDEN_SECTION_NEAREST_VISIBLE,
+    /** Previous/next has nothing to step through in the current Navigate By mode. */
+    NO_ITEMS_IN_MODE,
+    /** The current category has no items to step through. */
+    NO_ITEMS_IN_CATEGORY
+}
+
+/**
  * Reactive State representing the current Navigator under-the-hood engine state.
  */
 data class NavigatorState(
@@ -54,7 +70,7 @@ data class NavigatorState(
     val activeItemId: String? = null,
     val currentPage: Int = 1,
     val totalPages: Int = 1,
-    val notificationMessage: String? = null,
+    val notice: NavigatorNotice? = null,
     val navTargetSignal: NavTargetSignal? = null,
     val headingFoldStates: Map<String, Boolean> = emptyMap(),
     val objectVisibilities: Map<String, VisibilityState> = emptyMap()
@@ -170,7 +186,7 @@ class NavigationEngine(
 
         // Phase 7: Check Hidden state
         if (table.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            showNotice(NavigatorNotice.HIDDEN_ITEM)
             return
         }
 
@@ -191,7 +207,7 @@ class NavigationEngine(
 
         // Phase 7: Check Hidden state
         if (img.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            showNotice(NavigatorNotice.HIDDEN_ITEM)
             return
         }
 
@@ -222,11 +238,31 @@ class NavigationEngine(
         )
     }
 
+    /**
+     * Jumps to a section. Range sections (Plan 7C) carry their resolved jump
+     * target in [SectionNode.elementIndex]: the first navigable element, or for
+     * a hidden section the nearest visible position outside it (owner decision
+     * 2, closest to LO Writer). Legacy marker sections keep refusing hidden jumps.
+     */
     fun goToSection(id: String) {
         val sec = _state.value.index.sections.find { it.id == id } ?: return
 
         if (sec.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            if (!sec.id.startsWith(RANGE_SECTION_PREFIX)) {
+                showNotice(NavigatorNotice.HIDDEN_ITEM)
+                return
+            }
+            emitNavSignal(
+                signal = NavTargetSignal(
+                    targetType = NavigateBy.SECTION,
+                    targetId = sec.id,
+                    targetPageIndex = sec.pageIndex,
+                    targetElementIndex = sec.elementIndex,
+                    titleOrLabel = sec.sectionName
+                ),
+                activeItemId = sec.id
+            )
+            showNotice(NavigatorNotice.HIDDEN_SECTION_NEAREST_VISIBLE)
             return
         }
 
@@ -242,11 +278,54 @@ class NavigationEngine(
         )
     }
 
+    /** Plan 7C: jumps to the start of an authored index (leading page breaks skipped). */
+    fun goToIndex(id: String) {
+        val idx = _state.value.index.authoredIndexes.find { it.id == id } ?: return
+        emitNavSignal(
+            signal = NavTargetSignal(
+                targetType = NavigateBy.INDEX,
+                targetId = idx.id,
+                targetPageIndex = idx.pageIndex,
+                targetElementIndex = idx.elementIndex,
+                titleOrLabel = idx.name.orEmpty()
+            ),
+            activeItemId = idx.id
+        )
+    }
+
+    /** Plan 7C: jumps to an index entry paragraph itself (the row in the index). */
+    fun goToIndexEntry(id: String) {
+        val entry = _state.value.index.authoredIndexes.asSequence()
+            .flatMap { it.entries.asSequence() }
+            .firstOrNull { it.id == id } ?: return
+        emitNavSignal(
+            signal = NavTargetSignal(
+                targetType = NavigateBy.INDEX,
+                targetId = entry.id,
+                targetPageIndex = entry.pageIndex,
+                targetElementIndex = entry.elementIndex,
+                titleOrLabel = entry.text
+            ),
+            activeItemId = entry.id
+        )
+    }
+
+    /**
+     * Plan 7C "Go to entry...": follows an index entry's link to its target
+     * bookmark. Returns false when the anchor does not resolve, so callers
+     * only offer the action when it can succeed.
+     */
+    fun goToIndexEntryTarget(anchor: String): Boolean {
+        val bookmark = _state.value.index.bookmarks.find { it.name == anchor } ?: return false
+        goToBookmark(bookmark.id)
+        return true
+    }
+
     fun goToFrame(id: String) {
         val frame = _state.value.index.frames.find { it.id == id } ?: return
 
         if (frame.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            showNotice(NavigatorNotice.HIDDEN_ITEM)
             return
         }
 
@@ -296,7 +375,7 @@ class NavigationEngine(
         val shape = _state.value.index.shapes.find { it.id == id } ?: return
 
         if (shape.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            showNotice(NavigatorNotice.HIDDEN_ITEM)
             return
         }
 
@@ -316,7 +395,7 @@ class NavigationEngine(
         val ole = _state.value.index.oleObjects.find { it.id == id } ?: return
 
         if (ole.visibility == VisibilityState.HIDDEN) {
-            showNotification("This item is hidden")
+            showNotice(NavigatorNotice.HIDDEN_ITEM)
             return
         }
 
@@ -383,7 +462,8 @@ class NavigationEngine(
             NavigateBy.SHAPE -> iterateList(_state.value.index.shapes.map { it.id }, isNext = true) { goToShape(it) }
             NavigateBy.OLE -> iterateList(_state.value.index.oleObjects.map { it.id }, isNext = true) { goToOle(it) }
             NavigateBy.REMINDER -> iterateList(_state.value.index.reminders.map { it.id }, isNext = true) { goToReminder(it) }
-            else -> showNotification("No items to navigate next in $by mode")
+            NavigateBy.INDEX -> iterateList(_state.value.index.authoredIndexes.map { it.id }, isNext = true) { goToIndex(it) }
+            else -> showNotice(NavigatorNotice.NO_ITEMS_IN_MODE)
         }
     }
 
@@ -402,13 +482,14 @@ class NavigationEngine(
             NavigateBy.SHAPE -> iterateList(_state.value.index.shapes.map { it.id }, isNext = false) { goToShape(it) }
             NavigateBy.OLE -> iterateList(_state.value.index.oleObjects.map { it.id }, isNext = false) { goToOle(it) }
             NavigateBy.REMINDER -> iterateList(_state.value.index.reminders.map { it.id }, isNext = false) { goToReminder(it) }
-            else -> showNotification("No items to navigate previous in $by mode")
+            NavigateBy.INDEX -> iterateList(_state.value.index.authoredIndexes.map { it.id }, isNext = false) { goToIndex(it) }
+            else -> showNotice(NavigatorNotice.NO_ITEMS_IN_MODE)
         }
     }
 
     private fun iterateList(ids: List<String>, isNext: Boolean, action: (String) -> Unit) {
         if (ids.isEmpty()) {
-            showNotification("No items found for current category")
+            showNotice(NavigatorNotice.NO_ITEMS_IN_CATEGORY)
             return
         }
         val currentId = _state.value.activeItemId
@@ -459,12 +540,12 @@ class NavigationEngine(
         )
     }
 
-    fun showNotification(msg: String) {
-        _state.value = _state.value.copy(notificationMessage = msg)
+    fun showNotice(notice: NavigatorNotice) {
+        _state.value = _state.value.copy(notice = notice)
     }
 
-    fun clearNotificationMessage() {
-        _state.value = _state.value.copy(notificationMessage = null)
+    fun clearNotice() {
+        _state.value = _state.value.copy(notice = null)
     }
 
     fun clearNavSignal() {
@@ -504,6 +585,11 @@ class NavigationEngine(
         }
         list.forEach { recurse(it) }
         return result
+    }
+
+    private companion object {
+        /** Id prefix the index engine gives Plan 7C range sections. */
+        const val RANGE_SECTION_PREFIX = "section_range_"
     }
 
     private fun calculateTotalPages(index: DocumentIndex): Int {
