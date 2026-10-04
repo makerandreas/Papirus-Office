@@ -266,3 +266,35 @@ The recovered Plan 7F document says Sample-6 "declares the only `text:display` r
 CI run `37215310814` at commit `6585327` (PR merge ref for that tree): **348 tests across 63 suites, 0 failures, 0 errors, 0 skipped, 29.98 s** of JUnit time, Build job green, `Plan7eFontFaceImportTest` 7/7 and `Plan7eFontResolutionTest` 11/11. The twelve-file page matrix is unchanged from every earlier run in this PR (ODT `14/23/21/10/18/20`, DOCX `15/25/25/11/19/24`), and the dump still prints `(Aptos)` with zero `Aptos1` occurrences.
 
 ---
+
+## 14. The second recovered patch, verified and then deleted (2026-10-04)
+
+On 2026-10-04 the owner pushed a second export, `docs/01a104f4-222a-7f9c-9830-334b041e9a84.txt`
+(140,170 bytes, 17 files), as commit `2ddfbc9`. It is the complete change set of the Plan 7D
+build session, the one that landed as PR #29 before the Google AI Studio session went wrong:
+five new files (`TableGrid.kt`, `TableLayout.kt`, `Plan7dTableGridTest.kt`,
+`Plan7dTableImportTest.kt`, `Plan7dTableLayoutTest.kt`) and twelve modified files (InkyModule,
+LayoutDrivenDocumentRenderer, DocumentSemantics, DocumentSerializer, LayoutEngine,
+OfficeDocument, OfficeDocumentModel, SvXMLImport, SvXMLImportContext, strings.xml, and the two
+ledger files).
+
+**Verification method:** each of the five new files was reconstructed from the patch body and
+compared byte for byte against the file at `2ddfbc9`; all five are identical. Every added line
+run of every hunk in the twelve modified files was then located in the current tree. Result:
+all code hunks are present. Two apparent misses, both explained:
+
+* `SvXMLImport.kt`, the table-style arms of the `DocumentStyles` construction: present at
+  lines 1241 to 1259, contiguous except for the `fontFaces = fontFaces.toMap(),` line that
+  Plan 7E legitimately inserted inside the same block.
+* `plan-01-master-index.md` row 7: the patch carries the in-flight wording ("7D implementation
+  on `arena/01a104f4-papirus-office`, CI run `37177575040`"); the current row supersedes it
+  with the post-merge wording ("landed as #29, merge `66895a7`"). The roadmap's 7D
+  implementation record and scope-guard paragraphs from the same patch are present verbatim.
+
+**Conclusion: nothing was missing and nothing needed fixing.** The PR #30 repair had already
+restored the full 7D state. With that confirmed, the owner asked for both patch files to be
+deleted from the working tree (this commit does so). They remain retrievable from history:
+`git show 0311c4a:docs/01a10750-1f33-7425-b811-fda994620228.txt` and
+`git show 2ddfbc9:docs/01a104f4-222a-7f9c-9830-334b041e9a84.txt`.
+
+---
