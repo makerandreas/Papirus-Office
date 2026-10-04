@@ -3,7 +3,7 @@ package com.makerandreas.papirusoffice.data.odf
 import com.makerandreas.papirusoffice.data.OfficeFontFace
 
 /**
- * Resolves an ODF `style:font-name` value through the document's
+ * Resolves an ODF font reference through the document's
  * `office:font-face-decls` table.
  *
  * ODF 1.4 Part 3 section 20.277 is the reason this exists: if a font face
@@ -24,9 +24,15 @@ import com.makerandreas.papirusoffice.data.OfficeFontFace
 object FontFaceResolver {
 
     /**
-     * First family of a `svg:font-family` value (ODF 1.4 Part 3 19.532),
-     * which may be a comma-separated list with quote-wrapped names. Null when
-     * the value is blank or holds no usable name.
+     * First family of a family list such as `svg:font-family` or
+     * `fo:font-family` (ODF 1.4 Part 3 19.532), which may be comma-separated
+     * with quote-wrapped names: `'Times New Roman', serif` answers
+     * `Times New Roman`. Null when the value is blank or holds no usable name.
+     *
+     * A blank entry is skipped rather than ending the search, so a malformed
+     * leading separator does not hide a usable name behind it. No fixture
+     * declares a list (audit-017 section 4.1), so this only affects files
+     * outside the corpus.
      */
     fun firstFamily(raw: String?): String? =
         raw?.split(',')
@@ -34,23 +40,22 @@ object FontFaceResolver {
             ?.firstOrNull { it.isNotEmpty() }
 
     /**
-     * Declared family for [name], or null when the declaration table holds no
-     * usable entry for it. Callers keep the raw name in that case so the
-     * registry's own classification still answers. A declaration whose family
-     * repeats the alias resolves to that same string, which is what the file
-     * declares and never loops.
+     * The family a `style:font-name` (or `fo:font-family`) value names.
+     *
+     * [name] is the reference the style carries and [fontFaces] is
+     * `DocumentStyles.fontFaces`. A declared name answers its declaration's
+     * family. A name with no declaration, and a declaration with no usable
+     * family, answer the reference itself, so
+     * [com.makerandreas.papirusoffice.data.FontRegistry] can still classify it
+     * instead of receiving null. Only a blank reference answers null.
+     *
+     * The lookup tries the exact identifier first and then ignores case,
+     * which is how the style cascade in [SvXMLImport] resolves style names.
      */
     fun familyFor(name: String?, fontFaces: Map<String, OfficeFontFace>): String? {
-        val key = normalize(name) ?: return null
-        if (fontFaces.isEmpty()) return null
-        val face = fontFaces[key]
-            ?: fontFaces.values.firstOrNull { candidate ->
-                normalize(candidate.name)?.equals(key, ignoreCase = true) == true
-            }
-        return face?.let { firstFamily(it.family) }
+        val requested = firstFamily(name) ?: return null
+        val declaration = fontFaces[requested]
+            ?: fontFaces.entries.firstOrNull { it.key.equals(requested, ignoreCase = true) }?.value
+        return declaration?.let { firstFamily(it.family) } ?: requested
     }
-
-    /** Lookup key: surrounding whitespace and quotes removed. */
-    private fun normalize(name: String?): String? =
-        name?.trim()?.trim('\'', '"')?.trim()?.takeIf { it.isNotEmpty() }
 }

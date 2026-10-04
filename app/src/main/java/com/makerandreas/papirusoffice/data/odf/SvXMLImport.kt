@@ -671,7 +671,9 @@ class SvXMLImport(
                         "font-face-decls" -> insideFontFaceDecls = true
                         "font-face" -> if (insideFontFaceDecls) {
                             val faceName = attrs["name"]?.takeIf { it.isNotBlank() }
-                            val faceFamily = attrs["font-family"]?.takeIf { it.isNotBlank() }
+                            // svg:font-family may be a list; the declaration's
+                            // family is its first entry (19.532).
+                            val faceFamily = FontFaceResolver.firstFamily(attrs["font-family"])
                             if (faceName != null && faceFamily != null) {
                                 fontFaces.putIfAbsent(
                                     faceName,
