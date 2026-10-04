@@ -141,6 +141,9 @@ When necessary, translate all strings to `en_US` and add to `strings.xml`
 ## Notice on JNI
 If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
+## Notice on Navigator
+Navigator Deck: note that Sections and Indexes are readable for ODT **(Plan 7C)**, DOCX follows in Plan 8, and FCT Compact can show **"Go to entry…"** on linked TOC entries.
+
 ## Online Resources
 For other online resources, check the `CONCEPT.md` file on the **Links Used** section. All handful resources are available there for inspiration.
 
@@ -168,3 +171,6 @@ Only an explicit choice of antislop during or after selects a session mode. A re
 If the mode is unresolved, ask during/after and end the response; wait for the answer before any UI review, planning, or concept. For read-only tasks, put the active-mode notice only at the start of the final answer, never in progress messages. For editing tasks, announce before the first edit and omit it from the final answer.
 To update antislop later: download `antislop.md` again, or run `npx antislop-ai --update` if it was installed as skill folders.
 <!-- antislop:end -->
+
+## Provisions for providing reports, answers and/or output
+Use `/ELI10` *("explain like I'm 10)* protocol because this is my first time I'm doing vibe coding development like this, so I can easily understand about the context of your output with a very basic, understandable explanation.
