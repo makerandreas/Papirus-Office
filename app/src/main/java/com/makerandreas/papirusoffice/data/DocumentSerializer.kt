@@ -167,7 +167,11 @@ class DocumentSerializer(private val context: Context) {
 }
 
 internal fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsedDocument {
-    val parsedElements = body.elements.mapNotNull { element ->
+    // Element kinds without a parsed form are dropped below; sidecar ranges are
+    // remapped through oldToNew so they keep addressing the same content (audit-015 F-5).
+    val oldToNew = IntArray(body.elements.size) { -1 }
+    var nextIndex = 0
+    val parsedElements = body.elements.mapIndexedNotNull { oldIndex, element ->
         when (element) {
             is OfficeDocElement.ParagraphElement -> element.paragraph.toParsedParagraph()
             is OfficeParagraph -> element.toParsedParagraph()
@@ -196,7 +200,7 @@ internal fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsed
             is OfficeImage -> element.toParsedImage()
             is OfficePageBreak -> OfficeDocumentElement.PageBreak
             else -> null
-        }
+        }?.also { oldToNew[oldIndex] = nextIndex++ }
     }
     return OfficeParsedDocument(
         elements = parsedElements,
@@ -213,8 +217,8 @@ internal fun OfficeDocument.toOfficeParsedDocument(format: String): OfficeParsed
         styles = styles,
         metadata = metadata,
         bookmarks = bookmarks.map { it.name },
-        authoredIndexes = authoredIndexes,
-        namedSectionRanges = namedSectionRanges
+        authoredIndexes = DocumentRanges.remapIndexes(authoredIndexes, oldToNew, parsedElements.size),
+        namedSectionRanges = DocumentRanges.remapSections(namedSectionRanges, oldToNew, parsedElements.size)
     )
 }
 
