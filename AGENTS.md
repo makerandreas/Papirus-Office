@@ -141,6 +141,9 @@ When necessary, translate all strings to `en_US` and add to `strings.xml`
 ## Notice on JNI
 If JNI is available on the agent for unit tests, use it. Otherwise, use the GitHub API Approach instead.
 
+### Local toolchain check (2026-10-04, audit-016 §8)
+A JDK is not obtainable in the agent sandbox: `java`, `javac` and `/usr/lib/jvm` are absent, the Debian mirrors and every JDK vendor host are unreachable, and the one PyPI reachable JDK package (`jdk4py 25.0.2.1`) ships a runtime without `javac`. The Gradle distribution host, Maven Central, Google Maven and JitPack are unreachable as well and no `~/.gradle` cache exists, so `./gradlew testDebugUnitTest` cannot run locally even with a JDK. GitHub Actions is the compile and test evidence path; Google AI Studio runs the same suite locally for the owner. Statements derived only from source reading must say so instead of reporting a build or test result.
+
 ## Notice on Navigator
 Navigator Deck: note that Sections and Indexes are readable for ODT **(Plan 7C)**, DOCX follows in Plan 8, and FCT Compact can show **"Go to entry…"** on linked TOC entries.
 

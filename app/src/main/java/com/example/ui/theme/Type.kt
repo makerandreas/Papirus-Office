@@ -38,7 +38,7 @@ val GoogleSansFontFamily: FontFamily = try {
 // Google Sans Code (Monospace & Code Displays)
 val GoogleSansCodeFontFamily: FontFamily = try {
     FontFamily(
-        Font(R.font.google_sans_code_medium, FontWeight.Normal, loadingStrategy = FontLoadingStrategy.OptionalLocal),
+        Font(R.font.google_sans_code_regular, FontWeight.Normal, loadingStrategy = FontLoadingStrategy.OptionalLocal),
         Font(R.font.google_sans_code_medium, FontWeight.Medium, loadingStrategy = FontLoadingStrategy.OptionalLocal),
         Font(R.font.google_sans_code_bold, FontWeight.Bold, loadingStrategy = FontLoadingStrategy.OptionalLocal),
         Font(R.font.google_sans_code_italic, FontWeight.Normal, style = FontStyle.Italic, loadingStrategy = FontLoadingStrategy.OptionalLocal)

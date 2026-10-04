@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import coil.request.crossfade
 import coil.size.Size
 import com.example.R
 import com.makerandreas.papirusoffice.data.DocumentImages
