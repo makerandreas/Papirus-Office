@@ -189,7 +189,7 @@ Reduced gate per `AGENTS.md` addendum item 3.
 * **R-02 PASS:** no em dash in this document; a `grep` for the em dash code point (U+2014) over the file returns 0 lines.
 * **R-15 PASS:** no call to action; this is an internal analysis record.
 * **R-16 PASS:** no marketing vocabulary; headings name the artifact (audit, plan, gate).
-* **R-17 PASS:** every number traces to a named source: git/`gh` refs and IDs in section 1; run IDs `37211551672`, `37209964838`, `37208441343` and comment `5981186452`; test and suite counts from the PR #30 comment; page counts from the same comment's matrix; fixture counts re-derived in section 4 from `tests/inky/*.odt` with the stated method; file:line citations for every seam claim. Section 12 adds run `37213135047` and its PR comment, naming `784e9d3` and `c363ce3` as the delivered commits and `28a37fb` as the pre-fix head that run measured.
+* **R-17 PASS:** every number traces to a named source: git/`gh` refs and IDs in section 1; run IDs `37211551672`, `37209964838`, `37208441343` and comment `5981186452`; test and suite counts from the PR #30 comment; page counts from the same comment's matrix; fixture counts re-derived in section 4 from `tests/inky/*.odt` with the stated method; file:line citations for every seam claim. Section 12 adds run `37213135047` and its PR comment, naming `784e9d3` and `c363ce3` as the delivered commits and `28a37fb` as the pre-fix head that run measured. Section 13 adds the owner-supplied diff file (`docs/01a10750-1f33-7425-b811-fda994620228.txt`, commit `0311c4a`), its `coding-numstat.txt`, and runs `37213815272` and `37215310814`.
 * **R-36 PASS:** no capability, performance or compliance claim is asserted. Nothing was compiled or run locally; section 4.2 is labelled a static prediction, and section 5 states what could not be found rather than claiming a clean bill of health. The compile and test numbers added in section 12 come from the CI run named there, not from this sandbox, which still has no JDK.
 * **R-38 PASS:** no placeholder content is presented as real; the 7E plan and 7F scope are labelled as not implemented.
 * **C-5 PASS:** the claim that 7E is unshipped rests on three independent checks (local refs, remote branch head, absence of code), and the claim that the repair is intact rests on line counts and a declaration scan.
@@ -212,10 +212,57 @@ Delivered on `arena/01a1077a-papirus-office` as PR #31, the slot the section 2 s
 |---|---|---|
 | `784e9d3` | Declarations reader plus `Plan7eFontFaceImportTest` (4 tests): both XML parts, per-fixture inventories, first-wins precedence, blank declarations skipped | CI run `37213135047`: suite green |
 | `c363ce3` | `FontFaceResolver` plus one `resolveFontFamily` helper in both text-properties readers, so the resolved family is the single input to `TextMetrics.forStyle` and `OfficeRuns.fontFamilyFor`; `Plan7eFontResolutionTest` (8 tests) | same run: 7 green, 1 expectation failure |
+| `6585327` | Alignment with the recovered original diff (section 13): `familyFor` answers the reference itself when no declaration is usable, the list form resolves through the same call, `fontFaces` stores unquoted families, and the original test corpus is merged in | run `37215310814`: 348 tests, 0 failures, `Plan7eFontFaceImportTest` 7/7, `Plan7eFontResolutionTest` 11/11 |
 | records | Roadmap v2.8, `plan-01`, plan-04, `plan-5e-progress.md`, `PROJECT_CONTEXT.md`, the section 6 correction, this section and the new Plan 7F document | this file |
 
 **First compile.** Run `37213135047` (PR merge ref `3914079`, measuring the pre-fix head `28a37fb`) built green and ran **342 tests across 63 suites with 1 failure, 0 errors, 0 skipped, 32.64 s** of JUnit time against the 330-test baseline. The failure was this session's own expectation in `aliasAndDirectNameProduceTheSameFontChoice` (`Plan7eFontResolutionTest.kt:74`): `FontChoice.requested` is the resolved family after `FontFaceResolver` runs, so the alias string only survives on the raw registry path. The test now asserts both, and the remaining 11 new tests passed unmodified, including every fixture inventory and every alias decision.
 
+**Final tree.** After the alignment commit the suites hold 7 and 11 tests respectively, 348 in total across 63 suites on run `37215310814`, with the same matrix and dump line as the intermediate run. Section 13 records the comparison that produced the alignment and confirms that no fixture declares a family list, which is why the contract change could not move a page count.
+
 **Calibration, measured, not predicted.** The page matrix in the new comment is identical to the PR #30 baseline in every cell: ODT `14/23/21/10/18/20` and DOCX `15/25/25/11/19/24`, with the same reference, window, thin-page and empty-page columns. The dump changed exactly where section 4 required it to be observable: Sample-6.odt's body style prints `12.0 pt (Aptos) line factor 1.00` where the baseline printed `(Aptos1)`, and the string `Aptos1` occurs **0** times in the new comment against **1** time in the baseline comment. Resolution reaches layout, and the count did not move, so the earlier static prediction that the two advance tables do not cross a page boundary in this file is confirmed rather than overridden.
 
 **Decisions and remaining losses.** D3 is deferred to Plan 9; until writer regeneration exists, a modified save of an ODT that declares font faces would drop `office:font-face-decls`, and no writer path is touched by this PR. Items 5 and 6 move to `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`, whose scope section states the verified missing pieces (leader parsing and painting; no layout consumer of `SectionDisplay.HIDDEN`) and the synthetic-only test situation. The exit gate of section 6 is met on the evidence above, except the deliberately deferred save arm.
+
+---
+
+## 13. The recovered original diff, compared (added 2026-10-04)
+
+After this branch had already been rebuilt and verified, the owner supplied the previous session's diff from their Google AI Studio machine. It is stored in the repository as `docs/01a10750-1f33-7425-b811-fda994620228.txt` (271,182 bytes, 32 files) and was pushed by the owner as commit `0311c4a`, on top of the records commit. This section records what it contains, how it compares with the rebuild, and what was adopted.
+
+### 13.1 What the file is
+
+* It is the whole previous session, not only Plan 7E: the PR #30 repair (the seven restored screen/engine files, `build.gradle.kts`, `gradle.properties`, `libs.versions.toml`, the `Type.kt` and logo restorations) plus the 7E change set.
+* The 7E half matches the handoff's four-commit story: the declaration reader, `FontFaceResolver`, the save-capability arm, the records. That is the strongest available confirmation of the handoff description; a plain diff carries no commit identifiers, so the four SHAs it named remain unverified as object ids, and only the branch content is now recoverable.
+* The session's own `coding-numstat.txt` (12 files: the 7E docs, `FontFaceResolver`, `SvXMLImport`, and the two tests) shows the state after the owner reversed decision D3: no `OdtDocumentWriter` and no `Plan7eSaveCapabilityTest`. The diff file itself predates that reversal and still carries both. This branch follows the numstat: D3 stays deferred to Plan 9, and no writer path is touched.
+* The repair half is restoration, not new work: it puts back the full `UniversalXmlImportSheet`, `UniversalChartSheet`, `AboutScreen`, `DocxEmbeddedImage`, `DocumentImages`, `DocumentSession`, `PapirusOdfEngine`, `OfficeDocumentParser`, `SelectionEngine`, `SwNodes`, the LOKit probe, `build.gradle.kts`, `gradle.properties`, `gradle/libs.versions.toml`, `Type.kt` and the Pagella logo that the `cb89460` refactor had replaced or gutted. Nothing in the diff introduces a new screen, module or artifact, which answers the section 5 open question for this file: the "crap" the owner saw is the refactor already repaired by PR #30, and no separate junk is present here.
+
+### 13.2 The two places where the original was stronger, and were adopted
+
+| Item | Rebuild before this section | Original | Adopted |
+|---|---|---|---|
+| `familyFor` on an unresolvable name | returned null; each caller kept the raw string | answered the reference itself, null only for a blank reference | yes (`familyFor` is total, and the direct `fo:font-family` list form now resolves through the same call as an alias) |
+| A reference that is itself a family list (`fo:font-family="'Times New Roman', serif"`) | fell back to the raw string with the list tail attached | first family of the list | yes |
+| `DocumentStyles.fontFaces` values | the raw `svg:font-family` attribute, quotes included | the first family, unquoted | yes |
+| `firstFamily` on a list whose first entry is blank (`" , 'Liberation Serif'"`) | skipped the blank entry | answered null | no: skipping is strictly more forgiving, no fixture contains a list, and the test asserting it is kept |
+| Save refusal for declared font faces (D3) | absent | present | no: the owner deferred it to Plan 9 on 2026-10-04, and the original session's own numstat reverts it |
+
+The alignment is commit `6585327` ("align the resolver contract with the recovered original"). It also merges in the original's test corpus, which is stronger than the rebuild's in two ways: it checks every declaration of every fixture against the family it answers, and it proves with a synthetic package that a `style:font-name` alias and a `fo:font-family` list reach one family and one `FontChoice`. Both are now in `Plan7eFontResolutionTest` (11 tests) and `Plan7eFontFaceImportTest` (7 tests).
+
+### 13.3 The original's fixture claims, re-verified here
+
+Every corpus assertion in the recovered tests was re-derived from the six ODT ZIPs before adoption, and all of them hold:
+
+* Declaration counts 9/10/12/12/10/13, identical in `content.xml` and `styles.xml` in all six files.
+* `Aptos1` in all six; `Aptos2` only in Sample-6; `Aptos Display1` in 1/2/3/5/6; `Times New Roman1` in 1/2/4/5/6; `Noto Sans Devanagari1` in 2/3/4/5/6; `Arial1` and `Basic Sans1` only in Sample-4.
+* `style:font-charset` appears only in Sample-6 (`x-symbol`), `style:font-pitch` is `variable` throughout, and every alias declares `style:font-family-generic="system"`.
+* No fixture declares a comma-separated `svg:font-family` or `fo:font-family`, so the list handling affects no fixture page count. That is why the alignment commit cannot move the matrix, and the run confirms it.
+
+### 13.4 One claim in the recovered draft that is wrong
+
+The recovered Plan 7F document says Sample-6 "declares the only `text:display` range" and expects pagination to move there. That is false: a scan of all XML parts of all six `.odt` files finds **zero** `text:display` attributes and **zero** `<text:section>` body elements. The 7F document in this branch states the verified position (0 occurrences, synthetic tests only) and carries a note so the withdrawn expectation is not reintroduced. Its other content is good and was folded into that document: the scheduling freedom relative to Plan 8A, the non-goals, and the DOCX `w:tabs` boundary.
+
+### 13.5 Verification of the alignment
+
+CI run `37215310814` at commit `6585327` (PR merge ref for that tree): **348 tests across 63 suites, 0 failures, 0 errors, 0 skipped, 29.98 s** of JUnit time, Build job green, `Plan7eFontFaceImportTest` 7/7 and `Plan7eFontResolutionTest` 11/11. The twelve-file page matrix is unchanged from every earlier run in this PR (ODT `14/23/21/10/18/20`, DOCX `15/25/25/11/19/24`), and the dump still prints `(Aptos)` with zero `Aptos1` occurrences.
+
+---
