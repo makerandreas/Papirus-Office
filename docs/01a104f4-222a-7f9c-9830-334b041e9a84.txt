@@ -1,0 +1,2798 @@
+diff --git a/anti-slop/plan-01-master-index.md b/anti-slop/plan-01-master-index.md
+index f3700b1..68c73b3 100644
+--- a/anti-slop/plan-01-master-index.md
++++ b/anti-slop/plan-01-master-index.md
+@@ -33,7 +33,7 @@ The document format standards are separate and equally binding: ODF 1.4 Parts 1
+ | **4** | **Chrome and input** (was PR D) | F-01…F-06 | - | `plan-04-to-09-writer-fidelity.md` § Plan 4 | **consumed by Plan 2 / PR #11** (same scope; keep as design record, do not re-execute) |
+ | **5** | **Layout metrics and pagination** (was PR E) | page-count half of finding 6, F-10, F-21, F-24, F-25, F-28 | - | same file, § Plan 5; evidence `audit-007`, `audit-008`, `audit-009`, `audit-010`, `audit-011`; implementation record `plan-5e-progress.md` | **5a to 5e all landed**: 5a **PR #15**, 5b **PR #16**, 5c **PR #17**, 5d **PR #18**, 5e **PR #19** (merge `439ed05`, 2026-09-28). All twelve fixtures sit inside their per-format windows under the table advance backend; Plan 10 will move counts again when real Typefaces load |
+ | **6** | **Image pipeline and load performance** (was PR F) | F-07, F-18, the image half of save integrity | Plan 5 | same file, § Plan 6 | **6a to 6d all landed (COMPLETE)**: 6A **PR #22** (`eff150d`, run `36578390234`, 252 tests), 6B **PR #23** (`ac713e4`, runs `36587725933`/`36588655662`, 260 tests), 6C **PR #24** (`bdd2724`, run `36708650093`, 275 tests), 6D **PR #25** (closeout gate, run `36730234004`: 276 tests, 0 failures, 28.07 s of JUnit time across 48 suites; dead `DocxDocumentParser` plumbing removed, `LayoutEngine` unified on `DocumentImages.box`, `PaginationImageTest` added, 12-file matrix re-confirmed at ODT `15/23/18/10/18/19` and DOCX `15/25/21/11/19/23`) |
+-| **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7; split evidence `audit-014-2026-10-03-plan-7b-convergence.md` | **7A landed as PR #26**. Four-plan continuation, exactly one PR each: **7B canonical model/importer convergence (landed as #27)**; **7C authored indexes + named sections (#28, current; record in `audit-015` §9)**; **7D tables end to end (#29)**; **7E font aliases + final calibration (#30)** |
++| **7** | **ODF structural fidelity** (was PR G) | F-08, F-09, F-11…F-15, F-23, O-03…O-05 | Plan 5 | same file, § Plan 7; split evidence `audit-014-2026-10-03-plan-7b-convergence.md` | **7A landed as PR #26**. Four-plan continuation, exactly one PR each: **7B canonical model/importer convergence (landed as #27)**; **7C authored indexes + named sections (#28, current; record in `audit-015` §9)**; **7D tables end to end (implementation on `arena/01a104f4-papirus-office`, four commits, CI green in run `37177575040`)**; **7E font aliases + final calibration (#30)** |
+ | **8** | **OOXML structural fidelity** (was PR H) | F-16…F-20, F-26, F-27, DOCX halves of F-10/F-11 | Plans 5, 7 | same file, § Plan 8 | after Plan 7E: reforecasted as **PR #31 (8A)** and **PR #32 (8B)** |
+ | **9** | **Save round-trip integrity** (was PR I) | O-01, the "non-destructive package preservation" rule, the writer findings in `audit-006` §3 | Plans 6, 7, 8 | same file, § Plan 9 | after Plans 6-8: reforecasted as **PR #33**; 7B supplies the fail-closed capability boundary, while Plan 9 owns structural regeneration; its own pre-change gate still lands first |
+ | **10** | **Font engine + UI design language** | old PR D (bundled Typeface and substitution) and old PR E (Font Style UI, SAF/user fonts, curated Google Fonts), plus the `DESIGN.md` / m3.material.io review | Plans 5, 7, 8 | `plan-10-font-engine-and-design-language.md` | document-font thread stays parked until Plans 7E and 8B converge (reforecast **PR #34-#35**); 7E owns ODF declaration/alias integration and its immediate calibration, while Plan 10 owns the broader engine/UI work. Its UI-design thread is re-scoped by Plan 11 |
+diff --git a/anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md b/anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md
+index 0ac80e1..0d55b7e 100644
+--- a/anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md
++++ b/anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md
+@@ -330,6 +330,10 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
+ 
+ **Tests:** all source tables in Samples 1/2/3/6; synthetic repeats/spans/covered cells/header rows/borders; measurement-render parity; multi-page row pagination; cell hit tests; no regressions for zero-table fixtures.
+ 
++**Implementation record (branch `arena/01a104f4-papirus-office`, 2026-10-04):** Plan 7D is being delivered as one four-commit change set. Commits 1 and 2 retain compact table declarations and resolve the rectangular occupancy grid; commit 3 adds shared measurement, row grouping, fragment geometry and row-aware pagination; commit 4 adds the geometry-driven Compose renderer, cell-aware hit testing, row/column cursor context and status detail. Synthetic and imported-table layout tests cover declared widths, intrinsic cell paragraphs, borders, merged cells, repeated headers, multi-page body coverage, cell hits and the ODT source-table set. The local sandbox has no JDK; GitHub Actions run `37177575040` passed both the Unit Tests and Build jobs.
++
++**Scope guard:** table creation, insertion, editing, merge/split controls and native LibreOffice rendering remain out of Plan 7D. DOCX table parsing, font aliases and hidden-section pagination remain with their assigned plans. The compatibility renderer is retained only for externally supplied pre-geometry layouts; normal document layout uses `TableFragmentGeometry` from the paginator.
++
+ ### 4.7d PR #30, Plan 7E: ODF font-face aliases and final pagination calibration
+ 
+ **Goal:** resolve the document's declared font identities through one metrics/display path, then measure the complete ODT structure.
+diff --git a/app/src/main/java/com/example/modules/inky/InkyModule.kt b/app/src/main/java/com/example/modules/inky/InkyModule.kt
+index e988df4..a3fb63c 100644
+--- a/app/src/main/java/com/example/modules/inky/InkyModule.kt
++++ b/app/src/main/java/com/example/modules/inky/InkyModule.kt
+@@ -688,11 +688,11 @@ fun InkyModule(
+     // headings count), the element kind for tables and list items, and the
+     // hyphen placeholder elsewhere. Plan 7C adds authored ranges: inside an
+     // index only the index type is shown, otherwise the innermost section name
+-    // joins the detail (StatusObjectResolver). Table row/column and image
+-    // geometry are still not guessed.
++    // joins the detail (StatusObjectResolver). Plan 7D adds row/column detail
++    // when the shared table hit-test supplies it; image geometry remains absent.
+     var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
+ 
+-    LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
++    LaunchedEffect(docBodyText.selection, layoutCursor, activeLayoutDocument, navEngineState.index) {
+         val elements = activeLayoutDocument.body.elements
+         if (elements.isEmpty()) {
+             statusBarObjectInfo = null
+@@ -701,12 +701,18 @@ fun InkyModule(
+         val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
+         val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
+         val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
+-        val caretElementIndex = hit?.elementIndex ?: layoutCursor.elementIndex
++        val caretElementIndex = if (layoutCursor.tableRow != null && layoutCursor.tableColumn != null) {
++            layoutCursor.elementIndex
++        } else {
++            hit?.elementIndex ?: layoutCursor.elementIndex
++        }
+         val statusDetail = resolveStatusBarObjectInfo(
+             context = context,
+             caretElementIndex = caretElementIndex,
+             elements = elements,
+-            headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings)
++            headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings),
++            tableRow = layoutCursor.tableRow,
++            tableColumn = layoutCursor.tableColumn
+         )
+         val statusRanges = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.resolve(
+             indexes = activeLayoutDocument.authoredIndexes,
+@@ -719,8 +725,12 @@ fun InkyModule(
+             indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
+             join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
+         )
+-        val element = hit?.let { elements.getOrNull(it.elementIndex) }
+-            ?: elements.getOrNull(layoutCursor.elementIndex)
++        val element = if (layoutCursor.tableRow != null && layoutCursor.tableColumn != null) {
++            elements.getOrNull(layoutCursor.elementIndex)
++        } else {
++            hit?.let { elements.getOrNull(it.elementIndex) }
++                ?: elements.getOrNull(layoutCursor.elementIndex)
++        }
+         val paragraph = when (element) {
+             is com.makerandreas.papirusoffice.data.OfficeParagraph -> element
+             is com.makerandreas.papirusoffice.data.OfficeHeading -> com.makerandreas.papirusoffice.data.OfficeParagraph(
+@@ -5113,15 +5123,16 @@ fun LongClickIconButton(
+  * model can already prove about the element holding the caret, or null when it
+  * can prove none of them. Headings are resolved by the Navigator index rather
+  * than re-derived here, because that index is the one resolver that walks
+- * paragraph style parents; table and list-item rows show the element kind
+- * only, since the caret-to-element mapping stops at the element and row/column
+- * precision does not exist yet (plans 19/21).
++ * paragraph style parents. Table hits may additionally carry the resolved
++ * logical row and column from the shared layout geometry.
+  */
+ private fun resolveStatusBarObjectInfo(
+     context: android.content.Context,
+     caretElementIndex: Int,
+     elements: List<com.makerandreas.papirusoffice.data.OfficeElement>,
+-    headings: List<com.makerandreas.papirusoffice.data.navigation.HeadingNode>
++    headings: List<com.makerandreas.papirusoffice.data.navigation.HeadingNode>,
++    tableRow: Int? = null,
++    tableColumn: Int? = null
+ ): String? {
+     val element = elements.getOrNull(caretElementIndex) ?: return null
+     val heading = headings.firstOrNull { it.elementIndex == caretElementIndex }
+@@ -5131,8 +5142,13 @@ private fun resolveStatusBarObjectInfo(
+             heading.outlineLevel,
+             heading.title
+         )
+-        element is com.makerandreas.papirusoffice.data.OfficeTable ->
+-            context.getString(R.string.statusbar_object_table)
++        element is com.makerandreas.papirusoffice.data.OfficeTable ||
++            element is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement ->
++            if (tableRow != null && tableColumn != null) {
++                context.getString(R.string.statusbar_object_table_cell, tableRow + 1, tableColumn + 1)
++            } else {
++                context.getString(R.string.statusbar_object_table)
++            }
+         element is com.makerandreas.papirusoffice.data.OfficeListItem ->
+             context.getString(R.string.statusbar_object_list_item)
+         else -> null
+diff --git a/app/src/main/java/com/example/modules/inky/LayoutDrivenDocumentRenderer.kt b/app/src/main/java/com/example/modules/inky/LayoutDrivenDocumentRenderer.kt
+index c01da50..ac24aa3 100644
+--- a/app/src/main/java/com/example/modules/inky/LayoutDrivenDocumentRenderer.kt
++++ b/app/src/main/java/com/example/modules/inky/LayoutDrivenDocumentRenderer.kt
+@@ -2,6 +2,7 @@ package com.example.modules.inky
+ 
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.border
++import androidx.compose.foundation.Canvas
+ import androidx.compose.foundation.gestures.detectTapGestures
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -15,8 +16,10 @@ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.focus.FocusRequester
+ import androidx.compose.ui.focus.focusRequester
+ import androidx.compose.ui.focus.onFocusChanged
++import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.geometry.Rect
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.PathEffect
+ import androidx.compose.ui.graphics.SolidColor
+ import androidx.compose.ui.input.pointer.pointerInput
+ import androidx.compose.ui.layout.boundsInWindow
+@@ -40,6 +43,7 @@ import androidx.compose.ui.platform.LocalConfiguration
+ import androidx.compose.ui.platform.LocalContext
+ import com.makerandreas.papirusoffice.data.*
+ import java.io.File
++import android.graphics.Color as AndroidColor
+ 
+ /**
+  * Lets the screen ask the page stack to move input focus without owning the
+@@ -290,7 +294,10 @@ fun LayoutDrivenDocumentRenderer(
+                                                 elementIndex = hitResult.elementIndex,
+                                                 paragraphIndex = hitResult.paragraphIndex,
+                                                 runIndex = hitResult.lineIndex,
+-                                                offset = hitResult.characterOffset
++                                                offset = hitResult.characterOffset,
++                                                tableRow = hitResult.tableRow,
++                                                tableColumn = hitResult.tableColumn,
++                                                tableCell = hitResult.tableCell
+                                             )
+                                         )
+                                     }
+@@ -495,10 +502,14 @@ private fun RenderLaidOutElement(
+             TextOrField(element.paragraph)
+         }
+         is OfficeTable -> {
+-            RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale)
++            elemLayout.tableFragment?.let {
++                RenderTableFragment(it, pageScale, zoomScale, styles, textColor)
++            } ?: RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale, textColor)
+         }
+         is OfficeDocElement.TableElement -> {
+-            RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale)
++            elemLayout.tableFragment?.let {
++                RenderTableFragment(it, pageScale, zoomScale, styles, textColor)
++            } ?: RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale, textColor)
+         }
+         is OfficeImage -> {
+             RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, pageScale)
+@@ -787,14 +798,116 @@ private fun ParagraphText(
+     }
+ }
+ 
++@Composable
++private fun RenderTableFragment(
++    fragment: TableFragmentGeometry,
++    pageScale: Float,
++    zoomScale: Float,
++    styles: DocumentStyles,
++    textColor: Color
++) {
++    val outline = MaterialTheme.colorScheme.outline
++    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
++    val fragmentWidth = (fragment.bounds.right - fragment.bounds.left).coerceAtLeast(1f) * pageScale
++    val fragmentHeight = (fragment.bounds.bottom - fragment.bounds.top).coerceAtLeast(1f) * pageScale
++
++    Box(
++        modifier = Modifier
++            .width(fragmentWidth.dp)
++            .height(fragmentHeight.dp)
++    ) {
++        fragment.cells.forEach { cell ->
++            val left = (cell.bounds.left - fragment.bounds.left) * pageScale
++            val top = (cell.bounds.top - fragment.bounds.top) * pageScale
++            val width = (cell.bounds.right - cell.bounds.left).coerceAtLeast(1f) * pageScale
++            val height = (cell.bounds.bottom - cell.bounds.top).coerceAtLeast(1f) * pageScale
++            val background = cell.style.backgroundColorHex?.let(::tableColor)
++            Box(
++                modifier = Modifier
++                    .offset(left.dp, top.dp)
++                    .width(width.dp)
++                    .height(height.dp)
++                    .then(if (background != null) Modifier.background(background) else Modifier)
++                    .border(TABLE_LINE_DP, outlineVariant)
++            )
++            cell.paragraphs.forEach { paragraph ->
++                val paragraphLeft = (paragraph.bounds.left - fragment.bounds.left) * pageScale
++                val paragraphTop = (paragraph.bounds.top - fragment.bounds.top) * pageScale
++                val paragraphWidth = (paragraph.bounds.right - paragraph.bounds.left).coerceAtLeast(1f) * pageScale
++                val paragraphHeight = (paragraph.bounds.bottom - paragraph.bounds.top).coerceAtLeast(1f) * pageScale
++                val resolved = StyleResolver.resolveParagraphStyle(paragraph.paragraph.styleName, styles)
++                val annotated = remember(paragraph.paragraph, styles, zoomScale, textColor) {
++                    OfficeRuns.toAnnotatedString(paragraph.paragraph, styles, zoomScale, textColor)
++                }
++                val projected = remember(paragraph.layout, annotated, paragraph.paragraph, styles, zoomScale) {
++                    ParagraphProjection(
++                        paragraph.layout.lines,
++                        emptyList(),
++                        zoomScale / LayoutUnits.UNITS_PER_POINT,
++                        paragraph.paragraph,
++                        styles
++                    ).filter(annotated).text
++                }
++                Box(
++                    modifier = Modifier
++                        .offset(paragraphLeft.dp, paragraphTop.dp)
++                        .width(paragraphWidth.dp)
++                        .height(paragraphHeight.dp)
++                ) {
++                    Text(
++                        text = projected,
++                        softWrap = false,
++                        color = textColor,
++                        fontSize = (resolved.fontSizeSp * zoomScale).sp,
++                        lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits /
++                            LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
++                        fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
++                        textAlign = OfficeRuns.composeTextAlign(paragraph.paragraph.alignment ?: resolved.alignment),
++                        modifier = Modifier.fillMaxWidth()
++                    )
++                }
++            }
++        }
++        Canvas(Modifier.matchParentSize()) {
++            fragment.borderEdges.forEach { edge ->
++                val border = edge.border
++                val color = border.colorHex?.let(::tableColor) ?: outline
++                val pathEffect = when (border.style) {
++                    TableBorderLineStyle.DASHED -> PathEffect.dashPathEffect(floatArrayOf(6f * pageScale, 3f * pageScale))
++                    TableBorderLineStyle.DOTTED -> PathEffect.dashPathEffect(floatArrayOf(1f * pageScale, 2f * pageScale))
++                    else -> null
++                }
++                drawLine(
++                    color = color,
++                    start = Offset(
++                        (edge.startX - fragment.bounds.left) * pageScale,
++                        (edge.startY - fragment.bounds.top) * pageScale
++                    ),
++                    end = Offset(
++                        (edge.endX - fragment.bounds.left) * pageScale,
++                        (edge.endY - fragment.bounds.top) * pageScale
++                    ),
++                    strokeWidth = (border.widthUnits * pageScale).coerceAtLeast(0.5f),
++                    pathEffect = pathEffect
++                )
++            }
++        }
++    }
++}
++
++private fun tableColor(value: String): Color = runCatching {
++    Color(AndroidColor.parseColor(value))
++}.getOrDefault(Color.Transparent)
++
+ @Composable
+ private fun RenderTable(
+     rows: List<List<String>>,
+     zoomScale: Float,
+     textColor: Color = Color.Black
+ ) {
+-    // Grid lines come from the theme instead of fixed greys: R-25 wants at
+-    // least 4.5:1 for 10 sp cell text, and Color.DarkGray on white is 2.3:1.
++    // Compatibility fallback for externally supplied layouts from before the
++    // shared table geometry was available. Normal document layout always uses
++    // [RenderTableFragment].
+     Column(
+         modifier = Modifier
+             .fillMaxWidth()
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSemantics.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSemantics.kt
+index 8022ab3..623ff49 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSemantics.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSemantics.kt
+@@ -104,15 +104,59 @@ data class OfficeTableColumnSpec(
+     val styleName: String? = null,
+     val width: TableColumnWidthSpec = TableColumnWidthSpec(),
+     val repeatCount: Int = 1,
+-    val defaultCellStyleName: String? = null
++    val defaultCellStyleName: String? = null,
++    /** Ordinal in the compact ODF source declaration list; -1 means synthetic. */
++    val sourceColumnOrdinal: Int = -1
+ ) {
+     init {
+         require(repeatCount > 0) { "Table column repeat count must be positive" }
++        require(sourceColumnOrdinal >= -1) { "Table source column ordinal must be non-negative or -1" }
+     }
+ }
+ 
+ enum class TableCellOccupancy { ORIGIN, COVERED }
+ 
++enum class TableDiagnosticCode {
++    INVALID_REPEAT,
++    INVALID_SPAN,
++    OVERLAPPING_SPAN,
++    MISSING_GRID_SLOT,
++    UNSUPPORTED_DECLARATION,
++    OVER_HEIGHT
++}
++
++data class TableDiagnostic(
++    val code: TableDiagnosticCode,
++    val message: String,
++    val sourceRowOrdinal: Int? = null,
++    val sourceCellOrdinal: Int? = null,
++    val logicalRow: Int? = null,
++    val logicalColumn: Int? = null
++)
++
++/**
++ * A partially populated table-style declaration. Nullable properties preserve
++ * the ODF cascade distinction between "not declared" and an explicit value.
++ */
++data class TableStyleSpec(
++    val name: String,
++    val family: String,
++    val parentStyleName: String? = null,
++    val tableWidth: TableColumnWidthSpec? = null,
++    val columnWidth: TableColumnWidthSpec? = null,
++    val defaultCellStyleName: String? = null,
++    val minimumHeightUnits: Float? = null,
++    val exactHeightUnits: Float? = null,
++    val keepTogether: Boolean? = null,
++    val padding: TableInsets? = null,
++    val borderTop: TableBorder? = null,
++    val borderEnd: TableBorder? = null,
++    val borderBottom: TableBorder? = null,
++    val borderStart: TableBorder? = null,
++    val backgroundColorHex: String? = null,
++    val verticalAlignment: TableVerticalAlignment? = null
++)
++
+ enum class TableVerticalAlignment { TOP, MIDDLE, BOTTOM, AUTOMATIC }
+ 
+ enum class TableBorderLineStyle { NONE, SOLID, DOTTED, DASHED, DOUBLE, OTHER }
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSerializer.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSerializer.kt
+index 839b809..bd9bd54 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSerializer.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/DocumentSerializer.kt
+@@ -262,18 +262,22 @@ private fun OfficeTable.toParsedTable(): OfficeDocumentElement.Table = OfficeDoc
+                     occupancy = cell.occupancy,
+                     repeatCount = cell.repeatCount,
+                     styleName = cell.styleName,
+-                    boxStyle = cell.boxStyle
++                    boxStyle = cell.boxStyle,
++                    sourceCellOrdinal = cell.sourceCellOrdinal
+                 )
+             },
+             styleName = row.styleName,
+             isHeader = row.isHeader,
+             repeatCount = row.repeatCount,
+-            rowStyle = row.rowStyle
++            rowStyle = row.rowStyle,
++            sourceRowOrdinal = row.sourceRowOrdinal
+         )
+     },
+     numColumns = numColumns,
+     name = name,
+     columns = columns,
+-    styleName = styleName
++    styleName = styleName,
++    tableWidth = tableWidth,
++    diagnostics = diagnostics
+ )
+ 
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/LayoutEngine.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/LayoutEngine.kt
+index f1643b3..acdbb20 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/LayoutEngine.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/LayoutEngine.kt
+@@ -56,7 +56,8 @@ data class PageElementLayout(
+     val sourceStart: Int = 0,
+     val sourceEnd: Int = 0,
+     val continuesBefore: Boolean = false,
+-    val continuesAfter: Boolean = false
++    val continuesAfter: Boolean = false,
++    val tableFragment: TableFragmentGeometry? = null
+ )
+ 
+ data class DocumentLayoutResult(
+@@ -241,6 +242,132 @@ class LayoutEngine(
+                 (showImages || e !is OfficeImage && e !is OfficeDocElement.ImageElement) &&
+                 (showTables || e !is OfficeTable && e !is OfficeDocElement.TableElement)
+         }
++
++        fun tableOf(element: OfficeElement): OfficeTable? = when (element) {
++            is OfficeTable -> element
++            is OfficeDocElement.TableElement -> element.table
++            else -> null
++        }
++
++        fun placeTable(element: OfficeElement, index: Int, table: OfficeTable) {
++            if (previousAfter > 0f) {
++                y += previousAfter
++                previousAfter = 0f
++            }
++            val plan = TableLayoutEngine.measure(
++                table = table,
++                styles = document.styles,
++                availableWidth = pageSpec.contentWidthDp,
++                advanceSource = advanceSource,
++                hyphenator = hyphenator
++            )
++            val leadingHeaders = (0 until plan.headerRowCount).toList()
++            val crossingHeaderGroup = plan.rowGroups.firstOrNull {
++                it.startInclusive < plan.headerRowCount && it.endExclusive > plan.headerRowCount
++            }
++            val bodyGroups = plan.rowGroups.filter { group ->
++                group.startInclusive >= plan.headerRowCount || crossingHeaderGroup === group
++            }
++            var groupCursor = 0
++            var firstFragment = true
++            var headersEnabled = leadingHeaders.isNotEmpty() && crossingHeaderGroup == null
++            var emittedEmptyTable = false
++            var pendingDiagnostics = plan.diagnostics
++
++            while (groupCursor < bodyGroups.size || (firstFragment && leadingHeaders.isNotEmpty()) || (!emittedEmptyTable && plan.grid.rows.isEmpty())) {
++                val headerRows = if (headersEnabled && (firstFragment || groupCursor < bodyGroups.size)) leadingHeaders else emptyList()
++                val headerHeight = plan.heightOfRows(headerRows)
++                val firstGroup = bodyGroups.getOrNull(groupCursor)
++                val firstGroupHeight = firstGroup?.let(plan::heightOf) ?: 0f
++
++                if (firstGroup != null && firstGroupHeight > bodyHeight && placed.isNotEmpty()) {
++                    flush(PageEndReason.OVERFLOW)
++                    continue
++                }
++                if (firstGroup != null && firstGroupHeight > bodyHeight && headersEnabled && headerHeight + firstGroupHeight > bodyHeight) {
++                    pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
++                        TableDiagnosticCode.OVER_HEIGHT,
++                        "An oversized table row or span group was placed alone; the repeated header was omitted"
++                    )
++                    headersEnabled = false
++                    continue
++                }
++                if (firstGroup != null && y + headerHeight + firstGroupHeight > bottom + 0.001f && placed.isNotEmpty()) {
++                    flush(PageEndReason.OVERFLOW)
++                    continue
++                }
++                if (firstGroup != null && headerHeight > bodyHeight && headersEnabled) {
++                    pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
++                        TableDiagnosticCode.OVER_HEIGHT,
++                        "The table header is taller than the usable page body"
++                    )
++                    headersEnabled = false
++                    continue
++                }
++
++                val selectedGroups = mutableListOf<TableRowGroup>()
++                var selectedHeight = 0f
++                while (groupCursor + selectedGroups.size < bodyGroups.size) {
++                    val candidate = bodyGroups[groupCursor + selectedGroups.size]
++                    val candidateHeight = plan.heightOf(candidate)
++                    val candidateTotal = headerHeight + selectedHeight + candidateHeight
++                    if (selectedGroups.isNotEmpty() && y + candidateTotal > bottom + 0.001f) break
++                    if (selectedGroups.isEmpty() && candidateHeight > bodyHeight) {
++                        // Empty-page placement is the explicit forward-progress escape hatch.
++                        pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
++                            TableDiagnosticCode.OVER_HEIGHT,
++                            "An oversized table row or vertical-span group was placed alone",
++                            logicalRow = candidate.startInclusive
++                        )
++                    }
++                    selectedGroups += candidate
++                    selectedHeight += candidateHeight
++                    if (candidateHeight > bodyHeight) break
++                }
++
++                if (selectedGroups.isEmpty() && leadingHeaders.isNotEmpty() && firstFragment) {
++                    // A table containing only headers still gets one visible fragment.
++                    emittedEmptyTable = true
++                } else if (selectedGroups.isEmpty() && firstGroup == null) {
++                    emittedEmptyTable = true
++                }
++
++                val bodyRows = selectedGroups.flatMap { group -> group.startInclusive until group.endExclusive }
++                val rowRefs = buildList {
++                    headerRows.forEach { add(TableFragmentRowRef(it, isRepeatedHeader = !firstFragment, isBodyCoverage = false)) }
++                    bodyRows.forEach { add(TableFragmentRowRef(it, isRepeatedHeader = false, isBodyCoverage = true)) }
++                }
++                var fragment = plan.fragment(
++                    elementIndex = index,
++                    left = pageSpec.marginStartDp,
++                    top = y,
++                    rowRefs = rowRefs,
++                    extraDiagnostics = pendingDiagnostics
++                )
++                if (fragment.bounds.bottom <= fragment.bounds.top) {
++                    fragment = fragment.copy(bounds = fragment.bounds.copy(bottom = fragment.bounds.top + 1f))
++                }
++                register(index)
++                placed += PageElementLayout(
++                    element = element,
++                    bounds = fragment.bounds,
++                    elementIndex = index,
++                    tableFragment = fragment
++                )
++                y = fragment.bounds.bottom
++                previousAfter = 0f
++                previousCollapses = false
++                emittedEmptyTable = true
++                groupCursor += selectedGroups.size
++                firstFragment = false
++                pendingDiagnostics = emptyList()
++                if (groupCursor < bodyGroups.size && y >= bottom - 0.001f) {
++                    flush(PageEndReason.OVERFLOW)
++                }
++                if (selectedGroups.isEmpty() && groupCursor >= bodyGroups.size) break
++            }
++        }
++
+         for ((index, element) in elements.withIndex()) {
+             if (!visible(index)) continue
+             if (element is OfficePageBreak) {
+@@ -344,18 +471,15 @@ class LayoutEngine(
+                 if (style.pageBreakAfter && elements.getOrNull(index + 1) !is OfficePageBreak) {
+                     flush(PageEndReason.AUTHORED)
+                 }
++            } else if (tableOf(element) != null) {
++                placeTable(element, index, tableOf(element)!!)
+             } else {
+                 val imageBox = when (element) {
+                     is OfficeImage -> DocumentImages.box(element.widthDp, element.heightDp)
+                     is OfficeDocElement.ImageElement -> DocumentImages.box(element.image.widthDp, element.image.heightDp)
+                     else -> null
+                 }
+-                val height = when {
+-                    imageBox != null -> imageBox.heightUnits
+-                    element is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
+-                    element is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
+-                    else -> 30f
+-                }
++                val height = if (imageBox != null) imageBox.heightUnits else 30f
+                 val width = imageBox?.widthUnits?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
+                 if (y + previousAfter + height > bottom && placed.isNotEmpty()) flush(PageEndReason.OVERFLOW)
+                 y += previousAfter
+@@ -384,6 +508,49 @@ class LayoutEngine(
+             val b = elemLayout.bounds
+             if (relativeY >= b.top && relativeY <= b.bottom && x >= b.left && x <= b.right) {
+                 val element = elemLayout.element
++                elemLayout.tableFragment?.let { fragment ->
++                    val cell = fragment.cells.firstOrNull { geometry ->
++                        x >= geometry.bounds.left && x <= geometry.bounds.right &&
++                            relativeY >= geometry.bounds.top && relativeY <= geometry.bounds.bottom
++                    }
++                    if (cell != null) {
++                        val paragraph = cell.paragraphs.firstOrNull { geometry ->
++                            relativeY >= geometry.bounds.top && relativeY <= geometry.bounds.bottom
++                        }
++                        if (paragraph != null) {
++                            var lineY = paragraph.bounds.top
++                            paragraph.layout.lines.forEachIndexed { lineIndex, line ->
++                                if (relativeY >= lineY && relativeY <= lineY + line.height) {
++                                    val lineRelativeX = x - paragraph.bounds.left - line.left
++                                    val caret = line.caretAdvances.indices.minByOrNull {
++                                        kotlin.math.abs(line.caretAdvances[it] - lineRelativeX)
++                                    } ?: 0
++                                    return HitTestResult(
++                                        pageIndex = pageIndex,
++                                        elementIndex = elemLayout.elementIndex,
++                                        paragraphIndex = elemLayout.elementIndex,
++                                        lineIndex = lineIndex,
++                                        characterOffset = line.caretOffsets.getOrElse(caret) { line.startOffset },
++                                        tableRow = cell.cell.logicalRow,
++                                        tableColumn = cell.cell.logicalColumn,
++                                        tableCell = cell.cell.key
++                                    )
++                                }
++                                lineY += line.height
++                            }
++                        }
++                        return HitTestResult(
++                            pageIndex = pageIndex,
++                            elementIndex = elemLayout.elementIndex,
++                            paragraphIndex = elemLayout.elementIndex,
++                            lineIndex = -1,
++                            characterOffset = 0,
++                            tableRow = cell.cell.logicalRow,
++                            tableColumn = cell.cell.logicalColumn,
++                            tableCell = cell.cell.key
++                        )
++                    }
++                }
+                 if (elemLayout.paragraphLayout != null) {
+                     val pLayout = elemLayout.paragraphLayout
+                     var lineY = b.top
+@@ -418,7 +585,10 @@ data class HitTestResult(
+     val elementIndex: Int,
+     val paragraphIndex: Int,
+     val lineIndex: Int,
+-    val characterOffset: Int
++    val characterOffset: Int,
++    val tableRow: Int? = null,
++    val tableColumn: Int? = null,
++    val tableCell: TableCellSourceKey? = null
+ )
+ 
+ // ==========================================
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocument.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocument.kt
+index b89a415..52e9787 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocument.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocument.kt
+@@ -141,7 +141,9 @@ data class OfficeTable(
+     val numColumns: Int = 0,
+     val name: String? = null,
+     val columns: List<OfficeTableColumnSpec> = emptyList(),
+-    val styleName: String? = null
++    val styleName: String? = null,
++    val tableWidth: TableColumnWidthSpec = TableColumnWidthSpec(),
++    val diagnostics: List<TableDiagnostic> = emptyList()
+ ) : OfficeElement {
+     init {
+         require(numColumns >= 0) { "Table column count must be non-negative" }
+@@ -153,10 +155,13 @@ data class OfficeTableRow(
+     val styleName: String? = null,
+     val isHeader: Boolean = false,
+     val repeatCount: Int = 1,
+-    val rowStyle: TableRowStyle = TableRowStyle()
++    val rowStyle: TableRowStyle = TableRowStyle(),
++    /** Ordinal in the compact ODF source row list; -1 means synthetic. */
++    val sourceRowOrdinal: Int = -1
+ ) {
+     init {
+         require(repeatCount > 0) { "Table row repeat count must be positive" }
++        require(sourceRowOrdinal >= -1) { "Table source row ordinal must be non-negative or -1" }
+     }
+ }
+ 
+@@ -169,12 +174,15 @@ data class OfficeTableCell(
+     val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
+     val repeatCount: Int = 1,
+     val styleName: String? = null,
+-    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
++    val boxStyle: TableCellBoxStyle = TableCellBoxStyle(),
++    /** Ordinal in the compact source row; -1 means synthetic. */
++    val sourceCellOrdinal: Int = -1
+ ) {
+     init {
+         require(startColumn >= 0) { "Table cell start column must be non-negative" }
+         require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
+         require(repeatCount > 0) { "Table cell repeat count must be positive" }
++        require(sourceCellOrdinal >= -1) { "Table source cell ordinal must be non-negative or -1" }
+     }
+ }
+ 
+@@ -269,7 +277,12 @@ data class DocumentStyles(
+     /** Document-level ODF `<text:outline-style>` definition, if present. */
+     val outlineStyle: NumberingSpec? = null,
+     /** ODF font-face declarations keyed by their style:name alias. Populated by Plan 7E. */
+-    val fontFaces: Map<String, OfficeFontFace> = emptyMap()
++    val fontFaces: Map<String, OfficeFontFace> = emptyMap(),
++    /** Named and automatic ODF table-family declarations populated by Plan 7D. */
++    val tableStyles: Map<String, TableStyleSpec> = emptyMap(),
++    val tableColumnStyles: Map<String, TableStyleSpec> = emptyMap(),
++    val tableRowStyles: Map<String, TableStyleSpec> = emptyMap(),
++    val tableCellStyles: Map<String, TableStyleSpec> = emptyMap()
+ ) {
+     /** Page box behind an ODF master page, if both the master and its layout were read. */
+     fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
+@@ -450,7 +463,11 @@ data class DocumentCursor(
+     val elementIndex: Int = 0,
+     val paragraphIndex: Int = 0,
+     val runIndex: Int = 0,
+-    val offset: Int = 0
++    val offset: Int = 0,
++    /** Logical table context for viewer hit-testing; null for ordinary text. */
++    val tableRow: Int? = null,
++    val tableColumn: Int? = null,
++    val tableCell: TableCellSourceKey? = null
+ )
+ 
+ data class DocumentProperties(
+@@ -569,12 +586,15 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
+                     name = elem.name,
+                     columns = elem.columns,
+                     styleName = elem.styleName,
++                    tableWidth = elem.tableWidth,
++                    diagnostics = elem.diagnostics,
+                     rows = elem.rows.map { row ->
+                         OfficeTableRow(
+                             styleName = row.styleName,
+                             isHeader = row.isHeader,
+                             repeatCount = row.repeatCount,
+                             rowStyle = row.rowStyle,
++                            sourceRowOrdinal = row.sourceRowOrdinal,
+                             cells = row.cells.map { cell ->
+                                 OfficeTableCell(
+                                     text = cell.text,
+@@ -585,6 +605,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
+                                     repeatCount = cell.repeatCount,
+                                     styleName = cell.styleName,
+                                     boxStyle = cell.boxStyle,
++                                    sourceCellOrdinal = cell.sourceCellOrdinal,
+                                     paragraphs = cell.paragraphs.map { cellPara ->
+                                         val cellBookmarks = cellPara.bookmarks.filter { it.isNotBlank() }
+                                         allBookmarkNames.addAll(cellBookmarks)
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentModel.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentModel.kt
+index dddb5c0..43175d0 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentModel.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentModel.kt
+@@ -41,7 +41,9 @@ sealed class OfficeDocumentElement {
+         val numColumns: Int = 0,
+         val name: String? = null,
+         val columns: List<OfficeTableColumnSpec> = emptyList(),
+-        val styleName: String? = null
++        val styleName: String? = null,
++        val tableWidth: TableColumnWidthSpec = TableColumnWidthSpec(),
++        val diagnostics: List<TableDiagnostic> = emptyList()
+     ) : OfficeDocumentElement() {
+         init {
+             require(numColumns >= 0) { "Table column count must be non-negative" }
+@@ -64,10 +66,13 @@ data class TableRow(
+     val styleName: String? = null,
+     val isHeader: Boolean = false,
+     val repeatCount: Int = 1,
+-    val rowStyle: TableRowStyle = TableRowStyle()
++    val rowStyle: TableRowStyle = TableRowStyle(),
++    /** Ordinal in the compact ODF source row list; -1 means synthetic. */
++    val sourceRowOrdinal: Int = -1
+ ) {
+     init {
+         require(repeatCount > 0) { "Table row repeat count must be positive" }
++        require(sourceRowOrdinal >= -1) { "Table source row ordinal must be non-negative or -1" }
+     }
+ }
+ 
+@@ -80,12 +85,15 @@ data class TableCell(
+     val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
+     val repeatCount: Int = 1,
+     val styleName: String? = null,
+-    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
++    val boxStyle: TableCellBoxStyle = TableCellBoxStyle(),
++    /** Ordinal in the compact source row; -1 means synthetic. */
++    val sourceCellOrdinal: Int = -1
+ ) {
+     init {
+         require(startColumn >= 0) { "Table cell start column must be non-negative" }
+         require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
+         require(repeatCount > 0) { "Table cell repeat count must be positive" }
++        require(sourceCellOrdinal >= -1) { "Table source cell ordinal must be non-negative or -1" }
+     }
+ }
+ 
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/TableGrid.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/TableGrid.kt
+new file mode 100644
+index 0000000..d07f2af
+--- /dev/null
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/TableGrid.kt
+@@ -0,0 +1,364 @@
++package com.makerandreas.papirusoffice.data
++
++import kotlin.math.max
++
++/** Identifies one logical instance of a compact source cell declaration. */
++data class TableCellSourceKey(
++    val sourceRowOrdinal: Int,
++    val sourceCellOrdinal: Int,
++    val sourceRepeatIndex: Int,
++    /** Repeat ordinal of the compact source row; keeps repeated rows distinct. */
++    val sourceRowRepeatIndex: Int = 0
++)
++
++data class TableGridColumn(
++    val logicalColumn: Int,
++    val sourceColumnOrdinal: Int? = null,
++    val sourceRepeatIndex: Int = 0,
++    val width: TableColumnWidthSpec = TableColumnWidthSpec(),
++    val defaultCellStyleName: String? = null
++)
++
++data class TableGridCell(
++    val key: TableCellSourceKey,
++    val sourceCell: OfficeTableCell,
++    val logicalRow: Int,
++    val logicalColumn: Int,
++    val columnSpan: Int,
++    val rowSpan: Int,
++    val isHeader: Boolean
++)
++
++/**
++ * One logical slot. A covered slot points at its origin cell; an empty slot has
++ * no cell. This makes merged-cell hit testing possible without copying text.
++ */
++data class TableGridSlot(
++    val logicalRow: Int,
++    val logicalColumn: Int,
++    val occupancy: TableCellOccupancy? = null,
++    val cell: TableGridCell? = null,
++    val sourceRowOrdinal: Int? = null,
++    val sourceCellOrdinal: Int? = null,
++    val isHeader: Boolean = false
++)
++
++data class TableGridRow(
++    val logicalRow: Int,
++    val sourceRowOrdinal: Int?,
++    val sourceRepeatIndex: Int,
++    val isHeader: Boolean,
++    val rowStyle: TableRowStyle,
++    val slots: List<TableGridSlot>
++)
++
++data class TableGrid(
++    val tableName: String?,
++    val tableStyleName: String?,
++    val tableWidth: TableColumnWidthSpec,
++    val columns: List<TableGridColumn>,
++    val rows: List<TableGridRow>,
++    val diagnostics: List<TableDiagnostic> = emptyList()
++) {
++    val columnCount: Int get() = columns.size
++    val rowCount: Int get() = rows.size
++
++    fun slotAt(logicalRow: Int, logicalColumn: Int): TableGridSlot? =
++        rows.getOrNull(logicalRow)?.slots?.getOrNull(logicalColumn)
++
++    fun originCells(): List<TableGridCell> = rows
++        .asSequence()
++        .flatMap { it.slots.asSequence() }
++        .filter { it.occupancy == TableCellOccupancy.ORIGIN }
++        .mapNotNull { it.cell }
++        .distinctBy { it.key }
++        .toList()
++}
++
++/**
++ * Resolves compact ODF declarations into one rectangular logical occupancy
++ * grid. It never expands source objects: repeated source cells point to the
++ * same declaration and receive a repeat index in [TableCellSourceKey].
++ */
++object TableGridResolver {
++    /** A security budget, deliberately much higher than normal Writer tables. */
++    const val MAX_GRID_SLOTS: Long = 2_000_000L
++    const val MAX_GRID_ROWS: Int = 100_000
++    const val MAX_GRID_COLUMNS: Int = 10_000
++
++    private data class ActiveSpan(
++        val cell: TableGridCell,
++        val remainingRows: Int
++    )
++
++    fun resolve(table: OfficeTable): TableGrid {
++        val diagnostics = table.diagnostics.toMutableList()
++        val sourceColumns = expandColumns(table.columns, diagnostics)
++        val declaredColumnCount = maxOf(sourceColumns.size, table.numColumns).coerceAtMost(MAX_GRID_COLUMNS)
++        val rows = mutableListOf<TableGridRow>()
++        val active = linkedMapOf<Int, ActiveSpan>()
++        var logicalRow = 0
++        var slotBudget = MAX_GRID_SLOTS
++        var stop = false
++
++        rowLoop@ for ((sourceRowIndex, sourceRow) in table.rows.withIndex()) {
++            val sourceRowOrdinal = sourceRow.sourceRowOrdinal.takeIf { it >= 0 } ?: sourceRowIndex
++            val rowRepeat = sourceRow.repeatCount.coerceAtLeast(1)
++            for (sourceRepeatIndex in 0 until rowRepeat) {
++                if (logicalRow >= MAX_GRID_ROWS || slotBudget <= 0L) {
++                    diagnostics += TableDiagnostic(
++                        TableDiagnosticCode.UNSUPPORTED_DECLARATION,
++                        "Table logical-grid budget was reached; remaining repeats were not materialized",
++                        sourceRowOrdinal = sourceRowOrdinal
++                    )
++                    break@rowLoop
++                }
++
++                val rowSlots = linkedMapOf<Int, TableGridSlot>()
++                val coveredQueue = java.util.TreeSet<Int>()
++                active.forEach { (column, span) ->
++                    rowSlots[column] = TableGridSlot(
++                        logicalRow = logicalRow,
++                        logicalColumn = column,
++                        occupancy = TableCellOccupancy.COVERED,
++                        cell = span.cell,
++                        sourceRowOrdinal = span.cell.key.sourceRowOrdinal,
++                        sourceCellOrdinal = span.cell.key.sourceCellOrdinal,
++                        isHeader = sourceRow.isHeader
++                    )
++                    coveredQueue += column
++                }
++
++                var cursor = 0
++                for ((sourceCellIndex, sourceCell) in sourceRow.cells.withIndex()) {
++                    val sourceCellOrdinal = sourceCell.sourceCellOrdinal.takeIf { it >= 0 } ?: sourceCellIndex
++                    val cellRepeat = sourceCell.repeatCount.coerceAtLeast(1)
++                    for (sourceCellRepeatIndex in 0 until cellRepeat) {
++                        if (slotBudget <= 0L) {
++                            stop = true
++                            break
++                        }
++                        if (sourceCell.occupancy == TableCellOccupancy.COVERED) {
++                            val target = coveredQueue.firstOrNull { it >= cursor }
++                                ?: coveredQueue.firstOrNull()
++                            if (target == null) {
++                                val orphanColumn = nextFreeColumn(rowSlots, cursor)
++                                rowSlots[orphanColumn] = TableGridSlot(
++                                    logicalRow = logicalRow,
++                                    logicalColumn = orphanColumn,
++                                    occupancy = TableCellOccupancy.COVERED,
++                                    sourceRowOrdinal = sourceRowOrdinal,
++                                    sourceCellOrdinal = sourceCellOrdinal,
++                                    isHeader = sourceRow.isHeader
++                                )
++                                diagnostics += TableDiagnostic(
++                                    TableDiagnosticCode.MISSING_GRID_SLOT,
++                                    "Covered cell has no preceding spanning origin",
++                                    sourceRowOrdinal = sourceRowOrdinal,
++                                    sourceCellOrdinal = sourceCellOrdinal,
++                                    logicalRow = logicalRow,
++                                    logicalColumn = orphanColumn
++                                )
++                                cursor = orphanColumn + 1
++                            } else {
++                                coveredQueue.remove(target)
++                                cursor = target + 1
++                            }
++                            slotBudget--
++                            continue
++                        }
++
++                        val columnSpan = sourceCell.columnSpan.coerceAtLeast(1)
++                        val rowSpan = sourceCell.rowSpan.coerceAtLeast(1)
++                        val startColumn = findFreeSpanStart(rowSlots, cursor, columnSpan)
++                        val origin = TableGridCell(
++                            key = TableCellSourceKey(
++                                sourceRowOrdinal = sourceRowOrdinal,
++                                sourceCellOrdinal = sourceCellOrdinal,
++                                sourceRepeatIndex = sourceCellRepeatIndex,
++                                sourceRowRepeatIndex = sourceRepeatIndex
++                            ),
++                            sourceCell = sourceCell,
++                            logicalRow = logicalRow,
++                            logicalColumn = startColumn,
++                            columnSpan = columnSpan,
++                            rowSpan = rowSpan,
++                            isHeader = sourceRow.isHeader
++                        )
++                        val endColumn = startColumn + columnSpan
++                        var overlaps = false
++                        for (column in startColumn until endColumn) {
++                            if (rowSlots.containsKey(column)) overlaps = true
++                        }
++                        if (overlaps) {
++                            diagnostics += TableDiagnostic(
++                                TableDiagnosticCode.OVERLAPPING_SPAN,
++                                "Cell span overlaps an occupied logical slot; the origin was reduced to one slot",
++                                sourceRowOrdinal = sourceRowOrdinal,
++                                sourceCellOrdinal = sourceCellOrdinal,
++                                logicalRow = logicalRow,
++                                logicalColumn = startColumn
++                            )
++                        }
++                        val safeEnd = if (overlaps) startColumn + 1 else endColumn
++                        for (column in startColumn until safeEnd) {
++                            val occupancy = if (column == startColumn) TableCellOccupancy.ORIGIN else TableCellOccupancy.COVERED
++                            rowSlots[column] = TableGridSlot(
++                                logicalRow = logicalRow,
++                                logicalColumn = column,
++                                occupancy = occupancy,
++                                cell = origin,
++                                sourceRowOrdinal = sourceRowOrdinal,
++                                sourceCellOrdinal = sourceCellOrdinal,
++                                isHeader = sourceRow.isHeader
++                            )
++                            if (occupancy == TableCellOccupancy.COVERED) coveredQueue += column
++                        }
++                        if (rowSpan > 1) {
++                            for (column in startColumn until safeEnd) {
++                                active[column] = ActiveSpan(origin, rowSpan - 1)
++                            }
++                        }
++                        cursor = safeEnd
++                        slotBudget -= max(1, safeEnd - startColumn).toLong()
++                    }
++                    if (stop) break
++                }
++
++                val width = maxOf(declaredColumnCount, (rowSlots.keys.maxOrNull() ?: -1) + 1)
++                    .coerceAtMost(MAX_GRID_COLUMNS)
++                if (width > declaredColumnCount && declaredColumnCount > 0) {
++                    diagnostics += TableDiagnostic(
++                        TableDiagnosticCode.UNSUPPORTED_DECLARATION,
++                        "Cell occupancy extends beyond declared columns; automatic columns were added",
++                        sourceRowOrdinal = sourceRowOrdinal
++                    )
++                }
++                val row = TableGridRow(
++                    logicalRow = logicalRow,
++                    sourceRowOrdinal = sourceRowOrdinal,
++                    sourceRepeatIndex = sourceRepeatIndex,
++                    isHeader = sourceRow.isHeader,
++                    rowStyle = sourceRow.rowStyle,
++                    slots = (0 until width).map { column ->
++                        rowSlots[column] ?: run {
++                            diagnostics += TableDiagnostic(
++                                TableDiagnosticCode.MISSING_GRID_SLOT,
++                                "Required logical slot has no source cell",
++                                sourceRowOrdinal = sourceRowOrdinal,
++                                logicalRow = logicalRow,
++                                logicalColumn = column
++                            )
++                            TableGridSlot(
++                                logicalRow = logicalRow,
++                                logicalColumn = column,
++                                isHeader = sourceRow.isHeader
++                            )
++                        }
++                    }
++                )
++                rows += row
++                logicalRow++
++
++                val nextActive = linkedMapOf<Int, ActiveSpan>()
++                // remainingRows counts rows still covered after the row that
++                // created the anchor. Keep a zero-count entry for the final
++                // covered row, then remove it after that row is consumed.
++                active.forEach { (column, span) ->
++                    if (span.remainingRows > 0) {
++                        nextActive[column] = span.copy(remainingRows = span.remainingRows - 1)
++                    }
++                }
++                active.clear()
++                active.putAll(nextActive)
++                if (stop) break@rowLoop
++            }
++        }
++
++        val finalColumnCount = maxOf(
++            declaredColumnCount,
++            rows.maxOfOrNull { it.slots.size } ?: 0
++        ).coerceAtMost(MAX_GRID_COLUMNS)
++        val columns = expandColumnsToWidth(sourceColumns, finalColumnCount)
++        val normalizedRows = rows.map { row ->
++            if (row.slots.size >= finalColumnCount) row else row.copy(
++                slots = row.slots + (row.slots.size until finalColumnCount).map { column ->
++                    diagnostics += TableDiagnostic(
++                        TableDiagnosticCode.MISSING_GRID_SLOT,
++                        "Required logical slot has no source cell",
++                        sourceRowOrdinal = row.sourceRowOrdinal,
++                        logicalRow = row.logicalRow,
++                        logicalColumn = column
++                    )
++                    TableGridSlot(
++                        logicalRow = row.logicalRow,
++                        logicalColumn = column,
++                        isHeader = row.isHeader
++                    )
++                }
++            )
++        }
++        return TableGrid(
++            tableName = table.name,
++            tableStyleName = table.styleName,
++            tableWidth = table.tableWidth,
++            columns = columns,
++            rows = normalizedRows,
++            diagnostics = diagnostics
++        )
++    }
++
++    private fun expandColumns(
++        sourceColumns: List<OfficeTableColumnSpec>,
++        diagnostics: MutableList<TableDiagnostic>
++    ): List<TableGridColumn> {
++        val result = mutableListOf<TableGridColumn>()
++        for (source in sourceColumns) {
++            val count = source.repeatCount.coerceAtLeast(1)
++            for (repeatIndex in 0 until count) {
++                if (result.size >= MAX_GRID_COLUMNS) {
++                    diagnostics += TableDiagnostic(
++                        TableDiagnosticCode.UNSUPPORTED_DECLARATION,
++                        "Table column budget was reached; remaining column repeats were not materialized"
++                    )
++                    return result
++                }
++                result += TableGridColumn(
++                    logicalColumn = result.size,
++                    sourceColumnOrdinal = source.sourceColumnOrdinal.takeIf { it >= 0 },
++                    sourceRepeatIndex = repeatIndex,
++                    width = source.width,
++                    defaultCellStyleName = source.defaultCellStyleName
++                )
++            }
++        }
++        return result
++    }
++
++    private fun expandColumnsToWidth(
++        sourceColumns: List<TableGridColumn>,
++        width: Int
++    ): List<TableGridColumn> = (0 until width).map { column ->
++        sourceColumns.getOrNull(column)?.copy(logicalColumn = column)
++            ?: TableGridColumn(logicalColumn = column)
++    }
++
++    private fun nextFreeColumn(rowSlots: Map<Int, TableGridSlot>, start: Int): Int {
++        var candidate = start.coerceAtLeast(0)
++        while (rowSlots.containsKey(candidate)) candidate++
++        return candidate
++    }
++
++    private fun findFreeSpanStart(
++        rowSlots: Map<Int, TableGridSlot>,
++        start: Int,
++        span: Int
++    ): Int {
++        var candidate = start.coerceAtLeast(0)
++        while (candidate < MAX_GRID_COLUMNS) {
++            if ((candidate until candidate + span).all { !rowSlots.containsKey(it) }) return candidate
++            candidate = nextFreeColumn(rowSlots, candidate + 1)
++        }
++        return MAX_GRID_COLUMNS - 1
++    }
++}
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/TableLayout.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/TableLayout.kt
+new file mode 100644
+index 0000000..46f9406
+--- /dev/null
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/TableLayout.kt
+@@ -0,0 +1,412 @@
++package com.makerandreas.papirusoffice.data
++
++import kotlin.math.max
++
++private fun resolveTableParagraphStyle(paragraph: OfficeParagraph, styles: DocumentStyles): ParagraphStyle {
++    val base = StyleResolver.resolveParagraphStyle(paragraph.styleName, styles)
++    return base.copy(indentStartUnits = base.indentStartUnits + paragraph.indent)
++}
++
++/** A paragraph layout positioned inside one table cell. */
++data class TableCellParagraphGeometry(
++    val paragraph: OfficeParagraph,
++    val layout: ParagraphLayout,
++    val bounds: OfficeRect
++)
++
++data class TableCellGeometry(
++    val cell: TableGridCell,
++    val bounds: OfficeRect,
++    val contentBounds: OfficeRect,
++    val style: TableCellBoxStyle,
++    val paragraphs: List<TableCellParagraphGeometry>,
++    val paintBackground: Boolean = true
++)
++
++data class TableBorderEdgeGeometry(
++    val startX: Float,
++    val startY: Float,
++    val endX: Float,
++    val endY: Float,
++    val border: TableBorder,
++    val owner: TableCellSourceKey
++)
++
++data class TableFragmentRowGeometry(
++    val logicalRow: Int,
++    val sourceRowOrdinal: Int?,
++    val sourceRepeatIndex: Int,
++    val bounds: OfficeRect,
++    val isHeader: Boolean,
++    val isRepeatedHeader: Boolean,
++    val isBodyCoverage: Boolean
++)
++
++data class TableFragmentGeometry(
++    val elementIndex: Int,
++    val tableName: String?,
++    val bounds: OfficeRect,
++    val rows: List<TableFragmentRowGeometry>,
++    val cells: List<TableCellGeometry>,
++    val borderEdges: List<TableBorderEdgeGeometry>,
++    val repeatedHeaderRows: Set<Int>,
++    val bodyLogicalRows: Set<Int>,
++    val sourceRowStart: Int?,
++    val sourceRowEndExclusive: Int?,
++    val diagnostics: List<TableDiagnostic> = emptyList()
++)
++
++data class TableMeasuredRow(
++    val logicalRow: Int,
++    val sourceRowOrdinal: Int?,
++    val isHeader: Boolean,
++    val style: TableRowStyle,
++    val height: Float
++)
++
++data class TableRowGroup(
++    val startInclusive: Int,
++    val endExclusive: Int
++) {
++    val rowCount: Int get() = endExclusive - startInclusive
++}
++
++data class TableMeasuredCell(
++    val cell: TableGridCell,
++    val requiredHeight: Float,
++    val paragraphs: List<Pair<OfficeParagraph, ParagraphLayout>>
++)
++
++data class TableLayoutPlan(
++    val grid: TableGrid,
++    val tableWidth: Float,
++    val columnWidths: List<Float>,
++    val rows: List<TableMeasuredRow>,
++    val rowGroups: List<TableRowGroup>,
++    val headerRowCount: Int,
++    val measuredCells: Map<TableCellSourceKey, TableMeasuredCell>,
++    val styles: DocumentStyles,
++    val diagnostics: List<TableDiagnostic>
++) {
++    val totalHeight: Float get() = rows.sumOf { it.height.toDouble() }.toFloat()
++
++    fun rowHeight(row: Int): Float = rows.getOrNull(row)?.height ?: 0f
++
++    fun heightOf(group: TableRowGroup): Float =
++        (group.startInclusive until group.endExclusive).sumOf { rowHeight(it).toDouble() }.toFloat()
++
++    fun heightOfRows(rowIndices: List<Int>): Float = rowIndices.sumOf { rowHeight(it).toDouble() }.toFloat()
++
++    fun fragment(
++        elementIndex: Int,
++        left: Float,
++        top: Float,
++        rowRefs: List<TableFragmentRowRef>,
++        extraDiagnostics: List<TableDiagnostic> = emptyList()
++    ): TableFragmentGeometry {
++        if (rowRefs.isEmpty()) {
++            val bounds = OfficeRect(left, top, left + tableWidth, top)
++            return TableFragmentGeometry(
++                elementIndex = elementIndex,
++                tableName = grid.tableName,
++                bounds = bounds,
++                rows = emptyList(),
++                cells = emptyList(),
++                borderEdges = emptyList(),
++                repeatedHeaderRows = emptySet(),
++                bodyLogicalRows = emptySet(),
++                sourceRowStart = null,
++                sourceRowEndExclusive = null,
++                diagnostics = diagnostics + extraDiagnostics
++            )
++        }
++
++        val rowGeometry = mutableListOf<TableFragmentRowGeometry>()
++        var y = top
++        rowRefs.forEach { ref ->
++            val height = rowHeight(ref.logicalRow)
++            val row = grid.rows[ref.logicalRow]
++            val bounds = OfficeRect(left, y, left + tableWidth, y + height)
++            rowGeometry += TableFragmentRowGeometry(
++                logicalRow = ref.logicalRow,
++                sourceRowOrdinal = row.sourceRowOrdinal,
++                sourceRepeatIndex = row.sourceRepeatIndex,
++                bounds = bounds,
++                isHeader = row.isHeader,
++                isRepeatedHeader = ref.isRepeatedHeader,
++                isBodyCoverage = ref.isBodyCoverage
++            )
++            y += height
++        }
++        val includedRows = rowRefs.map { it.logicalRow }.toSet()
++        val cells = mutableListOf<TableCellGeometry>()
++        val edgeOwners = linkedMapOf<TableEdgeKey, TableBorderEdgeGeometry>()
++        val rowByLogical = rowGeometry.associateBy { it.logicalRow }
++
++        val originCells = grid.originCells().filter { it.logicalRow in includedRows }
++        originCells.forEach { origin ->
++            val row = rowByLogical[origin.logicalRow] ?: return@forEach
++            val x = left + columnWidths.take(origin.logicalColumn).sum()
++            val width = columnWidths
++                .drop(origin.logicalColumn)
++                .take(origin.columnSpan)
++                .sum()
++                .coerceAtLeast(1f)
++            val coveredRows = (origin.logicalRow until (origin.logicalRow + origin.rowSpan))
++                .filter { it in includedRows }
++            val height = coveredRows.sumOf { rowHeight(it).toDouble() }.toFloat().coerceAtLeast(row.bounds.bottom - row.bounds.top)
++            val bounds = OfficeRect(x, row.bounds.top, x + width, row.bounds.top + height)
++            val style = origin.sourceCell.boxStyle
++            val contentLeft = bounds.left + style.padding.startUnits + style.borderStart.widthUnits
++            val contentRight = bounds.right - style.padding.endUnits - style.borderEnd.widthUnits
++            val contentTop = bounds.top + style.padding.topUnits + style.borderTop.widthUnits
++            val contentBottom = bounds.bottom - style.padding.bottomUnits - style.borderBottom.widthUnits
++            val contentBounds = OfficeRect(
++                contentLeft,
++                contentTop,
++                contentRight.coerceAtLeast(contentLeft + 1f),
++                contentBottom.coerceAtLeast(contentTop)
++            )
++            val measured = measuredCells[origin.key]
++            val contentHeight = measured?.paragraphs?.sumOf { (paragraph, layout) ->
++                val paragraphStyle = resolveTableParagraphStyle(paragraph, styles)
++                (layout.height + paragraphStyle.spaceBeforeUnits + paragraphStyle.spaceAfterUnits).toDouble()
++            }?.toFloat() ?: 0f
++            val available = (contentBounds.bottom - contentBounds.top).coerceAtLeast(0f)
++            val verticalOffset = when (style.verticalAlignment) {
++                TableVerticalAlignment.MIDDLE -> ((available - contentHeight) / 2f).coerceAtLeast(0f)
++                TableVerticalAlignment.BOTTOM -> (available - contentHeight).coerceAtLeast(0f)
++                else -> 0f
++            }
++            var paragraphY = contentBounds.top + verticalOffset
++            val paragraphGeometry = measured?.paragraphs?.map { (paragraph, layout) ->
++                val paragraphStyle = resolveTableParagraphStyle(paragraph, styles)
++                paragraphY += paragraphStyle.spaceBeforeUnits
++                val paragraphBounds = OfficeRect(
++                    contentBounds.left,
++                    paragraphY,
++                    contentBounds.right,
++                    paragraphY + layout.height
++                )
++                paragraphY += layout.height + paragraphStyle.spaceAfterUnits
++                TableCellParagraphGeometry(paragraph, layout, paragraphBounds)
++            }.orEmpty()
++            cells += TableCellGeometry(origin, bounds, contentBounds, style, paragraphGeometry)
++            addEdge(edgeOwners, TableEdgeKey(x, bounds.top, x + width, bounds.top), style.borderTop, origin.key)
++            addEdge(edgeOwners, TableEdgeKey(x, bounds.bottom, x + width, bounds.bottom), style.borderBottom, origin.key)
++            addEdge(edgeOwners, TableEdgeKey(x, bounds.top, x, bounds.bottom), style.borderStart, origin.key)
++            addEdge(edgeOwners, TableEdgeKey(x + width, bounds.top, x + width, bounds.bottom), style.borderEnd, origin.key)
++        }
++
++        val sourceRows = rowGeometry.mapNotNull { it.sourceRowOrdinal }
++        return TableFragmentGeometry(
++            elementIndex = elementIndex,
++            tableName = grid.tableName,
++            bounds = OfficeRect(left, top, left + tableWidth, y),
++            rows = rowGeometry,
++            cells = cells,
++            borderEdges = edgeOwners.values.toList(),
++            repeatedHeaderRows = rowRefs.filter { it.isRepeatedHeader }.map { it.logicalRow }.toSet(),
++            bodyLogicalRows = rowRefs.filter { it.isBodyCoverage }.map { it.logicalRow }.toSet(),
++            sourceRowStart = sourceRows.minOrNull(),
++            sourceRowEndExclusive = sourceRows.maxOrNull()?.plus(1),
++            diagnostics = diagnostics + extraDiagnostics
++        )
++    }
++
++    private fun addEdge(
++        owners: MutableMap<TableEdgeKey, TableBorderEdgeGeometry>,
++        key: TableEdgeKey,
++        border: TableBorder,
++        owner: TableCellSourceKey
++    ) {
++        if (border.widthUnits <= 0f || border.style == TableBorderLineStyle.NONE) return
++        val candidate = TableBorderEdgeGeometry(key.x1, key.y1, key.x2, key.y2, border, owner)
++        val previous = owners[key]
++        if (previous == null || borderStrength(border) > borderStrength(previous.border)) {
++            owners[key] = candidate
++        }
++    }
++
++    private fun borderStrength(border: TableBorder): Float =
++        border.widthUnits + when (border.style) {
++            TableBorderLineStyle.DOUBLE -> 0.4f
++            TableBorderLineStyle.SOLID -> 0.3f
++            TableBorderLineStyle.DASHED -> 0.2f
++            TableBorderLineStyle.DOTTED -> 0.1f
++            else -> 0f
++        }
++
++    private data class TableEdgeKey(val x1: Float, val y1: Float, val x2: Float, val y2: Float)
++}
++
++data class TableFragmentRowRef(
++    val logicalRow: Int,
++    val isRepeatedHeader: Boolean = false,
++    val isBodyCoverage: Boolean = true
++)
++
++object TableLayoutEngine {
++    fun measure(
++        table: OfficeTable,
++        styles: DocumentStyles,
++        availableWidth: Float,
++        advanceSource: AdvanceSource,
++        hyphenator: HyphenationEngine?
++    ): TableLayoutPlan {
++        val grid = TableGridResolver.resolve(table)
++        val widthResult = resolveColumnWidths(grid, availableWidth)
++        val diagnostics = grid.diagnostics.toMutableList()
++        val measuredCells = linkedMapOf<TableCellSourceKey, TableMeasuredCell>()
++        var paragraphIndex = -1
++        grid.originCells().forEach { origin ->
++            val cellWidth = widthResult.columnWidths
++                .drop(origin.logicalColumn)
++                .take(origin.columnSpan)
++                .sum()
++                .coerceAtLeast(1f)
++            val style = origin.sourceCell.boxStyle
++            val innerWidth = (
++                cellWidth - style.padding.startUnits - style.padding.endUnits -
++                    style.borderStart.widthUnits - style.borderEnd.widthUnits
++                ).coerceAtLeast(1f)
++            val paragraphs = if (origin.sourceCell.paragraphs.isNotEmpty()) {
++                origin.sourceCell.paragraphs.map { paragraph ->
++                    val paragraphStyle = resolveTableParagraphStyle(paragraph, styles)
++                    val layout = ParagraphMeasurer(advanceSource, hyphenator).measure(
++                        paragraphIndex--, paragraph, paragraphStyle, styles, innerWidth
++                    )
++                    paragraph to layout
++                }
++            } else if (origin.sourceCell.text.isNotEmpty()) {
++                val paragraph = OfficeParagraph(origin.sourceCell.text)
++                val paragraphStyle = StyleResolver.resolveParagraphStyle(null, styles)
++                listOf(
++                    paragraph to ParagraphMeasurer(advanceSource, hyphenator).measure(
++                        paragraphIndex--, paragraph, paragraphStyle, styles, innerWidth
++                    )
++                )
++            } else {
++                emptyList()
++            }
++            val contentHeight = paragraphs.sumOf { (paragraph, layout) ->
++                val paragraphStyle = resolveTableParagraphStyle(paragraph, styles)
++                (paragraphStyle.spaceBeforeUnits + layout.height + paragraphStyle.spaceAfterUnits).toDouble()
++            }.toFloat()
++            val requiredHeight = (
++                contentHeight + style.padding.topUnits + style.padding.bottomUnits +
++                    style.borderTop.widthUnits + style.borderBottom.widthUnits
++                ).coerceAtLeast(0f)
++            measuredCells[origin.key] = TableMeasuredCell(origin, requiredHeight, paragraphs)
++        }
++
++        val rowHeights = grid.rows.map { row ->
++            var height = max(1f, row.rowStyle.minimumHeightUnits ?: 0f)
++            row.slots.filter { it.occupancy == TableCellOccupancy.ORIGIN }.mapNotNull { it.cell }.forEach { cell ->
++                if (cell.rowSpan == 1) {
++                    height = max(height, measuredCells[cell.key]?.requiredHeight ?: 0f)
++                }
++            }
++            row.rowStyle.exactHeightUnits?.let { height = max(height, it) }
++            height
++        }.toMutableList()
++        measuredCells.values.filter { it.cell.rowSpan > 1 }.forEach { measured ->
++            val start = measured.cell.logicalRow
++            val end = (start + measured.cell.rowSpan).coerceAtMost(rowHeights.size)
++            if (start < end) {
++                val current = (start until end).sumOf { rowHeights[it].toDouble() }.toFloat()
++                val deficit = measured.requiredHeight - current
++                if (deficit > 0f) rowHeights[end - 1] += deficit
++            }
++        }
++        val rows = grid.rows.mapIndexed { index, row ->
++            TableMeasuredRow(index, row.sourceRowOrdinal, row.isHeader, row.rowStyle, rowHeights[index])
++        }
++        val groups = rowGroups(grid, diagnostics)
++        val headerCount = grid.rows.takeWhile { it.isHeader }.size
++        return TableLayoutPlan(
++            grid = grid,
++            tableWidth = widthResult.tableWidth,
++            columnWidths = widthResult.columnWidths,
++            rows = rows,
++            rowGroups = groups,
++            headerRowCount = headerCount,
++            measuredCells = measuredCells,
++            styles = styles,
++            diagnostics = diagnostics
++        )
++    }
++
++    private data class WidthResult(val tableWidth: Float, val columnWidths: List<Float>)
++
++    private fun resolveColumnWidths(grid: TableGrid, availableWidth: Float): WidthResult {
++        val available = availableWidth.coerceAtLeast(1f)
++        val tableWidth = when (grid.tableWidth.kind) {
++            TableColumnWidthKind.ABSOLUTE -> grid.tableWidth.value.coerceAtLeast(1f).coerceAtMost(available)
++            TableColumnWidthKind.RELATIVE -> (available * (grid.tableWidth.value / 100f).coerceIn(0f, 1f)).coerceAtLeast(1f)
++            TableColumnWidthKind.AUTO -> available
++        }
++        val specs = if (grid.columns.isEmpty()) listOf(TableGridColumn(0)) else grid.columns
++        val fixed = specs.map { if (it.width.kind == TableColumnWidthKind.ABSOLUTE) it.width.value else 0f }
++        val fixedTotal = fixed.sum()
++        val relativeTotal = specs.sumOf { if (it.width.kind == TableColumnWidthKind.RELATIVE) it.width.value.toDouble() else 0.0 }.toFloat()
++        val autoCount = specs.count { it.width.kind == TableColumnWidthKind.AUTO }
++        val flexibleWeight = relativeTotal + autoCount.toFloat()
++        val widths = when {
++            fixedTotal > tableWidth -> {
++                val scale = tableWidth / fixedTotal
++                fixed.map { it * scale }
++            }
++            fixedTotal < tableWidth && flexibleWeight > 0f -> {
++                val remainder = tableWidth - fixedTotal
++                specs.map { spec ->
++                    when (spec.width.kind) {
++                        TableColumnWidthKind.ABSOLUTE -> spec.width.value
++                        TableColumnWidthKind.RELATIVE -> remainder * spec.width.value / flexibleWeight
++                        TableColumnWidthKind.AUTO -> remainder / flexibleWeight
++                    }
++                }
++            }
++            fixedTotal > 0f -> {
++                val scale = tableWidth / fixedTotal
++                fixed.map { it * scale }
++            }
++            else -> List(specs.size) { tableWidth / specs.size.coerceAtLeast(1) }
++        }.map { it.coerceAtLeast(1f) }
++        return WidthResult(widths.sum(), widths)
++    }
++
++    private fun rowGroups(grid: TableGrid, diagnostics: MutableList<TableDiagnostic>): List<TableRowGroup> {
++        if (grid.rows.isEmpty()) return emptyList()
++        val intervals = grid.originCells()
++            .filter { it.rowSpan > 1 }
++            .map { it.logicalRow to (it.logicalRow + it.rowSpan).coerceAtMost(grid.rows.size) }
++            .filter { it.first < it.second }
++            .sortedBy { it.first }
++            .toMutableList()
++        val merged = mutableListOf<TableRowGroup>()
++        intervals.forEach { (start, end) ->
++            val previous = merged.lastOrNull()
++            if (previous != null && start < previous.endExclusive) {
++                merged[merged.lastIndex] = previous.copy(endExclusive = max(previous.endExclusive, end))
++            } else {
++                merged += TableRowGroup(start, end)
++            }
++        }
++        val groups = mutableListOf<TableRowGroup>()
++        var row = 0
++        merged.forEach { group ->
++            while (row < group.startInclusive) groups += TableRowGroup(row, row + 1).also { row++ }
++            groups += group
++            row = group.endExclusive
++        }
++        while (row < grid.rows.size) groups += TableRowGroup(row, row + 1).also { row++ }
++        if (merged.any { it.startInclusive < grid.rows.takeWhile { r -> r.isHeader }.size && it.endExclusive > grid.rows.takeWhile { r -> r.isHeader }.size }) {
++            diagnostics += TableDiagnostic(
++                TableDiagnosticCode.UNSUPPORTED_DECLARATION,
++                "A vertical span crosses the leading header boundary; it remains indivisible"
++            )
++        }
++        return groups
++    }
++}
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImport.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImport.kt
+index 0e960a7..e35852f 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImport.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImport.kt
+@@ -3,6 +3,18 @@ package com.makerandreas.papirusoffice.data.odf
+ import com.makerandreas.papirusoffice.data.CharacterStyle
+ import com.makerandreas.papirusoffice.data.DocumentStyles
+ import com.makerandreas.papirusoffice.data.LayoutUnits
++import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
++import com.makerandreas.papirusoffice.data.TableBorder
++import com.makerandreas.papirusoffice.data.TableBorderLineStyle
++import com.makerandreas.papirusoffice.data.TableCellBoxStyle
++import com.makerandreas.papirusoffice.data.TableColumnWidthKind
++import com.makerandreas.papirusoffice.data.TableColumnWidthSpec
++import com.makerandreas.papirusoffice.data.TableDiagnostic
++import com.makerandreas.papirusoffice.data.TableDiagnosticCode
++import com.makerandreas.papirusoffice.data.TableInsets
++import com.makerandreas.papirusoffice.data.TableRowStyle
++import com.makerandreas.papirusoffice.data.TableStyleSpec
++import com.makerandreas.papirusoffice.data.TableVerticalAlignment
+ import com.makerandreas.papirusoffice.data.NumberingCounterState
+ import com.makerandreas.papirusoffice.data.NumberingFormatter
+ import com.makerandreas.papirusoffice.data.NumberingLevelSpec
+@@ -76,7 +88,20 @@ data class OdfStyleInfo(
+     val orphans: Int? = null,
+     val widows: Int? = null,
+     val tabStops: List<ParagraphTabStop>? = null,
+-    val defaultTabIntervalUnits: Float? = null
++    val defaultTabIntervalUnits: Float? = null,
++    val tableWidth: TableColumnWidthSpec? = null,
++    val columnWidth: TableColumnWidthSpec? = null,
++    val defaultCellStyleName: String? = null,
++    val tableMinimumHeightUnits: Float? = null,
++    val tableExactHeightUnits: Float? = null,
++    val tableKeepTogether: Boolean? = null,
++    val tablePadding: TableInsets? = null,
++    val tableBorderTop: TableBorder? = null,
++    val tableBorderEnd: TableBorder? = null,
++    val tableBorderBottom: TableBorder? = null,
++    val tableBorderStart: TableBorder? = null,
++    val tableBackgroundColorHex: String? = null,
++    val tableVerticalAlignment: TableVerticalAlignment? = null
+ )
+ 
+ /** Bold/italic/underline resolved from a character style, never from the style name. */
+@@ -116,7 +141,20 @@ private class StyleDraft(
+     var orphans: Int? = null,
+     var widows: Int? = null,
+     var tabStops: List<ParagraphTabStop>? = null,
+-    var defaultTabIntervalUnits: Float? = null
++    var defaultTabIntervalUnits: Float? = null,
++    var tableWidth: TableColumnWidthSpec? = null,
++    var columnWidth: TableColumnWidthSpec? = null,
++    var defaultCellStyleName: String? = null,
++    var tableMinimumHeightUnits: Float? = null,
++    var tableExactHeightUnits: Float? = null,
++    var tableKeepTogether: Boolean? = null,
++    var tablePadding: TableInsets? = null,
++    var tableBorderTop: TableBorder? = null,
++    var tableBorderEnd: TableBorder? = null,
++    var tableBorderBottom: TableBorder? = null,
++    var tableBorderStart: TableBorder? = null,
++    var tableBackgroundColorHex: String? = null,
++    var tableVerticalAlignment: TableVerticalAlignment? = null
+ ) {
+     fun toInfo(): OdfStyleInfo = OdfStyleInfo(
+         name = name,
+@@ -145,7 +183,20 @@ private class StyleDraft(
+         pageBreakBefore = pageBreakBefore,
+         pageBreakAfter = pageBreakAfter,
+         keepTogether = keepTogether, orphans = orphans, widows = widows,
+-        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits
++        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits,
++        tableWidth = tableWidth,
++        columnWidth = columnWidth,
++        defaultCellStyleName = defaultCellStyleName,
++        tableMinimumHeightUnits = tableMinimumHeightUnits,
++        tableExactHeightUnits = tableExactHeightUnits,
++        tableKeepTogether = tableKeepTogether,
++        tablePadding = tablePadding,
++        tableBorderTop = tableBorderTop,
++        tableBorderEnd = tableBorderEnd,
++        tableBorderBottom = tableBorderBottom,
++        tableBorderStart = tableBorderStart,
++        tableBackgroundColorHex = tableBackgroundColorHex,
++        tableVerticalAlignment = tableVerticalAlignment
+     )
+ }
+ 
+@@ -248,6 +299,118 @@ private fun parseFontWeightBold(raw: String?): Boolean? {
+     return numeric >= 700
+ }
+ 
++private fun parsePositiveFloat(raw: String?): Float? = raw?.trim()?.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
++
++private fun parseRelativeColumnWidth(raw: String?): TableColumnWidthSpec? {
++    val text = raw?.trim()?.removeSuffix("*") ?: return null
++    return parsePositiveFloat(text)?.let { TableColumnWidthSpec(TableColumnWidthKind.RELATIVE, it) }
++}
++
++private fun parseRelativeTableWidth(raw: String?): TableColumnWidthSpec? {
++    val text = raw?.trim()?.removeSuffix("%") ?: return null
++    return parsePositiveFloat(text)?.let { TableColumnWidthSpec(TableColumnWidthKind.RELATIVE, it) }
++}
++
++private fun parseAbsoluteWidth(raw: String?): TableColumnWidthSpec? {
++    if (raw.isNullOrBlank()) return null
++    val units = OdfLength.toLayoutUnits(raw, fallback = -1f)
++    return units.takeIf { it >= 0f && it.isFinite() }
++        ?.let { TableColumnWidthSpec(TableColumnWidthKind.ABSOLUTE, it) }
++}
++
++private fun parseColumnWidth(absolute: String?, relative: String?): TableColumnWidthSpec? =
++    parseAbsoluteWidth(absolute) ?: parseRelativeColumnWidth(relative)
++
++private fun parseTableWidth(absolute: String?, relative: String?): TableColumnWidthSpec? =
++    parseRelativeTableWidth(relative) ?: parseAbsoluteWidth(absolute)
++
++private fun parseBorder(raw: String?): TableBorder? {
++    if (raw.isNullOrBlank()) return null
++    val tokens = raw.trim().split(Regex("\\s+"))
++    if (tokens.any { it.equals("none", ignoreCase = true) }) return TableBorder()
++    val width = tokens.firstNotNullOfOrNull { token ->
++        val value = OdfLength.toLayoutUnits(token, fallback = -1f)
++        value.takeIf { it >= 0f && it.isFinite() }
++    } ?: 0f
++    val style = tokens.firstNotNullOfOrNull { token ->
++        when (token.lowercase(Locale.ROOT)) {
++            "solid" -> TableBorderLineStyle.SOLID
++            "dotted" -> TableBorderLineStyle.DOTTED
++            "dashed" -> TableBorderLineStyle.DASHED
++            "double" -> TableBorderLineStyle.DOUBLE
++            "none" -> TableBorderLineStyle.NONE
++            else -> null
++        }
++    } ?: if (width > 0f) TableBorderLineStyle.SOLID else TableBorderLineStyle.OTHER
++    val color = tokens.firstOrNull { it.startsWith("#") || it.equals("transparent", ignoreCase = true) }
++    return TableBorder(widthUnits = width, style = style, colorHex = color, sourceStyle = raw)
++}
++
++private fun parseVerticalAlignment(raw: String?): TableVerticalAlignment? = when (raw?.trim()?.lowercase(Locale.ROOT)) {
++    "top" -> TableVerticalAlignment.TOP
++    "middle", "center" -> TableVerticalAlignment.MIDDLE
++    "bottom" -> TableVerticalAlignment.BOTTOM
++    "automatic", "auto" -> TableVerticalAlignment.AUTOMATIC
++    else -> null
++}
++
++private fun parseTablePadding(attrs: Map<String, String>, previous: TableInsets?): TableInsets? {
++    val shorthand = attrs["padding"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
++        ?.takeIf { it >= 0f && it.isFinite() }
++    val base = previous ?: TableInsets()
++    val top = attrs["padding-top"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
++        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.topUnits
++    val end = attrs["padding-right"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
++        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.endUnits
++    val bottom = attrs["padding-bottom"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
++        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.bottomUnits
++    val start = attrs["padding-left"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
++        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.startUnits
++    return if (shorthand != null || attrs.keys.any { it.startsWith("padding-") }) {
++        TableInsets(topUnits = top, endUnits = end, bottomUnits = bottom, startUnits = start)
++    } else {
++        previous
++    }
++}
++
++private fun applyTableProperties(draft: StyleDraft, family: String, attrs: Map<String, String>) {
++    when (family.lowercase(Locale.ROOT)) {
++        "table" -> {
++            parseTableWidth(attrs["width"], attrs["rel-width"])?.let { draft.tableWidth = it }
++        }
++        "table-column" -> {
++            parseColumnWidth(attrs["column-width"], attrs["rel-column-width"])?.let { draft.columnWidth = it }
++        }
++        "table-row" -> {
++            (attrs["min-height"] ?: attrs["min-row-height"])?.let { raw ->
++                parseAbsoluteWidth(raw)?.value?.let { draft.tableMinimumHeightUnits = it }
++            }
++            (attrs["row-height"] ?: attrs["height"])?.let { raw ->
++                parseAbsoluteWidth(raw)?.value?.let { draft.tableExactHeightUnits = it }
++            }
++            when (attrs["keep-together"]?.lowercase(Locale.ROOT)) {
++                "always", "true" -> draft.tableKeepTogether = true
++                "auto", "false" -> draft.tableKeepTogether = false
++            }
++        }
++        "table-cell" -> {
++            draft.tablePadding = parseTablePadding(attrs, draft.tablePadding)
++            attrs["border"]?.let { parseBorder(it)?.let { border ->
++                draft.tableBorderTop = border
++                draft.tableBorderEnd = border
++                draft.tableBorderBottom = border
++                draft.tableBorderStart = border
++            } }
++            attrs["border-top"]?.let { parseBorder(it)?.let { draft.tableBorderTop = it } }
++            attrs["border-right"]?.let { parseBorder(it)?.let { draft.tableBorderEnd = it } }
++            attrs["border-bottom"]?.let { parseBorder(it)?.let { draft.tableBorderBottom = it } }
++            attrs["border-left"]?.let { parseBorder(it)?.let { draft.tableBorderStart = it } }
++            draft.tableBackgroundColorHex = attrs["background-color"] ?: draft.tableBackgroundColorHex
++            parseVerticalAlignment(attrs["vertical-align"])?.let { draft.tableVerticalAlignment = it }
++        }
++    }
++}
++
+ private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
+     val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
+     parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
+@@ -354,9 +517,27 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
+     orphans = over.orphans ?: base.orphans,
+     widows = over.widows ?: base.widows,
+     tabStops = over.tabStops ?: base.tabStops,
+-    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits
++    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits,
++    tableWidth = over.tableWidth ?: base.tableWidth,
++    columnWidth = over.columnWidth ?: base.columnWidth,
++    defaultCellStyleName = over.defaultCellStyleName ?: base.defaultCellStyleName,
++    tableMinimumHeightUnits = over.tableMinimumHeightUnits ?: base.tableMinimumHeightUnits,
++    tableExactHeightUnits = over.tableExactHeightUnits ?: base.tableExactHeightUnits,
++    tableKeepTogether = over.tableKeepTogether ?: base.tableKeepTogether,
++    tablePadding = over.tablePadding ?: base.tablePadding,
++    tableBorderTop = over.tableBorderTop ?: base.tableBorderTop,
++    tableBorderEnd = over.tableBorderEnd ?: base.tableBorderEnd,
++    tableBorderBottom = over.tableBorderBottom ?: base.tableBorderBottom,
++    tableBorderStart = over.tableBorderStart ?: base.tableBorderStart,
++    tableBackgroundColorHex = over.tableBackgroundColorHex ?: base.tableBackgroundColorHex,
++    tableVerticalAlignment = over.tableVerticalAlignment ?: base.tableVerticalAlignment
+ )
+ 
++private val TABLE_STYLE_FAMILIES = setOf("table", "table-column", "table-row", "table-cell")
++
++private fun tableStyleKey(family: String, name: String): String =
++    "${family.lowercase(Locale.ROOT)}:${name.lowercase(Locale.ROOT)}"
++
+ class SvXMLImport(
+     val extractedImages: Map<String, File> = emptyMap(),
+     private val diagnostics: OdfImportDiagnostics = SilentOdfImportDiagnostics
+@@ -364,6 +545,7 @@ class SvXMLImport(
+     private val contextStack = ArrayDeque<SvXMLImportContext>()
+     private val parsedElements = mutableListOf<OfficeDocumentElement>()
+     private val styleMap = mutableMapOf<String, OdfStyleInfo>()
++    private val tableStyleMap = LinkedHashMap<String, OdfStyleInfo>()
+     private val pageLayouts = LinkedHashMap<String, PageStyleSpec>()
+     private val masterPages = LinkedHashMap<String, String>()
+     private var pageSpecFromDefaultStyle: PageStyleSpec? = null
+@@ -438,6 +620,7 @@ class SvXMLImport(
+                     val attrs = when (localName) {
+                         "style", "page-layout", "default-style", "page-layout-properties",
+                         "master-page", "text-properties", "paragraph-properties", "tab-stop",
++                        "table-properties", "table-column-properties", "table-row-properties", "table-cell-properties",
+                         "header-footer-properties", "list-style", "outline-style",
+                         "list-level-style-number", "list-level-style-bullet", "list-level-style-image",
+                         "outline-level-style", "list-level-properties", "list-level-label-alignment" -> attrIndex(parser)
+@@ -549,6 +732,10 @@ class SvXMLImport(
+                             }
+                         }
+                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
++                        "table-properties" -> pendingDraft?.let { applyTableProperties(it, "table", attrs) }
++                        "table-column-properties" -> pendingDraft?.let { applyTableProperties(it, "table-column", attrs) }
++                        "table-row-properties" -> pendingDraft?.let { applyTableProperties(it, "table-row", attrs) }
++                        "table-cell-properties" -> pendingDraft?.let { applyTableProperties(it, "table-cell", attrs) }
+                         "tab-stops" -> pendingDraft?.let { it.tabStops = emptyList() }
+                         "tab-stop" -> pendingDraft?.let { draft ->
+                             val position = attrs["position"]?.let { LayoutUnits.parseLength(it) }
+@@ -654,12 +841,21 @@ class SvXMLImport(
+         if (info.name.isBlank()) return
+         styleMap[info.name] = info
+         styleMap[info.name.lowercase(Locale.ROOT)] = info
++        if (info.family.lowercase(Locale.ROOT) in TABLE_STYLE_FAMILIES) {
++            tableStyleMap[tableStyleKey(info.family, info.name)] = info
++            tableStyleMap[tableStyleKey(info.family, info.name.lowercase(Locale.ROOT))] = info
++        }
+     }
+ 
+     private fun lookupStyle(name: String): OdfStyleInfo? {
+         return styleMap[name] ?: styleMap[name.lowercase(Locale.ROOT)]
+     }
+ 
++    private fun lookupTableStyle(family: String, name: String): OdfStyleInfo? {
++        return tableStyleMap[tableStyleKey(family, name)]
++            ?: tableStyleMap[tableStyleKey(family, name.lowercase(Locale.ROOT))]
++    }
++
+     /**
+      * Overlay default-style (paragraph family only) then the parent chain,
+      * child last. Character styles skip default-style so a missing size stays
+@@ -686,6 +882,86 @@ class SvXMLImport(
+         return acc.copy(name = chain.first().name, family = chain.first().family, parentName = chain.first().parentName)
+     }
+ 
++    private fun cascadeTableStyle(name: String, family: String): OdfStyleInfo? {
++        val chain = ArrayList<OdfStyleInfo>(4)
++        val seen = HashSet<String>(8)
++        var curr: String? = name
++        var depth = 0
++        while (curr != null && depth < 16 && seen.add(curr.lowercase(Locale.ROOT))) {
++            val info = lookupTableStyle(family, curr) ?: break
++            chain.add(info)
++            curr = info.parentName
++            depth++
++        }
++        if (chain.isEmpty()) return null
++        var acc = OdfStyleInfo(name = "", family = family)
++        for (i in chain.lastIndex downTo 0) {
++            acc = overlayStyle(acc, chain[i])
++        }
++        return acc.copy(name = chain.first().name, family = family, parentName = chain.first().parentName)
++    }
++
++    private fun OdfStyleInfo.toTableStyleSpec(): TableStyleSpec = TableStyleSpec(
++        name = name,
++        family = family,
++        parentStyleName = parentName,
++        tableWidth = tableWidth,
++        columnWidth = columnWidth,
++        defaultCellStyleName = defaultCellStyleName,
++        minimumHeightUnits = tableMinimumHeightUnits,
++        exactHeightUnits = tableExactHeightUnits,
++        keepTogether = tableKeepTogether,
++        padding = tablePadding,
++        borderTop = tableBorderTop,
++        borderEnd = tableBorderEnd,
++        borderBottom = tableBorderBottom,
++        borderStart = tableBorderStart,
++        backgroundColorHex = tableBackgroundColorHex,
++        verticalAlignment = tableVerticalAlignment
++    )
++
++    fun resolveTableStyle(styleName: String?, family: String): TableStyleSpec? {
++        if (styleName.isNullOrBlank()) return null
++        return cascadeTableStyle(styleName, family)?.toTableStyleSpec()
++    }
++
++    fun resolveTableWidth(styleName: String?): TableColumnWidthSpec {
++        return resolveTableStyle(styleName, "table")?.tableWidth ?: TableColumnWidthSpec()
++    }
++
++    fun resolveTableColumnWidth(styleName: String?): TableColumnWidthSpec {
++        return resolveTableStyle(styleName, "table-column")?.columnWidth ?: TableColumnWidthSpec()
++    }
++
++    fun resolveTableRowStyle(styleName: String?): TableRowStyle {
++        val style = resolveTableStyle(styleName, "table-row")
++        return TableRowStyle(
++            minimumHeightUnits = style?.minimumHeightUnits,
++            exactHeightUnits = style?.exactHeightUnits,
++            keepTogether = style?.keepTogether == true
++        )
++    }
++
++    fun resolveTableCellBoxStyle(styleName: String?): TableCellBoxStyle {
++        val style = resolveTableStyle(styleName, "table-cell")
++        return TableCellBoxStyle(
++            padding = style?.padding ?: TableInsets(),
++            borderTop = style?.borderTop ?: TableBorder(),
++            borderEnd = style?.borderEnd ?: TableBorder(),
++            borderBottom = style?.borderBottom ?: TableBorder(),
++            borderStart = style?.borderStart ?: TableBorder(),
++            backgroundColorHex = style?.backgroundColorHex,
++            verticalAlignment = style?.verticalAlignment ?: TableVerticalAlignment.AUTOMATIC
++        )
++    }
++
++    fun resolveTableDefaultCellStyle(styleName: String?): String? =
++        resolveTableStyle(styleName, "table-column")?.defaultCellStyleName
++
++    fun resolveAllTableStyles(): List<TableStyleSpec> = tableStyleMap.values
++        .distinctBy { tableStyleKey(it.family, it.name) }
++        .map { it.toTableStyleSpec() }
++
+     fun resolveSpanFormatting(styleName: String?): OdfSpanFormat {
+         if (styleName.isNullOrBlank()) return OdfSpanFormat()
+         val cascaded = cascadeStyle(styleName, "text") ?: return OdfSpanFormat()
+@@ -901,6 +1177,7 @@ class SvXMLImport(
+             ?: pageLayouts.values.firstOrNull()
+             ?: pageSpecFromDefaultStyle
+         val defaultPara = defaultParagraphStyle?.toParagraphStyle()
++        val tableStyles = resolveAllTableStyles()
+         return DocumentStyles(
+             paragraphStyles = paragraphs,
+             characterStyles = characters,
+@@ -910,7 +1187,15 @@ class SvXMLImport(
+             firstMasterPageName = firstBodyMasterPageName(),
+             defaultParagraphStyle = defaultPara,
+             listStyles = listStyles.toMap(),
+-            outlineStyle = outlineStyle
++            outlineStyle = outlineStyle,
++            tableStyles = tableStyles.filter { it.family.equals("table", ignoreCase = true) }
++                .associateBy { it.name },
++            tableColumnStyles = tableStyles.filter { it.family.equals("table-column", ignoreCase = true) }
++                .associateBy { it.name },
++            tableRowStyles = tableStyles.filter { it.family.equals("table-row", ignoreCase = true) }
++                .associateBy { it.name },
++            tableCellStyles = tableStyles.filter { it.family.equals("table-cell", ignoreCase = true) }
++                .associateBy { it.name }
+         )
+     }
+ 
+@@ -965,6 +1250,7 @@ class SvXMLImport(
+         parsedElements.clear()
+         contextStack.clear()
+         styleMap.clear()
++        tableStyleMap.clear()
+         pageLayouts.clear()
+         masterPages.clear()
+         pageSpecFromDefaultStyle = null
+diff --git a/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImportContext.kt b/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImportContext.kt
+index a09c2f8..dfc7ec4 100644
+--- a/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImportContext.kt
++++ b/app/src/main/java/com/makerandreas/papirusoffice/data/odf/SvXMLImportContext.kt
+@@ -2,7 +2,11 @@ package com.makerandreas.papirusoffice.data.odf
+ import java.util.Locale
+ 
+ import com.makerandreas.papirusoffice.data.OfficeDocumentElement
++import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
+ import com.makerandreas.papirusoffice.data.TableCell
++import com.makerandreas.papirusoffice.data.TableCellOccupancy
++import com.makerandreas.papirusoffice.data.TableDiagnostic
++import com.makerandreas.papirusoffice.data.TableDiagnosticCode
+ import com.makerandreas.papirusoffice.data.TableRow
+ import com.makerandreas.papirusoffice.data.TextRun
+ import java.io.File
+@@ -929,8 +933,29 @@ class OdfListItemParagraphContext(
+     }
+ }
+ 
++/** Parse a positive ODF repeat count without silently dropping declarations. */
++private fun parseTableRepeat(raw: String?, onInvalid: (String) -> Unit): Int {
++    if (raw.isNullOrBlank()) return 1
++    val parsed = raw.trim().toLongOrNull()
++    return when {
++        parsed == null || parsed <= 0L -> {
++            onInvalid("Invalid table repeat count '$raw'; using 1")
++            1
++        }
++        parsed > Int.MAX_VALUE.toLong() -> {
++            onInvalid("Table repeat count '$raw' exceeds the model range; using Int.MAX_VALUE")
++            Int.MAX_VALUE
++        }
++        else -> parsed.toInt()
++    }
++}
++
+ /**
+  * Context for <table:table>.
++ *
++ * Rows, cells and columns stay compact here. The repeat counts are source
++ * declarations; TableGridResolver expands them later without duplicating the
++ * source text or losing provenance.
+  */
+ class OdfTableContext(
+     importFilter: SvXMLImport,
+@@ -939,41 +964,138 @@ class OdfTableContext(
+ ) : SvXMLImportContext(importFilter, token) {
+ 
+     val tableName: String = attributes["table:name"] ?: attributes["name"] ?: ""
++    val styleName: String? = (attributes["table:style-name"] ?: attributes["style-name"])
++        ?.takeIf { it.isNotBlank() }
+     val rows = mutableListOf<TableRow>()
++    val columns = mutableListOf<OfficeTableColumnSpec>()
++    val diagnostics = mutableListOf<TableDiagnostic>()
++
++    fun addDiagnostic(
++        code: TableDiagnosticCode,
++        message: String,
++        sourceRowOrdinal: Int? = null,
++        sourceCellOrdinal: Int? = null
++    ) {
++        diagnostics += TableDiagnostic(code, message, sourceRowOrdinal, sourceCellOrdinal)
++    }
++
++    fun addColumn(column: OfficeTableColumnSpec) {
++        columns += column.copy(sourceColumnOrdinal = columns.size)
++    }
++
++    fun addRow(row: TableRow) {
++        rows += row.copy(sourceRowOrdinal = rows.size)
++    }
+ 
+     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+         return when (token) {
+-            OdfXmlToken.XML_TABLE_ROW, OdfXmlToken.XML_TABLE_HEADER_ROWS -> {
+-                OdfTableRowContext(importFilter, token, attributes, this)
+-            }
++            OdfXmlToken.XML_TABLE_COLUMN -> OdfTableColumnContext(importFilter, token, attributes, this)
++            OdfXmlToken.XML_TABLE_ROW -> OdfTableRowContext(importFilter, token, attributes, this, isHeader = false)
++            OdfXmlToken.XML_TABLE_HEADER_ROWS -> OdfTableHeaderRowsContext(importFilter, token, this)
+             else -> super.createChildContext(token, attributes)
+         }
+     }
+ 
+     override fun onEndElement(token: OdfXmlToken) {
+-        if (rows.isNotEmpty()) {
+-            val maxCols = rows.maxOfOrNull { it.cells.size } ?: 0
+-            val tableElement = OfficeDocumentElement.Table(
+-                rows = rows.toList(),
+-                numColumns = maxCols,
+-                name = tableName.ifBlank { null }
+-            )
++        val declaredColumns = columns.sumOf { it.repeatCount.toLong() }
++            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
++        val rowColumns = rows.maxOfOrNull { row ->
++            row.cells.sumOf { it.repeatCount.toLong() }
++                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
++        } ?: 0
++        val tableElement = OfficeDocumentElement.Table(
++            rows = rows.toList(),
++            numColumns = maxOf(declaredColumns, rowColumns),
++            name = tableName.ifBlank { null },
++            columns = columns.toList(),
++            styleName = styleName,
++            tableWidth = importFilter.resolveTableWidth(styleName),
++            diagnostics = diagnostics.toList()
++        )
++        // A declared empty table is still a table. This also keeps source
++        // diagnostics visible to the later geometry stage.
++        if (rows.isNotEmpty() || columns.isNotEmpty() || styleName != null) {
+             importFilter.addElement(tableElement)
+         }
+     }
+ }
+ 
+-/**
+- * Context for <table:table-row>.
+- */
++/** Context for one compact <table:table-column> declaration. */
++class OdfTableColumnContext(
++    importFilter: SvXMLImport,
++    token: OdfXmlToken,
++    private val attributes: Map<String, String>,
++    private val parentTableContext: OdfTableContext
++) : SvXMLImportContext(importFilter, token) {
++    override fun onEndElement(token: OdfXmlToken) {
++        val styleName = (attributes["table:style-name"] ?: attributes["style-name"])
++            ?.takeIf { it.isNotBlank() }
++        val repeatCount = parseTableRepeat(
++            attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
++        ) { message ->
++            parentTableContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
++        }
++        val directWidth = com.makerandreas.papirusoffice.data.util.OdfLength.toLayoutUnits(
++            attributes["style:column-width"] ?: attributes["column-width"], fallback = -1f
++        ).takeIf { it >= 0f && it.isFinite() }
++        val width = if (directWidth != null) {
++            com.makerandreas.papirusoffice.data.TableColumnWidthSpec(
++                com.makerandreas.papirusoffice.data.TableColumnWidthKind.ABSOLUTE,
++                directWidth
++            )
++        } else {
++            importFilter.resolveTableColumnWidth(styleName)
++        }
++        val defaultCellStyleName = attributes["table:default-cell-style-name"]
++            ?: attributes["default-cell-style-name"]
++            ?: importFilter.resolveTableDefaultCellStyle(styleName)
++        parentTableContext.addColumn(
++            OfficeTableColumnSpec(
++                styleName = styleName,
++                width = width,
++                repeatCount = repeatCount,
++                defaultCellStyleName = defaultCellStyleName
++            )
++        )
++    }
++}
++
++/** ODF header rows are a wrapper, not a row. */
++class OdfTableHeaderRowsContext(
++    importFilter: SvXMLImport,
++    token: OdfXmlToken,
++    private val parentTableContext: OdfTableContext
++) : SvXMLImportContext(importFilter, token) {
++    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
++        return when (token) {
++            OdfXmlToken.XML_TABLE_ROW -> OdfTableRowContext(
++                importFilter, token, attributes, parentTableContext, isHeader = true
++            )
++            else -> super.createChildContext(token, attributes)
++        }
++    }
++}
++
++/** Context for <table:table-row>. */
+ class OdfTableRowContext(
+     importFilter: SvXMLImport,
+     token: OdfXmlToken,
+     private val attributes: Map<String, String> = emptyMap(),
+-    private val parentTableContext: OdfTableContext
++    private val parentTableContext: OdfTableContext,
++    private val isHeader: Boolean
+ ) : SvXMLImportContext(importFilter, token) {
+ 
+     val cells = mutableListOf<TableCell>()
++    private val styleName: String? = (attributes["table:style-name"] ?: attributes["style-name"])
++        ?.takeIf { it.isNotBlank() }
++
++    fun addCell(cell: TableCell) {
++        cells += cell.copy(sourceCellOrdinal = cells.size)
++    }
++
++    fun addDiagnostic(code: TableDiagnosticCode, message: String) {
++        parentTableContext.addDiagnostic(code, message)
++    }
+ 
+     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+         return when (token) {
+@@ -985,21 +1107,24 @@ class OdfTableRowContext(
+     }
+ 
+     override fun onEndElement(token: OdfXmlToken) {
+-        if (cells.isNotEmpty()) {
+-            val repeatStr = attributes["table:number-rows-repeated"] ?: attributes["number-rows-repeated"]
+-            val repeatCount = (repeatStr?.toIntOrNull() ?: 1).coerceIn(1, 64)
+-            val row = TableRow(cells = cells.toList())
+-            for (i in 0 until repeatCount) {
+-                // Copy per repeat: sharing one instance would alias mutations across rows.
+-                parentTableContext.rows.add(if (i == 0) row else row.copy())
+-            }
++        val repeatCount = parseTableRepeat(
++            attributes["table:number-rows-repeated"] ?: attributes["number-rows-repeated"]
++        ) { message ->
++            parentTableContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
+         }
++        parentTableContext.addRow(
++            TableRow(
++                cells = cells.toList(),
++                styleName = styleName,
++                isHeader = isHeader,
++                repeatCount = repeatCount,
++                rowStyle = importFilter.resolveTableRowStyle(styleName)
++            )
++        )
+     }
+ }
+ 
+-/**
+- * Context for <table:table-cell>.
+- */
++/** Context for <table:table-cell> and <table:covered-table-cell>. */
+ class OdfTableCellContext(
+     importFilter: SvXMLImport,
+     token: OdfXmlToken,
+@@ -1009,6 +1134,7 @@ class OdfTableCellContext(
+ 
+     private val textBuilder = StringBuilder()
+     private val cellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
++    private val covered = token == OdfXmlToken.XML_COVERED_TABLE_CELL
+ 
+     override fun onCharacters(text: String) {
+         textBuilder.append(text)
+@@ -1033,30 +1159,71 @@ class OdfTableCellContext(
+         var rawText = textBuilder.toString().trim()
+         if (rawText.isEmpty()) {
+             val officeVal = attributes["office:value"] ?: attributes["office:date-value"] ?: attributes["office:boolean-value"]
+-            if (!officeVal.isNullOrBlank()) {
+-                rawText = officeVal
+-            }
++            if (!officeVal.isNullOrBlank()) rawText = officeVal
+         }
+-        val repeatStr = attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
+-        val repeatCount = repeatStr?.toIntOrNull() ?: 1
+-
++        if (covered && (rawText.isNotEmpty() || cellParagraphs.isNotEmpty())) {
++            parentRowContext.addDiagnostic(
++                TableDiagnosticCode.UNSUPPORTED_DECLARATION,
++                "Covered table cell content was ignored to preserve the anchor text"
++            )
++            rawText = ""
++            cellParagraphs.clear()
++        }
++        val repeatCount = parseTableRepeat(
++            attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
++        ) { message ->
++            parentRowContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
++        }
++        val columnSpan = parseTableSpan(
++            attributes["table:number-columns-spanned"] ?: attributes["number-columns-spanned"],
++            "column",
++            parentRowContext
++        )
++        val rowSpan = parseTableSpan(
++            attributes["table:number-rows-spanned"] ?: attributes["number-rows-spanned"],
++            "row",
++            parentRowContext
++        )
++        val styleName = (attributes["table:style-name"] ?: attributes["style-name"])
++            ?.takeIf { it.isNotBlank() }
+         val cell = TableCell(
+             text = rawText,
+-            paragraphs = if (cellParagraphs.isNotEmpty()) cellParagraphs.toList() else if (rawText.isNotEmpty()) listOf(OfficeDocumentElement.Paragraph(text = rawText)) else emptyList()
++            paragraphs = if (cellParagraphs.isNotEmpty()) {
++                cellParagraphs.toList()
++            } else if (rawText.isNotEmpty() && !covered) {
++                listOf(OfficeDocumentElement.Paragraph(text = rawText))
++            } else {
++                emptyList()
++            },
++            columnSpan = columnSpan,
++            rowSpan = rowSpan,
++            occupancy = if (covered) TableCellOccupancy.COVERED else TableCellOccupancy.ORIGIN,
++            repeatCount = repeatCount,
++            styleName = styleName,
++            boxStyle = importFilter.resolveTableCellBoxStyle(styleName)
+         )
++        parentRowContext.addCell(cell)
++    }
+ 
+-        if (rawText.isNotEmpty()) {
+-            val count = repeatCount.coerceIn(1, 256)
+-            for (i in 0 until count) {
+-                // Copy per repeat: sharing one instance would alias mutations across cells.
+-                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
++    private fun parseTableSpan(raw: String?, axis: String, row: OdfTableRowContext): Int {
++        if (raw.isNullOrBlank()) return 1
++        val parsed = raw.trim().toLongOrNull()
++        return when {
++            parsed == null || parsed <= 0L -> {
++                row.addDiagnostic(
++                    TableDiagnosticCode.INVALID_SPAN,
++                    "Invalid $axis span '$raw'; using 1"
++                )
++                1
+             }
+-        } else {
+-            // For empty cells, only replicate if small (<= 16), otherwise avoid explosive empty columns in ODS
+-            val count = repeatCount.coerceIn(1, 16)
+-            for (i in 0 until count) {
+-                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
++            parsed > Int.MAX_VALUE.toLong() -> {
++                row.addDiagnostic(
++                    TableDiagnosticCode.INVALID_SPAN,
++                    "$axis span '$raw' exceeds the model range; using Int.MAX_VALUE"
++                )
++                Int.MAX_VALUE
+             }
++            else -> parsed.toInt()
+         }
+     }
+ }
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index e22b754..b0fb93d 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -185,6 +185,7 @@
+     <!-- WG Ch.1 Table 1 "section or object information": only facts the model proves today -->
+     <string name="statusbar_object_heading">Heading %1$d: %2$s</string>
+     <string name="statusbar_object_table">Table</string>
++    <string name="statusbar_object_table_cell">Table, row %1$d, column %2$d</string>
+     <string name="statusbar_object_list_item">List item</string>
+     <!-- Plan 7C: status bar inside an authored index shows the index type (LO Writer index type names). -->
+     <string name="statusbar_index_table_of_contents">Table of Contents</string>
+diff --git a/app/src/test/java/com/example/Plan7dTableGridTest.kt b/app/src/test/java/com/example/Plan7dTableGridTest.kt
+new file mode 100644
+index 0000000..be3bd78
+--- /dev/null
++++ b/app/src/test/java/com/example/Plan7dTableGridTest.kt
+@@ -0,0 +1,108 @@
++package com.example
++
++import com.makerandreas.papirusoffice.data.OfficeTable
++import com.makerandreas.papirusoffice.data.OfficeTableCell
++import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
++import com.makerandreas.papirusoffice.data.OfficeTableRow
++import com.makerandreas.papirusoffice.data.TableCellOccupancy
++import com.makerandreas.papirusoffice.data.TableGridResolver
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class Plan7dTableGridTest {
++    @Test
++    fun horizontalAndVerticalSpansUseOneOriginAndCoveredSlots() {
++        val table = OfficeTable(
++            numColumns = 3,
++            columns = listOf(OfficeTableColumnSpec(repeatCount = 3, sourceColumnOrdinal = 0)),
++            rows = listOf(
++                OfficeTableRow(
++                    sourceRowOrdinal = 0,
++                    cells = listOf(
++                        OfficeTableCell("A", columnSpan = 2, rowSpan = 2, sourceCellOrdinal = 0),
++                        OfficeTableCell("", occupancy = TableCellOccupancy.COVERED, sourceCellOrdinal = 1),
++                        OfficeTableCell("C", sourceCellOrdinal = 2)
++                    )
++                ),
++                OfficeTableRow(
++                    sourceRowOrdinal = 1,
++                    cells = listOf(
++                        OfficeTableCell("", occupancy = TableCellOccupancy.COVERED, sourceCellOrdinal = 0),
++                        OfficeTableCell("", occupancy = TableCellOccupancy.COVERED, sourceCellOrdinal = 1),
++                        OfficeTableCell("D", sourceCellOrdinal = 2)
++                    )
++                )
++            )
++        )
++
++        val grid = TableGridResolver.resolve(table)
++        assertEquals(2, grid.rowCount)
++        assertEquals(3, grid.columnCount)
++        assertEquals("A", grid.slotAt(0, 0)?.cell?.sourceCell?.text)
++        assertEquals(TableCellOccupancy.COVERED, grid.slotAt(0, 1)?.occupancy)
++        assertEquals("A", grid.slotAt(0, 1)?.cell?.sourceCell?.text)
++        assertEquals(TableCellOccupancy.COVERED, grid.slotAt(1, 0)?.occupancy)
++        assertEquals(TableCellOccupancy.COVERED, grid.slotAt(1, 1)?.occupancy)
++        assertEquals("A", grid.slotAt(1, 1)?.cell?.sourceCell?.text)
++        assertEquals("D", grid.slotAt(1, 2)?.cell?.sourceCell?.text)
++        assertEquals(3, grid.originCells().size)
++        assertTrue(grid.diagnostics.isEmpty())
++    }
++
++    @Test
++    fun highCellRepeatsRemainCompactInTheSourceAndExpandWithoutTheOldSmallClamp() {
++        val table = OfficeTable(
++            numColumns = 500,
++            rows = listOf(
++                OfficeTableRow(
++                    sourceRowOrdinal = 0,
++                    cells = listOf(OfficeTableCell("x", repeatCount = 500, sourceCellOrdinal = 0))
++                )
++            )
++        )
++
++        val grid = TableGridResolver.resolve(table)
++        assertEquals(500, grid.columnCount)
++        assertEquals(500, grid.originCells().size)
++        assertEquals(499, grid.originCells().last().key.sourceRepeatIndex)
++    }
++
++    @Test
++    fun repeatedSourceRowsKeepDistinctOriginKeys() {
++        val grid = TableGridResolver.resolve(
++            OfficeTable(
++                numColumns = 1,
++                rows = listOf(
++                    OfficeTableRow(
++                        sourceRowOrdinal = 2,
++                        repeatCount = 3,
++                        cells = listOf(OfficeTableCell("row", sourceCellOrdinal = 4))
++                    )
++                )
++            )
++        )
++
++        assertEquals(3, grid.rowCount)
++        assertEquals(3, grid.originCells().size)
++        assertEquals(setOf(0, 1, 2), grid.originCells().map { it.key.sourceRowRepeatIndex }.toSet())
++    }
++
++    @Test
++    fun orphanCoveredCellIsSafeAndDiagnostic() {
++        val grid = TableGridResolver.resolve(
++            OfficeTable(
++                numColumns = 1,
++                rows = listOf(
++                    OfficeTableRow(
++                        sourceRowOrdinal = 0,
++                        cells = listOf(OfficeTableCell("", occupancy = TableCellOccupancy.COVERED, sourceCellOrdinal = 0))
++                    )
++                )
++            )
++        )
++
++        assertEquals(TableCellOccupancy.COVERED, grid.slotAt(0, 0)?.occupancy)
++        assertTrue(grid.diagnostics.any { it.code.name == "MISSING_GRID_SLOT" })
++    }
++}
+diff --git a/app/src/test/java/com/example/Plan7dTableImportTest.kt b/app/src/test/java/com/example/Plan7dTableImportTest.kt
+new file mode 100644
+index 0000000..c1805eb
+--- /dev/null
++++ b/app/src/test/java/com/example/Plan7dTableImportTest.kt
+@@ -0,0 +1,162 @@
++package com.example
++
++import com.makerandreas.papirusoffice.data.OfficeDocumentElement
++import com.makerandreas.papirusoffice.data.TableCellOccupancy
++import com.makerandreas.papirusoffice.data.TableColumnWidthKind
++import com.makerandreas.papirusoffice.data.TableVerticalAlignment
++import com.makerandreas.papirusoffice.data.odf.OdtImportPipeline
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.ByteArrayOutputStream
++import java.util.zip.ZipEntry
++import java.util.zip.ZipOutputStream
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34])
++class Plan7dTableImportTest {
++    @Test
++    fun existingOdtCorpusKeepsTheExactTableMatrix() {
++        data class Expected(val rows: Int, val columns: Int, val hasHeader: Boolean)
++        val expected = mapOf(
++            1 to listOf(Expected(5, 3, true), Expected(6, 3, false), Expected(8, 3, false)),
++            2 to listOf(Expected(6, 3, true), Expected(13, 3, true)),
++            3 to listOf(Expected(8, 5, true)),
++            4 to emptyList(),
++            5 to emptyList(),
++            6 to listOf(Expected(6, 5, true))
++        )
++
++        for (sample in SampleMatrix.sampleNumbers) {
++            val parsed = OdtImportPipeline().parse(SampleMatrix.findTestFile(SampleMatrix.odtName(sample)))
++            assertFalse("Sample-$sample should parse: ${parsed.failureReason}", parsed.isParsingFailed)
++            val tables = parsed.elements.filterIsInstance<OfficeDocumentElement.Table>()
++            assertEquals("Sample-$sample table count", expected.getValue(sample).size, tables.size)
++            expected.getValue(sample).zip(tables).forEachIndexed { index, (shape, table) ->
++                assertEquals("Sample-$sample table ${index + 1} rows", shape.rows, table.rows.size)
++                assertEquals("Sample-$sample table ${index + 1} columns", shape.columns, table.numColumns)
++                assertEquals(
++                    "Sample-$sample table ${index + 1} header",
++                    shape.hasHeader,
++                    table.rows.any { it.isHeader }
++                )
++            }
++        }
++    }
++
++    @Test
++    fun compactImportPreservesWrappersRepeatsStylesAndCellText() {
++        val parsed = OdtImportPipeline().parse(syntheticOdt(), "plan-7d-table.odt")
++        assertFalse(parsed.failureReason ?: "synthetic table parse failed", parsed.isParsingFailed)
++        assertEquals(3, parsed.elements.size)
++        assertEquals(listOf("Before", "After"), parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().map { it.text })
++
++        val table = parsed.elements.filterIsInstance<OfficeDocumentElement.Table>().single()
++        assertEquals("SyntheticTable", table.name)
++        assertEquals(4, table.numColumns)
++        assertEquals(4, table.columns.single().repeatCount)
++        assertEquals(TableColumnWidthKind.ABSOLUTE, table.columns.single().width.kind)
++        assertEquals(2, table.rows.size)
++        assertTrue(table.rows.first().isHeader)
++        assertEquals(1, table.rows.first().repeatCount)
++        assertEquals(3, table.rows[1].repeatCount)
++        assertTrue(table.rows[1].rowStyle.minimumHeightUnits != null)
++        val bodyCell = table.rows[1].cells.first { it.repeatCount == 2 }
++        assertEquals(2, bodyCell.repeatCount)
++        assertEquals(TableCellOccupancy.ORIGIN, bodyCell.occupancy)
++        assertEquals(0, bodyCell.sourceCellOrdinal)
++        assertEquals(1, table.rows[1].sourceRowOrdinal)
++
++        assertEquals("Body styled linked", bodyCell.text)
++        assertEquals(1, bodyCell.paragraphs.size)
++        assertEquals("cell-bookmark", bodyCell.paragraphs.single().bookmarks.single())
++        assertTrue(bodyCell.paragraphs.single().runs.any { it.hyperlink == "https://example.test" })
++        assertEquals(TableVerticalAlignment.MIDDLE, bodyCell.boxStyle.verticalAlignment)
++        assertTrue(bodyCell.boxStyle.padding.startUnits > 0f)
++        assertNotNull(parsed.styles.tableStyles["TableA"])
++        assertNotNull(parsed.styles.tableColumnStyles["ColumnA"])
++        assertNotNull(parsed.styles.tableRowStyles["RowA"])
++        assertNotNull(parsed.styles.tableCellStyles["CellAuto"])
++        assertTrue(parsed.bookmarks.contains("cell-bookmark"))
++    }
++
++    private fun syntheticOdt(): ByteArray {
++        val styles = """
++            <office:document-styles
++                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
++                xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
++                xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
++                xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">
++              <office:styles>
++                <style:style style:name="TableA" style:family="table">
++                  <style:table-properties style:rel-width="100%"/>
++                </style:style>
++                <style:style style:name="ColumnA" style:family="table-column">
++                  <style:table-column-properties style:column-width="2cm"/>
++                </style:style>
++                <style:style style:name="RowA" style:family="table-row">
++                  <style:table-row-properties fo:min-height="0.4cm" fo:keep-together="always"/>
++                </style:style>
++                <style:style style:name="CellA" style:family="table-cell">
++                  <style:table-cell-properties fo:padding="0.1cm" fo:border="0.5pt solid #000000"/>
++                </style:style>
++              </office:styles>
++            </office:document-styles>
++        """.trimIndent()
++        val content = """
++            <office:document-content
++                xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
++                xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
++                xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
++                xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
++                xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
++                xmlns:xlink="http://www.w3.org/1999/xlink">
++              <office:automatic-styles>
++                <style:style style:name="CellAuto" style:family="table-cell">
++                  <style:table-cell-properties fo:padding-left="0.2cm" fo:padding-right="0.2cm"
++                      fo:border="0.5pt solid #000000" style:vertical-align="middle"/>
++                </style:style>
++              </office:automatic-styles>
++              <office:body><office:text>
++                <text:p>Before</text:p>
++                <table:table table:name="SyntheticTable" table:style-name="TableA">
++                  <table:table-column table:style-name="ColumnA" table:number-columns-repeated="4"/>
++                  <table:table-header-rows>
++                    <table:table-row table:style-name="RowA">
++                      <table:table-cell table:style-name="CellA"><text:p>Header</text:p></table:table-cell>
++                      <table:table-cell table:style-name="CellA"><text:p>Two</text:p></table:table-cell>
++                      <table:table-cell table:style-name="CellA"><text:p>Three</text:p></table:table-cell>
++                      <table:table-cell table:style-name="CellA"><text:p>Four</text:p></table:table-cell>
++                    </table:table-row>
++                  </table:table-header-rows>
++                  <table:table-row table:style-name="RowA" table:number-rows-repeated="3">
++                    <table:table-cell table:style-name="CellAuto" table:number-columns-repeated="2">
++                      <text:p>Body <text:bookmark-start text:name="cell-bookmark"/>styled <text:a xlink:href="https://example.test">linked</text:a></text:p>
++                    </table:table-cell>
++                    <table:table-cell><text:p>Three</text:p></table:table-cell>
++                    <table:table-cell><text:p>Four</text:p></table:table-cell>
++                  </table:table-row>
++                </table:table>
++                <text:p>After</text:p>
++              </office:text></office:body>
++            </office:document-content>
++        """.trimIndent()
++        val output = ByteArrayOutputStream()
++        ZipOutputStream(output).use { zip ->
++            fun entry(name: String, value: String) {
++                zip.putNextEntry(ZipEntry(name))
++                zip.write(value.toByteArray())
++                zip.closeEntry()
++            }
++            entry("mimetype", "application/vnd.oasis.opendocument.text")
++            entry("styles.xml", styles)
++            entry("content.xml", content)
++        }
++        return output.toByteArray()
++    }
++}
+diff --git a/app/src/test/java/com/example/Plan7dTableLayoutTest.kt b/app/src/test/java/com/example/Plan7dTableLayoutTest.kt
+new file mode 100644
+index 0000000..c4b6c26
+--- /dev/null
++++ b/app/src/test/java/com/example/Plan7dTableLayoutTest.kt
+@@ -0,0 +1,202 @@
++package com.example
++
++import com.makerandreas.papirusoffice.data.DocumentBody
++import com.makerandreas.papirusoffice.data.DocumentStyles
++import com.makerandreas.papirusoffice.data.OfficeDocument
++import com.makerandreas.papirusoffice.data.OfficeParagraph
++import com.makerandreas.papirusoffice.data.OfficeTable
++import com.makerandreas.papirusoffice.data.OfficeTableCell
++import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
++import com.makerandreas.papirusoffice.data.OfficeTableRow
++import com.makerandreas.papirusoffice.data.PageStyleSpec
++import com.makerandreas.papirusoffice.data.ParagraphStyle
++import com.makerandreas.papirusoffice.data.TableBorder
++import com.makerandreas.papirusoffice.data.TableBorderLineStyle
++import com.makerandreas.papirusoffice.data.TableColumnWidthKind
++import com.makerandreas.papirusoffice.data.TableLayoutEngine
++import com.makerandreas.papirusoffice.data.TableVerticalAlignment
++import com.makerandreas.papirusoffice.data.LayoutEngine
++import com.makerandreas.papirusoffice.data.TableAdvanceSource
++import com.makerandreas.papirusoffice.data.toOfficeDocument
++import com.makerandreas.papirusoffice.data.odf.OdtImportPipeline
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [34])
++class Plan7dTableLayoutTest {
++    private val styles = DocumentStyles(
++        defaultParagraphStyle = ParagraphStyle("Default", fontSizeSp = 12f),
++        paragraphStyles = mapOf("Body" to ParagraphStyle("Body", fontSizeSp = 12f))
++    )
++
++    @Test
++    fun measureUsesDeclaredColumnsCellParagraphsRowMinimumsAndBorderOwnership() {
++        val border = TableBorder(1f, TableBorderLineStyle.SOLID, "#112233")
++        val table = OfficeTable(
++            numColumns = 2,
++            columns = listOf(
++                OfficeTableColumnSpec(width = com.makerandreas.papirusoffice.data.TableColumnWidthSpec(TableColumnWidthKind.ABSOLUTE, 90f)),
++                OfficeTableColumnSpec(width = com.makerandreas.papirusoffice.data.TableColumnWidthSpec(TableColumnWidthKind.ABSOLUTE, 190f))
++            ),
++            rows = listOf(
++                OfficeTableRow(
++                    sourceRowOrdinal = 0,
++                    rowStyle = com.makerandreas.papirusoffice.data.TableRowStyle(minimumHeightUnits = 28f),
++                    cells = listOf(
++                        OfficeTableCell(
++                            text = "wide origin",
++                            paragraphs = listOf(OfficeParagraph("wide origin", "Body")),
++                            columnSpan = 2,
++                            rowSpan = 2,
++                            boxStyle = com.makerandreas.papirusoffice.data.TableCellBoxStyle(
++                                borderTop = border,
++                                borderEnd = border,
++                                borderBottom = border,
++                                borderStart = border,
++                                verticalAlignment = TableVerticalAlignment.MIDDLE
++                            )
++                        )
++                    )
++                ),
++                OfficeTableRow(
++                    sourceRowOrdinal = 1,
++                    cells = listOf(
++                        OfficeTableCell("covered", occupancy = com.makerandreas.papirusoffice.data.TableCellOccupancy.COVERED),
++                        OfficeTableCell("covered", occupancy = com.makerandreas.papirusoffice.data.TableCellOccupancy.COVERED)
++                    )
++                )
++            )
++        )
++
++        val plan = TableLayoutEngine.measure(table, styles, 280f, TableAdvanceSource, null)
++        assertEquals(2, plan.columnWidths.size)
++        assertEquals(90f, plan.columnWidths[0], 0.01f)
++        assertEquals(190f, plan.columnWidths[1], 0.01f)
++        assertEquals(2, plan.rows.size)
++        assertTrue("minimum row height participates in measurement", plan.rows.first().height >= 28f)
++        assertTrue("a spanning cell contributes to the row group", plan.rowGroups.any { it.rowCount == 2 })
++
++        val fragment = plan.fragment(
++            elementIndex = 7,
++            left = 10f,
++            top = 20f,
++            rowRefs = listOf(
++                com.makerandreas.papirusoffice.data.TableFragmentRowRef(0),
++                com.makerandreas.papirusoffice.data.TableFragmentRowRef(1)
++            )
++        )
++        assertEquals(1, fragment.cells.size)
++        assertEquals(280f, fragment.cells.single().bounds.right - fragment.cells.single().bounds.left, 0.01f)
++        assertTrue("explicit border is emitted once per owned edge", fragment.borderEdges.isNotEmpty())
++        assertEquals(TableVerticalAlignment.MIDDLE, fragment.cells.single().style.verticalAlignment)
++        assertNotNull(fragment.cells.single().paragraphs.singleOrNull())
++    }
++
++    @Test
++    fun paginationRepeatsOnlySemanticHeaderAndKeepsBodyCoverageUnique() {
++        val rows = buildList {
++            add(OfficeTableRow(isHeader = true, sourceRowOrdinal = 0, cells = listOf(OfficeTableCell("Header"))))
++            repeat(8) { row ->
++                add(
++                    OfficeTableRow(
++                        sourceRowOrdinal = row + 1,
++                        cells = listOf(OfficeTableCell("Body row $row"))
++                    )
++                )
++            }
++        }
++        val document = OfficeDocument(
++            styles = styles,
++            body = DocumentBody(listOf(OfficeTable(rows = rows, numColumns = 1)))
++        )
++        val spec = PageStyleSpec(
++            widthDp = 240f,
++            heightDp = 92f,
++            marginTopDp = 5f,
++            marginBottomDp = 5f,
++            marginStartDp = 10f,
++            marginEndDp = 10f
++        )
++        val result = LayoutEngine(spec, advanceSource = TableAdvanceSource).performLayout(document)
++        assertTrue("table rows should flow onto more than one page", result.pages.size > 1)
++        val fragments = result.pages.flatMap { it.elements }.mapNotNull { it.tableFragment }
++        assertTrue(fragments.size > 1)
++        assertTrue(fragments.drop(1).all { it.repeatedHeaderRows.contains(0) })
++        val bodyRows = fragments.flatMap { it.bodyLogicalRows.toList() }
++        assertEquals(bodyRows.size, bodyRows.toSet().size)
++        assertEquals((1..8).toSet(), bodyRows.toSet())
++        assertTrue(fragments.drop(1).all { fragment -> fragment.rows.none { it.logicalRow == 0 && it.isBodyCoverage } })
++    }
++
++    @Test
++    fun everyOdtSourceTableReachesSharedGeometry() {
++        for (sample in listOf(1, 2, 3, 6)) {
++            val parsed = OdtImportPipeline().parse(SampleMatrix.findTestFile(SampleMatrix.odtName(sample)))
++            assertTrue("Sample-$sample parse failed: ${parsed.failureReason}", !parsed.isParsingFailed)
++            val document = parsed.toOfficeDocument()
++            val tableIndices = document.body.elements.mapIndexedNotNull { index, element ->
++                if (element is OfficeTable) index else null
++            }
++            assertTrue("Sample-$sample should contain imported tables", tableIndices.isNotEmpty())
++            val layout = LayoutEngine(
++                parsed.styles.defaultPageStyle ?: PageStyleSpec.FALLBACK,
++                advanceSource = TableAdvanceSource
++            ).performLayout(document)
++            tableIndices.forEach { index ->
++                val fragments = layout.pages.flatMap { it.elements }
++                    .filter { it.elementIndex == index }
++                    .mapNotNull { it.tableFragment }
++                assertTrue("Sample-$sample table $index has no geometry", fragments.isNotEmpty())
++                assertTrue("Sample-$sample table $index has no origin cells", fragments.any { it.cells.isNotEmpty() })
++            }
++        }
++    }
++
++    @Test
++    fun hitTestReturnsLogicalCellIdentityForMergedAndOrdinaryCells() {
++        val table = OfficeTable(
++            numColumns = 2,
++            rows = listOf(
++                OfficeTableRow(
++                    sourceRowOrdinal = 4,
++                    cells = listOf(OfficeTableCell("merged", columnSpan = 2, sourceCellOrdinal = 3))
++                ),
++                OfficeTableRow(
++                    sourceRowOrdinal = 5,
++                    cells = listOf(
++                        OfficeTableCell("left", sourceCellOrdinal = 0),
++                        OfficeTableCell("right", sourceCellOrdinal = 1)
++                    )
++                )
++            )
++        )
++        val document = OfficeDocument(styles = styles, body = DocumentBody(listOf(table)))
++        val pageSpec = PageStyleSpec(
++            widthDp = 300f,
++            heightDp = 300f,
++            marginTopDp = 5f,
++            marginBottomDp = 5f,
++            marginStartDp = 10f,
++            marginEndDp = 10f
++        )
++        val layoutEngine = LayoutEngine(pageSpec, advanceSource = TableAdvanceSource)
++        val result = layoutEngine.performLayout(document)
++        val fragment = result.pages.single().elements.single().tableFragment!!
++        val merged = fragment.cells.single { it.cell.logicalRow == 0 }
++        val hit = layoutEngine.hitTest(
++            x = (merged.bounds.left + merged.bounds.right) / 2f,
++            y = (merged.bounds.top + merged.bounds.bottom) / 2f,
++            pages = result.pages
++        )
++        assertNotNull(hit)
++        assertEquals(0, hit!!.tableRow)
++        assertEquals(0, hit.tableColumn)
++        assertEquals(3, hit.tableCell?.sourceCellOrdinal)
++    }
++}
