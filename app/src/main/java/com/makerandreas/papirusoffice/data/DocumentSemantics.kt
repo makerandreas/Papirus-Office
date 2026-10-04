@@ -21,7 +21,8 @@ enum class DocumentIndexKind {
     TABLE_INDEX,
     ILLUSTRATION_INDEX,
     OBJECT_INDEX,
-    USER_INDEX
+    USER_INDEX,
+    BIBLIOGRAPHY
 }
 
 /** One authored entry whose rendered paragraph remains in normal body flow. */
@@ -29,7 +30,9 @@ data class DocumentIndexEntry(
     val elementIndex: Int,
     val level: Int? = null,
     val targetAnchor: String? = null,
-    val displayedPageLabel: String? = null
+    val displayedPageLabel: String? = null,
+    /** Visible entry text without the trailing page label, tabs collapsed to single spaces. */
+    val text: String = ""
 ) {
     init {
         require(elementIndex >= 0) { "Index entry element must be non-negative" }
@@ -45,10 +48,18 @@ data class DocumentIndexRange(
     val styleName: String? = null,
     val bodyRange: BodyElementRange,
     val entries: List<DocumentIndexEntry> = emptyList(),
-    val isProtected: Boolean = false
+    val isProtected: Boolean = false,
+    /** Elements produced by `text:index-title`; always inside [bodyRange] and never listed as entries. */
+    val titleRange: BodyElementRange? = null
 ) {
     init {
         require(id.isNotBlank()) { "Index id must not be blank" }
+        require(
+            titleRange == null || (
+                titleRange.startInclusive >= bodyRange.startInclusive &&
+                    titleRange.endExclusive <= bodyRange.endExclusive
+                )
+        ) { "Index title range must fall inside the index body range" }
         require(entries.all { it.elementIndex in bodyRange }) {
             "Index entries must fall inside the index body range"
         }

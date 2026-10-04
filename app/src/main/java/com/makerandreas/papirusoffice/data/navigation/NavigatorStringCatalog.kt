@@ -152,8 +152,9 @@ object NavigatorStringCatalog {
         }
     }
 
-    fun headingLevelFromStyleName(styleName: String?): Int {
-        if (styleName.isNullOrBlank()) return 0
+    fun headingLevelFromStyleName(rawStyleName: String?): Int {
+        if (rawStyleName.isNullOrBlank()) return 0
+        val styleName = decodeOdfStyleName(rawStyleName)
         val lower = styleName.lowercase(Locale.ROOT)
         val isHeading = allPacks.any { pack -> pack.headingStyleTokens.any { lower.contains(it) } } ||
             extraHeadingTokens.any { lower.contains(it) }
@@ -210,5 +211,19 @@ object NavigatorStringCatalog {
         }
     }
 
+    /**
+     * Decodes ODF style-name escapes such as `Heading_20_1` to `Heading 1`
+     * (LibreOffice encodes characters invalid in an NCName as `_hex_`).
+     * Without this, the `20` of `_20_` is read as an outline level (audit-015 F-2).
+     */
+    fun decodeOdfStyleName(name: String): String {
+        if (!name.contains('_')) return name
+        return ODF_ESCAPE_REGEX.replace(name) { match ->
+            val code = match.groupValues[1].toIntOrNull(16)
+            if (code != null && Character.isValidCodePoint(code)) String(Character.toChars(code)) else match.value
+        }
+    }
+
     private val DIGIT_REGEX = Regex("""\d+""")
+    private val ODF_ESCAPE_REGEX = Regex("""_([0-9A-Fa-f]{2,4})_""")
 }
