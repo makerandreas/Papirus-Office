@@ -20,6 +20,7 @@ import com.makerandreas.papirusoffice.data.NumberingFormatter
 import com.makerandreas.papirusoffice.data.NumberingLevelSpec
 import com.makerandreas.papirusoffice.data.NumberingSpec
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
+import com.makerandreas.papirusoffice.data.OfficeFontFace
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.PageStyleSpec
 import com.makerandreas.papirusoffice.data.ParagraphTabStop
@@ -243,7 +244,11 @@ private class NumberingLevelDraft(
     )
 }
 
-private fun applyLevelTextProperties(draft: NumberingLevelDraft, attrs: Map<String, String>) {
+private fun applyLevelTextProperties(
+    draft: NumberingLevelDraft,
+    attrs: Map<String, String>,
+    fontFaces: Map<String, OfficeFontFace> = emptyMap()
+) {
     val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
     parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
 
@@ -260,9 +265,26 @@ private fun applyLevelTextProperties(draft: NumberingLevelDraft, attrs: Map<Stri
 
     val family = attrs["font-name"] ?: attrs["font-family"]
     if (!family.isNullOrBlank()) {
-        draft.fontFamily = family.trim().trim('\'', '"')
+        draft.fontFamily = resolveFontFamily(family, fontFaces)
     }
 }
+
+/**
+ * The single resolution point for an ODF family value: `style:font-name`
+ * (ODF 1.4 Part 3 20.277) is looked up in the document's declaration table,
+ * and any other spelling falls through to the raw, quote-trimmed name so the
+ * registry still classifies it.
+ *
+ * Resolution happens while the style is read, which is sound because both
+ * `office:document-content` and `office:document-styles` place
+ * `office:font-face-decls` before their style elements; that order was
+ * checked in all twelve fixture parts on 2026-10-04 (audit-017 section 4.1).
+ * `styles.xml` is also parsed before `content.xml`
+ * (`SvXMLImport.parseOdfXml`), so an alias declared in either part is in the
+ * table before any style that uses it is read.
+ */
+private fun resolveFontFamily(raw: String, fontFaces: Map<String, OfficeFontFace>): String =
+    FontFaceResolver.familyFor(raw, fontFaces) ?: raw.trim().trim('\'', '"')
 
 /** Resolved label and font properties for a list item or numbered heading. */
 data class OdfFormattedListLabel(
@@ -411,7 +433,11 @@ private fun applyTableProperties(draft: StyleDraft, family: String, attrs: Map<S
     }
 }
 
-private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
+private fun applyTextProperties(
+    draft: StyleDraft,
+    attrs: Map<String, String>,
+    fontFaces: Map<String, OfficeFontFace> = emptyMap()
+) {
     val fontWeight = attrs["font-weight"] ?: attrs["font-weight-asian"] ?: attrs["font-weight-complex"]
     parseFontWeightBold(fontWeight)?.let { draft.isBold = it }
 
@@ -433,7 +459,7 @@ private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
 
     val family = attrs["font-name"] ?: attrs["font-family"]
     if (!family.isNullOrBlank()) {
-        draft.fontFamily = family.trim().trim('\'', '"')
+        draft.fontFamily = resolveFontFamily(family, fontFaces)
     }
 }
 
@@ -548,6 +574,14 @@ class SvXMLImport(
     private val tableStyleMap = LinkedHashMap<String, OdfStyleInfo>()
     private val pageLayouts = LinkedHashMap<String, PageStyleSpec>()
     private val masterPages = LinkedHashMap<String, String>()
+    /**
+     * `office:font-face-decls` declarations from both XML parts, keyed by
+     * `style:name` (ODF 1.4 Part 3 3.14, 19.502.3). The first declaration of
+     * an alias wins, which is what the fixtures need: every `.odt` declares
+     * the same set in `styles.xml` and `content.xml`, and `styles.xml` is
+     * parsed first. Plan 7E resolves `style:font-name` through this table.
+     */
+    private val fontFaces = LinkedHashMap<String, OfficeFontFace>()
     private var pageSpecFromDefaultStyle: PageStyleSpec? = null
     private var standardPageLayoutName: String? = null
     private var firstMasterPageLayoutName: String? = null
@@ -605,6 +639,9 @@ class SvXMLImport(
         var pendingListIsOutline = false
         val pendingListLevels = LinkedHashMap<Int, NumberingLevelSpec>()
         var pendingLevelDraft: NumberingLevelDraft? = null
+        // office:font-face-decls is a sibling of office:styles; only the
+        // declared faces inside it are read.
+        var insideFontFaceDecls = false
         try {
             val factory = XmlPullParserFactory.newInstance()
             factory.isNamespaceAware = true
@@ -619,7 +656,7 @@ class SvXMLImport(
                     // tags; content.xml would otherwise pay this cost per element.
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
-                        "master-page", "text-properties", "paragraph-properties", "tab-stop",
+                        "master-page", "text-properties", "paragraph-properties", "tab-stop", "font-face",
                         "table-properties", "table-column-properties", "table-row-properties", "table-cell-properties",
                         "header-footer-properties", "list-style", "outline-style",
                         "list-level-style-number", "list-level-style-bullet", "list-level-style-image",
@@ -627,6 +664,29 @@ class SvXMLImport(
                         else -> emptyMap()
                     }
                     when (localName) {
+                        // ODF 1.4 Part 3 3.14 / 19.502.3: the declaration table
+                        // that style:font-name refers into (20.277). Declared
+                        // faces are stored once; a blank name or blank family is
+                        // unusable because OfficeFontFace rejects both.
+                        "font-face-decls" -> insideFontFaceDecls = true
+                        "font-face" -> if (insideFontFaceDecls) {
+                            val faceName = attrs["name"]?.takeIf { it.isNotBlank() }
+                            // svg:font-family may be a list; the declaration's
+                            // family is its first entry (19.532).
+                            val faceFamily = FontFaceResolver.firstFamily(attrs["font-family"])
+                            if (faceName != null && faceFamily != null) {
+                                fontFaces.putIfAbsent(
+                                    faceName,
+                                    OfficeFontFace(
+                                        name = faceName,
+                                        family = faceFamily,
+                                        genericFamily = attrs["font-family-generic"],
+                                        pitch = attrs["font-pitch"],
+                                        charset = attrs["font-charset"]
+                                    )
+                                )
+                            }
+                        }
                         "style" -> {
                             pendingDraft?.let { commitStyleDraft(it, isDefault = pendingIsDefault) }
                             val name = attrs["name"]
@@ -726,9 +786,9 @@ class SvXMLImport(
                         }
                         "text-properties" -> {
                             if (pendingLevelDraft != null) {
-                                applyLevelTextProperties(pendingLevelDraft!!, attrs)
+                                applyLevelTextProperties(pendingLevelDraft!!, attrs, fontFaces)
                             } else {
-                                pendingDraft?.let { applyTextProperties(it, attrs) }
+                                pendingDraft?.let { applyTextProperties(it, attrs, fontFaces) }
                             }
                         }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
@@ -768,6 +828,7 @@ class SvXMLImport(
                     }
                 } else if (eventType == XmlPullParser.END_TAG) {
                     when ((parser.name ?: "").substringAfterLast(':')) {
+                        "font-face-decls" -> insideFontFaceDecls = false
                         "header-style", "footer-style" -> pendingHeaderFooter = null
                         "list-level-style-number", "list-level-style-bullet", "outline-level-style" -> {
                             pendingLevelDraft?.let { ld -> pendingListLevels[ld.level] = ld.toSpec() }
@@ -1188,6 +1249,7 @@ class SvXMLImport(
             defaultParagraphStyle = defaultPara,
             listStyles = listStyles.toMap(),
             outlineStyle = outlineStyle,
+            fontFaces = fontFaces.toMap(),
             tableStyles = tableStyles.filter { it.family.equals("table", ignoreCase = true) }
                 .associateBy { it.name },
             tableColumnStyles = tableStyles.filter { it.family.equals("table-column", ignoreCase = true) }
@@ -1259,6 +1321,7 @@ class SvXMLImport(
         defaultParagraphStyle = null
         listStyles.clear()
         outlineStyle = null
+        fontFaces.clear()
         outlineCounter.reset()
         listCounters.clear()
         anonymousListCounter.reset()
