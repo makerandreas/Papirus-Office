@@ -81,6 +81,11 @@ class Plan7cNavigationStatusTest {
         assertNull("entry without link", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, 3))
         assertNull("index title", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, 0))
         assertNull("outside the index", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, 6))
+        assertNull("no element under the caret", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, -1))
+        assertEquals("selection inside one entry", "_TOC1", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, 1, 1))
+        assertNull("selection leaving the entry", StatusObjectResolver.goToEntryAnchor(listOf(toc), bookmarks, 1, 2))
+        val alphabetical = toc.copy(id = "index_2", kind = DocumentIndexKind.ALPHABETICAL_INDEX)
+        assertNull("only a table of contents offers the action", StatusObjectResolver.goToEntryAnchor(listOf(alphabetical), bookmarks, 1))
     }
 
     @Test

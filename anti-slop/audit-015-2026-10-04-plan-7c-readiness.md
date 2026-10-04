@@ -135,8 +135,8 @@ The record below is **target until merged**. Line numbers refer to the branch he
 | Typed Navigator notices instead of engine literals (F-11) | shipped | `NavigationEngine.kt:52` and the sheet's notice mapping |
 | `goToIndex`, `goToIndexEntry`, next and previous for `NavigateBy.INDEX` | shipped | `NavigationEngine.kt:282` |
 | Indexes category in the ALL list, entry rows, section rows indented by depth | shipped | `UniversalNavigatorSheet.kt:476`, `:1199` |
-| Pure status resolver: index type first, else innermost section joined with the detail (F-10) | shipped | `StatusObjectResolver.kt:29`, `InkyModule.kt:720` |
-| FCT Compact "Go to entry…" | shipped | `StatusObjectResolver.kt:64`, `PapirusTextToolbar.kt:198`, `InkyModule.kt:3822`, `NavigationEngine.kt:318` |
+| Pure status resolver: index type first, else innermost section joined with the detail (F-10) | shipped | `StatusObjectResolver.kt:29`, `InkyModule.kt:716` |
+| FCT Compact "Go to entry…", offered only when both selection ends sit in one linked table-of-contents entry (owner follow-up, 2026-10-04) | shipped | `StatusObjectResolver.kt:66`, `PapirusTextToolbar.kt:198`, `InkyModule.kt:3732`, `:3844`, `NavigationEngine.kt:318` |
 | Tests | shipped, CI pending | `Plan7cAuthoredIndexTest`, `Plan7cSectionRangeTest`, `Plan7cNavigationStatusTest`; updated `Plan7bSemanticImportTest`, `NavigationEngineTest`, `NavigatorCategoryHonestyTest` |
 
 **Known limits, all recorded rather than hidden:**

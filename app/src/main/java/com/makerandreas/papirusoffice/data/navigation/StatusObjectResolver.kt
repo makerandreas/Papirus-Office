@@ -57,17 +57,21 @@ object StatusObjectResolver {
     }
 
     /**
-     * Anchor for the FCT "Go to entry..." action at [elementIndex]: the entry's
-     * link target when the caret is on a linked index entry and the target is
-     * a known bookmark, else null (the action is not offered).
+     * Anchor for the FCT "Go to entry..." action. Offered only when the caret
+     * (or the whole selection, [elementIndex]..[endElementIndex]) is on one
+     * entry of a table of contents whose link target is a known bookmark.
+     * Body text, other index kinds, index titles, unlinked entries and
+     * selections that leave the entry all return null (the action is hidden).
      */
     fun goToEntryAnchor(
         indexes: List<DocumentIndexRange>,
         bookmarkNames: Set<String>,
-        elementIndex: Int
+        elementIndex: Int,
+        endElementIndex: Int = elementIndex
     ): String? {
-        if (elementIndex < 0) return null
+        if (elementIndex < 0 || endElementIndex != elementIndex) return null
         for (index in indexes) {
+            if (index.kind != DocumentIndexKind.TABLE_OF_CONTENT) continue
             if (elementIndex !in index.bodyRange) continue
             val entry = index.entries.firstOrNull { it.elementIndex == elementIndex } ?: continue
             val anchor = entry.targetAnchor ?: continue

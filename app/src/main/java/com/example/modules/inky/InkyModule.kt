@@ -691,15 +691,11 @@ fun InkyModule(
     // joins the detail (StatusObjectResolver). Table row/column and image
     // geometry are still not guessed.
     var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
-    // Plan 7C: anchor offered by FCT Compact "Go to entry…" for the caret's
-    // table-of-contents entry; null hides the action.
-    var fctGoToEntryAnchor by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
         val elements = activeLayoutDocument.body.elements
         if (elements.isEmpty()) {
             statusBarObjectInfo = null
-            fctGoToEntryAnchor = null
             return@LaunchedEffect
         }
         val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
@@ -722,11 +718,6 @@ fun InkyModule(
             detail = statusDetail,
             indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
             join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
-        )
-        fctGoToEntryAnchor = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.goToEntryAnchor(
-            indexes = activeLayoutDocument.authoredIndexes,
-            bookmarkNames = navEngineState.index.bookmarks.mapTo(HashSet()) { it.name },
-            elementIndex = caretElementIndex
         )
         val element = hit?.let { elements.getOrNull(it.elementIndex) }
             ?: elements.getOrNull(layoutCursor.elementIndex)
@@ -3729,6 +3720,37 @@ fun InkyModule(
             fctClipboardManager.hasText()
         } catch (e: Exception) {
             true
+        }
+    }
+
+    // Plan 7C: FCT Compact "Go to entry…" target. Computed in composition from
+    // the current selection (not from an effect), so the option can never
+    // show a stale answer from where the caret was before. Both selection
+    // ends must sit inside the same linked entry of a table of contents;
+    // anywhere else (body text, other index kinds, a selection leaving the
+    // entry, or an offset outside every element) the option is not offered.
+    val fctGoToEntryAnchor = remember(
+        docBodyText.selection,
+        docBodyText.text,
+        activeLayoutDocument,
+        navEngineState.index.bookmarks
+    ) {
+        val elements = activeLayoutDocument.body.elements
+        val indexes = activeLayoutDocument.authoredIndexes
+        if (elements.isEmpty() || indexes.none { it.kind == com.makerandreas.papirusoffice.data.DocumentIndexKind.TABLE_OF_CONTENT }) {
+            null
+        } else {
+            val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
+            fun strictElementAt(offset: Int): Int =
+                windows.values.firstOrNull { offset >= it.start && offset <= it.end }?.elementIndex ?: -1
+            val textLength = docBodyText.text.length
+            val selection = docBodyText.selection
+            com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.goToEntryAnchor(
+                indexes = indexes,
+                bookmarkNames = navEngineState.index.bookmarks.mapTo(HashSet()) { it.name },
+                elementIndex = strictElementAt(selection.min.coerceIn(0, textLength)),
+                endElementIndex = strictElementAt(selection.max.coerceIn(0, textLength))
+            )
         }
     }
 
