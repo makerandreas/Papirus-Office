@@ -10,10 +10,15 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class Plan7dTableImportTest {
     @Test
     fun existingOdtCorpusKeepsTheExactTableMatrix() {
@@ -60,12 +65,13 @@ class Plan7dTableImportTest {
         assertTrue(table.rows.first().isHeader)
         assertEquals(1, table.rows.first().repeatCount)
         assertEquals(3, table.rows[1].repeatCount)
-        assertEquals(2, table.rows[1].cells.single().repeatCount)
-        assertEquals(TableCellOccupancy.ORIGIN, table.rows[1].cells.single().occupancy)
-        assertEquals(0, table.rows[1].cells.single().sourceCellOrdinal)
+        assertTrue(table.rows[1].rowStyle.minimumHeightUnits != null)
+        val bodyCell = table.rows[1].cells.first { it.repeatCount == 2 }
+        assertEquals(2, bodyCell.repeatCount)
+        assertEquals(TableCellOccupancy.ORIGIN, bodyCell.occupancy)
+        assertEquals(0, bodyCell.sourceCellOrdinal)
         assertEquals(1, table.rows[1].sourceRowOrdinal)
 
-        val bodyCell = table.rows[1].cells.single()
         assertEquals("Body styled linked", bodyCell.text)
         assertEquals(1, bodyCell.paragraphs.size)
         assertEquals("cell-bookmark", bodyCell.paragraphs.single().bookmarks.single())

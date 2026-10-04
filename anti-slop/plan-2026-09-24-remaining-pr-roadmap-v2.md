@@ -330,6 +330,10 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Tests:** all source tables in Samples 1/2/3/6; synthetic repeats/spans/covered cells/header rows/borders; measurement-render parity; multi-page row pagination; cell hit tests; no regressions for zero-table fixtures.
 
+**Implementation record (branch `arena/01a104f4-papirus-office`, 2026-10-04):** Plan 7D is being delivered as one four-commit change set. Commits 1 and 2 retain compact table declarations and resolve the rectangular occupancy grid; commit 3 adds shared measurement, row grouping, fragment geometry and row-aware pagination; commit 4 adds the geometry-driven Compose renderer, cell-aware hit testing, row/column cursor context and status detail. Synthetic and imported-table layout tests cover declared widths, intrinsic cell paragraphs, borders, merged cells, repeated headers, multi-page body coverage, cell hits and the ODT source-table set. The local sandbox has no JDK; GitHub Actions run `37177575040` passed both the Unit Tests and Build jobs.
+
+**Scope guard:** table creation, insertion, editing, merge/split controls and native LibreOffice rendering remain out of Plan 7D. DOCX table parsing, font aliases and hidden-section pagination remain with their assigned plans. The compatibility renderer is retained only for externally supplied pre-geometry layouts; normal document layout uses `TableFragmentGeometry` from the paginator.
+
 ### 4.7d PR #30, Plan 7E: ODF font-face aliases and final pagination calibration
 
 **Goal:** resolve the document's declared font identities through one metrics/display path, then measure the complete ODT structure.

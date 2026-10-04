@@ -508,6 +508,49 @@ class LayoutEngine(
             val b = elemLayout.bounds
             if (relativeY >= b.top && relativeY <= b.bottom && x >= b.left && x <= b.right) {
                 val element = elemLayout.element
+                elemLayout.tableFragment?.let { fragment ->
+                    val cell = fragment.cells.firstOrNull { geometry ->
+                        x >= geometry.bounds.left && x <= geometry.bounds.right &&
+                            relativeY >= geometry.bounds.top && relativeY <= geometry.bounds.bottom
+                    }
+                    if (cell != null) {
+                        val paragraph = cell.paragraphs.firstOrNull { geometry ->
+                            relativeY >= geometry.bounds.top && relativeY <= geometry.bounds.bottom
+                        }
+                        if (paragraph != null) {
+                            var lineY = paragraph.bounds.top
+                            paragraph.layout.lines.forEachIndexed { lineIndex, line ->
+                                if (relativeY >= lineY && relativeY <= lineY + line.height) {
+                                    val lineRelativeX = x - paragraph.bounds.left - line.left
+                                    val caret = line.caretAdvances.indices.minByOrNull {
+                                        kotlin.math.abs(line.caretAdvances[it] - lineRelativeX)
+                                    } ?: 0
+                                    return HitTestResult(
+                                        pageIndex = pageIndex,
+                                        elementIndex = elemLayout.elementIndex,
+                                        paragraphIndex = elemLayout.elementIndex,
+                                        lineIndex = lineIndex,
+                                        characterOffset = line.caretOffsets.getOrElse(caret) { line.startOffset },
+                                        tableRow = cell.cell.logicalRow,
+                                        tableColumn = cell.cell.logicalColumn,
+                                        tableCell = cell.cell.key
+                                    )
+                                }
+                                lineY += line.height
+                            }
+                        }
+                        return HitTestResult(
+                            pageIndex = pageIndex,
+                            elementIndex = elemLayout.elementIndex,
+                            paragraphIndex = elemLayout.elementIndex,
+                            lineIndex = -1,
+                            characterOffset = 0,
+                            tableRow = cell.cell.logicalRow,
+                            tableColumn = cell.cell.logicalColumn,
+                            tableCell = cell.cell.key
+                        )
+                    }
+                }
                 if (elemLayout.paragraphLayout != null) {
                     val pLayout = elemLayout.paragraphLayout
                     var lineY = b.top
@@ -542,7 +585,10 @@ data class HitTestResult(
     val elementIndex: Int,
     val paragraphIndex: Int,
     val lineIndex: Int,
-    val characterOffset: Int
+    val characterOffset: Int,
+    val tableRow: Int? = null,
+    val tableColumn: Int? = null,
+    val tableCell: TableCellSourceKey? = null
 )
 
 // ==========================================

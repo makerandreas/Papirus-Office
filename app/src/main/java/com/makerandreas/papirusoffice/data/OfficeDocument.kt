@@ -463,7 +463,11 @@ data class DocumentCursor(
     val elementIndex: Int = 0,
     val paragraphIndex: Int = 0,
     val runIndex: Int = 0,
-    val offset: Int = 0
+    val offset: Int = 0,
+    /** Logical table context for viewer hit-testing; null for ordinary text. */
+    val tableRow: Int? = null,
+    val tableColumn: Int? = null,
+    val tableCell: TableCellSourceKey? = null
 )
 
 data class DocumentProperties(

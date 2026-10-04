@@ -185,6 +185,7 @@
     <!-- WG Ch.1 Table 1 "section or object information": only facts the model proves today -->
     <string name="statusbar_object_heading">Heading %1$d: %2$s</string>
     <string name="statusbar_object_table">Table</string>
+    <string name="statusbar_object_table_cell">Table, row %1$d, column %2$d</string>
     <string name="statusbar_object_list_item">List item</string>
     <!-- Plan 7C: status bar inside an authored index shows the index type (LO Writer index type names). -->
     <string name="statusbar_index_table_of_contents">Table of Contents</string>

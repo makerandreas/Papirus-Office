@@ -17,11 +17,18 @@ import com.makerandreas.papirusoffice.data.TableLayoutEngine
 import com.makerandreas.papirusoffice.data.TableVerticalAlignment
 import com.makerandreas.papirusoffice.data.LayoutEngine
 import com.makerandreas.papirusoffice.data.TableAdvanceSource
+import com.makerandreas.papirusoffice.data.toOfficeDocument
+import com.makerandreas.papirusoffice.data.odf.OdtImportPipeline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class Plan7dTableLayoutTest {
     private val styles = DocumentStyles(
         defaultParagraphStyle = ParagraphStyle("Default", fontSizeSp = 12f),
@@ -127,4 +134,69 @@ class Plan7dTableLayoutTest {
         assertTrue(fragments.drop(1).all { fragment -> fragment.rows.none { it.logicalRow == 0 && it.isBodyCoverage } })
     }
 
+    @Test
+    fun everyOdtSourceTableReachesSharedGeometry() {
+        for (sample in listOf(1, 2, 3, 6)) {
+            val parsed = OdtImportPipeline().parse(SampleMatrix.findTestFile(SampleMatrix.odtName(sample)))
+            assertTrue("Sample-$sample parse failed: ${parsed.failureReason}", !parsed.isParsingFailed)
+            val document = parsed.toOfficeDocument()
+            val tableIndices = document.body.elements.mapIndexedNotNull { index, element ->
+                if (element is OfficeTable) index else null
+            }
+            assertTrue("Sample-$sample should contain imported tables", tableIndices.isNotEmpty())
+            val layout = LayoutEngine(
+                parsed.styles.defaultPageStyle ?: PageStyleSpec.FALLBACK,
+                advanceSource = TableAdvanceSource
+            ).performLayout(document)
+            tableIndices.forEach { index ->
+                val fragments = layout.pages.flatMap { it.elements }
+                    .filter { it.elementIndex == index }
+                    .mapNotNull { it.tableFragment }
+                assertTrue("Sample-$sample table $index has no geometry", fragments.isNotEmpty())
+                assertTrue("Sample-$sample table $index has no origin cells", fragments.any { it.cells.isNotEmpty() })
+            }
+        }
+    }
+
+    @Test
+    fun hitTestReturnsLogicalCellIdentityForMergedAndOrdinaryCells() {
+        val table = OfficeTable(
+            numColumns = 2,
+            rows = listOf(
+                OfficeTableRow(
+                    sourceRowOrdinal = 4,
+                    cells = listOf(OfficeTableCell("merged", columnSpan = 2, sourceCellOrdinal = 3))
+                ),
+                OfficeTableRow(
+                    sourceRowOrdinal = 5,
+                    cells = listOf(
+                        OfficeTableCell("left", sourceCellOrdinal = 0),
+                        OfficeTableCell("right", sourceCellOrdinal = 1)
+                    )
+                )
+            )
+        )
+        val document = OfficeDocument(styles = styles, body = DocumentBody(listOf(table)))
+        val pageSpec = PageStyleSpec(
+            widthDp = 300f,
+            heightDp = 300f,
+            marginTopDp = 5f,
+            marginBottomDp = 5f,
+            marginStartDp = 10f,
+            marginEndDp = 10f
+        )
+        val layoutEngine = LayoutEngine(pageSpec, advanceSource = TableAdvanceSource)
+        val result = layoutEngine.performLayout(document)
+        val fragment = result.pages.single().elements.single().tableFragment!!
+        val merged = fragment.cells.single { it.cell.logicalRow == 0 }
+        val hit = layoutEngine.hitTest(
+            x = (merged.bounds.left + merged.bounds.right) / 2f,
+            y = (merged.bounds.top + merged.bounds.bottom) / 2f,
+            pages = result.pages
+        )
+        assertNotNull(hit)
+        assertEquals(0, hit!!.tableRow)
+        assertEquals(0, hit.tableColumn)
+        assertEquals(3, hit.tableCell?.sourceCellOrdinal)
+    }
 }
