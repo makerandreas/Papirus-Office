@@ -688,11 +688,11 @@ fun InkyModule(
     // headings count), the element kind for tables and list items, and the
     // hyphen placeholder elsewhere. Plan 7C adds authored ranges: inside an
     // index only the index type is shown, otherwise the innermost section name
-    // joins the detail (StatusObjectResolver). Table row/column and image
-    // geometry are still not guessed.
+    // joins the detail (StatusObjectResolver). Plan 7D adds row/column detail
+    // when the shared table hit-test supplies it; image geometry remains absent.
     var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
+    LaunchedEffect(docBodyText.selection, layoutCursor, activeLayoutDocument, navEngineState.index) {
         val elements = activeLayoutDocument.body.elements
         if (elements.isEmpty()) {
             statusBarObjectInfo = null
@@ -701,12 +701,18 @@ fun InkyModule(
         val caret = docBodyText.selection.start.coerceIn(0, docBodyText.text.length)
         val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
         val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
-        val caretElementIndex = hit?.elementIndex ?: layoutCursor.elementIndex
+        val caretElementIndex = if (layoutCursor.tableRow != null && layoutCursor.tableColumn != null) {
+            layoutCursor.elementIndex
+        } else {
+            hit?.elementIndex ?: layoutCursor.elementIndex
+        }
         val statusDetail = resolveStatusBarObjectInfo(
             context = context,
             caretElementIndex = caretElementIndex,
             elements = elements,
-            headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings)
+            headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings),
+            tableRow = layoutCursor.tableRow,
+            tableColumn = layoutCursor.tableColumn
         )
         val statusRanges = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.resolve(
             indexes = activeLayoutDocument.authoredIndexes,
@@ -719,8 +725,12 @@ fun InkyModule(
             indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
             join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
         )
-        val element = hit?.let { elements.getOrNull(it.elementIndex) }
-            ?: elements.getOrNull(layoutCursor.elementIndex)
+        val element = if (layoutCursor.tableRow != null && layoutCursor.tableColumn != null) {
+            elements.getOrNull(layoutCursor.elementIndex)
+        } else {
+            hit?.let { elements.getOrNull(it.elementIndex) }
+                ?: elements.getOrNull(layoutCursor.elementIndex)
+        }
         val paragraph = when (element) {
             is com.makerandreas.papirusoffice.data.OfficeParagraph -> element
             is com.makerandreas.papirusoffice.data.OfficeHeading -> com.makerandreas.papirusoffice.data.OfficeParagraph(
@@ -5113,15 +5123,16 @@ fun LongClickIconButton(
  * model can already prove about the element holding the caret, or null when it
  * can prove none of them. Headings are resolved by the Navigator index rather
  * than re-derived here, because that index is the one resolver that walks
- * paragraph style parents; table and list-item rows show the element kind
- * only, since the caret-to-element mapping stops at the element and row/column
- * precision does not exist yet (plans 19/21).
+ * paragraph style parents. Table hits may additionally carry the resolved
+ * logical row and column from the shared layout geometry.
  */
 private fun resolveStatusBarObjectInfo(
     context: android.content.Context,
     caretElementIndex: Int,
     elements: List<com.makerandreas.papirusoffice.data.OfficeElement>,
-    headings: List<com.makerandreas.papirusoffice.data.navigation.HeadingNode>
+    headings: List<com.makerandreas.papirusoffice.data.navigation.HeadingNode>,
+    tableRow: Int? = null,
+    tableColumn: Int? = null
 ): String? {
     val element = elements.getOrNull(caretElementIndex) ?: return null
     val heading = headings.firstOrNull { it.elementIndex == caretElementIndex }
@@ -5131,8 +5142,13 @@ private fun resolveStatusBarObjectInfo(
             heading.outlineLevel,
             heading.title
         )
-        element is com.makerandreas.papirusoffice.data.OfficeTable ->
-            context.getString(R.string.statusbar_object_table)
+        element is com.makerandreas.papirusoffice.data.OfficeTable ||
+            element is com.makerandreas.papirusoffice.data.OfficeDocElement.TableElement ->
+            if (tableRow != null && tableColumn != null) {
+                context.getString(R.string.statusbar_object_table_cell, tableRow + 1, tableColumn + 1)
+            } else {
+                context.getString(R.string.statusbar_object_table)
+            }
         element is com.makerandreas.papirusoffice.data.OfficeListItem ->
             context.getString(R.string.statusbar_object_list_item)
         else -> null

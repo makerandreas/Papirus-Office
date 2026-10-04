@@ -104,14 +104,58 @@ data class OfficeTableColumnSpec(
     val styleName: String? = null,
     val width: TableColumnWidthSpec = TableColumnWidthSpec(),
     val repeatCount: Int = 1,
-    val defaultCellStyleName: String? = null
+    val defaultCellStyleName: String? = null,
+    /** Ordinal in the compact ODF source declaration list; -1 means synthetic. */
+    val sourceColumnOrdinal: Int = -1
 ) {
     init {
         require(repeatCount > 0) { "Table column repeat count must be positive" }
+        require(sourceColumnOrdinal >= -1) { "Table source column ordinal must be non-negative or -1" }
     }
 }
 
 enum class TableCellOccupancy { ORIGIN, COVERED }
+
+enum class TableDiagnosticCode {
+    INVALID_REPEAT,
+    INVALID_SPAN,
+    OVERLAPPING_SPAN,
+    MISSING_GRID_SLOT,
+    UNSUPPORTED_DECLARATION,
+    OVER_HEIGHT
+}
+
+data class TableDiagnostic(
+    val code: TableDiagnosticCode,
+    val message: String,
+    val sourceRowOrdinal: Int? = null,
+    val sourceCellOrdinal: Int? = null,
+    val logicalRow: Int? = null,
+    val logicalColumn: Int? = null
+)
+
+/**
+ * A partially populated table-style declaration. Nullable properties preserve
+ * the ODF cascade distinction between "not declared" and an explicit value.
+ */
+data class TableStyleSpec(
+    val name: String,
+    val family: String,
+    val parentStyleName: String? = null,
+    val tableWidth: TableColumnWidthSpec? = null,
+    val columnWidth: TableColumnWidthSpec? = null,
+    val defaultCellStyleName: String? = null,
+    val minimumHeightUnits: Float? = null,
+    val exactHeightUnits: Float? = null,
+    val keepTogether: Boolean? = null,
+    val padding: TableInsets? = null,
+    val borderTop: TableBorder? = null,
+    val borderEnd: TableBorder? = null,
+    val borderBottom: TableBorder? = null,
+    val borderStart: TableBorder? = null,
+    val backgroundColorHex: String? = null,
+    val verticalAlignment: TableVerticalAlignment? = null
+)
 
 enum class TableVerticalAlignment { TOP, MIDDLE, BOTTOM, AUTOMATIC }
 

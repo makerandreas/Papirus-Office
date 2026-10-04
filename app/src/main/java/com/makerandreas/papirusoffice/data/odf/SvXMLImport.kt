@@ -3,6 +3,18 @@ package com.makerandreas.papirusoffice.data.odf
 import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.LayoutUnits
+import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
+import com.makerandreas.papirusoffice.data.TableBorder
+import com.makerandreas.papirusoffice.data.TableBorderLineStyle
+import com.makerandreas.papirusoffice.data.TableCellBoxStyle
+import com.makerandreas.papirusoffice.data.TableColumnWidthKind
+import com.makerandreas.papirusoffice.data.TableColumnWidthSpec
+import com.makerandreas.papirusoffice.data.TableDiagnostic
+import com.makerandreas.papirusoffice.data.TableDiagnosticCode
+import com.makerandreas.papirusoffice.data.TableInsets
+import com.makerandreas.papirusoffice.data.TableRowStyle
+import com.makerandreas.papirusoffice.data.TableStyleSpec
+import com.makerandreas.papirusoffice.data.TableVerticalAlignment
 import com.makerandreas.papirusoffice.data.NumberingCounterState
 import com.makerandreas.papirusoffice.data.NumberingFormatter
 import com.makerandreas.papirusoffice.data.NumberingLevelSpec
@@ -76,7 +88,20 @@ data class OdfStyleInfo(
     val orphans: Int? = null,
     val widows: Int? = null,
     val tabStops: List<ParagraphTabStop>? = null,
-    val defaultTabIntervalUnits: Float? = null
+    val defaultTabIntervalUnits: Float? = null,
+    val tableWidth: TableColumnWidthSpec? = null,
+    val columnWidth: TableColumnWidthSpec? = null,
+    val defaultCellStyleName: String? = null,
+    val tableMinimumHeightUnits: Float? = null,
+    val tableExactHeightUnits: Float? = null,
+    val tableKeepTogether: Boolean? = null,
+    val tablePadding: TableInsets? = null,
+    val tableBorderTop: TableBorder? = null,
+    val tableBorderEnd: TableBorder? = null,
+    val tableBorderBottom: TableBorder? = null,
+    val tableBorderStart: TableBorder? = null,
+    val tableBackgroundColorHex: String? = null,
+    val tableVerticalAlignment: TableVerticalAlignment? = null
 )
 
 /** Bold/italic/underline resolved from a character style, never from the style name. */
@@ -116,7 +141,20 @@ private class StyleDraft(
     var orphans: Int? = null,
     var widows: Int? = null,
     var tabStops: List<ParagraphTabStop>? = null,
-    var defaultTabIntervalUnits: Float? = null
+    var defaultTabIntervalUnits: Float? = null,
+    var tableWidth: TableColumnWidthSpec? = null,
+    var columnWidth: TableColumnWidthSpec? = null,
+    var defaultCellStyleName: String? = null,
+    var tableMinimumHeightUnits: Float? = null,
+    var tableExactHeightUnits: Float? = null,
+    var tableKeepTogether: Boolean? = null,
+    var tablePadding: TableInsets? = null,
+    var tableBorderTop: TableBorder? = null,
+    var tableBorderEnd: TableBorder? = null,
+    var tableBorderBottom: TableBorder? = null,
+    var tableBorderStart: TableBorder? = null,
+    var tableBackgroundColorHex: String? = null,
+    var tableVerticalAlignment: TableVerticalAlignment? = null
 ) {
     fun toInfo(): OdfStyleInfo = OdfStyleInfo(
         name = name,
@@ -145,7 +183,20 @@ private class StyleDraft(
         pageBreakBefore = pageBreakBefore,
         pageBreakAfter = pageBreakAfter,
         keepTogether = keepTogether, orphans = orphans, widows = widows,
-        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits
+        tabStops = tabStops, defaultTabIntervalUnits = defaultTabIntervalUnits,
+        tableWidth = tableWidth,
+        columnWidth = columnWidth,
+        defaultCellStyleName = defaultCellStyleName,
+        tableMinimumHeightUnits = tableMinimumHeightUnits,
+        tableExactHeightUnits = tableExactHeightUnits,
+        tableKeepTogether = tableKeepTogether,
+        tablePadding = tablePadding,
+        tableBorderTop = tableBorderTop,
+        tableBorderEnd = tableBorderEnd,
+        tableBorderBottom = tableBorderBottom,
+        tableBorderStart = tableBorderStart,
+        tableBackgroundColorHex = tableBackgroundColorHex,
+        tableVerticalAlignment = tableVerticalAlignment
     )
 }
 
@@ -246,6 +297,118 @@ private fun parseFontWeightBold(raw: String?): Boolean? {
     if (text == "normal" || text == "lighter") return false
     val numeric = text.toIntOrNull() ?: return null
     return numeric >= 700
+}
+
+private fun parsePositiveFloat(raw: String?): Float? = raw?.trim()?.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
+
+private fun parseRelativeColumnWidth(raw: String?): TableColumnWidthSpec? {
+    val text = raw?.trim()?.removeSuffix("*") ?: return null
+    return parsePositiveFloat(text)?.let { TableColumnWidthSpec(TableColumnWidthKind.RELATIVE, it) }
+}
+
+private fun parseRelativeTableWidth(raw: String?): TableColumnWidthSpec? {
+    val text = raw?.trim()?.removeSuffix("%") ?: return null
+    return parsePositiveFloat(text)?.let { TableColumnWidthSpec(TableColumnWidthKind.RELATIVE, it) }
+}
+
+private fun parseAbsoluteWidth(raw: String?): TableColumnWidthSpec? {
+    if (raw.isNullOrBlank()) return null
+    val units = OdfLength.toLayoutUnits(raw, fallback = -1f)
+    return units.takeIf { it >= 0f && it.isFinite() }
+        ?.let { TableColumnWidthSpec(TableColumnWidthKind.ABSOLUTE, it) }
+}
+
+private fun parseColumnWidth(absolute: String?, relative: String?): TableColumnWidthSpec? =
+    parseAbsoluteWidth(absolute) ?: parseRelativeColumnWidth(relative)
+
+private fun parseTableWidth(absolute: String?, relative: String?): TableColumnWidthSpec? =
+    parseRelativeTableWidth(relative) ?: parseAbsoluteWidth(absolute)
+
+private fun parseBorder(raw: String?): TableBorder? {
+    if (raw.isNullOrBlank()) return null
+    val tokens = raw.trim().split(Regex("\\s+"))
+    if (tokens.any { it.equals("none", ignoreCase = true) }) return TableBorder()
+    val width = tokens.firstNotNullOfOrNull { token ->
+        val value = OdfLength.toLayoutUnits(token, fallback = -1f)
+        value.takeIf { it >= 0f && it.isFinite() }
+    } ?: 0f
+    val style = tokens.firstNotNullOfOrNull { token ->
+        when (token.lowercase(Locale.ROOT)) {
+            "solid" -> TableBorderLineStyle.SOLID
+            "dotted" -> TableBorderLineStyle.DOTTED
+            "dashed" -> TableBorderLineStyle.DASHED
+            "double" -> TableBorderLineStyle.DOUBLE
+            "none" -> TableBorderLineStyle.NONE
+            else -> null
+        }
+    } ?: if (width > 0f) TableBorderLineStyle.SOLID else TableBorderLineStyle.OTHER
+    val color = tokens.firstOrNull { it.startsWith("#") || it.equals("transparent", ignoreCase = true) }
+    return TableBorder(widthUnits = width, style = style, colorHex = color, sourceStyle = raw)
+}
+
+private fun parseVerticalAlignment(raw: String?): TableVerticalAlignment? = when (raw?.trim()?.lowercase(Locale.ROOT)) {
+    "top" -> TableVerticalAlignment.TOP
+    "middle", "center" -> TableVerticalAlignment.MIDDLE
+    "bottom" -> TableVerticalAlignment.BOTTOM
+    "automatic", "auto" -> TableVerticalAlignment.AUTOMATIC
+    else -> null
+}
+
+private fun parseTablePadding(attrs: Map<String, String>, previous: TableInsets?): TableInsets? {
+    val shorthand = attrs["padding"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
+        ?.takeIf { it >= 0f && it.isFinite() }
+    val base = previous ?: TableInsets()
+    val top = attrs["padding-top"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
+        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.topUnits
+    val end = attrs["padding-right"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
+        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.endUnits
+    val bottom = attrs["padding-bottom"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
+        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.bottomUnits
+    val start = attrs["padding-left"]?.let { OdfLength.toLayoutUnits(it, fallback = -1f) }
+        ?.takeIf { it >= 0f && it.isFinite() } ?: shorthand ?: base.startUnits
+    return if (shorthand != null || attrs.keys.any { it.startsWith("padding-") }) {
+        TableInsets(topUnits = top, endUnits = end, bottomUnits = bottom, startUnits = start)
+    } else {
+        previous
+    }
+}
+
+private fun applyTableProperties(draft: StyleDraft, family: String, attrs: Map<String, String>) {
+    when (family.lowercase(Locale.ROOT)) {
+        "table" -> {
+            parseTableWidth(attrs["width"], attrs["rel-width"])?.let { draft.tableWidth = it }
+        }
+        "table-column" -> {
+            parseColumnWidth(attrs["column-width"], attrs["rel-column-width"])?.let { draft.columnWidth = it }
+        }
+        "table-row" -> {
+            (attrs["min-height"] ?: attrs["min-row-height"])?.let { raw ->
+                parseAbsoluteWidth(raw)?.value?.let { draft.tableMinimumHeightUnits = it }
+            }
+            (attrs["row-height"] ?: attrs["height"])?.let { raw ->
+                parseAbsoluteWidth(raw)?.value?.let { draft.tableExactHeightUnits = it }
+            }
+            when (attrs["keep-together"]?.lowercase(Locale.ROOT)) {
+                "always", "true" -> draft.tableKeepTogether = true
+                "auto", "false" -> draft.tableKeepTogether = false
+            }
+        }
+        "table-cell" -> {
+            draft.tablePadding = parseTablePadding(attrs, draft.tablePadding)
+            attrs["border"]?.let { parseBorder(it)?.let { border ->
+                draft.tableBorderTop = border
+                draft.tableBorderEnd = border
+                draft.tableBorderBottom = border
+                draft.tableBorderStart = border
+            } }
+            attrs["border-top"]?.let { parseBorder(it)?.let { draft.tableBorderTop = it } }
+            attrs["border-right"]?.let { parseBorder(it)?.let { draft.tableBorderEnd = it } }
+            attrs["border-bottom"]?.let { parseBorder(it)?.let { draft.tableBorderBottom = it } }
+            attrs["border-left"]?.let { parseBorder(it)?.let { draft.tableBorderStart = it } }
+            draft.tableBackgroundColorHex = attrs["background-color"] ?: draft.tableBackgroundColorHex
+            parseVerticalAlignment(attrs["vertical-align"])?.let { draft.tableVerticalAlignment = it }
+        }
+    }
 }
 
 private fun applyTextProperties(draft: StyleDraft, attrs: Map<String, String>) {
@@ -354,8 +517,26 @@ private fun overlayStyle(base: OdfStyleInfo, over: OdfStyleInfo): OdfStyleInfo =
     orphans = over.orphans ?: base.orphans,
     widows = over.widows ?: base.widows,
     tabStops = over.tabStops ?: base.tabStops,
-    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits
+    defaultTabIntervalUnits = over.defaultTabIntervalUnits ?: base.defaultTabIntervalUnits,
+    tableWidth = over.tableWidth ?: base.tableWidth,
+    columnWidth = over.columnWidth ?: base.columnWidth,
+    defaultCellStyleName = over.defaultCellStyleName ?: base.defaultCellStyleName,
+    tableMinimumHeightUnits = over.tableMinimumHeightUnits ?: base.tableMinimumHeightUnits,
+    tableExactHeightUnits = over.tableExactHeightUnits ?: base.tableExactHeightUnits,
+    tableKeepTogether = over.tableKeepTogether ?: base.tableKeepTogether,
+    tablePadding = over.tablePadding ?: base.tablePadding,
+    tableBorderTop = over.tableBorderTop ?: base.tableBorderTop,
+    tableBorderEnd = over.tableBorderEnd ?: base.tableBorderEnd,
+    tableBorderBottom = over.tableBorderBottom ?: base.tableBorderBottom,
+    tableBorderStart = over.tableBorderStart ?: base.tableBorderStart,
+    tableBackgroundColorHex = over.tableBackgroundColorHex ?: base.tableBackgroundColorHex,
+    tableVerticalAlignment = over.tableVerticalAlignment ?: base.tableVerticalAlignment
 )
+
+private val TABLE_STYLE_FAMILIES = setOf("table", "table-column", "table-row", "table-cell")
+
+private fun tableStyleKey(family: String, name: String): String =
+    "${family.lowercase(Locale.ROOT)}:${name.lowercase(Locale.ROOT)}"
 
 class SvXMLImport(
     val extractedImages: Map<String, File> = emptyMap(),
@@ -364,6 +545,7 @@ class SvXMLImport(
     private val contextStack = ArrayDeque<SvXMLImportContext>()
     private val parsedElements = mutableListOf<OfficeDocumentElement>()
     private val styleMap = mutableMapOf<String, OdfStyleInfo>()
+    private val tableStyleMap = LinkedHashMap<String, OdfStyleInfo>()
     private val pageLayouts = LinkedHashMap<String, PageStyleSpec>()
     private val masterPages = LinkedHashMap<String, String>()
     private var pageSpecFromDefaultStyle: PageStyleSpec? = null
@@ -438,6 +620,7 @@ class SvXMLImport(
                     val attrs = when (localName) {
                         "style", "page-layout", "default-style", "page-layout-properties",
                         "master-page", "text-properties", "paragraph-properties", "tab-stop",
+                        "table-properties", "table-column-properties", "table-row-properties", "table-cell-properties",
                         "header-footer-properties", "list-style", "outline-style",
                         "list-level-style-number", "list-level-style-bullet", "list-level-style-image",
                         "outline-level-style", "list-level-properties", "list-level-label-alignment" -> attrIndex(parser)
@@ -549,6 +732,10 @@ class SvXMLImport(
                             }
                         }
                         "paragraph-properties" -> pendingDraft?.let { applyParagraphProperties(it, attrs) }
+                        "table-properties" -> pendingDraft?.let { applyTableProperties(it, "table", attrs) }
+                        "table-column-properties" -> pendingDraft?.let { applyTableProperties(it, "table-column", attrs) }
+                        "table-row-properties" -> pendingDraft?.let { applyTableProperties(it, "table-row", attrs) }
+                        "table-cell-properties" -> pendingDraft?.let { applyTableProperties(it, "table-cell", attrs) }
                         "tab-stops" -> pendingDraft?.let { it.tabStops = emptyList() }
                         "tab-stop" -> pendingDraft?.let { draft ->
                             val position = attrs["position"]?.let { LayoutUnits.parseLength(it) }
@@ -654,10 +841,19 @@ class SvXMLImport(
         if (info.name.isBlank()) return
         styleMap[info.name] = info
         styleMap[info.name.lowercase(Locale.ROOT)] = info
+        if (info.family.lowercase(Locale.ROOT) in TABLE_STYLE_FAMILIES) {
+            tableStyleMap[tableStyleKey(info.family, info.name)] = info
+            tableStyleMap[tableStyleKey(info.family, info.name.lowercase(Locale.ROOT))] = info
+        }
     }
 
     private fun lookupStyle(name: String): OdfStyleInfo? {
         return styleMap[name] ?: styleMap[name.lowercase(Locale.ROOT)]
+    }
+
+    private fun lookupTableStyle(family: String, name: String): OdfStyleInfo? {
+        return tableStyleMap[tableStyleKey(family, name)]
+            ?: tableStyleMap[tableStyleKey(family, name.lowercase(Locale.ROOT))]
     }
 
     /**
@@ -685,6 +881,86 @@ class SvXMLImport(
         }
         return acc.copy(name = chain.first().name, family = chain.first().family, parentName = chain.first().parentName)
     }
+
+    private fun cascadeTableStyle(name: String, family: String): OdfStyleInfo? {
+        val chain = ArrayList<OdfStyleInfo>(4)
+        val seen = HashSet<String>(8)
+        var curr: String? = name
+        var depth = 0
+        while (curr != null && depth < 16 && seen.add(curr.lowercase(Locale.ROOT))) {
+            val info = lookupTableStyle(family, curr) ?: break
+            chain.add(info)
+            curr = info.parentName
+            depth++
+        }
+        if (chain.isEmpty()) return null
+        var acc = OdfStyleInfo(name = "", family = family)
+        for (i in chain.lastIndex downTo 0) {
+            acc = overlayStyle(acc, chain[i])
+        }
+        return acc.copy(name = chain.first().name, family = family, parentName = chain.first().parentName)
+    }
+
+    private fun OdfStyleInfo.toTableStyleSpec(): TableStyleSpec = TableStyleSpec(
+        name = name,
+        family = family,
+        parentStyleName = parentName,
+        tableWidth = tableWidth,
+        columnWidth = columnWidth,
+        defaultCellStyleName = defaultCellStyleName,
+        minimumHeightUnits = tableMinimumHeightUnits,
+        exactHeightUnits = tableExactHeightUnits,
+        keepTogether = tableKeepTogether,
+        padding = tablePadding,
+        borderTop = tableBorderTop,
+        borderEnd = tableBorderEnd,
+        borderBottom = tableBorderBottom,
+        borderStart = tableBorderStart,
+        backgroundColorHex = tableBackgroundColorHex,
+        verticalAlignment = tableVerticalAlignment
+    )
+
+    fun resolveTableStyle(styleName: String?, family: String): TableStyleSpec? {
+        if (styleName.isNullOrBlank()) return null
+        return cascadeTableStyle(styleName, family)?.toTableStyleSpec()
+    }
+
+    fun resolveTableWidth(styleName: String?): TableColumnWidthSpec {
+        return resolveTableStyle(styleName, "table")?.tableWidth ?: TableColumnWidthSpec()
+    }
+
+    fun resolveTableColumnWidth(styleName: String?): TableColumnWidthSpec {
+        return resolveTableStyle(styleName, "table-column")?.columnWidth ?: TableColumnWidthSpec()
+    }
+
+    fun resolveTableRowStyle(styleName: String?): TableRowStyle {
+        val style = resolveTableStyle(styleName, "table-row")
+        return TableRowStyle(
+            minimumHeightUnits = style?.minimumHeightUnits,
+            exactHeightUnits = style?.exactHeightUnits,
+            keepTogether = style?.keepTogether == true
+        )
+    }
+
+    fun resolveTableCellBoxStyle(styleName: String?): TableCellBoxStyle {
+        val style = resolveTableStyle(styleName, "table-cell")
+        return TableCellBoxStyle(
+            padding = style?.padding ?: TableInsets(),
+            borderTop = style?.borderTop ?: TableBorder(),
+            borderEnd = style?.borderEnd ?: TableBorder(),
+            borderBottom = style?.borderBottom ?: TableBorder(),
+            borderStart = style?.borderStart ?: TableBorder(),
+            backgroundColorHex = style?.backgroundColorHex,
+            verticalAlignment = style?.verticalAlignment ?: TableVerticalAlignment.AUTOMATIC
+        )
+    }
+
+    fun resolveTableDefaultCellStyle(styleName: String?): String? =
+        resolveTableStyle(styleName, "table-column")?.defaultCellStyleName
+
+    fun resolveAllTableStyles(): List<TableStyleSpec> = tableStyleMap.values
+        .distinctBy { tableStyleKey(it.family, it.name) }
+        .map { it.toTableStyleSpec() }
 
     fun resolveSpanFormatting(styleName: String?): OdfSpanFormat {
         if (styleName.isNullOrBlank()) return OdfSpanFormat()
@@ -901,6 +1177,7 @@ class SvXMLImport(
             ?: pageLayouts.values.firstOrNull()
             ?: pageSpecFromDefaultStyle
         val defaultPara = defaultParagraphStyle?.toParagraphStyle()
+        val tableStyles = resolveAllTableStyles()
         return DocumentStyles(
             paragraphStyles = paragraphs,
             characterStyles = characters,
@@ -910,7 +1187,15 @@ class SvXMLImport(
             firstMasterPageName = firstBodyMasterPageName(),
             defaultParagraphStyle = defaultPara,
             listStyles = listStyles.toMap(),
-            outlineStyle = outlineStyle
+            outlineStyle = outlineStyle,
+            tableStyles = tableStyles.filter { it.family.equals("table", ignoreCase = true) }
+                .associateBy { it.name },
+            tableColumnStyles = tableStyles.filter { it.family.equals("table-column", ignoreCase = true) }
+                .associateBy { it.name },
+            tableRowStyles = tableStyles.filter { it.family.equals("table-row", ignoreCase = true) }
+                .associateBy { it.name },
+            tableCellStyles = tableStyles.filter { it.family.equals("table-cell", ignoreCase = true) }
+                .associateBy { it.name }
         )
     }
 
@@ -965,6 +1250,7 @@ class SvXMLImport(
         parsedElements.clear()
         contextStack.clear()
         styleMap.clear()
+        tableStyleMap.clear()
         pageLayouts.clear()
         masterPages.clear()
         pageSpecFromDefaultStyle = null

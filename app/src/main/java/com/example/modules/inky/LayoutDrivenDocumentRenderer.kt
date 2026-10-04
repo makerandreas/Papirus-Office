@@ -2,6 +2,7 @@ package com.example.modules.inky
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,8 +16,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
@@ -40,6 +43,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.makerandreas.papirusoffice.data.*
 import java.io.File
+import android.graphics.Color as AndroidColor
 
 /**
  * Lets the screen ask the page stack to move input focus without owning the
@@ -290,7 +294,10 @@ fun LayoutDrivenDocumentRenderer(
                                                 elementIndex = hitResult.elementIndex,
                                                 paragraphIndex = hitResult.paragraphIndex,
                                                 runIndex = hitResult.lineIndex,
-                                                offset = hitResult.characterOffset
+                                                offset = hitResult.characterOffset,
+                                                tableRow = hitResult.tableRow,
+                                                tableColumn = hitResult.tableColumn,
+                                                tableCell = hitResult.tableCell
                                             )
                                         )
                                     }
@@ -495,10 +502,14 @@ private fun RenderLaidOutElement(
             TextOrField(element.paragraph)
         }
         is OfficeTable -> {
-            RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale)
+            elemLayout.tableFragment?.let {
+                RenderTableFragment(it, pageScale, zoomScale, styles, textColor)
+            } ?: RenderTable(element.rows.map { it.cells.map { c -> c.text } }, zoomScale, textColor)
         }
         is OfficeDocElement.TableElement -> {
-            RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale)
+            elemLayout.tableFragment?.let {
+                RenderTableFragment(it, pageScale, zoomScale, styles, textColor)
+            } ?: RenderTable(element.table.rows.map { it.cells.map { c -> c.text } }, zoomScale, textColor)
         }
         is OfficeImage -> {
             RenderImage(element.imageFile, element.imagePath, element.widthDp, element.heightDp, extractedImages, pageScale)
@@ -788,13 +799,115 @@ private fun ParagraphText(
 }
 
 @Composable
+private fun RenderTableFragment(
+    fragment: TableFragmentGeometry,
+    pageScale: Float,
+    zoomScale: Float,
+    styles: DocumentStyles,
+    textColor: Color
+) {
+    val outline = MaterialTheme.colorScheme.outline
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val fragmentWidth = (fragment.bounds.right - fragment.bounds.left).coerceAtLeast(1f) * pageScale
+    val fragmentHeight = (fragment.bounds.bottom - fragment.bounds.top).coerceAtLeast(1f) * pageScale
+
+    Box(
+        modifier = Modifier
+            .width(fragmentWidth.dp)
+            .height(fragmentHeight.dp)
+    ) {
+        fragment.cells.forEach { cell ->
+            val left = (cell.bounds.left - fragment.bounds.left) * pageScale
+            val top = (cell.bounds.top - fragment.bounds.top) * pageScale
+            val width = (cell.bounds.right - cell.bounds.left).coerceAtLeast(1f) * pageScale
+            val height = (cell.bounds.bottom - cell.bounds.top).coerceAtLeast(1f) * pageScale
+            val background = cell.style.backgroundColorHex?.let(::tableColor)
+            Box(
+                modifier = Modifier
+                    .offset(left.dp, top.dp)
+                    .width(width.dp)
+                    .height(height.dp)
+                    .then(if (background != null) Modifier.background(background) else Modifier)
+                    .border(TABLE_LINE_DP, outlineVariant)
+            )
+            cell.paragraphs.forEach { paragraph ->
+                val paragraphLeft = (paragraph.bounds.left - fragment.bounds.left) * pageScale
+                val paragraphTop = (paragraph.bounds.top - fragment.bounds.top) * pageScale
+                val paragraphWidth = (paragraph.bounds.right - paragraph.bounds.left).coerceAtLeast(1f) * pageScale
+                val paragraphHeight = (paragraph.bounds.bottom - paragraph.bounds.top).coerceAtLeast(1f) * pageScale
+                val resolved = StyleResolver.resolveParagraphStyle(paragraph.paragraph.styleName, styles)
+                val annotated = remember(paragraph.paragraph, styles, zoomScale, textColor) {
+                    OfficeRuns.toAnnotatedString(paragraph.paragraph, styles, zoomScale, textColor)
+                }
+                val projected = remember(paragraph.layout, annotated, paragraph.paragraph, styles, zoomScale) {
+                    ParagraphProjection(
+                        paragraph.layout.lines,
+                        emptyList(),
+                        zoomScale / LayoutUnits.UNITS_PER_POINT,
+                        paragraph.paragraph,
+                        styles
+                    ).filter(annotated).text
+                }
+                Box(
+                    modifier = Modifier
+                        .offset(paragraphLeft.dp, paragraphTop.dp)
+                        .width(paragraphWidth.dp)
+                        .height(paragraphHeight.dp)
+                ) {
+                    Text(
+                        text = projected,
+                        softWrap = false,
+                        color = textColor,
+                        fontSize = (resolved.fontSizeSp * zoomScale).sp,
+                        lineHeight = (TextMetrics.forStyle(resolved).lineHeightUnits /
+                            LayoutUnits.UNITS_PER_POINT * zoomScale).sp,
+                        fontFamily = OfficeRuns.fontFamilyFor(resolved.fontFamily),
+                        textAlign = OfficeRuns.composeTextAlign(paragraph.paragraph.alignment ?: resolved.alignment),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+        Canvas(Modifier.matchParentSize()) {
+            fragment.borderEdges.forEach { edge ->
+                val border = edge.border
+                val color = border.colorHex?.let(::tableColor) ?: outline
+                val pathEffect = when (border.style) {
+                    TableBorderLineStyle.DASHED -> PathEffect.dashPathEffect(floatArrayOf(6f * pageScale, 3f * pageScale))
+                    TableBorderLineStyle.DOTTED -> PathEffect.dashPathEffect(floatArrayOf(1f * pageScale, 2f * pageScale))
+                    else -> null
+                }
+                drawLine(
+                    color = color,
+                    start = Offset(
+                        (edge.startX - fragment.bounds.left) * pageScale,
+                        (edge.startY - fragment.bounds.top) * pageScale
+                    ),
+                    end = Offset(
+                        (edge.endX - fragment.bounds.left) * pageScale,
+                        (edge.endY - fragment.bounds.top) * pageScale
+                    ),
+                    strokeWidth = (border.widthUnits * pageScale).coerceAtLeast(0.5f),
+                    pathEffect = pathEffect
+                )
+            }
+        }
+    }
+}
+
+private fun tableColor(value: String): Color = runCatching {
+    Color(AndroidColor.parseColor(value))
+}.getOrDefault(Color.Transparent)
+
+@Composable
 private fun RenderTable(
     rows: List<List<String>>,
     zoomScale: Float,
     textColor: Color = Color.Black
 ) {
-    // Grid lines come from the theme instead of fixed greys: R-25 wants at
-    // least 4.5:1 for 10 sp cell text, and Color.DarkGray on white is 2.3:1.
+    // Compatibility fallback for externally supplied layouts from before the
+    // shared table geometry was available. Normal document layout always uses
+    // [RenderTableFragment].
     Column(
         modifier = Modifier
             .fillMaxWidth()
