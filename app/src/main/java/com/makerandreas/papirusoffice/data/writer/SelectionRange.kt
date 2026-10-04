@@ -11,4 +11,5 @@ data class SelectionRange(
     val max: Int get() = kotlin.math.max(start, end)
     val length: Int get() = max - min
     val isCollapsed: Boolean get() = start == end
+    val isEmpty: Boolean get() = start == end
 }
