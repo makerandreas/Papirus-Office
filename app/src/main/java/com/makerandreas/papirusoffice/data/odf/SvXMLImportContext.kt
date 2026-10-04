@@ -94,6 +94,9 @@ class OdfTextBodyContext(
 ) : SvXMLImportContext(importFilter, token) {
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+        if (token == OdfXmlToken.XML_SECTION || indexKindFor(token) != null) {
+            return requireNotNull(textFlowChildContext(importFilter, token, attributes))
+        }
         return when (token) {
             OdfXmlToken.XML_P -> {
                 OdfParagraphContext(importFilter, token, attributes)
@@ -260,7 +263,9 @@ class OdfParagraphContext(
 
     override fun onEndElement(token: OdfXmlToken) {
         val fullText = textBuilder.toString()
-        val headingLvl = importFilter.resolveHeadingLevel(styleName)
+        // Index titles and entries use outline-capable styles (Contents_20_Heading);
+        // they stay paragraphs so the Navigator does not list them as headings.
+        val headingLvl = if (importFilter.isInsideIndex) null else importFilter.resolveHeadingLevel(styleName)
         val element = if (headingLvl != null) {
             val paraListStyle = importFilter.resolveParagraphListStyleName(styleName)
             val label = if (!paraListStyle.isNullOrEmpty() && fullText.isNotBlank()) {
@@ -1015,6 +1020,10 @@ class OdfTableCellContext(
                 if (textBuilder.isNotEmpty()) textBuilder.append(" ")
                 textBuilder.append(cellPara.text)
                 cellParagraphs.add(cellPara)
+            }
+            OdfXmlToken.XML_SECTION -> {
+                importFilter.reportUnsupported("text:section", attributes)
+                OdfTableCellSectionContext(importFilter, token, this)
             }
             else -> super.createChildContext(token, attributes)
         }

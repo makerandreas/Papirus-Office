@@ -112,7 +112,13 @@ class PapirusTextToolbar : TextToolbar {
         onProofreadClick: () -> Unit = {},
         onTranslateClick: () -> Unit = {},
         onRewriteClick: (style: String) -> Unit = {},
-        onSetReminderClick: () -> Unit = {}
+        onSetReminderClick: () -> Unit = {},
+        /**
+         * Plan 7C: non-null only when the caret sits on a table-of-contents
+         * entry whose link resolves to a bookmark. Shown first in FCT Compact
+         * as "Go to entry…" (tap and hold the entry, then tap the action).
+         */
+        onGoToEntryClick: (() -> Unit)? = null
     ) {
         if (statusState == TextToolbarStatus.Shown) {
             var mode by remember { mutableStateOf(FctMode.COMPACT) }
@@ -189,6 +195,16 @@ class PapirusTextToolbar : TextToolbar {
                                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    if (onGoToEntryClick != null) {
+                                        FctTextButton(stringResource(R.string.fct_go_to_entry)) {
+                                            hide()
+                                            onGoToEntryClick()
+                                        }
+                                        VerticalDivider(
+                                            modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant
+                                        )
+                                    }
                                     if (isEditMode) {
                                         // Editor Mode Compact
                                         if (hasSelection && (onCut != null || onCutClick != null)) {
@@ -631,6 +647,24 @@ private fun getSynonymsForText(text: String): List<String> {
         clean.contains("buat") || clean.contains("kerja") -> listOf("Susun", "Ciptakan", "Gagas", "Hasilkan", "Gubah")
         clean.contains("hello") || clean.contains("halo") -> listOf("Hai", "Salam", "Greetings", "Sapaan")
         else -> listOf("Persamaan 1", "Persamaan 2", "Sinonim Kata")
+    }
+}
+
+@Composable
+private fun FctTextButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+        modifier = Modifier.height(40.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 

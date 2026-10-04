@@ -244,7 +244,7 @@ class OdtImportPipeline(
                     if (event == XmlPullParser.START_TAG) {
                         when (parser.name.orEmpty().substringAfterLast(':')) {
                             "table-of-content", "alphabetical-index", "table-index",
-                            "illustration-index", "object-index", "user-index" -> indexes = true
+                            "illustration-index", "object-index", "user-index", "bibliography" -> indexes = true
                             "section" -> sections = true
                             "table" -> tables = true
                             "font-face" -> fontFaces = true

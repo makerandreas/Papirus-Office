@@ -17,7 +17,7 @@ object DocumentTextMerger {
             } else {
                 blocks.map { OfficeParagraph(text = it) }
             }
-            return document.copy(body = DocumentBody(elements), isModified = true)
+            return document.copy(body = DocumentBody(elements), isModified = true).withValidatedRanges()
         }
 
         val oldText = original.mapNotNull(::textOf).joinToString("\n\n")
@@ -33,7 +33,7 @@ object DocumentTextMerger {
                     window.text.substring(oldText.length - suffix - window.start)
                 val updated = original.toMutableList()
                 updated[window.elementIndex] = replaceText(original[window.elementIndex], replacement)
-                return document.copy(body = DocumentBody(updated), isModified = true)
+                return document.copy(body = DocumentBody(updated), isModified = true).withValidatedRanges()
             }
         }
 
@@ -59,10 +59,13 @@ object DocumentTextMerger {
             result.add(OfficeParagraph(text = extra))
         }
 
+        // Structural elements stay in place and extra blocks only append, so
+        // sidecar ranges keep their positions; validation drops any that a
+        // caller handed in already out of bounds (audit-015 F-6).
         return document.copy(
             body = DocumentBody(elements = result),
             isModified = true
-        )
+        ).withValidatedRanges()
     }
 
     private fun splitBlocks(text: String): List<String> {

@@ -377,8 +377,24 @@ class SvXMLImport(
     private var anonymousListCounter = NumberingCounterState()
     private var lastListStyleName: String? = null
     private val documentBookmarks = LinkedHashSet<String>()
+    private var currentFileName: String = ""
+    private val semanticRanges = OdfSemanticRangeCollector(
+        elementCount = { parsedElements.size },
+        elementAt = { parsedElements[it] },
+        parentStyleOf = { lookupStyle(it)?.parentName }
+    )
 
     val elements: List<OfficeDocumentElement> get() = parsedElements
+
+    /** True while body flow is inside an authored index; suppresses heading promotion (audit-015 F-1). */
+    val isInsideIndex: Boolean get() = semanticRanges.isInsideIndex
+
+    internal val ranges: OdfSemanticRangeCollector get() = semanticRanges
+
+    /** Reports an element the importer recognises but cannot represent at its position. */
+    fun reportUnsupported(tagName: String, attributes: Map<String, String>) {
+        diagnostics.unsupportedTag(currentFileName, tagName, attributes)
+    }
 
     fun addElement(element: OfficeDocumentElement) {
         parsedElements.add(element)
@@ -962,6 +978,8 @@ class SvXMLImport(
         anonymousListCounter.reset()
         lastListStyleName = null
         documentBookmarks.clear()
+        semanticRanges.reset()
+        currentFileName = fileName
 
         // Preload style hierarchies from styles.xml and content.xml automatic-styles
         // without clearing defaults between the two so office:styles survive.
@@ -1074,7 +1092,9 @@ class SvXMLImport(
                 failureReason = null,
                 pageCount = odpSlideCount,
                 styles = toDocumentStyles(),
-                bookmarks = documentBookmarks.toList()
+                bookmarks = documentBookmarks.toList(),
+                authoredIndexes = if (isOdt) semanticRanges.authoredIndexes() else emptyList(),
+                namedSectionRanges = if (isOdt) semanticRanges.namedSections() else emptyList()
             )
 
         } catch (e: Exception) {

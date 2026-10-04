@@ -316,6 +316,8 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Tests:** Samples 2/4/5/6 authored TOC entries and page labels; synthetic nested/named/protected sections; exact ranges and jump targets; status context; no duplicate body text; all page windows hold.
 
+**Owner decisions (2026-10-04, audit-015 §7.1):** tab stops and leaders leave item 1 and move to 7E (§4.7d item 5). Hidden sections are listed greyed out and jump to the nearest visible position. TOC `#_TOC` links are grouped under their index, not under Hyperlinks. 7C adds a TOC entry go-to: tap and hold an entry to open FCT Compact, then tap "Go to entry…". The strings sweep becomes Plan 3D (`plan-3d-strings-sweep.md`). Implementation record: audit-015 §9.
+
 ### 4.7c PR #29, Plan 7D: table structure, measurement, pagination, rendering, and cell hit-testing
 
 **Goal:** make one format-neutral table geometry load-bearing end to end.
@@ -336,8 +338,10 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 2. Resolve style alias -> declared family -> `FontRegistry` substitution. Metrics and renderer must receive the same final family; no renderer-only alias map.
 3. Cover Times New Roman/Liberation Serif and the fixture corpus's generated aliases without confusing style alias names with actual family names.
 4. Re-run the full six-ODT element dump/page matrix after 7C/7D are load-bearing. Explain every shift, tighten only with evidence, and record the final windows before 8A starts.
+5. **Tab stops and leaders (moved from 7C on 2026-10-04).** Parse ODF `style:tab-stops` (position, type, `style:leader-style`, `style:leader-text`) in the paragraph style chain, lay out tabs against them in `TextMetrics`, and paint leaders. TOC entries in Samples 2/4/5/6 are the first consumers: entry text, dot leader, right-aligned page label.
+6. **Hidden-section rendering (added 2026-10-04).** Plan 7C lists `text:display="none"` sections and keeps jumps out of them, but the paginator still lays out their content. Exclude hidden ranges from layout here, because hiding them changes pagination, and do it before the final matrix in item 4.
 
-**Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages.
+**Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages; tab-stop positions and leader painting for the TOC entries; hidden-section content absent from layout.
 
 ### 4.8 PR #31, Plan 8A: DOCX style chain + run formatting
 
@@ -483,6 +487,7 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 17. **⚑ v2.4 (2026-09-26, audit-007):** (a) **PR 16 split** into 16a (Plan 5B, parsing: fake breaks out, real breaks and section starts in, body rect from margins + header/footer heights, metric-only style chain, F-21 defaults) and 16b (Plan 5C, measurement: `TextMetrics` load-bearing, constants deleted, widows/orphans, tab stops, windows); 17 still depends on 15, 18 now depends on 16b. (b) **Windows are per format** and cover all six pairs; the "Sample-5 `15..21` both formats" wording is withdrawn because the OnlyOffice ODT exports of Sample-3/4/5 lost Word's `pPrDefault` (single-spaced, 0 after) and Sample-3.odt declares 0 cm top/bottom margins; geometry is honoured as declared (user decision), and the ODT column is provisional until the user regenerates the `.odt` fixtures with Collabora Office. (c) **DOCX references completed** from M365 Copilot: Sample-1 15, Sample-3 20, Sample-4 10 (Sample-2 23 and Sample-5 18 from `app.xml`, Sample-6 21 as before). (d) **PR 15 gains** the dump over all six pairs, `SampleMatrixTest`, header/footer heights in `PageStyleSpec`, and the §8 font corpus. (e) **Corrections to the record:** §2's counts are confirmed; Sample-4/5 ODT's "margin-top 0" (§2.1's Sample-5 note) is a fixed-height header carrying the margin (equivalent to the DOCX), not a defect, while Sample-3.odt's 0 cm margins are; the "double break makes a blank page" theory (plan-02 item 7) is refuted by `flushPage()`'s guard, so E-0 is confirmation, not diagnosis. (f) **Native libraries:** the checked-in `.so` files are LFS pointers to a 196 MB (arm64) / 135 MB (v7a) `liblo-native-code.so` plus the NSS/NSPR set; the "~60 KB stub" wording in earlier audits is withdrawn (audit-007 §10).
 
 18. **v2.6 (2026-10-03):** the old combined 7B package and its downstream PR forecast are superseded by 7B canonical/import convergence, 7C indexes/sections/navigation/status, 7D tables end to end, and 7E font declarations/aliases/calibration. The ODT matrix was re-read from the current ZIPs: Sample-6 has no `text:section`, list-style definitions are in `styles.xml`, and current list/heading/soft-break counts replace the pre-regeneration rows. `audit-014` records the implementation boundary.
+19. **v2.7 (2026-10-04, audit-015):** Plan 7C is implemented as one PR in four commits. Tab stops and leaders move from 7C to 7E (§4.7d item 5), and hidden-section rendering is added to 7E (§4.7d item 6). The strings sweep is Plan 3D in its own file. No forecast PR slot moves, because 3D is scheduled when the owner picks a slot.
 
 ---
 

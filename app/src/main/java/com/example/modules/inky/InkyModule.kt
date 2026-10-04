@@ -686,8 +686,10 @@ fun InkyModule(
     // level and text (resolved by the Navigator index, which is also the only
     // resolver that follows style parents, so Sample-5's paragraph-styled
     // headings count), the element kind for tables and list items, and the
-    // hyphen placeholder elsewhere. Table row/column, section names and image
-    // geometry are not guessed: they arrive with plans 19/21.
+    // hyphen placeholder elsewhere. Plan 7C adds authored ranges: inside an
+    // index only the index type is shown, otherwise the innermost section name
+    // joins the detail (StatusObjectResolver). Table row/column and image
+    // geometry are still not guessed.
     var statusBarObjectInfo by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(docBodyText.selection, activeLayoutDocument, navEngineState.index) {
@@ -700,11 +702,22 @@ fun InkyModule(
         val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
         val hit = com.makerandreas.papirusoffice.data.DocumentTextWindows.elementForOffset(windows, caret)
         val caretElementIndex = hit?.elementIndex ?: layoutCursor.elementIndex
-        statusBarObjectInfo = resolveStatusBarObjectInfo(
+        val statusDetail = resolveStatusBarObjectInfo(
             context = context,
             caretElementIndex = caretElementIndex,
             elements = elements,
             headings = com.makerandreas.papirusoffice.data.navigation.flattenHeadings(navEngineState.index.headings)
+        )
+        val statusRanges = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.resolve(
+            indexes = activeLayoutDocument.authoredIndexes,
+            sections = activeLayoutDocument.namedSectionRanges,
+            elementIndex = caretElementIndex
+        )
+        statusBarObjectInfo = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.compose(
+            context = statusRanges,
+            detail = statusDetail,
+            indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
+            join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
         )
         val element = hit?.let { elements.getOrNull(it.elementIndex) }
             ?: elements.getOrNull(layoutCursor.elementIndex)
@@ -3710,6 +3723,37 @@ fun InkyModule(
         }
     }
 
+    // Plan 7C: FCT Compact "Go to entry…" target. Computed in composition from
+    // the current selection (not from an effect), so the option can never
+    // show a stale answer from where the caret was before. Both selection
+    // ends must sit inside the same linked entry of a table of contents;
+    // anywhere else (body text, other index kinds, a selection leaving the
+    // entry, or an offset outside every element) the option is not offered.
+    val fctGoToEntryAnchor = remember(
+        docBodyText.selection,
+        docBodyText.text,
+        activeLayoutDocument,
+        navEngineState.index.bookmarks
+    ) {
+        val elements = activeLayoutDocument.body.elements
+        val indexes = activeLayoutDocument.authoredIndexes
+        if (elements.isEmpty() || indexes.none { it.kind == com.makerandreas.papirusoffice.data.DocumentIndexKind.TABLE_OF_CONTENT }) {
+            null
+        } else {
+            val windows = com.makerandreas.papirusoffice.data.DocumentTextWindows.compute(elements, docBodyText.text)
+            fun strictElementAt(offset: Int): Int =
+                windows.values.firstOrNull { offset >= it.start && offset <= it.end }?.elementIndex ?: -1
+            val textLength = docBodyText.text.length
+            val selection = docBodyText.selection
+            com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.goToEntryAnchor(
+                indexes = indexes,
+                bookmarkNames = navEngineState.index.bookmarks.mapTo(HashSet()) { it.name },
+                elementIndex = strictElementAt(selection.min.coerceIn(0, textLength)),
+                endElementIndex = strictElementAt(selection.max.coerceIn(0, textLength))
+            )
+        }
+    }
+
     customTextToolbar.Content(
         isEditMode = isEditMode,
         isListParagraph = activeInkySubpage in listOf("bulleted_list", "numbered_list", "multilevel_list"),
@@ -3796,6 +3840,9 @@ fun InkyModule(
         },
         onSetReminderClick = {
             showSetReminderDialog = true
+        },
+        onGoToEntryClick = fctGoToEntryAnchor?.let { anchor ->
+            { navEngine.goToIndexEntryTarget(anchor); Unit }
         }
     )
 

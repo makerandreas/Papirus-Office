@@ -38,17 +38,30 @@ enum class NavigatorCategoryAvailability {
  * any parser reading the file's bookmarks, which is exactly why the category
  * is not readable yet.
  *
- * The search skips this package. `DocumentIndexEngine` does construct
- * `OfficeSection` from `doc.sections`, but nothing fills `doc.sections`, so
- * counting that as production would classify sections as readable on the
- * strength of a list no parser ever populates.
+ * The search skips this package so the index engine's own reshaping never
+ * counts as a parser producing the class.
+ *
+ * [readableFormats] narrows a readable category to the formats whose parser
+ * builds the class (Plan 7C reads ODF indexes and sections, not DOCX ones).
+ * Empty means every format. For any other format the empty state falls back
+ * to "not yet available", because an empty list proves nothing there.
  */
 data class NavigatorCategory(
     val key: String,
     val availability: NavigatorCategoryAvailability,
     val elementClasses: List<String> = emptyList(),
-    val ownerPlan: String? = null
-)
+    val ownerPlan: String? = null,
+    val readableFormats: Set<String> = emptySet()
+) {
+    /** Availability for a document parsed as [format] (`ParserReport.format`). */
+    fun availabilityFor(format: String?): NavigatorCategoryAvailability {
+        if (readableFormats.isEmpty() || availability == NavigatorCategoryAvailability.NOT_READABLE_YET) {
+            return availability
+        }
+        val normalized = format?.trim()?.uppercase().orEmpty()
+        return if (normalized in readableFormats) availability else NavigatorCategoryAvailability.NOT_READABLE_YET
+    }
+}
 
 object NavigatorCategories {
 
@@ -63,10 +76,20 @@ object NavigatorCategories {
         // Not readable yet: the index has an arm for the class, but no parser
         // in the tree constructs it, so the limb never gets data on a real
         // file. Owner plan = the PR that makes it readable.
-        NavigatorCategory("hyperlinks", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeHyperlink"), "plan-18/20"),
+        // Link runs are read (OfficeTextRun.hyperlink), but no parser builds an
+        // OfficeHyperlink element and no plan item owns the category yet.
+        NavigatorCategory("hyperlinks", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeHyperlink"), null),
         NavigatorCategory("bookmarks", NavigatorCategoryAvailability.PARSED_DOCUMENT_CLASS, listOf("OfficeBookmark")),
-        NavigatorCategory("sections", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeSection"), "plan-19/21"),
-        NavigatorCategory("fields", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeField"), "plan-21"),
+        // Plan 7C: ODF text:section ranges (DocumentSectionRange, built by the
+        // ODF importer). DOCX sections are not read, so DOCX keeps the
+        // not-yet-available wording.
+        NavigatorCategory(
+            "sections",
+            NavigatorCategoryAvailability.PARSED_DOCUMENT_CLASS,
+            listOf("DocumentSectionRange"),
+            readableFormats = setOf("ODT")
+        ),
+        NavigatorCategory("fields", NavigatorCategoryAvailability.NOT_READABLE_YET, listOf("OfficeField"), "plan-8B"),
         // No plan item owns these yet. Recorded as "unassigned" rather than
         // borrowing the nearest plan number: a wrong marker is worse than an
         // honest gap, and §8 of the roadmap lists these gaps for the user.
@@ -77,11 +100,14 @@ object NavigatorCategories {
         // as OfficeImage, so "Text Frames" would list pictures under a second
         // name. Not a stub to keep, a gap to name.
         NavigatorCategory("frames", NavigatorCategoryAvailability.NOT_READABLE_YET, emptyList(), null),
-        // Indexes are authored TOC/index content (a table of contents is not a
-        // heading, a table or an image): the parsers drop the whole snapshot
-        // today, so the category may not claim the document has none. Read by
-        // plan 19 (ODF) and plan 21 (DOCX).
-        NavigatorCategory("indexes", NavigatorCategoryAvailability.NOT_READABLE_YET, emptyList(), "plan-19/21"),
+        // Plan 7C: authored ODF indexes (DocumentIndexRange, built by the ODF
+        // importer). DOCX indexes are not read yet.
+        NavigatorCategory(
+            "indexes",
+            NavigatorCategoryAvailability.PARSED_DOCUMENT_CLASS,
+            listOf("DocumentIndexRange"),
+            readableFormats = setOf("ODT")
+        ),
         // OLE rows come from OfficeResources.objects, which no parser fills.
         // The class itself is constructed (as a default), so there is no
         // constructor to assert on here: this one stays hand-checked.
