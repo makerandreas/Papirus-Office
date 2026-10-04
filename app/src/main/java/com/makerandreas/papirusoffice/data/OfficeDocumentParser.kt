@@ -30,14 +30,6 @@ data class ParsingProgress(
     val stage: LoadingStage? = null
 )
 
-typealias DocxDocumentParser = OfficeDocumentParser
-
-data class DocxParseResult(
-    val text: String = "",
-    val extractedImages: Map<String, java.io.File> = emptyMap(),
-    val parsedDocument: OfficeParsedDocument? = null
-)
-
 sealed class SchemaValidationResult {
     object Valid : SchemaValidationResult()
     data class Invalid(val reason: String, val warnings: List<String> = emptyList()) : SchemaValidationResult()

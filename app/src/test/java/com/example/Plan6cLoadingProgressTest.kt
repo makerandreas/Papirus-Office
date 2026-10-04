@@ -31,7 +31,7 @@ class Plan6cLoadingProgressTest {
 
     private fun repoRoot(): File {
         var root: File? = File(".").absoluteFile
-        while (root != null && !File(root, "settings.gradle.kts").exists() && !File(root, ".git").exists()) root = root.parentFile
+        while (root != null && !File(root, ".git").exists()) root = root.parentFile
         return root ?: File(".").absoluteFile
     }
 

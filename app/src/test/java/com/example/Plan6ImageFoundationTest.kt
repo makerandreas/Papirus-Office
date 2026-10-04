@@ -35,12 +35,8 @@ class Plan6ImageFoundationTest {
 
     private fun fixture(name: String): File {
         var root: File? = File(".").absoluteFile
-        while (root != null && !File(root, "settings.gradle.kts").exists() && !File(root, ".git").exists()) root = root.parentFile
+        while (root != null && !File(root, ".git").exists()) root = root.parentFile
         val file = File(root ?: File("."), "tests/inky/$name")
-        if (!file.isFile) {
-            val fallback = SampleMatrix.findTestFile(name)
-            if (fallback.isFile) return fallback
-        }
         assertTrue("Missing fixture: ${file.absolutePath}", file.isFile)
         return file
     }
