@@ -56,7 +56,8 @@ data class PageElementLayout(
     val sourceStart: Int = 0,
     val sourceEnd: Int = 0,
     val continuesBefore: Boolean = false,
-    val continuesAfter: Boolean = false
+    val continuesAfter: Boolean = false,
+    val tableFragment: TableFragmentGeometry? = null
 )
 
 data class DocumentLayoutResult(
@@ -241,6 +242,132 @@ class LayoutEngine(
                 (showImages || e !is OfficeImage && e !is OfficeDocElement.ImageElement) &&
                 (showTables || e !is OfficeTable && e !is OfficeDocElement.TableElement)
         }
+
+        fun tableOf(element: OfficeElement): OfficeTable? = when (element) {
+            is OfficeTable -> element
+            is OfficeDocElement.TableElement -> element.table
+            else -> null
+        }
+
+        fun placeTable(element: OfficeElement, index: Int, table: OfficeTable) {
+            if (previousAfter > 0f) {
+                y += previousAfter
+                previousAfter = 0f
+            }
+            val plan = TableLayoutEngine.measure(
+                table = table,
+                styles = document.styles,
+                availableWidth = pageSpec.contentWidthDp,
+                advanceSource = advanceSource,
+                hyphenator = hyphenator
+            )
+            val leadingHeaders = (0 until plan.headerRowCount).toList()
+            val crossingHeaderGroup = plan.rowGroups.firstOrNull {
+                it.startInclusive < plan.headerRowCount && it.endExclusive > plan.headerRowCount
+            }
+            val bodyGroups = plan.rowGroups.filter { group ->
+                group.startInclusive >= plan.headerRowCount || crossingHeaderGroup === group
+            }
+            var groupCursor = 0
+            var firstFragment = true
+            var headersEnabled = leadingHeaders.isNotEmpty() && crossingHeaderGroup == null
+            var emittedEmptyTable = false
+            var pendingDiagnostics = plan.diagnostics
+
+            while (groupCursor < bodyGroups.size || (firstFragment && leadingHeaders.isNotEmpty()) || (!emittedEmptyTable && plan.grid.rows.isEmpty())) {
+                val headerRows = if (headersEnabled && (firstFragment || groupCursor < bodyGroups.size)) leadingHeaders else emptyList()
+                val headerHeight = plan.heightOfRows(headerRows)
+                val firstGroup = bodyGroups.getOrNull(groupCursor)
+                val firstGroupHeight = firstGroup?.let(plan::heightOf) ?: 0f
+
+                if (firstGroup != null && firstGroupHeight > bodyHeight && placed.isNotEmpty()) {
+                    flush(PageEndReason.OVERFLOW)
+                    continue
+                }
+                if (firstGroup != null && firstGroupHeight > bodyHeight && headersEnabled && headerHeight + firstGroupHeight > bodyHeight) {
+                    pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
+                        TableDiagnosticCode.OVER_HEIGHT,
+                        "An oversized table row or span group was placed alone; the repeated header was omitted"
+                    )
+                    headersEnabled = false
+                    continue
+                }
+                if (firstGroup != null && y + headerHeight + firstGroupHeight > bottom + 0.001f && placed.isNotEmpty()) {
+                    flush(PageEndReason.OVERFLOW)
+                    continue
+                }
+                if (firstGroup != null && headerHeight > bodyHeight && headersEnabled) {
+                    pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
+                        TableDiagnosticCode.OVER_HEIGHT,
+                        "The table header is taller than the usable page body"
+                    )
+                    headersEnabled = false
+                    continue
+                }
+
+                val selectedGroups = mutableListOf<TableRowGroup>()
+                var selectedHeight = 0f
+                while (groupCursor + selectedGroups.size < bodyGroups.size) {
+                    val candidate = bodyGroups[groupCursor + selectedGroups.size]
+                    val candidateHeight = plan.heightOf(candidate)
+                    val candidateTotal = headerHeight + selectedHeight + candidateHeight
+                    if (selectedGroups.isNotEmpty() && y + candidateTotal > bottom + 0.001f) break
+                    if (selectedGroups.isEmpty() && candidateHeight > bodyHeight) {
+                        // Empty-page placement is the explicit forward-progress escape hatch.
+                        pendingDiagnostics = pendingDiagnostics + TableDiagnostic(
+                            TableDiagnosticCode.OVER_HEIGHT,
+                            "An oversized table row or vertical-span group was placed alone",
+                            logicalRow = candidate.startInclusive
+                        )
+                    }
+                    selectedGroups += candidate
+                    selectedHeight += candidateHeight
+                    if (candidateHeight > bodyHeight) break
+                }
+
+                if (selectedGroups.isEmpty() && leadingHeaders.isNotEmpty() && firstFragment) {
+                    // A table containing only headers still gets one visible fragment.
+                    emittedEmptyTable = true
+                } else if (selectedGroups.isEmpty() && firstGroup == null) {
+                    emittedEmptyTable = true
+                }
+
+                val bodyRows = selectedGroups.flatMap { group -> group.startInclusive until group.endExclusive }
+                val rowRefs = buildList {
+                    headerRows.forEach { add(TableFragmentRowRef(it, isRepeatedHeader = !firstFragment, isBodyCoverage = false)) }
+                    bodyRows.forEach { add(TableFragmentRowRef(it, isRepeatedHeader = false, isBodyCoverage = true)) }
+                }
+                var fragment = plan.fragment(
+                    elementIndex = index,
+                    left = pageSpec.marginStartDp,
+                    top = y,
+                    rowRefs = rowRefs,
+                    extraDiagnostics = pendingDiagnostics
+                )
+                if (fragment.bounds.bottom <= fragment.bounds.top) {
+                    fragment = fragment.copy(bounds = fragment.bounds.copy(bottom = fragment.bounds.top + 1f))
+                }
+                register(index)
+                placed += PageElementLayout(
+                    element = element,
+                    bounds = fragment.bounds,
+                    elementIndex = index,
+                    tableFragment = fragment
+                )
+                y = fragment.bounds.bottom
+                previousAfter = 0f
+                previousCollapses = false
+                emittedEmptyTable = true
+                groupCursor += selectedGroups.size
+                firstFragment = false
+                pendingDiagnostics = emptyList()
+                if (groupCursor < bodyGroups.size && y >= bottom - 0.001f) {
+                    flush(PageEndReason.OVERFLOW)
+                }
+                if (selectedGroups.isEmpty() && groupCursor >= bodyGroups.size) break
+            }
+        }
+
         for ((index, element) in elements.withIndex()) {
             if (!visible(index)) continue
             if (element is OfficePageBreak) {
@@ -344,18 +471,15 @@ class LayoutEngine(
                 if (style.pageBreakAfter && elements.getOrNull(index + 1) !is OfficePageBreak) {
                     flush(PageEndReason.AUTHORED)
                 }
+            } else if (tableOf(element) != null) {
+                placeTable(element, index, tableOf(element)!!)
             } else {
                 val imageBox = when (element) {
                     is OfficeImage -> DocumentImages.box(element.widthDp, element.heightDp)
                     is OfficeDocElement.ImageElement -> DocumentImages.box(element.image.widthDp, element.image.heightDp)
                     else -> null
                 }
-                val height = when {
-                    imageBox != null -> imageBox.heightUnits
-                    element is OfficeTable -> (element.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    element is OfficeDocElement.TableElement -> (element.table.rows.size * 35f + 10f).coerceAtLeast(40f)
-                    else -> 30f
-                }
+                val height = if (imageBox != null) imageBox.heightUnits else 30f
                 val width = imageBox?.widthUnits?.coerceAtMost(pageSpec.contentWidthDp) ?: pageSpec.contentWidthDp
                 if (y + previousAfter + height > bottom && placed.isNotEmpty()) flush(PageEndReason.OVERFLOW)
                 y += previousAfter
