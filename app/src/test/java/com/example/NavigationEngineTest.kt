@@ -24,6 +24,7 @@ import com.makerandreas.papirusoffice.data.OfficeTableCell
 import com.makerandreas.papirusoffice.data.navigation.DocumentIndexEngine
 import com.makerandreas.papirusoffice.data.navigation.NavigateBy
 import com.makerandreas.papirusoffice.data.navigation.NavigationEngine
+import com.makerandreas.papirusoffice.data.navigation.NavigatorNotice
 import com.makerandreas.papirusoffice.data.navigation.VisibilityState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -178,7 +179,7 @@ class NavigationEngineTest {
         navEngine.goToTable(tableId)
 
         // Expect warning toast signal
-        assertEquals("This item is hidden", navEngine.state.value.notificationMessage)
+        assertEquals(NavigatorNotice.HIDDEN_ITEM, navEngine.state.value.notice)
     }
 
     @Test

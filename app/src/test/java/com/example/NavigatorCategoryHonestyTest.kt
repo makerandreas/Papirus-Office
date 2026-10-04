@@ -19,10 +19,10 @@ import java.io.File
  * fails here instead of shipping a Navigator that still claims the document has
  * no bookmarks.
  *
- * Producers are every Kotlin file outside `data/navigation/`. The index engine
- * lives inside that package and reshapes `doc.sections` into `OfficeSection`;
- * counting it would classify sections as readable on the strength of a list no
- * parser fills.
+ * Producers are every Kotlin file outside `data/navigation/`, so the index
+ * engine's own node construction never counts as a parser. Plan 7C sections
+ * and indexes are readable through `DocumentSectionRange` and
+ * `DocumentIndexRange`, which only the ODF importer constructs.
  */
 class NavigatorCategoryHonestyTest {
 

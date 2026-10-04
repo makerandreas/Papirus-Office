@@ -256,6 +256,10 @@ Plan 7B establishes the boundary the next three plans consume without implementi
 
 Explicitly deferred: populating/rendering index and section sidecars (7C), populating and consuming table geometry (7D), and parsing/resolving font faces plus pagination calibration (7E).
 
+### Plan 7C record (forecast PR #28, target until merged)
+
+G-2 and G-7 are implemented for ODF. Dedicated contexts record half-open ranges for `text:section` and all seven index elements while their paragraphs stay in normal body flow. Index entries carry their text, a level taken from the entry template through the paragraph style chain, the link anchor and the authored page label (roman `ii`/`iii` stay strings). The Navigator lists indexes with their entries and lists sections nested by depth. Hidden sections are greyed and their jumps land on the nearest visible position. TOC links are grouped under their index. The status bar shows the index type inside an index, and otherwise the innermost section name joined with the existing detail. FCT Compact offers "Go to entry…" on linked TOC entries. Tab stops, leaders and hidden-section rendering move to 7E. The full evidence table and known limits are in `audit-015` §9.
+
 ---
 
 ## Plan 8: OOXML structural fidelity (was PR H)

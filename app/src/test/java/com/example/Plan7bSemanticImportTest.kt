@@ -70,7 +70,7 @@ class Plan7bSemanticImportTest {
     }
 
     @Test
-    fun namedSectionProvenanceBlocksModifiedSaveWithoutPullingPlan7cForward() {
+    fun namedSectionProvenanceBlocksModifiedSave() {
         val bytes = odtPackage(
             mapOf(
                 "mimetype" to "application/vnd.oasis.opendocument.text",
@@ -88,7 +88,8 @@ class Plan7bSemanticImportTest {
         val parsed = OdtImportPipeline().parse(bytes, "section.odt")
         assertFalse(parsed.isParsingFailed)
         assertTrue(requireNotNull(parsed.odtPackageData).sourceFeatures.hasNamedSections)
-        assertTrue("7C owns range population", parsed.namedSectionRanges.isEmpty())
+        // Plan 7C populates the range; save stays refused either way.
+        assertEquals(listOf("Chapter"), parsed.namedSectionRanges.map { it.name })
 
         val document = parsed.toOfficeDocument().copy(isModified = true)
         val capability = OdtDocumentWriter().saveCapability(document)
