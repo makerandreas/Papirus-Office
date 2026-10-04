@@ -41,7 +41,9 @@ sealed class OfficeDocumentElement {
         val numColumns: Int = 0,
         val name: String? = null,
         val columns: List<OfficeTableColumnSpec> = emptyList(),
-        val styleName: String? = null
+        val styleName: String? = null,
+        val tableWidth: TableColumnWidthSpec = TableColumnWidthSpec(),
+        val diagnostics: List<TableDiagnostic> = emptyList()
     ) : OfficeDocumentElement() {
         init {
             require(numColumns >= 0) { "Table column count must be non-negative" }
@@ -64,10 +66,13 @@ data class TableRow(
     val styleName: String? = null,
     val isHeader: Boolean = false,
     val repeatCount: Int = 1,
-    val rowStyle: TableRowStyle = TableRowStyle()
+    val rowStyle: TableRowStyle = TableRowStyle(),
+    /** Ordinal in the compact ODF source row list; -1 means synthetic. */
+    val sourceRowOrdinal: Int = -1
 ) {
     init {
         require(repeatCount > 0) { "Table row repeat count must be positive" }
+        require(sourceRowOrdinal >= -1) { "Table source row ordinal must be non-negative or -1" }
     }
 }
 
@@ -80,12 +85,15 @@ data class TableCell(
     val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
     val repeatCount: Int = 1,
     val styleName: String? = null,
-    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
+    val boxStyle: TableCellBoxStyle = TableCellBoxStyle(),
+    /** Ordinal in the compact source row; -1 means synthetic. */
+    val sourceCellOrdinal: Int = -1
 ) {
     init {
         require(startColumn >= 0) { "Table cell start column must be non-negative" }
         require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
         require(repeatCount > 0) { "Table cell repeat count must be positive" }
+        require(sourceCellOrdinal >= -1) { "Table source cell ordinal must be non-negative or -1" }
     }
 }
 

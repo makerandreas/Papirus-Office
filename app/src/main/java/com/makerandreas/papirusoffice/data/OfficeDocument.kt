@@ -141,7 +141,9 @@ data class OfficeTable(
     val numColumns: Int = 0,
     val name: String? = null,
     val columns: List<OfficeTableColumnSpec> = emptyList(),
-    val styleName: String? = null
+    val styleName: String? = null,
+    val tableWidth: TableColumnWidthSpec = TableColumnWidthSpec(),
+    val diagnostics: List<TableDiagnostic> = emptyList()
 ) : OfficeElement {
     init {
         require(numColumns >= 0) { "Table column count must be non-negative" }
@@ -153,10 +155,13 @@ data class OfficeTableRow(
     val styleName: String? = null,
     val isHeader: Boolean = false,
     val repeatCount: Int = 1,
-    val rowStyle: TableRowStyle = TableRowStyle()
+    val rowStyle: TableRowStyle = TableRowStyle(),
+    /** Ordinal in the compact ODF source row list; -1 means synthetic. */
+    val sourceRowOrdinal: Int = -1
 ) {
     init {
         require(repeatCount > 0) { "Table row repeat count must be positive" }
+        require(sourceRowOrdinal >= -1) { "Table source row ordinal must be non-negative or -1" }
     }
 }
 
@@ -169,12 +174,15 @@ data class OfficeTableCell(
     val occupancy: TableCellOccupancy = TableCellOccupancy.ORIGIN,
     val repeatCount: Int = 1,
     val styleName: String? = null,
-    val boxStyle: TableCellBoxStyle = TableCellBoxStyle()
+    val boxStyle: TableCellBoxStyle = TableCellBoxStyle(),
+    /** Ordinal in the compact source row; -1 means synthetic. */
+    val sourceCellOrdinal: Int = -1
 ) {
     init {
         require(startColumn >= 0) { "Table cell start column must be non-negative" }
         require(columnSpan > 0 && rowSpan > 0) { "Table cell spans must be positive" }
         require(repeatCount > 0) { "Table cell repeat count must be positive" }
+        require(sourceCellOrdinal >= -1) { "Table source cell ordinal must be non-negative or -1" }
     }
 }
 
@@ -269,7 +277,12 @@ data class DocumentStyles(
     /** Document-level ODF `<text:outline-style>` definition, if present. */
     val outlineStyle: NumberingSpec? = null,
     /** ODF font-face declarations keyed by their style:name alias. Populated by Plan 7E. */
-    val fontFaces: Map<String, OfficeFontFace> = emptyMap()
+    val fontFaces: Map<String, OfficeFontFace> = emptyMap(),
+    /** Named and automatic ODF table-family declarations populated by Plan 7D. */
+    val tableStyles: Map<String, TableStyleSpec> = emptyMap(),
+    val tableColumnStyles: Map<String, TableStyleSpec> = emptyMap(),
+    val tableRowStyles: Map<String, TableStyleSpec> = emptyMap(),
+    val tableCellStyles: Map<String, TableStyleSpec> = emptyMap()
 ) {
     /** Page box behind an ODF master page, if both the master and its layout were read. */
     fun pageStyleForMaster(masterPageName: String?): PageStyleSpec? {
@@ -569,12 +582,15 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     name = elem.name,
                     columns = elem.columns,
                     styleName = elem.styleName,
+                    tableWidth = elem.tableWidth,
+                    diagnostics = elem.diagnostics,
                     rows = elem.rows.map { row ->
                         OfficeTableRow(
                             styleName = row.styleName,
                             isHeader = row.isHeader,
                             repeatCount = row.repeatCount,
                             rowStyle = row.rowStyle,
+                            sourceRowOrdinal = row.sourceRowOrdinal,
                             cells = row.cells.map { cell ->
                                 OfficeTableCell(
                                     text = cell.text,
@@ -585,6 +601,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                                     repeatCount = cell.repeatCount,
                                     styleName = cell.styleName,
                                     boxStyle = cell.boxStyle,
+                                    sourceCellOrdinal = cell.sourceCellOrdinal,
                                     paragraphs = cell.paragraphs.map { cellPara ->
                                         val cellBookmarks = cellPara.bookmarks.filter { it.isNotBlank() }
                                         allBookmarkNames.addAll(cellBookmarks)

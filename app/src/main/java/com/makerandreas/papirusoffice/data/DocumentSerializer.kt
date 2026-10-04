@@ -262,18 +262,22 @@ private fun OfficeTable.toParsedTable(): OfficeDocumentElement.Table = OfficeDoc
                     occupancy = cell.occupancy,
                     repeatCount = cell.repeatCount,
                     styleName = cell.styleName,
-                    boxStyle = cell.boxStyle
+                    boxStyle = cell.boxStyle,
+                    sourceCellOrdinal = cell.sourceCellOrdinal
                 )
             },
             styleName = row.styleName,
             isHeader = row.isHeader,
             repeatCount = row.repeatCount,
-            rowStyle = row.rowStyle
+            rowStyle = row.rowStyle,
+            sourceRowOrdinal = row.sourceRowOrdinal
         )
     },
     numColumns = numColumns,
     name = name,
     columns = columns,
-    styleName = styleName
+    styleName = styleName,
+    tableWidth = tableWidth,
+    diagnostics = diagnostics
 )
 

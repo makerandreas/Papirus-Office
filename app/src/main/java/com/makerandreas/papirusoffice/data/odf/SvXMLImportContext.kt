@@ -2,7 +2,11 @@ package com.makerandreas.papirusoffice.data.odf
 import java.util.Locale
 
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
+import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
 import com.makerandreas.papirusoffice.data.TableCell
+import com.makerandreas.papirusoffice.data.TableCellOccupancy
+import com.makerandreas.papirusoffice.data.TableDiagnostic
+import com.makerandreas.papirusoffice.data.TableDiagnosticCode
 import com.makerandreas.papirusoffice.data.TableRow
 import com.makerandreas.papirusoffice.data.TextRun
 import java.io.File
@@ -929,8 +933,29 @@ class OdfListItemParagraphContext(
     }
 }
 
+/** Parse a positive ODF repeat count without silently dropping declarations. */
+private fun parseTableRepeat(raw: String?, onInvalid: (String) -> Unit): Int {
+    if (raw.isNullOrBlank()) return 1
+    val parsed = raw.trim().toLongOrNull()
+    return when {
+        parsed == null || parsed <= 0L -> {
+            onInvalid("Invalid table repeat count '$raw'; using 1")
+            1
+        }
+        parsed > Int.MAX_VALUE.toLong() -> {
+            onInvalid("Table repeat count '$raw' exceeds the model range; using Int.MAX_VALUE")
+            Int.MAX_VALUE
+        }
+        else -> parsed.toInt()
+    }
+}
+
 /**
  * Context for <table:table>.
+ *
+ * Rows, cells and columns stay compact here. The repeat counts are source
+ * declarations; TableGridResolver expands them later without duplicating the
+ * source text or losing provenance.
  */
 class OdfTableContext(
     importFilter: SvXMLImport,
@@ -939,41 +964,138 @@ class OdfTableContext(
 ) : SvXMLImportContext(importFilter, token) {
 
     val tableName: String = attributes["table:name"] ?: attributes["name"] ?: ""
+    val styleName: String? = (attributes["table:style-name"] ?: attributes["style-name"])
+        ?.takeIf { it.isNotBlank() }
     val rows = mutableListOf<TableRow>()
+    val columns = mutableListOf<OfficeTableColumnSpec>()
+    val diagnostics = mutableListOf<TableDiagnostic>()
+
+    fun addDiagnostic(
+        code: TableDiagnosticCode,
+        message: String,
+        sourceRowOrdinal: Int? = null,
+        sourceCellOrdinal: Int? = null
+    ) {
+        diagnostics += TableDiagnostic(code, message, sourceRowOrdinal, sourceCellOrdinal)
+    }
+
+    fun addColumn(column: OfficeTableColumnSpec) {
+        columns += column.copy(sourceColumnOrdinal = columns.size)
+    }
+
+    fun addRow(row: TableRow) {
+        rows += row.copy(sourceRowOrdinal = rows.size)
+    }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
-            OdfXmlToken.XML_TABLE_ROW, OdfXmlToken.XML_TABLE_HEADER_ROWS -> {
-                OdfTableRowContext(importFilter, token, attributes, this)
-            }
+            OdfXmlToken.XML_TABLE_COLUMN -> OdfTableColumnContext(importFilter, token, attributes, this)
+            OdfXmlToken.XML_TABLE_ROW -> OdfTableRowContext(importFilter, token, attributes, this, isHeader = false)
+            OdfXmlToken.XML_TABLE_HEADER_ROWS -> OdfTableHeaderRowsContext(importFilter, token, this)
             else -> super.createChildContext(token, attributes)
         }
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        if (rows.isNotEmpty()) {
-            val maxCols = rows.maxOfOrNull { it.cells.size } ?: 0
-            val tableElement = OfficeDocumentElement.Table(
-                rows = rows.toList(),
-                numColumns = maxCols,
-                name = tableName.ifBlank { null }
-            )
+        val declaredColumns = columns.sumOf { it.repeatCount.toLong() }
+            .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        val rowColumns = rows.maxOfOrNull { row ->
+            row.cells.sumOf { it.repeatCount.toLong() }
+                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        } ?: 0
+        val tableElement = OfficeDocumentElement.Table(
+            rows = rows.toList(),
+            numColumns = maxOf(declaredColumns, rowColumns),
+            name = tableName.ifBlank { null },
+            columns = columns.toList(),
+            styleName = styleName,
+            tableWidth = importFilter.resolveTableWidth(styleName),
+            diagnostics = diagnostics.toList()
+        )
+        // A declared empty table is still a table. This also keeps source
+        // diagnostics visible to the later geometry stage.
+        if (rows.isNotEmpty() || columns.isNotEmpty() || styleName != null) {
             importFilter.addElement(tableElement)
         }
     }
 }
 
-/**
- * Context for <table:table-row>.
- */
+/** Context for one compact <table:table-column> declaration. */
+class OdfTableColumnContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken,
+    private val attributes: Map<String, String>,
+    private val parentTableContext: OdfTableContext
+) : SvXMLImportContext(importFilter, token) {
+    override fun onEndElement(token: OdfXmlToken) {
+        val styleName = (attributes["table:style-name"] ?: attributes["style-name"])
+            ?.takeIf { it.isNotBlank() }
+        val repeatCount = parseTableRepeat(
+            attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
+        ) { message ->
+            parentTableContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
+        }
+        val directWidth = com.makerandreas.papirusoffice.data.util.OdfLength.toLayoutUnits(
+            attributes["style:column-width"] ?: attributes["column-width"], fallback = -1f
+        ).takeIf { it >= 0f && it.isFinite() }
+        val width = if (directWidth != null) {
+            com.makerandreas.papirusoffice.data.TableColumnWidthSpec(
+                com.makerandreas.papirusoffice.data.TableColumnWidthKind.ABSOLUTE,
+                directWidth
+            )
+        } else {
+            importFilter.resolveTableColumnWidth(styleName)
+        }
+        val defaultCellStyleName = attributes["table:default-cell-style-name"]
+            ?: attributes["default-cell-style-name"]
+            ?: importFilter.resolveTableDefaultCellStyle(styleName)
+        parentTableContext.addColumn(
+            OfficeTableColumnSpec(
+                styleName = styleName,
+                width = width,
+                repeatCount = repeatCount,
+                defaultCellStyleName = defaultCellStyleName
+            )
+        )
+    }
+}
+
+/** ODF header rows are a wrapper, not a row. */
+class OdfTableHeaderRowsContext(
+    importFilter: SvXMLImport,
+    token: OdfXmlToken,
+    private val parentTableContext: OdfTableContext
+) : SvXMLImportContext(importFilter, token) {
+    override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
+        return when (token) {
+            OdfXmlToken.XML_TABLE_ROW -> OdfTableRowContext(
+                importFilter, token, attributes, parentTableContext, isHeader = true
+            )
+            else -> super.createChildContext(token, attributes)
+        }
+    }
+}
+
+/** Context for <table:table-row>. */
 class OdfTableRowContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
     private val attributes: Map<String, String> = emptyMap(),
-    private val parentTableContext: OdfTableContext
+    private val parentTableContext: OdfTableContext,
+    private val isHeader: Boolean
 ) : SvXMLImportContext(importFilter, token) {
 
     val cells = mutableListOf<TableCell>()
+    private val styleName: String? = (attributes["table:style-name"] ?: attributes["style-name"])
+        ?.takeIf { it.isNotBlank() }
+
+    fun addCell(cell: TableCell) {
+        cells += cell.copy(sourceCellOrdinal = cells.size)
+    }
+
+    fun addDiagnostic(code: TableDiagnosticCode, message: String) {
+        parentTableContext.addDiagnostic(code, message)
+    }
 
     override fun createChildContext(token: OdfXmlToken, attributes: Map<String, String>): SvXMLImportContext {
         return when (token) {
@@ -985,21 +1107,24 @@ class OdfTableRowContext(
     }
 
     override fun onEndElement(token: OdfXmlToken) {
-        if (cells.isNotEmpty()) {
-            val repeatStr = attributes["table:number-rows-repeated"] ?: attributes["number-rows-repeated"]
-            val repeatCount = (repeatStr?.toIntOrNull() ?: 1).coerceIn(1, 64)
-            val row = TableRow(cells = cells.toList())
-            for (i in 0 until repeatCount) {
-                // Copy per repeat: sharing one instance would alias mutations across rows.
-                parentTableContext.rows.add(if (i == 0) row else row.copy())
-            }
+        val repeatCount = parseTableRepeat(
+            attributes["table:number-rows-repeated"] ?: attributes["number-rows-repeated"]
+        ) { message ->
+            parentTableContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
         }
+        parentTableContext.addRow(
+            TableRow(
+                cells = cells.toList(),
+                styleName = styleName,
+                isHeader = isHeader,
+                repeatCount = repeatCount,
+                rowStyle = importFilter.resolveTableRowStyle(styleName)
+            )
+        )
     }
 }
 
-/**
- * Context for <table:table-cell>.
- */
+/** Context for <table:table-cell> and <table:covered-table-cell>. */
 class OdfTableCellContext(
     importFilter: SvXMLImport,
     token: OdfXmlToken,
@@ -1009,6 +1134,7 @@ class OdfTableCellContext(
 
     private val textBuilder = StringBuilder()
     private val cellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
+    private val covered = token == OdfXmlToken.XML_COVERED_TABLE_CELL
 
     override fun onCharacters(text: String) {
         textBuilder.append(text)
@@ -1033,30 +1159,71 @@ class OdfTableCellContext(
         var rawText = textBuilder.toString().trim()
         if (rawText.isEmpty()) {
             val officeVal = attributes["office:value"] ?: attributes["office:date-value"] ?: attributes["office:boolean-value"]
-            if (!officeVal.isNullOrBlank()) {
-                rawText = officeVal
-            }
+            if (!officeVal.isNullOrBlank()) rawText = officeVal
         }
-        val repeatStr = attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
-        val repeatCount = repeatStr?.toIntOrNull() ?: 1
-
+        if (covered && (rawText.isNotEmpty() || cellParagraphs.isNotEmpty())) {
+            parentRowContext.addDiagnostic(
+                TableDiagnosticCode.UNSUPPORTED_DECLARATION,
+                "Covered table cell content was ignored to preserve the anchor text"
+            )
+            rawText = ""
+            cellParagraphs.clear()
+        }
+        val repeatCount = parseTableRepeat(
+            attributes["table:number-columns-repeated"] ?: attributes["number-columns-repeated"]
+        ) { message ->
+            parentRowContext.addDiagnostic(TableDiagnosticCode.INVALID_REPEAT, message)
+        }
+        val columnSpan = parseTableSpan(
+            attributes["table:number-columns-spanned"] ?: attributes["number-columns-spanned"],
+            "column",
+            parentRowContext
+        )
+        val rowSpan = parseTableSpan(
+            attributes["table:number-rows-spanned"] ?: attributes["number-rows-spanned"],
+            "row",
+            parentRowContext
+        )
+        val styleName = (attributes["table:style-name"] ?: attributes["style-name"])
+            ?.takeIf { it.isNotBlank() }
         val cell = TableCell(
             text = rawText,
-            paragraphs = if (cellParagraphs.isNotEmpty()) cellParagraphs.toList() else if (rawText.isNotEmpty()) listOf(OfficeDocumentElement.Paragraph(text = rawText)) else emptyList()
+            paragraphs = if (cellParagraphs.isNotEmpty()) {
+                cellParagraphs.toList()
+            } else if (rawText.isNotEmpty() && !covered) {
+                listOf(OfficeDocumentElement.Paragraph(text = rawText))
+            } else {
+                emptyList()
+            },
+            columnSpan = columnSpan,
+            rowSpan = rowSpan,
+            occupancy = if (covered) TableCellOccupancy.COVERED else TableCellOccupancy.ORIGIN,
+            repeatCount = repeatCount,
+            styleName = styleName,
+            boxStyle = importFilter.resolveTableCellBoxStyle(styleName)
         )
+        parentRowContext.addCell(cell)
+    }
 
-        if (rawText.isNotEmpty()) {
-            val count = repeatCount.coerceIn(1, 256)
-            for (i in 0 until count) {
-                // Copy per repeat: sharing one instance would alias mutations across cells.
-                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
+    private fun parseTableSpan(raw: String?, axis: String, row: OdfTableRowContext): Int {
+        if (raw.isNullOrBlank()) return 1
+        val parsed = raw.trim().toLongOrNull()
+        return when {
+            parsed == null || parsed <= 0L -> {
+                row.addDiagnostic(
+                    TableDiagnosticCode.INVALID_SPAN,
+                    "Invalid $axis span '$raw'; using 1"
+                )
+                1
             }
-        } else {
-            // For empty cells, only replicate if small (<= 16), otherwise avoid explosive empty columns in ODS
-            val count = repeatCount.coerceIn(1, 16)
-            for (i in 0 until count) {
-                parentRowContext.cells.add(if (i == 0) cell else cell.copy())
+            parsed > Int.MAX_VALUE.toLong() -> {
+                row.addDiagnostic(
+                    TableDiagnosticCode.INVALID_SPAN,
+                    "$axis span '$raw' exceeds the model range; using Int.MAX_VALUE"
+                )
+                Int.MAX_VALUE
             }
+            else -> parsed.toInt()
         }
     }
 }
