@@ -165,3 +165,10 @@ class SwNodes {
         return copy
     }
 }
+
+class SwDoc(
+    val nodes: SwNodes = SwNodes(),
+    val documentTitle: String = "Untitled",
+    val undoManager: com.makerandreas.papirusoffice.data.writer.UndoManager = com.makerandreas.papirusoffice.data.writer.UndoManager()
+)
+

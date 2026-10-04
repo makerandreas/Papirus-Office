@@ -228,11 +228,9 @@ class DocumentMediaStoreTest {
     }
 
     private fun fixture(name: String): File {
-        var root: File? = File(".").absoluteFile
-        while (root != null && !File(root, ".git").exists()) root = root.parentFile
-        return File(root ?: File("."), "tests/inky/$name").also {
-            assertTrue("Missing fixture ${it.absolutePath}", it.isFile)
-        }
+        val file = SampleMatrix.findTestFile(name)
+        assertTrue("Missing fixture ${file.absolutePath}", file.isFile)
+        return file
     }
 
     private fun bytes(value: String) = value.toByteArray(Charsets.UTF_8)

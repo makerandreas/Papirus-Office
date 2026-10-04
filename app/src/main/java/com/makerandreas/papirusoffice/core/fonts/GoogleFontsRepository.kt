@@ -11,6 +11,22 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
 
+data class GoogleFontsResponse(val items: List<GoogleFontMetadata> = emptyList())
+
+data class GoogleFontMetadata(
+    val family: String = "",
+    val category: String = "sans-serif",
+    val variants: List<String> = emptyList(),
+    val files: Map<String, String>? = null
+)
+
+data class DownloadableFont(
+    val family: String,
+    val variant: String,
+    val url: String,
+    val category: String
+)
+
 class GoogleFontsRepository(private val context: Context) {
     private val TAG = "GoogleFontsRepository"
     private val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
@@ -91,4 +107,3 @@ class GoogleFontsRepository(private val context: Context) {
         return downloadables
     }
 }
-

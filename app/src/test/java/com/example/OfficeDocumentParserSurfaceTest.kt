@@ -41,7 +41,7 @@ class OfficeDocumentParserSurfaceTest {
     private fun repoRoot(): File {
         var f: File? = File(".").absoluteFile
         while (f != null) {
-            if (File(f, ".git").exists()) return f
+            if (File(f, "settings.gradle.kts").exists() || File(f, ".git").exists()) return f
             f = f.parentFile
         }
         return File(".").absoluteFile
