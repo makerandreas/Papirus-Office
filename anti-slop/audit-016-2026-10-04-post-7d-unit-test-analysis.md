@@ -226,7 +226,7 @@ Commit 2 is where a table-height regression would show up if the resolution chan
 
 1. **D1, the refactor.** Confirm option A (revert plus re-apply) or state which of its changes are wanted on their own.
 2. **D2, 7E shape.** Confirm the split of §5.2 (7E fonts and calibration, 7F tab stops and hidden sections), or keep one plan.
-3. **D3, save capability.** Block modified saves that would drop font-face declarations (recommended, no fixture changes), or leave it and record the loss until Plan 9.
+3. **D3, save capability.** Block modified saves that would drop font-face declarations (recommended, no fixture changes), or leave it and record the loss until Plan 9. **Superseded 2026-10-04:** the owner deferred this to Plan 9, which owns writer regeneration; the loss (a regenerated `content.xml` would drop the declaration table) is recorded in `audit-017` section 12 rather than blocked.
 4. **D4, sequence.** Repair first and then implement 7E in this session, or stop at the repair and plan 7E in a later session.
 5. **D5, AGENTS.md.** Approve the added local-toolchain note recording that the sandbox can reach PyPI and GitHub only, that `jdk4py` ships a JRE without `javac`, and that CI stays the compile/test evidence path.
 

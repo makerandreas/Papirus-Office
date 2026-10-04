@@ -40,7 +40,7 @@ Papirus currently uses its Kotlin document engine for office-document parsing, e
 ### A. The Papirus Engine (`com.makerandreas.papirusoffice.data`)
 A pure Kotlin and Jetpack Compose document engine that directly parses document structures and renders them dynamically in Compose canvas and layout components:
 - **`OfficeDocumentParser` & `DocxDocumentParser`**: Unpacks ZIP packages (`content.xml`, `styles.xml`, `document.xml`, `xl/worksheets/`, `ppt/slides/`), parses XML nodes, extracts inline images, metadata, and styles.
-  - **ODF Processing (`SvXMLImport`, `SvXMLImportContext`, `OdfXmlToken`)**: Context-driven parser paths exist for text documents (`.odt`), spreadsheets (`.ods`) and presentations (`.odp`); coverage is partial and continues to be measured against real sample files and ODF 1.4.
+  - **ODF Processing (`SvXMLImport`, `SvXMLImportContext`, `OdfXmlToken`)**: Context-driven parser paths exist for text documents (`.odt`), spreadsheets (`.ods`) and presentations (`.odp`); coverage is partial and continues to be measured against real sample files and ODF 1.4. For `.odt`, `office:font-face-decls` is read from both `styles.xml` and `content.xml` into `DocumentStyles.fontFaces`, and a `style:font-name` alias is resolved to its declared family before `FontRegistry` substitution (PR #31), so measurement and display share one resolved family.
   - **OpenXML / OOXML Processing**:
     - `.docx`: WordprocessingML parser paths cover selected paragraphs, runs, headings, tables and styles; advanced style resolution, numbering, fields and section behavior remain fidelity work.
     - `.xlsx`: SpreadsheetML paths include shared strings, workbook sheets, cell references and selected table content; feature coverage is not complete.

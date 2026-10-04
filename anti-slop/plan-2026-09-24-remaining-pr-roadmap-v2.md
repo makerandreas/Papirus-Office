@@ -334,20 +334,34 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Scope guard:** table creation, insertion, editing, merge/split controls and native LibreOffice rendering remain out of Plan 7D. DOCX table parsing, font aliases and hidden-section pagination remain with their assigned plans. The compatibility renderer is retained only for externally supplied pre-geometry layouts; normal document layout uses `TableFragmentGeometry` from the paginator.
 
-### 4.7d PR #30, Plan 7E: ODF font-face aliases and final pagination calibration
+### 4.7d PR #31, Plan 7E: ODF font-face aliases and final pagination calibration
 
 **Goal:** resolve the document's declared font identities through one metrics/display path, then measure the complete ODT structure.
+
+**Status (v2.8, 2026-10-04).** PR #30 is the post-7D repair merge, so the slot 7E held in earlier revisions moves from #30 to **#31** and every later slot shifts by one. The first build of 7E was written in a sandbox whose four commits never reached a ref (audit-017 section 1); the change set was rebuilt from this section and is delivered in PR #31 as three commits: the declaration reader, the resolver plus wiring, and the calibration and records commit. Two owner decisions taken with the rebuild: items 5 and 6 are split out to Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`), and the modified-save refusal tied to font-face declarations (decision D3 in audit-016) is deferred to Plan 9, which owns writer regeneration; the resulting loss is recorded in audit-017 section 12.
 
 1. **G-6 declarations.** Parse `office:font-face-decls` from `content.xml` and `styles.xml`, including `style:name`, `svg:font-family`, generic family, pitch, and charset into `DocumentStyles.fontFaces`.
 2. Resolve style alias -> declared family -> `FontRegistry` substitution. Metrics and renderer must receive the same final family; no renderer-only alias map.
 3. Cover Times New Roman/Liberation Serif and the fixture corpus's generated aliases without confusing style alias names with actual family names.
 4. Re-run the full six-ODT element dump/page matrix after 7C/7D are load-bearing. Explain every shift, tighten only with evidence, and record the final windows before 8A starts.
-5. **Tab stops and leaders (moved from 7C on 2026-10-04).** Parse ODF `style:tab-stops` (position, type, `style:leader-style`, `style:leader-text`) in the paragraph style chain, lay out tabs against them in `TextMetrics`, and paint leaders. TOC entries in Samples 2/4/5/6 are the first consumers: entry text, dot leader, right-aligned page label.
-6. **Hidden-section rendering (added 2026-10-04).** Plan 7C lists `text:display="none"` sections and keeps jumps out of them, but the paginator still lays out their content. Exclude hidden ranges from layout here, because hiding them changes pagination, and do it before the final matrix in item 4.
+5. **Tab stops and leaders (moved from 7C on 2026-10-04; split out to Plan 7F on 2026-10-04).** Parse ODF `style:tab-stops` (position, type, `style:leader-style`, `style:leader-text`) in the paragraph style chain, lay out tabs against them in `TextMetrics`, and paint leaders. TOC entries in Samples 2/4/5/6 are the first consumers: entry text, dot leader, right-aligned page label. Positions and alignment already ship; `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md` owns the leader field and the painting.
+6. **Hidden-section rendering (added 2026-10-04; split out to Plan 7F on 2026-10-04).** Plan 7C lists `text:display="none"` sections and keeps jumps out of them, but the paginator still lays out their content. Exclude hidden ranges from layout. No fixture contains one, so the item cannot move the matrix and its tests are synthetic.
 
-**Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages; tab-stop positions and leader painting for the TOC entries; hidden-section content absent from layout.
+**Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages. The tab-stop, leader and hidden-section tests named in earlier revisions belong to Plan 7F and are listed there.
 
-### 4.8 PR #31, Plan 8A: DOCX style chain + run formatting
+**Implementation record (branch `arena/01a1077a-papirus-office`, 2026-10-04).** Three commits on top of `9356212`, after the lost build was rebuilt from source:
+
+| Commit | Content | Tests added |
+|---|---|---|
+| `784e9d3` | `office:font-face-decls` read from `styles.xml` and `content.xml` into `DocumentStyles.fontFaces`, keyed by `style:name`, raw `svg:font-family` kept for the resolver; first declaration of an alias wins; blank name or blank family skipped | `Plan7eFontFaceImportTest` (4) |
+| `c363ce3` | `FontFaceResolver` plus one `resolveFontFamily` helper in both text-properties readers, so the resolved family is the single input to `TextMetrics.forStyle` and `OfficeRuns.fontFamilyFor` | `Plan7eFontResolutionTest` (8) |
+| records | this section, `plan-01` row 7, sections 4.7d/4.8 to 4.12 here, plan-04's Plan 7 record, `plan-5e-progress.md`, `PROJECT_CONTEXT.md`, `audit-017` and the new 7F document | none |
+
+CI run `37213135047` (fresh PR merge ref `3914079`; it measured the pre-fix head `28a37fb`, and commit 2 in the table is `c363ce3` after the expectation fix) compiled the new code on the first try: **342 tests across 63 suites, 1 failure**, and the Build job green. The failure was the resolution test's own expectation for `FontChoice.requested`, which after resolution is the declared family rather than the alias; the expectation was corrected to assert both values (resolved path gives `Times New Roman`, the raw path keeps `Times New Roman1`). Every other 7E assertion passed, including the fixture inventories and all six alias decisions.
+
+**Calibration, measured.** The page matrix in that run is identical to the PR #30 baseline in every cell: ODT `14/23/21/10/18/20` and DOCX `15/25/25/11/19/24`, with the same thin-page and empty-page columns. No window moved and none widened. The one observable change is the resolution itself, visible in the same dump: Sample-6.odt's body style reads `12.0 pt (Aptos) line factor 1.00` where the baseline read `(Aptos1)`, and the string `Aptos1` occurs **0** times in the new dump against **1** time in the PR #30 dump. `Aptos` resolves to the Martel Sans stand-in (`BUNDLED_STAND_IN`, `metricCompatible = false`), and the identical page count confirms the earlier static prediction that the two advance tables do not cross a page boundary in this file. Decision D3 (save refusal) is deferred to Plan 9 by the owner; until then a regenerated `content.xml` would drop the declaration table, and that loss is recorded rather than blocked. `OdtDocumentWriter.saveCapability` and every writer path are untouched by this PR.
+
+### 4.8 PR #32, Plan 8A: DOCX style chain + run formatting
 
 Closes H-1, H-2, F-16, F-20, the DOCX half of F-10.
 
@@ -361,7 +375,7 @@ Closes H-1, H-2, F-16, F-20, the DOCX half of F-10.
 **Acceptance:** heading/body sizes and fonts come from the file in every sample; no run-flag leak; Sample-3 control green.
 **Size:** large.
 
-### 4.9 PR #32, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
+### 4.9 PR #33, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
 
 Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F-26, F-27, F-28 tail, O-03, O-02 remaining.
 
@@ -377,16 +391,16 @@ Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F
 **Acceptance:** Sample-6.docx fidelity checklist; Sample-6's two formats (the one metric-identical pair, audit-007 §1) converge on the same page window, the other pairs hold their per-format windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of the audit-007 §1 references, never below).
 **Size:** large.
 
-### 4.10 PR #33, Plan 9: save round-trip integrity (pre-change gate first)
+### 4.10 PR #34, Plan 9: save round-trip integrity (pre-change gate first)
 
 Closes O-01, the non-destructive-package rule, plan-03 3.13, 3.19, 3.20, 3.26, 3.27, and retires F-2 (`OfficeDocElement`).
 
-Scheduled **after** Plans 6, 7E and 8B land (**forecast PR slot #33** per the 2026-10-03 split), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
+Scheduled **after** Plans 6, 7E and 8B land (**forecast PR slot #34** after the 2026-10-04 shift), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
 **Acceptance:** open → save → reopen preserves text, styles, numbering, tables, images, TOC for Sample-6 in both formats, verified by a CI round-trip test. **Scope is firmed by a short plan document before this PR starts; do not start it from this paragraph alone.**
 
 ### 4.11 Plan 10: stays parked
 
-Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after Plan 8B (forecast #32) converges both formats and the user re-confirms** (forecast slots #34-#35 after the 2026-10-03 split) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
+Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after Plan 8B (forecast #33) converges both formats and the user re-confirms** (forecast slots #35-#36 after the 2026-10-04 shift) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
 
 ### 4.12 Plan 1: master index updates (living document, per PR)
 
@@ -404,6 +418,16 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 18 | 2026-09-27 | row 5 → "5D landed" | § Plan 5 got the 5D breaks and defaults record (audit-010) |
 | 19 | 2026-09-28 | row 5 → "5A to 5E landed" | § Plan 5 got the 5E record; `plan-5e-progress.md` carries the batch-by-batch evidence |
 
+**Landed 2026-10-02 to 2026-10-04** (Plan 1's two documentation PRs #20/#21 and the four Plan 6 increments #22 to #25 are recorded in the forward-schedule paragraph above):
+
+| PR | Merged | plan-01 registry change (§2) | plan file line |
+|---|---|---|---|
+| 26 | 2026-10-02 | row 7 → "7A landed" | Plan 7 got the 7A record (G-1/G-3/G-4/G-4b); Plan 12A got the LOKit seam record (`audit-013`) |
+| 27 | 2026-10-03 | row 7 → "7B landed" | Plan 7 G-0 implementation record; `audit-014` |
+| 28 | 2026-10-04 | row 7 → "7C landed" | Plan 7 G-2/G-7 record; `audit-015` section 9 |
+| 29 | 2026-10-04 | row 7 → "7D landed" | Plan 7 G-5 implementation record |
+| 30 | 2026-10-04 | row 7 → "7D regression repaired on `main`" | `audit-016` (post-7D unit-test analysis) and `audit-017` (recovery state, forecast shift) |
+
 **Forward schedule, updated 2026-09-30 (Plan 6 complete).** Plan 1's documentation PRs took #20 and #21. Plan 6 then took four PRs instead of the one slot v1 predicted: **#22 (6A, image extents and fail-safe image saves, run `36578390234`, 252 unit tests), #23 (6B, durable media storage and recovery, runs `36587725933`/`36588655662`, 260 unit tests), #24 (6C, decode presentation and real loading progress, run `36708650093`, 275 unit tests), and #25 (6D, closeout gate: dead `DocxDocumentParser` plumbing deleted, `LayoutEngine` unified on `DocumentImages.box`, `PaginationImageTest` added, per-suite JUnit timings and `Plan6cLoadingProgressTest` stdout added to the CI PR comment, 276 unit tests across 48 suites in run `36730234004`)**. Local Java remains unavailable in the sandbox, so every number below comes from a GitHub Actions run. Plan IDs remain authoritative; the PR slots below are the reforecast promised when Plan 6 was split, and they are expectations, not reservations.
 
 | Plan | PR slot | plan-01 registry change | plan file line |
@@ -417,15 +441,16 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
 | 7A | **#26 landed** | row 7 -> "7A landed" | Plan 7 records G-1/G-3/G-4/G-4b |
-| 7B | **#27** | row 7 -> "7B importer/model convergence" | Plan 7 G-0 implementation record + `audit-014` |
-| 7C | **#28** | row 7 -> "7C indexes/sections landed" | Plan 7 records G-2/G-7 and navigation/status |
-| 7D | **#29** | row 7 -> "7D tables landed" | Plan 7 records G-5 end to end |
-| 7E | **#30** | row 7 -> "Plan 7 complete" | Plan 7 records G-6 aliases and final ODT matrix |
-| 8A | **#31** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
-| 8B | **#32** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
-| 9 | **#33** | row 9 -> landed | Plan 9 structural round-trip record |
-| 10 resume | **#34-#35** | row 10 status change when it starts | plan-10 head note |
-| 11 packages | **#36-#40** | row 11 status change per package | plan-11 §5 |
+| 7B | **#27 landed** | row 7 -> "7B importer/model convergence" | Plan 7 G-0 implementation record + `audit-014` |
+| 7C | **#28 landed** | row 7 -> "7C indexes/sections landed" | Plan 7 records G-2/G-7 and navigation/status |
+| 7D | **#29 landed** | row 7 -> "7D tables landed" | Plan 7 records G-5 end to end |
+| repair | **#30 landed** | row 7 gets the regression and repair note | `audit-016` post-7D analysis, `audit-017` recovery state |
+| 7E | **#31 (this PR)** | row 7 -> "Plan 7 complete" | Plan 7 records G-6 aliases and the final ODT matrix |
+| 8A | **#32** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
+| 8B | **#33** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
+| 9 | **#34** | row 9 -> landed | Plan 9 structural round-trip record |
+| 10 resume | **#35-#36** | row 10 status change when it starts | plan-10 head note |
+| 11 packages | **#37-#41** | row 11 status change per package | plan-11 §5 |
 
 Plan IDs remain authoritative and slots are forecasts. Plan 12B/12C stay after Plan 9.
 
@@ -448,11 +473,11 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 | 1 | 7B (canonical model/import convergence) | **#27** | research only | runtime/facade parity; save capability closed |
 | 2 | 7C (indexes/sections/navigation/status) | **#28** | research only | sidecars populated and navigable |
 | 3 | 7D (tables end to end) | **#29** | research only | shared geometry through cell hit-testing |
-| 4 | 7E (font aliases/calibration) | **#30** | research only | metrics/display parity; final ODT matrix |
-| 5 | 8A (DOCX style chain/runs) | **#31** | none | DOCX style chain green |
-| 6 | 8B (DOCX numbering/fields/tables/sections) | **#32** | none | both-format convergence |
-| 7 | 9 (save round trip) | **#33** | Plan 10 resume decision | structural round-trip CI matrix |
-| 8 | 10 and 11 packages | **#34-#40** | per package | per-package gate in plan-11 §5 |
+| 4 | 7E (font aliases/calibration) | **#31** | research only | metrics/display parity; final ODT matrix |
+| 5 | 8A (DOCX style chain/runs) | **#32** | none | DOCX style chain green |
+| 6 | 8B (DOCX numbering/fields/tables/sections) | **#33** | none | both-format convergence |
+| 7 | 9 (save round trip) | **#34** | Plan 10 resume decision | structural round-trip CI matrix |
+| 8 | 10 and 11 packages | **#35-#41** | per package | per-package gate in plan-11 §5 |
 | 9 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
 
 **Device checklist resume points** (`docs/InkyC1Checklist.md`, deliberately postponed; section order = item number):
@@ -492,6 +517,8 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 
 18. **v2.6 (2026-10-03):** the old combined 7B package and its downstream PR forecast are superseded by 7B canonical/import convergence, 7C indexes/sections/navigation/status, 7D tables end to end, and 7E font declarations/aliases/calibration. The ODT matrix was re-read from the current ZIPs: Sample-6 has no `text:section`, list-style definitions are in `styles.xml`, and current list/heading/soft-break counts replace the pre-regeneration rows. `audit-014` records the implementation boundary.
 19. **v2.7 (2026-10-04, audit-015):** Plan 7C is implemented as one PR in four commits. Tab stops and leaders move from 7C to 7E (§4.7d item 5), and hidden-section rendering is added to 7E (§4.7d item 6). The strings sweep is Plan 3D in its own file. No forecast PR slot moves, because 3D is scheduled when the owner picks a slot.
+
+20. **v2.8 (2026-10-04, audit-016 and audit-017):** the post-7D refactor regression (`cb89460`) and its repair are recorded; PR #30 is the repair merge `9356212`, so the forecast from 7E onward shifts by one: 7E `#31`, 8A `#32`, 8B `#33`, Plan 9 `#34`, Plan 10 `#35`-`#36`, Plan 11 `#37`-`#41`. Plan 7E is delivered as PR #31; its first two commits compiled in CI run `37213135047` (342 tests, one corrected expectation, Build green) and the calibration is measured: the twelve-file page matrix is unchanged from PR #30, with Sample-6.odt's dump line moving from `(Aptos1)` to `(Aptos)` and no `Aptos1` left in the dump. Items 5 and 6 leave 7E for the new Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`), and decision D3 (save refusal for declared font faces) is deferred to Plan 9. Every earlier line that names a 7E slot of `#30` is superseded on that point only.
 
 ---
 
