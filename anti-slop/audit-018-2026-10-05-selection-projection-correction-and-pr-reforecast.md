@@ -61,6 +61,12 @@ Plan IDs remain authoritative; #32 is now an actual open PR, while #33 onward ar
 
 ---
 
+## 7. Merge closeout (2026-10-05)
+
+PR #32 was subsequently merged as `466240e99aa30f24d016b800279d6a625d72454d`. Its PR-head run `37259378329` passed 350 tests across 64 suites and the merge workflow `37259905276` passed both Unit Tests and Build (SemVer & Nightly). The open/unmerged statements above describe the audit snapshot before merge and are retained as historical facts. The current forward sequence remains Plan 7F at forecast #33, then 8A #34 and onward.
+
+---
+
 ## 6. Synchronized planning references
 
 The current sequence and scope are synchronized in:
