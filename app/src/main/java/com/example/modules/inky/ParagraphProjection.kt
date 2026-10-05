@@ -53,8 +53,11 @@ internal class ParagraphProjection(
                 when (char) {
                     '\r', '\n', '\u00ad' -> Unit
                     '\t' -> {
-                        val tabStart = out.length
-                        append('\u00a0', source)
+                        val leader = line.tabLeaders.firstOrNull { it.sourceOffset == source }
+                        val leaderStart = out.length
+                        leader?.renderedText?.forEach { append(it, source) }
+                        val leaderEnd = out.length
+
                         val caret = line.caretOffsets.indexOf(source)
                         val advance = if (caret >= 0 && caret + 1 < line.caretAdvances.size)
                             line.caretAdvances[caret + 1] - line.caretAdvances[caret] else 0f
@@ -65,9 +68,20 @@ internal class ParagraphProjection(
                             hit
                         }
                         val resolved = run?.let { OfficeRuns.mergeRun(it, base, styles) } ?: base
+                        if (leader != null && leaderStart < leaderEnd) {
+                            val measuredLeaderWidth = TextMetrics.forStyle(resolved)
+                                .widthOf(leader.renderedText).coerceAtLeast(0.01f)
+                            out.addStyle(SpanStyle(textGeometricTransform = TextGeometricTransform(
+                                scaleX = (leader.widthUnits / measuredLeaderWidth).coerceAtLeast(0.001f))),
+                                leaderStart, leaderEnd)
+                        }
+
+                        val tabStart = out.length
+                        append('\u00a0', source)
+                        val remainingAdvance = (advance - (leader?.widthUnits ?: 0f)).coerceAtLeast(0f)
                         val spaceWidth = TextMetrics.forStyle(resolved).widthOf(" ").coerceAtLeast(0.01f)
                         out.addStyle(SpanStyle(textGeometricTransform = TextGeometricTransform(
-                            scaleX = (advance / spaceWidth).coerceAtLeast(0.001f))), tabStart, out.length)
+                            scaleX = (remainingAdvance / spaceWidth).coerceAtLeast(0.001f))), tabStart, out.length)
                     }
                     else -> append(char, source)
                 }

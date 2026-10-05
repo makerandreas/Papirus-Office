@@ -10,6 +10,7 @@ internal class ParagraphMeasurer(
     private val hyphenator: HyphenationEngine?
 ) {
     private data class Glyph(val start: Int, val end: Int, val text: String, val metrics: TextMetrics)
+    private data class ResolvedTabAdvance(val width: Float, val stop: ParagraphTabStop?)
 
     fun measure(index: Int, paragraph: OfficeParagraph, style: ParagraphStyle,
                 styles: DocumentStyles, width: Float): ParagraphLayout {
@@ -54,7 +55,7 @@ internal class ParagraphMeasurer(
         }
         fun hard(g: Glyph) = g.text == "\n" || g.text == "\r\n" || g.text == "\r"
         fun widthOf(g: Glyph): Float = if (hard(g) || g.text == "\u00ad") 0f else g.metrics.widthOf(g.text)
-        fun tabAdvance(glyphIndex: Int, x: Float): Float {
+        fun tabAdvance(glyphIndex: Int, x: Float): ResolvedTabAdvance {
             val interval = style.defaultTabIntervalUnits.takeIf { it.isFinite() && it > 0f } ?: 48f
             val sorted = style.tabStops.sortedBy { it.positionUnits }
             val stop = sorted.firstOrNull { it.positionUnits > x + 0.001f && it.alignment != TabAlignment.CLEAR }
@@ -74,7 +75,32 @@ internal class ParagraphMeasurer(
                 TabAlignment.DECIMAL -> if (foundDecimal) decimal else following
                 else -> 0f
             }
-            return (target - x - offset).coerceAtLeast(0f)
+            return ResolvedTabAdvance((target - x - offset).coerceAtLeast(0f), stop)
+        }
+
+        fun tabLeader(sourceOffset: Int, requested: String, metrics: TextMetrics, gapWidth: Float): TabLeaderLayout? {
+            if (requested.codePointCount(0, requested.length) != 1 ||
+                requested.length == 1 && requested[0].isWhitespace() ||
+                !gapWidth.isFinite() || gapWidth <= 0f
+            ) return null
+
+            val fallbackApplied = !metrics.hasGlyph(requested)
+            val glyph = if (fallbackApplied) "." else requested
+            if (!metrics.hasGlyph(glyph)) return null
+            val glyphWidth = metrics.widthOf(glyph)
+            if (!glyphWidth.isFinite() || glyphWidth <= 0f) return null
+
+            var repetitions = floor((gapWidth + 0.001f) / glyphWidth).toInt().coerceIn(0, MAX_TAB_LEADER_GLYPHS)
+            if (repetitions == 0) return null
+            var rendered = glyph.repeat(repetitions)
+            var leaderWidth = metrics.widthOf(rendered)
+            while (repetitions > 0 && (!leaderWidth.isFinite() || leaderWidth > gapWidth + 0.001f)) {
+                repetitions--
+                rendered = glyph.repeat(repetitions)
+                leaderWidth = metrics.widthOf(rendered)
+            }
+            if (repetitions == 0 || !leaderWidth.isFinite() || leaderWidth <= 0f) return null
+            return TabLeaderLayout(sourceOffset, requested, rendered, leaderWidth, fallbackApplied)
         }
         val lines = mutableListOf<LineLayout>()
         var from = 0
@@ -89,7 +115,7 @@ internal class ParagraphMeasurer(
             while (to < glyphs.size) {
                 val g = glyphs[to]
                 if (to > from && g.start in paragraph.pageBreakOffsets) break
-                val advance = if (g.text == "\t") tabAdvance(to, origin + x) else widthOf(g)
+                val advance = if (g.text == "\t") tabAdvance(to, origin + x).width else widthOf(g)
                 if (x + advance > capacity && to > from) {
                     if (lastBreak > from) {
                         to = lastBreak
@@ -115,9 +141,18 @@ internal class ParagraphMeasurer(
             var natural = base.naturalLineHeightUnits
             var fontSize = base.fontSizeUnits
             val display = StringBuilder()
+            val tabLeaders = mutableListOf<TabLeaderLayout>()
             for (gIndex in from until to) {
                 val g = glyphs[gIndex]
-                measuredWidth += if (g.text == "\t") tabAdvance(gIndex, origin + measuredWidth) else widthOf(g)
+                if (g.text == "\t") {
+                    val tab = tabAdvance(gIndex, origin + measuredWidth)
+                    measuredWidth += tab.width
+                    tab.stop?.leaderText?.let { requested ->
+                        tabLeader(g.start, requested, g.metrics, tab.width)?.let(tabLeaders::add)
+                    }
+                } else {
+                    measuredWidth += widthOf(g)
+                }
                 natural = maxOf(natural, g.metrics.naturalLineHeightUnits)
                 fontSize = maxOf(fontSize, g.metrics.fontSizeUnits)
                 if (!hard(g) && g.text != "\u00ad") display.append(g.text)
@@ -134,7 +169,7 @@ internal class ParagraphMeasurer(
             val height = base.lineHeightFor(natural, fontSize).coerceAtLeast(1f)
             lines += LineLayout(display.toString(), sliceRuns(paragraph, sourceStart, sourceEnd), measuredWidth,
                 height, (height - natural) / 2f + fontSize, sourceStart, sourceEnd,
-                origin + alignmentOffset, offsets, positions, selectedHyphen)
+                origin + alignmentOffset, offsets, positions, selectedHyphen, tabLeaders = tabLeaders)
             from = to
         } while (from < glyphs.size)
         if (glyphs.lastOrNull()?.let(::hard) == true) {
@@ -147,6 +182,8 @@ internal class ParagraphMeasurer(
     }
 
     companion object {
+        private const val MAX_TAB_LEADER_GLYPHS = 2048
+
         fun sliceRuns(paragraph: OfficeParagraph, start: Int, end: Int): List<OfficeTextRun> {
             if (paragraph.runs.joinToString("") { it.text } != paragraph.text) return emptyList()
             var offset = 0

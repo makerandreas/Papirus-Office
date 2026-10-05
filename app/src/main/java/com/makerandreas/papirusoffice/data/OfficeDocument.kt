@@ -306,7 +306,12 @@ data class DocumentStyles(
  */
 enum class TabAlignment { LEFT, RIGHT, CENTER, DECIMAL, CLEAR }
 
-data class ParagraphTabStop(val positionUnits: Float, val alignment: TabAlignment = TabAlignment.LEFT)
+data class ParagraphTabStop(
+    val positionUnits: Float,
+    val alignment: TabAlignment = TabAlignment.LEFT,
+    /** ODF `style:leader-text`; line-style leaders are outside Plan 7F's supported subset. */
+    val leaderText: String? = null
+)
 
 data class ParagraphStyle(
     val name: String,

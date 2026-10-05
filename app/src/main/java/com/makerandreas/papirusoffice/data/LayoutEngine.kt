@@ -8,6 +8,18 @@ import kotlin.math.min
 // PHASE 1 & 2: Paragraph & Line Layout Models
 // ==========================================
 
+data class TabLeaderLayout(
+    /** Source offset of the tab whose already-reserved gap receives this text. */
+    val sourceOffset: Int,
+    /** Character requested by `style:leader-text`. */
+    val requestedText: String,
+    /** Repeated display text; may use the supported-character fallback. */
+    val renderedText: String,
+    /** Width reserved for [renderedText] within the tab's measured advance. */
+    val widthUnits: Float,
+    val fallbackApplied: Boolean = false
+)
+
 data class LineLayout(
     val text: String,
     val runs: List<OfficeTextRun> = emptyList(),
@@ -21,7 +33,9 @@ data class LineLayout(
     /** Source UTF-16 caret boundaries and their measured positions, relative to left. */
     val caretOffsets: List<Int> = emptyList(),
     val caretAdvances: List<Float> = emptyList(),
-    val discretionaryHyphen: Boolean = false
+    val discretionaryHyphen: Boolean = false,
+    /** Display-only text leaders; source text and measured tab advances are unchanged. */
+    val tabLeaders: List<TabLeaderLayout> = emptyList()
 )
 
 data class ParagraphLayout(
