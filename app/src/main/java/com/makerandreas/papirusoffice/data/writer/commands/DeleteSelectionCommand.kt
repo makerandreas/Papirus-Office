@@ -1,5 +1,6 @@
 package com.makerandreas.papirusoffice.data.writer.commands
 
+import com.makerandreas.papirusoffice.data.DocumentTextProjection
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.PapirusLogger
 import com.makerandreas.papirusoffice.data.undo.UndoAction
@@ -28,10 +29,11 @@ class DeleteSelectionCommand(
 
     override fun execute(doc: OfficeDocument): OfficeDocument {
         PapirusLogger.d("UNDO", "DeleteSelectionCommand execute")
+        val editorText = fullOriginalText.ifEmpty { DocumentTextProjection.editorText(doc) }
         if (actualDeletedText.isEmpty()) {
-            actualDeletedText = SelectionEngine.extract(doc, selection)
+            actualDeletedText = SelectionEngine.extract(editorText, selection)
         }
-        return SelectionEngine.delete(doc, selection)
+        return SelectionEngine.delete(doc, selection, editorText)
     }
 
     override fun undo(doc: OfficeDocument): OfficeDocument {

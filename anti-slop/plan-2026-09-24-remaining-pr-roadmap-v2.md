@@ -167,13 +167,17 @@ Sub-item IDs keep their plan identity (E = Plan 5, F = 6, G = 7, H = 8, I = 9). 
 | 27 | 7B | Canonical semantic model and ODT importer convergence | 7A | medium | one package/import path; facade parity; unsupported modified save fails closed |
 | 28 | 7C | Authored indexes, named section ranges, Navigator, status context | 7B | large | snapshots/ranges are navigable without duplicate body flow |
 | 29 | 7D | Table structure, measurement, pagination, rendering, cell hit-testing | 7C | large | one table geometry from parser through interaction |
-| 30 | 7E | ODF font-face aliases and final pagination calibration | 7D | medium | declared face drives metrics/display; ODT fixture evidence refreshed |
-| 31 | 8A | DOCX style chain + run formatting (char-link convention, numId-suppression flag) | 7E | large | heading/body sizes from the file, no leak |
-| 32 | 8B | DOCX numbering, fields, tables, sections, TOC snapshot | 8A (+7D shared geometry) | large | Sample-6 DOCX checklist; both formats converge; windows hold |
-| 33 | 9 | Save round-trip integrity (pre-change gate first) | 6, 7E, 8B | large | open → save → reopen preserves structure |
-| 34-35 | 10 | Font engine + design language, **parked** | 8B + user decision | - | resume trigger §4.11 |
+| 30 | repair | Post-7D regression repair | 7D | small | **landed** (`9356212`); regression analysis in `audit-016`/`audit-017` |
+| 31 | 7E | ODF font-face aliases and final pagination calibration | 7D | medium | **landed**; declared face drives metrics/display; ODT fixture evidence refreshed |
+| 32 | corrective follow-up (not a Plan) | Shared Inky editor-text projection and selection-coordinate regression fix | 7E (#31) | medium | editor initialization, selection/model edits, merging, and element windows agree; regression test covers list/table offsets and undo |
+| 33 | 7F | ODF tab leaders and body-level hidden-section layout | 7E + corrective follow-up (#32, merge-order gate) | medium | separate leader and hidden-section commit/test gates; no page-count movement |
+| 34 | 8A | DOCX style chain + run formatting (char-link convention, numId-suppression flag) | 7E | large | heading/body sizes from the file, no leak |
+| 35 | 8B | DOCX numbering, fields, tables, sections, TOC snapshot | 8A (+7D shared geometry) | large | Sample-6 DOCX checklist; both formats converge; windows hold |
+| 36 | 9 | Save round-trip integrity (pre-change gate first) | 6, 7E, 8B | large | open → save → reopen preserves structure |
+| 37-38 | 10 | Font engine + design language, **parked** | 8B + user decision | - | resume trigger §4.11 |
+| 39-43 | 11 | Hybrid experience UI packages | Plan 9 + Plan 10; per-package gates | large | per-package gates in `plan-11` §5 |
 
-Historical parallelism for Plans 3-5 is unchanged. From 7B forward the semantic dependency chain is sequential: **7B -> 7C -> 7D -> 7E -> 8A -> 8B -> 9**. Research may overlap, but implementation PRs do not: 8A must consume the settled canonical model, and 8B must consume 7D's shared geometry. Plan 11's UI packages remain a separate track (chrome only) and need their own Compose BOM bump PR first (BOM `2024.09.00` has no Material 3 Expressive API).
+Historical parallelism for Plans 3-5 is unchanged. The semantic dependency chain remains **7B -> 7C -> 7D -> 7E -> 8A -> 8B -> 9**. The agreed implementation order adds a separate editor-projection correction (#32) and then Plan 7F (#33) before 8A; neither is folded into Plan 7E, and 8A does not technically depend on 7F. Research may overlap, but implementation PRs do not: 8A must consume the settled canonical model, and 8B must consume 7D's shared geometry. Plan 11's UI packages remain a separate track and need their own Compose BOM bump PR first (BOM `2024.09.00` has no Material 3 Expressive API).
 
 ---
 
@@ -365,7 +369,27 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Deferred and known loss.** Decision D3 (refusing a modified save that would drop font-face declarations) is deferred to Plan 9 by the owner. The recovered diff contains that arm in `OdtDocumentWriter.saveCapability` plus `Plan7eSaveCapabilityTest`, written before the owner's decision; the previous session's own numstat (`coding-numstat.txt`) shows both files absent from its final state, and this branch matches that. Until Plan 9 writes declarations, a regenerated `content.xml` would drop them, and that loss is recorded rather than blocked. `OdtDocumentWriter` and every writer path are untouched by this PR.
 
-### 4.8 PR #32, Plan 8A: DOCX style chain + run formatting
+### 4.7e PR #32, corrective follow-up: Inky editor projection and selection coordinates (not a Plan)
+
+**Goal:** make selection offsets mean the same thing in the Inky text field, document model operations, merging, and element windows. This is a separate correctness repair, not Plan 7F.
+
+**Finding:** `OfficeDocument.toPlainText()` includes generated list labels and table-cell text, while Inky's flat editor projection contains paragraph/heading/list-item text and skips tables and other structural elements. `SelectionEngine` previously used the broader string for model extraction/deletion/insertion, so offsets after a list item or table could select or delete the wrong characters. Parsing also seeded the editor directly from `DocxParseResult.text` rather than the canonical editor projection.
+
+**Implementation direction:** one `DocumentTextProjection` owns the editor block set and `\n\n` separator. Inky initialization/open/reload, selection extraction and edits, `DeleteSelectionCommand`, `DocumentTextMerger`, and `DocumentTextWindows` all consume it; `toPlainText()` keeps its separate full-content semantics. Structured parse results project through the adapted model, while plain-text imports keep their raw text fallback.
+
+**Regression gate:** `SelectionProjectionConsistencyTest` exercises an imported heading/list/table/paragraph document, checks the post-table character selection, verifies the table survives deletion and undo restores the editor text, and checks the mapped element window. The full unit-test and build CI must pass before this forecast leaves #32. No local JDK is available in the current sandbox; local test execution is therefore not claimed.
+
+**Scope guard:** no ODF leader or hidden-section feature and no save-format redesign. No UI redesign or new controls are included; the only Inky UI-module change is routing existing editor buffers through the shared projection. The correction does not expand Plan 7F.
+
+### 4.7f PR #33, Plan 7F: ODF tab leaders and hidden-section layout
+
+**Goal:** render authored ODF tab leaders and omit supported hidden body-level section ranges from layout, without changing reserved tab advances or the twelve-fixture page matrix. The detailed plan is `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`.
+
+**Delivery:** one PR with two scoped feature commits and gates: (1) leader import/model/layout/painting plus leader tests; the gate must pass before (2) hidden-section layout plus synthetic tests begins. Records-only cleanup may follow the feature commits.
+
+**Boundaries:** ODF only. Conditional sections remain recorded and laid out; there is no condition evaluator. Sections contained inside table cells are unsupported. DOCX `w:tabs`/`w:vanish`, hidden text runs, TOC regeneration, and UI editing remain out of scope. The plan contains no fixture with a hidden section, so these tests are synthetic and the page-count matrix must not move.
+
+### 4.8 PR #34, Plan 8A: DOCX style chain + run formatting
 
 Closes H-1, H-2, F-16, F-20, the DOCX half of F-10.
 
@@ -379,7 +403,7 @@ Closes H-1, H-2, F-16, F-20, the DOCX half of F-10.
 **Acceptance:** heading/body sizes and fonts come from the file in every sample; no run-flag leak; Sample-3 control green.
 **Size:** large.
 
-### 4.9 PR #33, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
+### 4.9 PR #35, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
 
 Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F-26, F-27, F-28 tail, O-03, O-02 remaining.
 
@@ -395,16 +419,16 @@ Closes H-3…H-7, ⚑H-3b/⚑H-4b/⚑H-6b (new), F-13 DOCX parity, F-17, F-19, F
 **Acceptance:** Sample-6.docx fidelity checklist; Sample-6's two formats (the one metric-identical pair, audit-007 §1) converge on the same page window, the other pairs hold their per-format windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of the audit-007 §1 references, never below).
 **Size:** large.
 
-### 4.10 PR #34, Plan 9: save round-trip integrity (pre-change gate first)
+### 4.10 PR #36, Plan 9: save round-trip integrity (pre-change gate first)
 
 Closes O-01, the non-destructive-package rule, plan-03 3.13, 3.19, 3.20, 3.26, 3.27, and retires F-2 (`OfficeDocElement`).
 
-Scheduled **after** Plans 6, 7E and 8B land (**forecast PR slot #34** after the 2026-10-04 shift), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
+Scheduled **after** Plans 6, 7E and 8B land (**forecast PR slot #36** in the 2026-10-05 schedule), with its own pre-change gate (plan-04-to-09 § Plan 9 text stays the seed): a real ODT writer (styles, list styles, TOC, manifest entries per ODF Part 2, `style:font-face`, `office:version` 1.4; today `generateOdtXml` at `DocxDocumentParser.kt:748+` writes a bare `office:document-content` with `office:version="1.2"` and no styles at all), a real DOCX writer (`styles.xml` consistent with the regenerated `document.xml`, heading/char pairs per §2.3, `numbering.xml` references that exist, `w:tblGrid`, images in the package with rels), the original-package-bytes fallback removed once round trip is proven, and the `OfficeDocElement` wrapper deleted in a mechanical final commit.
 **Acceptance:** open → save → reopen preserves text, styles, numbering, tables, images, TOC for Sample-6 in both formats, verified by a CI round-trip test. **Scope is firmed by a short plan document before this PR starts; do not start it from this paragraph alone.**
 
 ### 4.11 Plan 10: stays parked
 
-Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after Plan 8B (forecast #33) converges both formats and the user re-confirms** (forecast slots #35-#36 after the 2026-10-04 shift) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
+Thread A (real `Typeface` loading, A2 policy write-down, A3 Font Style UI, A4 SAF/user fonts, A5 metrics-parity test) and B2 to B6 resume **after Plan 8B (forecast #35) converges both formats and the user re-confirms** (forecast slots #37-#38 after the 2026-10-05 reforecast) (the §0 display decision is already binding on `FontRegistry` from PR 15, so A1 is an upgrade of the loader, not a redesign). B1 (the `DESIGN.md`/m3.material.io review) lands early as documentation in PR 14.
 
 ### 4.12 Plan 1: master index updates (living document, per PR)
 
@@ -431,6 +455,7 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 28 | 2026-10-04 | row 7 → "7C landed" | Plan 7 G-2/G-7 record; `audit-015` section 9 |
 | 29 | 2026-10-04 | row 7 → "7D landed" | Plan 7 G-5 implementation record |
 | 30 | 2026-10-04 | row 7 → "7D regression repaired on `main`" | `audit-016` (post-7D unit-test analysis) and `audit-017` (recovery state, forecast shift) |
+| 31 | 2026-10-04 | row 7 → "7E font aliases/calibration landed" | Plan 7E implementation record above; final CI run `37215310814`; PR #31 merged on 2026-10-04 |
 
 **Forward schedule, updated 2026-09-30 (Plan 6 complete).** Plan 1's documentation PRs took #20 and #21. Plan 6 then took four PRs instead of the one slot v1 predicted: **#22 (6A, image extents and fail-safe image saves, run `36578390234`, 252 unit tests), #23 (6B, durable media storage and recovery, runs `36587725933`/`36588655662`, 260 unit tests), #24 (6C, decode presentation and real loading progress, run `36708650093`, 275 unit tests), and #25 (6D, closeout gate: dead `DocxDocumentParser` plumbing deleted, `LayoutEngine` unified on `DocumentImages.box`, `PaginationImageTest` added, per-suite JUnit timings and `Plan6cLoadingProgressTest` stdout added to the CI PR comment, 276 unit tests across 48 suites in run `36730234004`)**. Local Java remains unavailable in the sandbox, so every number below comes from a GitHub Actions run. Plan IDs remain authoritative; the PR slots below are the reforecast promised when Plan 6 was split, and they are expectations, not reservations.
 
@@ -440,7 +465,7 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 
 **2026-10-02 insertion.** Plan 12A and Plan 7A landed together in PR #26: the LOKit JNI/process seam and ODF numbering, heading/list runs, hyperlinks, and bookmarks. Evidence: `audit-013-2026-10-02-plan-12a-and-7a.md`.
 
-**2026-10-03 Plan 7 split.** The old combined 7B row is void. Exactly one PR belongs to each of 7B, 7C, 7D, and 7E. The current forecast is:
+**Plan 7 split (decision 2026-10-03; forecast rechecked 2026-10-05).** The old combined 7B row is void. Exactly one PR belongs to each of 7B, 7C, 7D, 7E, and 7F. Plan 7E is merged; the current forecast is:
 
 | Plan | PR slot | plan-01 registry change | plan file line |
 |---|---|---|---|
@@ -449,12 +474,14 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 7C | **#28 landed** | row 7 -> "7C indexes/sections landed" | Plan 7 records G-2/G-7 and navigation/status |
 | 7D | **#29 landed** | row 7 -> "7D tables landed" | Plan 7 records G-5 end to end |
 | repair | **#30 landed** | row 7 gets the regression and repair note | `audit-016` post-7D analysis, `audit-017` recovery state |
-| 7E | **#31 (this PR)** | row 7 -> "Plan 7 complete" | Plan 7 records G-6 aliases and the final ODT matrix |
-| 8A | **#32** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
-| 8B | **#33** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
-| 9 | **#34** | row 9 -> landed | Plan 9 structural round-trip record |
-| 10 resume | **#35-#36** | row 10 status change when it starts | plan-10 head note |
-| 11 packages | **#37-#41** | row 11 status change per package | plan-11 §5 |
+| 7E | **#31 landed** | row 7 -> "7E font aliases/calibration landed" | Plan 7 records G-6 aliases and the final ODT matrix |
+| corrective follow-up (not a Plan) | **#32 forecast** | row 7 notes the editor-projection correction separately from 7F | `audit-018`; selection regression record in this section |
+| 7F | **#33 forecast** | row 7 -> "7F ODF leaders/hidden-section layout" when merged | Plan 7F document; two feature commits with separate gates |
+| 8A | **#34** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
+| 8B | **#35** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
+| 9 | **#36** | row 9 -> landed | Plan 9 structural round-trip record |
+| 10 resume | **#37-#38** | row 10 status change when it starts | plan-10 head note |
+| 11 packages | **#39-#43** | row 11 status change per package | plan-11 §5 |
 
 Plan IDs remain authoritative and slots are forecasts. Plan 12B/12C stay after Plan 9.
 
@@ -468,21 +495,25 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 **Landed 2026-09-24 to 2026-09-28:** 13 (3B), 14 (Plan 3C / Plan 11 docs), 15 (5A), 16 (5B), 17 (5C), 18 (5D), 19 (5E). Plan 5 shipped as five PRs rather than the 16a/16b split predicted below.
 
-**Forward schedule, amended 2026-10-03 for the four-plan ODF split** (plan IDs first; PR slots are forecasts):
+**Forward schedule, amended 2026-10-05 after the editor-projection review** (plan IDs first; PR slots are forecasts):
 
-| Order | Plan | PR slot | Parallel with | Gate to enter the next |
+| Order | Plan / corrective work | PR slot | Parallel with | Gate to enter the next |
 |---|---|---|---|---|
 | - | 6 (images and media) | **#22-#25, merged** | - | **done:** media self-heals; unsafe image save refuses |
 | - | 7A (numbering, runs, links, bookmarks) | **#26, merged** | - | **done:** ODT numbering fidelity |
-| 1 | 7B (canonical model/import convergence) | **#27** | research only | runtime/facade parity; save capability closed |
-| 2 | 7C (indexes/sections/navigation/status) | **#28** | research only | sidecars populated and navigable |
-| 3 | 7D (tables end to end) | **#29** | research only | shared geometry through cell hit-testing |
-| 4 | 7E (font aliases/calibration) | **#31** | research only | metrics/display parity; final ODT matrix |
-| 5 | 8A (DOCX style chain/runs) | **#32** | none | DOCX style chain green |
-| 6 | 8B (DOCX numbering/fields/tables/sections) | **#33** | none | both-format convergence |
-| 7 | 9 (save round trip) | **#34** | Plan 10 resume decision | structural round-trip CI matrix |
-| 8 | 10 and 11 packages | **#35-#41** | per package | per-package gate in plan-11 §5 |
-| 9 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
+| 1 | 7B (canonical model/import convergence) | **#27, merged** | research only | runtime/facade parity; save capability closed |
+| 2 | 7C (indexes/sections/navigation/status) | **#28, merged** | research only | sidecars populated and navigable |
+| 3 | 7D (tables end to end) | **#29, merged** | research only | shared geometry through cell hit-testing |
+| - | post-7D regression repair | **#30, merged** | - | **done:** recovery verified in `audit-017` |
+| 4 | 7E (font aliases/calibration) | **#31, merged** | research only | metrics/display parity; final ODT matrix |
+| 5 | editor-projection correction (not a Plan) | **#32** | none | selection, merge, and windows use one text coordinate space |
+| 6 | 7F (ODF leaders/body-level hidden sections) | **#33** | none | leader gate then hidden-section gate; no matrix movement |
+| 7 | 8A (DOCX style chain/runs) | **#34** | none | DOCX style chain green |
+| 8 | 8B (DOCX numbering/fields/tables/sections) | **#35** | none | both-format convergence |
+| 9 | 9 (save round trip) | **#36** | Plan 10 resume decision | structural round-trip CI matrix |
+| 10 | 10 (font engine + design language) | **#37-#38** | per §4.11 user decision | resume trigger and implementation gates |
+| 11 | 11 (hybrid UI packages) | **#39-#43** | per package | per-package gate in plan-11 §5 |
+| 12 | Owner device pass | none | after Plan 11 | all twelve `InkyC1Checklist` sections on hardware |
 
 **Device checklist resume points** (`docs/InkyC1Checklist.md`, deliberately postponed; section order = item number):
 
@@ -523,6 +554,7 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 19. **v2.7 (2026-10-04, audit-015):** Plan 7C is implemented as one PR in four commits. Tab stops and leaders move from 7C to 7E (§4.7d item 5), and hidden-section rendering is added to 7E (§4.7d item 6). The strings sweep is Plan 3D in its own file. No forecast PR slot moves, because 3D is scheduled when the owner picks a slot.
 
 20. **v2.8 (2026-10-04, audit-016 and audit-017):** the post-7D refactor regression (`cb89460`) and its repair are recorded; PR #30 is the repair merge `9356212`, so the forecast from 7E onward shifts by one: 7E `#31`, 8A `#32`, 8B `#33`, Plan 9 `#34`, Plan 10 `#35`-`#36`, Plan 11 `#37`-`#41`. Plan 7E is delivered as PR #31; its first two commits compiled in CI run `37213135047` (342 tests, one corrected expectation, Build green) and the calibration is measured: the twelve-file page matrix is unchanged from PR #30, with Sample-6.odt's dump line moving from `(Aptos1)` to `(Aptos)` and no `Aptos1` left in the dump. Items 5 and 6 leave 7E for the new Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`), and decision D3 (save refusal for declared font faces) is deferred to Plan 9. Every earlier line that names a 7E slot of `#30` is superseded on that point only.
+21. **v2.9 (2026-10-05, `audit-018`).** PR #31 merged Plan 7E. The post-merge selection review found editor/model offset drift around generated list labels and structural tables; the shared projection correction is forecast separately as PR #32, followed by the still-distinct one-PR Plan 7F at #33. The forward schedule becomes 8A #34, 8B #35, Plan 9 #36, Plan 10 #37-#38, and Plan 11 #39-#43. This supersedes only the earlier PR-number forecast, not plan ownership or the Plan 7F scope boundaries. Plan 7F uses separate leader and hidden-section commits/gates; hidden sections in table cells, conditional evaluation, DOCX `w:tabs`/`w:vanish`, and UI editing remain out of scope.
 
 ---
 

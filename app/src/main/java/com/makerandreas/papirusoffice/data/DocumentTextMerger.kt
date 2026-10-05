@@ -20,7 +20,7 @@ object DocumentTextMerger {
             return document.copy(body = DocumentBody(elements), isModified = true).withValidatedRanges()
         }
 
-        val oldText = original.mapNotNull(::textOf).joinToString("\n\n")
+        val oldText = DocumentTextProjection.editorText(original)
         if (oldText == editedText) return document
         val prefix = oldText.commonPrefixWith(editedText).length
         val suffix = minOf(oldText.commonSuffixWith(editedText).length, oldText.length - prefix, editedText.length - prefix)
@@ -70,7 +70,7 @@ object DocumentTextMerger {
 
     private fun splitBlocks(text: String): List<String> {
         if (text.isEmpty()) return emptyList()
-        return text.split("\n\n")
+        return text.split(DocumentTextProjection.BLOCK_SEPARATOR)
     }
 
     private fun isStructural(element: OfficeElement): Boolean {
@@ -94,13 +94,7 @@ object DocumentTextMerger {
         }
     }
 
-    fun textOf(element: OfficeElement): String? = when (element) {
-        is OfficeParagraph -> element.text
-        is OfficeHeading -> element.text
-        is OfficeListItem -> element.text
-        is OfficeDocElement.ParagraphElement -> element.paragraph.text
-        else -> null
-    }
+    fun textOf(element: OfficeElement): String? = DocumentTextProjection.elementText(element)
 
     private fun remapBreaks(oldText: String, newText: String, offsets: List<Int>): List<Int> {
         val prefix = oldText.commonPrefixWith(newText).length
@@ -112,15 +106,7 @@ object DocumentTextMerger {
         }.coerceIn(0, newText.length) }
     }
 
-    fun isTextual(element: OfficeElement): Boolean {
-        return when (element) {
-            is OfficeParagraph,
-            is OfficeHeading,
-            is OfficeListItem,
-            is OfficeDocElement.ParagraphElement -> true
-            else -> false
-        }
-    }
+    fun isTextual(element: OfficeElement): Boolean = DocumentTextProjection.isTextual(element)
 
     // The legacy wrapper arm is defensive: runtime import paths emit direct
     // implementors. Full OfficeDocElement retirement is tracked in the plan.

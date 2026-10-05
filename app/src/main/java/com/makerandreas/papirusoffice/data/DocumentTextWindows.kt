@@ -4,8 +4,8 @@ import androidx.compose.ui.text.TextRange
 
 /**
  * Window of the flat editor string owned by one textual document element.
- * [start] is inclusive, [end] is exclusive, both offsets into the global
- * `\n\n`-joined text that [DocumentTextMerger] also consumes.
+ * [start] is inclusive, [end] is exclusive, both offsets into the text joined
+ * with [DocumentTextProjection.BLOCK_SEPARATOR] that the merger also consumes.
  */
 data class DocumentTextWindow(
     val elementIndex: Int,
@@ -15,25 +15,29 @@ data class DocumentTextWindow(
 )
 
 /**
- * Bidirectional map between the flat edit text and textual body elements.
- * Both sides split on `"\n\n"` in document order, so window N always covers
- * block N; structural elements (images, tables, breaks) own no text.
+ * Bidirectional map between the shared editor-text projection and its body
+ * elements. The source blocks use [DocumentTextProjection] in document order,
+ * so window N always covers block N; structural elements own no text.
  */
 object DocumentTextWindows {
 
     fun compute(elements: List<OfficeElement>, globalText: String): Map<Int, DocumentTextWindow> {
-        val sourceBlocks = elements.mapNotNull { DocumentTextMerger.textOf(it) }
+        val sourceBlocks = elements.mapNotNull { DocumentTextProjection.elementText(it) }
         // Consecutive hard newlines inside a paragraph are not paragraph separators.
-        val blocks = if (sourceBlocks.joinToString("\n\n") == globalText) sourceBlocks else globalText.split("\n\n")
+        val blocks = if (sourceBlocks.joinToString(DocumentTextProjection.BLOCK_SEPARATOR) == globalText) {
+            sourceBlocks
+        } else {
+            globalText.split(DocumentTextProjection.BLOCK_SEPARATOR)
+        }
         val windows = LinkedHashMap<Int, DocumentTextWindow>(blocks.size)
         var blockIndex = 0
         var offset = 0
         elements.forEachIndexed { elementIndex, element ->
-            if (!DocumentTextMerger.isTextual(element)) return@forEachIndexed
+            if (!DocumentTextProjection.isTextual(element)) return@forEachIndexed
             if (blockIndex >= blocks.size) return@forEachIndexed
             val text = blocks[blockIndex]
             windows[elementIndex] = DocumentTextWindow(elementIndex, text, offset, offset + text.length)
-            offset += text.length + 2
+            offset += text.length + DocumentTextProjection.BLOCK_SEPARATOR.length
             blockIndex++
         }
         return windows
