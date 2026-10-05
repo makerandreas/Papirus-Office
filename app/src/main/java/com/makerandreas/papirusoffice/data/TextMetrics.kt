@@ -28,6 +28,9 @@ interface AdvanceSource {
     val name: String
     fun advance(text: String, fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Float
     fun naturalLineHeight(fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Float
+
+    /** True when the resolved face can paint [text] rather than a missing-glyph box. */
+    fun hasGlyph(text: String, fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Boolean = true
 }
 
 /**
@@ -95,6 +98,9 @@ object TableAdvanceSource : AdvanceSource {
 
     override fun naturalLineHeight(fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Float =
         fontSizeUnits * naturalEm(choice.generic)
+
+    override fun hasGlyph(text: String, fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Boolean =
+        text.length == 1 && text[0] in serifEm
 }
 
 /**
@@ -129,6 +135,12 @@ class PaintAdvanceSource : AdvanceSource {
         if (text.isEmpty() || fontSizeUnits <= 0f) return 0f
         configure(fontSizeUnits, isBold, isItalic, choice)
         return paint.measureText(text)
+    }
+
+    override fun hasGlyph(text: String, fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Boolean {
+        if (text.isEmpty() || fontSizeUnits <= 0f) return false
+        configure(fontSizeUnits, isBold, isItalic, choice)
+        return paint.hasGlyph(text)
     }
 
     override fun naturalLineHeight(fontSizeUnits: Float, isBold: Boolean, isItalic: Boolean, choice: FontChoice): Float {
@@ -193,6 +205,9 @@ class TextMetrics private constructor(
 
     override fun widthOf(text: String): Float =
         source.advance(text, fontSizeUnits, style.isBold, style.isItalic, choice)
+
+    fun hasGlyph(text: String): Boolean =
+        text.isNotEmpty() && source.hasGlyph(text, fontSizeUnits, style.isBold, style.isItalic, choice)
 
     companion object {
         @Volatile

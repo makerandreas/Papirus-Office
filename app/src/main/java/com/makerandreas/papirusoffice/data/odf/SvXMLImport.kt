@@ -50,6 +50,12 @@ private fun attrIndex(parser: XmlPullParser): Map<String, String> {
     return attrs
 }
 
+private fun isSingleUnicodeScalar(value: String): Boolean {
+    if (value.isEmpty() || value.codePointCount(0, value.length) != 1) return false
+    val codePoint = value.codePointAt(0)
+    return codePoint !in 0xD800..0xDFFF
+}
+
 /**
  * Modern ODF SAX Import Filter class in Papirus Engine,
  * mirroring SvXMLImport in LibreOffice xmloff module ("xo" library).
@@ -805,7 +811,10 @@ class SvXMLImport(
                                 "char" -> TabAlignment.DECIMAL
                                 else -> TabAlignment.LEFT
                             }
-                            if (position != null && position >= 0f) draft.tabStops = draft.tabStops.orEmpty() + ParagraphTabStop(position, align)
+                            val leaderText = attrs["leader-text"]?.takeIf(::isSingleUnicodeScalar)
+                            if (position != null && position >= 0f) {
+                                draft.tabStops = draft.tabStops.orEmpty() + ParagraphTabStop(position, align, leaderText)
+                            }
                         }
                         "page-layout-properties" -> {
                             val spec = buildPageLayoutSpec(attrs)
