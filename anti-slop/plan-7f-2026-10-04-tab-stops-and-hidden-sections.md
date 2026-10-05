@@ -55,7 +55,7 @@ Plan 7C records `SectionDisplay.HIDDEN` on `DocumentSectionRange` (`DocumentSema
 
 * The exclusion happens in one place, decided by the same `DocumentSectionRange` values Plan 7C records, so the renderer and the Navigator cannot disagree. Filtering uses each range against the original `DocumentBody.elements` indices; it must not compact or reindex the body before pagination.
 * Conditional sections (`SectionDisplay.CONDITIONAL`) keep their current treatment: recorded, laid out, and reported with their condition. 7F does not evaluate conditions, because no plan owns a condition evaluator.
-* Tests, all synthetic: body-level hidden content absent from layout; a nested hidden range inside a visible one; conditional and visible sections unchanged. Sections contained inside table cells are explicitly unsupported and are not a 7F acceptance case.
+* Tests, all synthetic: body-level hidden content absent from layout; a nested hidden range inside a visible one; conditional and visible sections unchanged; page breaks inside hidden ranges do not flush pages; later visible elements retain original body indices; `DocumentTextProjection`/`DocumentTextWindows` and the editable source text remain stable. Sections contained inside table cells are explicitly unsupported and are not a 7F acceptance case.
 
 **No fixture contains a hidden section:** all six `.odt` files have zero `text:display` attributes (any value) and zero `<text:section>` body elements in every XML part, so this item cannot move the page matrix. Its tests can only be synthetic.
 

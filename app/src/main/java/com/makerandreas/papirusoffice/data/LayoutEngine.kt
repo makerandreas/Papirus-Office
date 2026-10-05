@@ -249,10 +249,16 @@ class LayoutEngine(
             else -> null
         }
         val elements = document.body.elements
+        val hiddenSectionRanges = document.namedSectionRanges
+            .asSequence()
+            .filter { it.display == SectionDisplay.HIDDEN && it.bodyRange.endExclusive <= elements.size }
+            .map { it.bodyRange }
+            .toList()
         paragraphLayoutCache.keys.retainAll(elements.indices.toSet())
         fun visible(index: Int): Boolean {
             val e = elements[index]
-            return outlineEngine?.isElementHidden(index) != true &&
+            return hiddenSectionRanges.none { index in it } &&
+                outlineEngine?.isElementHidden(index) != true &&
                 (showImages || e !is OfficeImage && e !is OfficeDocElement.ImageElement) &&
                 (showTables || e !is OfficeTable && e !is OfficeDocElement.TableElement)
         }
