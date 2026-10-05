@@ -34,6 +34,11 @@ data class OfficeDocument(
     val namedSectionRanges: List<DocumentSectionRange> = emptyList()
 )
 
+/**
+ * Broader plain-text view for diagnostics/serialization, including table cells
+ * and generated list labels. Do not use its offsets for Inky selections;
+ * those are defined by [DocumentTextProjection].
+ */
 fun OfficeDocument.toPlainText(): String {
     return body.elements.joinToString("\n\n") { element ->
         when (element) {

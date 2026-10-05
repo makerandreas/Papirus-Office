@@ -2,6 +2,7 @@ package com.example.modules.inky
 import androidx.compose.material.icons.automirrored.rounded.*
 import android.util.Log
 import kotlin.math.roundToInt
+import com.makerandreas.papirusoffice.data.DocumentTextProjection
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -307,15 +308,7 @@ fun InkyModule(
     LaunchedEffect(currentSessionState?.document) {
         val sessionDoc = currentSessionState?.document
         if (sessionDoc != null) {
-            val textFromDoc = sessionDoc.body.elements.mapNotNull {
-                when (it) {
-                    is com.makerandreas.papirusoffice.data.OfficeParagraph -> it.text
-                    is com.makerandreas.papirusoffice.data.OfficeHeading -> it.text
-                    is com.makerandreas.papirusoffice.data.OfficeListItem -> it.text
-                    is com.makerandreas.papirusoffice.data.OfficeDocElement.ParagraphElement -> it.paragraph.text
-                    else -> null
-                }
-            }.joinToString("\n\n")
+            val textFromDoc = DocumentTextProjection.editorText(sessionDoc)
 
             if (textFromDoc.isNotBlank() && textFromDoc != docBodyText.text) {
                 docBodyText = androidx.compose.ui.text.input.TextFieldValue(
@@ -369,6 +362,7 @@ fun InkyModule(
                             docOpenFailedError = parseResult.parsedDocument.failureReason
                         } else {
                             val parsedDoc = parseResult.parsedDocument
+                            val editorText = DocumentTextProjection.editorText(parseResult)
                             if (parsedDoc?.pageCount != null && parsedDoc.pageCount > 0) {
                                 detectedDocPageCount = parsedDoc.pageCount
                             }
@@ -385,9 +379,9 @@ fun InkyModule(
                                     )
                                     isSaved = false
                                 } else {
-                                    val safeCursor = lastSession.cursor.coerceIn(0, parseResult.text.length)
+                                    val safeCursor = lastSession.cursor.coerceIn(0, editorText.length)
                                     docBodyText = androidx.compose.ui.text.input.TextFieldValue(
-                                        text = parseResult.text,
+                                        text = editorText,
                                         selection = androidx.compose.ui.text.TextRange(safeCursor)
                                     )
                                 }
@@ -396,11 +390,11 @@ fun InkyModule(
                                     scrollState.scrollTo(lastSession.scroll.coerceIn(0, scrollState.maxValue))
                                 }
                             } else {
-                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
+                                docBodyText = androidx.compose.ui.text.input.TextFieldValue(editorText)
                             }
 
-                            lastTextRecordedValue = parseResult.text
-                            initialLoadedText = parseResult.text
+                            lastTextRecordedValue = editorText
+                            initialLoadedText = editorText
                             docxImages = parseResult.extractedImages
                             updateInkyMetadata(f.absolutePath, f.name, parseResult.text)
                             if (!isTemplateNew) {
@@ -426,10 +420,11 @@ fun InkyModule(
                 } else {
                     com.makerandreas.papirusoffice.data.DocxParseResult("")
                 }
+                val editorText = DocumentTextProjection.editorText(parseResult)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                    lastTextRecordedValue = parseResult.text
-                    initialLoadedText = parseResult.text
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(editorText)
+                    lastTextRecordedValue = editorText
+                    initialLoadedText = editorText
                     docxImages = parseResult.extractedImages
 
                     // Set active session for the default loaded template
@@ -822,7 +817,7 @@ fun InkyModule(
             if (currentSession != null) {
                 val result = com.makerandreas.papirusoffice.data.framework.DocumentLifecycleManager.reload(context, currentSession)
                 if (result != null) {
-                    reloadedText = result.text
+                    reloadedText = DocumentTextProjection.editorText(result)
                 }
             } else {
                 // Fallback if no active session
@@ -835,7 +830,7 @@ fun InkyModule(
                             cacheRepo.invalidateCache(file)
                             val parser = com.makerandreas.papirusoffice.data.DocxDocumentParser(context)
                             val parseResult = parser.parseDocument(file, bypassCache = true)
-                            reloadedText = parseResult.text
+                            reloadedText = DocumentTextProjection.editorText(parseResult)
                         }
                     } catch (e: Exception) {}
                 }
@@ -1215,10 +1210,11 @@ fun InkyModule(
             if (file != null && file.exists()) {
                 runDocumentLoading(true, name) {
                     val parseResult = docxParser.parseDocument(file)
+                    val editorText = DocumentTextProjection.editorText(parseResult)
                     run {
                         docTitle = name
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                        lastTextRecordedValue = parseResult.text
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(editorText)
+                        lastTextRecordedValue = editorText
                         docxImages = parseResult.extractedImages
                         isSaved = true
                         isEditMode = true
@@ -1289,9 +1285,10 @@ fun InkyModule(
                     } else {
                         com.makerandreas.papirusoffice.data.DocxParseResult("")
                     }
-                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                    lastTextRecordedValue = parseResult.text
-                    initialLoadedText = parseResult.text
+                    val editorText = DocumentTextProjection.editorText(parseResult)
+                    docBodyText = androidx.compose.ui.text.input.TextFieldValue(editorText)
+                    lastTextRecordedValue = editorText
+                    initialLoadedText = editorText
                     docxImages = parseResult.extractedImages
 
                     // Set active session!
@@ -3698,10 +3695,11 @@ fun InkyModule(
                 isParsingDoc = true
                 coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     val parseResult = docxParser.parseDocument(file)
+                    val editorText = DocumentTextProjection.editorText(parseResult)
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(parseResult.text)
-                        lastTextRecordedValue = parseResult.text
-                        initialLoadedText = parseResult.text
+                        docBodyText = androidx.compose.ui.text.input.TextFieldValue(editorText)
+                        lastTextRecordedValue = editorText
+                        initialLoadedText = editorText
                         docxImages = parseResult.extractedImages
                         isSaved = true
                         isParsingDoc = false

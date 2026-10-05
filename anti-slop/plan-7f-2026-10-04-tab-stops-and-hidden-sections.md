@@ -1,12 +1,14 @@
 # Plan 7F: ODF tab leaders and hidden-section layout
 
-**Date:** 2026-10-04. **Status:** planned, not implemented.
-**Forecast:** one PR after Plan 7E (PR #31). The forecast slot moves with the order; the plan ID does not.
+**Scope drafted:** 2026-10-04. **Schedule/scope rechecked:** 2026-10-05. **Status:** planned, not implemented.
+**Forecast:** one PR, **#33**, after the separate selection-projection correction (**#32**). Plan 7E is already merged as PR #31. Forecasts can move; the plan ID does not.
 **Scope owner:** the owner approved this split when PR #30 landed (recorded in that PR's body: 7E owns font-face declarations, alias resolution and final calibration; 7F owns ODF tab stops/leaders and hidden-section layout). The first draft of this document was written in a session whose commits never reached a remote (audit-017 section 1); this version is rebuilt from the tree and the raw fixture packages and is labelled static where it states design rather than measured fact.
-**References:** roadmap v2 section 4.7d items 5 and 6, `audit-015` section 9 (Plan 7C record), `audit-017` sections 4.3 and 4.4 (fixture re-derivation) and section 13.4 (the withdrawn `text:display` expectation).
-**Depends on:** Plan 7E (the resolved family is an input to tab measurement). Plan 8A does not depend on this plan: 8A schedules after 7E, and 7F may run beside it or after it, as the owner prefers.
+**References:** roadmap v2 sections 4.7d items 5 and 6 and 4.7f (current scope/sequence), `audit-015` section 9 (Plan 7C record), `audit-017` sections 4.3 and 4.4 (fixture re-derivation) and section 13.4 (the withdrawn `text:display` expectation), and `audit-018` (selection-projection correction and forecast).
+**Depends on:** Plan 7E (the resolved family is an input to tab measurement) and the selection-projection correction PR #32 as the chosen merge-order gate. Plan 8A does not technically depend on 7F, but the agreed forecast schedules this one-PR Plan 7F before 8A; implementation PRs remain sequential.
 
-**Goal:** the authored leaders in the tabbed entries render, and content the file asks to hide is not laid out.
+**Goal:** the authored leaders in the tabbed entries render, and content inside supported body-level hidden-section ranges is not laid out.
+
+**Delivery structure:** one PR with two separate feature commits and commit-level test gates. Commit 1 delivers leader import/model/layout/painting and its tests; it must pass before commit 2 starts. Commit 2 delivers hidden-section layout and synthetic tests. Any records-only cleanup comes after both gates. Plan 7F remains distinct from the selection-projection correction in PR #32.
 
 ---
 
@@ -50,22 +52,23 @@ Plan 7C records `SectionDisplay.HIDDEN` on `DocumentSectionRange` (`DocumentSema
 
 * The exclusion happens in one place, decided by the same `DocumentSectionRange` values Plan 7C records, so the renderer and the Navigator cannot disagree.
 * Conditional sections (`SectionDisplay.CONDITIONAL`) keep their current treatment: recorded, laid out, and reported with their condition. 7F does not evaluate conditions, because no plan owns a condition evaluator.
-* Tests, all synthetic: hidden content absent from layout; a nested hidden range inside a visible one; a hidden range inside a table cell; conditional and visible sections unchanged.
+* Tests, all synthetic: body-level hidden content absent from layout; a nested hidden range inside a visible one; conditional and visible sections unchanged. Sections contained inside table cells are explicitly unsupported and are not a 7F acceptance case.
 
 **No fixture contains a hidden section:** all six `.odt` files have zero `text:display` attributes (any value) and zero `<text:section>` body elements in every XML part, so this item cannot move the page matrix. Its tests can only be synthetic.
 
-**Withdrawn expectation (2026-10-04).** The first draft of this document, written in the lost session and recovered from `docs/01a10750-1f33-7425-b811-fda994620228.txt`, expected Sample-6 to move because it "declares the only `text:display` range". That claim was re-checked against the raw packages and is false; it is recorded here so the expectation is not reintroduced from the older draft. The recovered draft's other points are folded into this document: the scheduling freedom above, the DOCX `w:tabs` boundary below, and the non-goals in section 5.
+**Withdrawn expectation (2026-10-04).** The first draft of this document, written in the lost session and recovered from `docs/01a10750-1f33-7425-b811-fda994620228.txt`, expected Sample-6 to move because it "declares the only `text:display` range". That claim was re-checked against the raw packages and is false; it is recorded here so the expectation is not reintroduced from the older draft. The recovered draft's other points are folded into this document: the sequential implementation order above, the DOCX `w:tabs` boundary below, and the non-goals in section 5.
 
 ## 4. Gates
 
 * All twelve fixtures stay inside their recorded windows (`SampleMatrix.kt`) and **no count moves**. Leaders are painted inside an advance that is already reserved, and no fixture has a hidden section, so a movement is a defect to explain rather than a calibration.
 * `Plan7dTableLayoutTest`, `PaginationFidelityTest` and the `Plan7e*` suites stay green.
+* Hidden-section support is limited to the body-level section ranges represented by Plan 7C; sections contained inside table cells remain unsupported.
 * No editing features: tab-stop editing, rulers, leader pickers and the FCT Tab settings dialog stay with their own plans (Plan 11 packages).
 * No new claim about painting bundled fonts: that remains Plan 10 A1.
 
 ## 5. Out of scope and non-goals
 
-DOCX `w:tabs` leaders and the DOCX half of the TOC entries (Plan 8A owns `w:pPr/w:tabs`; Plan 8B owns the DOCX TOC snapshot), field and TOC generation (Plan 8B / Plan 9), hidden *text* runs (`text:display` on spans, `w:vanish`), and conditional-section evaluation.
+DOCX `w:tabs` leaders and the DOCX half of the TOC entries (Plan 8A owns `w:pPr/w:tabs`; Plan 8B owns the DOCX TOC snapshot), field and TOC generation (Plan 8B / Plan 9), hidden *text* runs (`text:display` on spans, `w:vanish`), conditional-section evaluation, and sections contained inside table cells.
 
 * No rewriting of the tab-stop model beyond adding the leader fields, and no tab-stop editing UI (rulers, leader pickers, the FCT Tab settings dialog) which belongs to the Plan 11 packages.
 * No TOC regeneration and no "Update Index" control; Plan 9 owns writing.
