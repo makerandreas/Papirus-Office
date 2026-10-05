@@ -105,7 +105,7 @@ A resource in `res/font`, a ZIP in the repository, a composable name, a roadmap 
 
 ## 5. PR sequence and work packages
 
-Plan 3B is complete. PRs #15 to #19 were used by Plan 5, Plan 1 documentation used #20-#21, Plan 6 used #22-#25, and Plan 7A landed as #26. The 2026-10-03 ODF split delivered 7B `#27` canonical/import convergence, 7C `#28` indexes/sections/navigation/status, and 7D `#29` tables; the repair was #30, and Plan 7E font aliases/calibration merged as #31. The separate editor-projection correction PR #32 merged as `466240e` (not a Plan; CI green), then Plan 7F at #33, 8A #34, 8B #35, and Plan 9 #36. **Plan 11 implementation packages are forecast at #39 to #43** after Plan 10 #37-#38. Plan IDs remain the stable key and PR numbers are forecasts. The forward schedule lives in roadmap v2 §4.12 and `plan-01-master-index.md` §2; `audit-014` records the ODF split and `audit-018` records the correction/reforecast.
+Plan 3B is complete. PRs #15 to #19 were used by Plan 5, Plan 1 documentation used #20-#21, Plan 6 used #22-#25, and Plan 7A landed as #26. The 2026-10-03 ODF split delivered 7B `#27` canonical/import convergence, 7C `#28` indexes/sections/navigation/status, and 7D `#29` tables; the repair was #30, and Plan 7E font aliases/calibration merged as #31. The separate editor-projection correction PR #32 merged as `466240e` (not a Plan; CI green), then Plan 7F at #33 (open; feature gates green, not merged), 8A #34, 8B #35, and Plan 9 #36. **Plan 11 implementation packages are forecast at #39 to #43** after Plan 10 #37-#38. Plan IDs remain the stable key and PR numbers are forecasts. The forward schedule lives in roadmap v2 §4.12 and `plan-01-master-index.md` §2; `audit-014` records the ODF split and `audit-018` records the correction/reforecast.
 
 | Order | Scope | Exit gate |
 |---|---|---|
@@ -120,7 +120,7 @@ Plan 3B is complete. PRs #15 to #19 were used by Plan 5, Plan 1 documentation us
 
 ### Dependency and ordering notes
 
-- The documentation contract is PR 14 (merged). Plan 7A landed as #26. The current implementation sequence is Plan 7B #27, 7C #28, 7D #29, the post-7D repair #30, and 7E #31 (merged); then the separate editor-projection correction #32 (merged; CI green), Plan 7F #33, 8A #34, 8B #35, Plan 9 #36, and Plan 10 #37-#38. Plan 11 packages follow (**forecast #39-#43** in plan-01 §2 and roadmap v2 §4.12); plan IDs are stable and PR numbers are not reserved.
+- The documentation contract is PR 14 (merged). Plan 7A landed as #26. The current implementation sequence is Plan 7B #27, 7C #28, 7D #29, the post-7D repair #30, and 7E #31 (merged); then the separate editor-projection correction #32 (merged; CI green), Plan 7F #33 (open; CI green), 8A #34, 8B #35, Plan 9 #36, and Plan 10 #37-#38. Plan 11 packages follow (**forecast #39-#43** in plan-01 §2 and roadmap v2 §4.12); plan IDs are stable and PR numbers are not reserved.
 - Theme and app-shell work can proceed alongside ODF/DOCX parser work only where they touch separate UI/theme paths. Share anti-slop gates and resolve source conflicts before merge.
 - UI Google Sans work is not a substitute for Plan 5/7/8 document-font metrics and should not block a shell redesign. Conversely, do not change saved document font names to make the UI font path work.
 - Ribbon controls that edit content depend on their model/writer capability, so follow Plans 6–9 or coordinate capability by capability. Design specs may be written early; implementation cannot claim persistence until round-trip evidence passes.

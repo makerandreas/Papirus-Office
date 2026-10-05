@@ -1,7 +1,7 @@
 # Plan 7F: ODF tab leaders and hidden-section layout
 
-**Scope drafted:** 2026-10-04. **Scope corrected:** 2026-10-05. **Status:** implementation in progress; see the staged feature commits and gates below.
-**Forecast:** one PR, **#33**, after the separate selection-projection correction (**#32**, merged as `466240e`). Plan 7E is merged as PR #31. Forecasts can move; the plan ID does not.
+**Scope drafted:** 2026-10-04. **Scope corrected:** 2026-10-05. **Status:** implemented in PR #33; both feature gates passed; PR remains open and unmerged.
+**PR:** one PR, **#33**, after the separate selection-projection correction (**#32**, merged as `466240e`). Plan 7E is merged as PR #31. Forecasts can move; the plan ID does not.
 **Scope owner:** the owner approved this split when PR #30 landed (recorded in that PR's body: 7E owns font-face declarations, alias resolution and final calibration; 7F owns ODF tab stops/leaders and hidden-section layout). The first draft of this document was written in a session whose commits never reached a remote (audit-017 section 1); this version is rebuilt from the tree and the raw fixture packages and is labelled static where it states design rather than measured fact.
 **References:** roadmap v2 sections 4.7d items 5 and 6 and 4.7f (current scope/sequence), `audit-015` section 9 (Plan 7C record), `audit-017` sections 4.3 and 4.4 (fixture re-derivation) and section 13.4 (the withdrawn `text:display` expectation), and `audit-018` (selection-projection correction, reforecast, and merge closeout).
 **Depends on:** Plan 7E (the resolved family is an input to tab measurement) and the merged selection-projection correction PR #32 as the chosen merge-order gate. Plan 8A does not technically depend on 7F, but the agreed forecast schedules this one-PR Plan 7F before 8A; implementation PRs remain sequential.
@@ -17,10 +17,10 @@
 Verified in the tree on 2026-10-04:
 
 * **Positions and alignment.** `SvXMLImport.kt:797-806` reads `<style:tab-stops>` and `<style:tab-stop>`, maps `style:type` (`right`, `center`, `char` to DECIMAL, otherwise LEFT) and appends `ParagraphTabStop(positionUnits, alignment)`. `SvXMLImport.kt:496` reads `style:tab-stop-distance` into `defaultTabIntervalUnits`.
-* **Model.** `TabAlignment` (`LEFT, RIGHT, CENTER, DECIMAL, CLEAR`) and `ParagraphTabStop(positionUnits, alignment)` at `OfficeDocument.kt:302-304`; `ParagraphStyle.defaultTabIntervalUnits` defaults to `48f` (`OfficeDocument.kt:346`) and the field participates in the cache key at `LayoutEngine.kt:165`, so a tab change invalidates measurement.
+* **Model.** Positions and `TabAlignment` (`LEFT, RIGHT, CENTER, DECIMAL, CLEAR`) predate 7F; `ParagraphTabStop` now carries nullable `leaderText` in addition to `positionUnits` and `alignment` (`OfficeDocument.kt:302-312`). `ParagraphStyle.defaultTabIntervalUnits` still defaults to `48f`, and tab stops participate in the paragraph cache key, so a tab change invalidates measurement.
 * **Layout.** `ParagraphMeasurer.tabAdvance` (`:57-90`) walks the sorted stops, applies RIGHT, CENTER and DECIMAL offsets from the text that follows the tab, skips `CLEAR` stops (and steps past a cleared position), honours the style interval, and falls back to `48f` when the style sets none. It is consumed twice, while choosing a break (`:92`) and while measuring the line (`:120`).
 
-**Missing:** `style:leader-style` (ODF 1.4 Part 3 §19.489) and `style:leader-text` (§19.490) are read nowhere (`grep -rn "leader" app/src/main/java` returns no hit), `ParagraphTabStop` has no leader field, and nothing paints a leader.
+**Pre-7F baseline gap (verified 2026-10-04):** neither `style:leader-style` (§19.489) nor `style:leader-text` (§19.490) was read (`grep -rn "leader" app/src/main/java` had no hit), `ParagraphTabStop` had no leader field, and the display projection painted no leaders. The implementation and tested support boundary are recorded below.
 
 Normative shape, re-read in `docs/odf/OpenDocument-v1.4-part3-schema.html`:
 
@@ -51,7 +51,7 @@ Fixture load (audit-017 section 4.3, re-verified in this session from the raw pa
 
 ## 3. Item 2: hidden-section layout
 
-Plan 7C records `SectionDisplay.HIDDEN` on `DocumentSectionRange` (`DocumentSemantics.kt:69-79`) and keeps Navigator rows and jumps out of hidden ranges (`DocumentIndexEngine.kt:410,414`), but no layout path reads `namedSectionRanges`: the paginator's consumers use paragraphs and elements only, so hidden text is still placed. 7F excludes hidden ranges, and everything nested inside them, from layout.
+Plan 7C records `SectionDisplay.HIDDEN` on `DocumentSectionRange` (`DocumentSemantics.kt:69-79`) and keeps Navigator rows and jumps out of hidden ranges (`DocumentIndexEngine.kt:410,414`). Before 7F, no layout path read `namedSectionRanges`, so hidden text was still placed; the implementation now excludes hidden ranges, and everything nested inside them, from layout.
 
 * The exclusion happens in one place, decided by the same `DocumentSectionRange` values Plan 7C records, so the renderer and the Navigator cannot disagree. Filtering uses each range against the original `DocumentBody.elements` indices; it must not compact or reindex the body before pagination.
 * Conditional sections (`SectionDisplay.CONDITIONAL`) keep their current treatment: recorded, laid out, and reported with their condition. 7F does not evaluate conditions, because no plan owns a condition evaluator.
@@ -78,3 +78,14 @@ DOCX `w:tabs` leaders and the DOCX half of the TOC entries (Plan 8A owns `w:pPr/
 * No page furniture: `w:headerReference`/`w:footerReference` stay recorded and not rendered.
 * No change to how the Navigator lists hidden sections: the Plan 7C behaviour stands, including graying and jumps that land on the nearest visible position.
 * No new claim about painting bundled fonts: that remains Plan 10 A1.
+
+## 6. Implementation closeout (2026-10-05)
+
+Plan 7F was delivered in the one PR #33 using the two feature/test-gated commits required above:
+
+| Commit | Delivery | CI gate |
+|---|---|---|
+| `65e6e3c` | ODF textual-leader import, model, measurement and display projection; `Plan7fTabLeaderTest` | Run `37310408444`: 355 tests across 65 suites, 0 failures/errors/skips; Unit Tests and Build passed. The focused leader suite passed 5/5. |
+| `428ea38` | Body-level hidden-section layout using original element indices; `Plan7fHiddenSectionLayoutTest` | Run `37311218794`: 358 tests across 66 suites, 0 failures/errors/skips; Unit Tests and Build passed. Hidden-section tests passed 3/3 and leader tests remained 5/5. |
+
+The final run's twelve-fixture matrix stayed unchanged from the post-7E baseline: ODT `14/23/21/10/18/20`, DOCX `15/25/25/11/19/24`; every count remained within its recorded `SampleMatrix` window. `PaginationFidelityTest` passed. Local Gradle execution was unavailable because this sandbox has no Java/JDK; verification is from GitHub Actions. PR #33 is open and not merged.

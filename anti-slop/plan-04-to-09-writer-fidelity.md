@@ -340,7 +340,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 | 7 | **Plan 7D** tables end to end | none | one table geometry reaches layout, rendering, pagination, and hit-testing |
 | 8 | **Plan 7E** fonts/calibration | none | declared aliases drive metrics/display; fixtures remeasured |
 | 9 | **Editor projection correction (PR #32 merged; CI green; not a Plan)** | none | selection/model/merge/window offsets agree |
-| 10 | **Plan 7F (PR #33)** leaders/hidden sections | none | leader and hidden-section commits pass separate gates; matrix unchanged |
+| 10 | **Plan 7F (PR #33 open; feature gates green)** textual leaders/hidden sections | none | separate leader and hidden-section commits pass CI; matrix unchanged |
 | 11 | **Plan 8 (PR #34-#35)** OOXML structure | after **Plan 7E** and the scheduled Plan 7F | Sample-6.docx fidelity checklist; both-format convergence |
 | 12 | **Plan 9 (PR #36)** save integrity | after **Plan 8B** | round-trip test: open → save → reopen preserves text, styles, tables, images |
 

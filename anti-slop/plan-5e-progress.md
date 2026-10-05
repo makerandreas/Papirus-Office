@@ -1,6 +1,6 @@
 # Plan 5e implementation record
 
-> **Current Plan 7 sequence (2026-10-04):** 7B canonical model/importer convergence (#27) -> 7C authored indexes and named sections (#28) -> 7D tables end to end (#29) -> PR #30 regression repair -> 7E font-face aliases/final calibration (#31) -> 7F tab leaders/hidden sections, with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`, `audit-017-2026-10-04-plan-7e-recovery-and-7f-shape.md` and `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`.
+> **Current Plan 7 sequence (2026-10-05):** 7B canonical model/importer convergence (#27) -> 7C authored indexes and named sections (#28) -> 7D tables end to end (#29) -> PR #30 regression repair -> 7E font-face aliases/final calibration (#31) -> 7F tab leaders/hidden sections (PR #33 open; both feature gates green, not merged), with exactly one PR per plan. This sequence supersedes any older combined package or downstream PR forecast; see `audit-014-2026-10-03-plan-7b-convergence.md`, `audit-017-2026-10-04-plan-7e-recovery-and-7f-shape.md`, `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`, and roadmap v2's v2.11 implementation note.
 
 
 Date: 2026-09-28. Scope and gates: [audit-011](audit-011-2026-09-28-plan-5e-readiness.md), section 6.

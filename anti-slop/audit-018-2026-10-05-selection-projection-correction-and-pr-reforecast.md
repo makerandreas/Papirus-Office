@@ -57,22 +57,22 @@ It does not add conditional-section evaluation, sections contained inside table 
 | #37-#38 | Plan 10 resume |
 | #39-#43 | Plan 11 UI packages |
 
-Plan IDs remain authoritative; #32 is now an actual open PR, while #33 onward are forecasts, not reservations. This reforecast supersedes the 2026-10-04 forward slots only; it does not alter the owners or scope of Plans 7E, 7F, or 8-11.
+Plan IDs remain authoritative; at the time of this reforecast, #32 was an actual open PR while #33 onward were forecasts, not reservations. This reforecast supersedes the 2026-10-04 forward slots only; it does not alter the owners or scope of Plans 7E, 7F, or 8-11.
 
 ---
 
 ## 7. Merge closeout (2026-10-05)
 
-PR #32 was subsequently merged as `466240e99aa30f24d016b800279d6a625d72454d`. Its PR-head run `37259378329` passed 350 tests across 64 suites and the merge workflow `37259905276` passed both Unit Tests and Build (SemVer & Nightly). The open/unmerged statements above describe the audit snapshot before merge and are retained as historical facts. The current forward sequence remains Plan 7F at forecast #33, then 8A #34 and onward.
+PR #32 was subsequently merged as `466240e99aa30f24d016b800279d6a625d72454d`. Its PR-head run `37259378329` passed 350 tests across 64 suites and the merge workflow `37259905276` passed both Unit Tests and Build (SemVer & Nightly). The open/unmerged statements above describe the audit snapshot before merge and are retained as historical facts. At that time, the forward sequence still forecast Plan 7F at #33, then 8A #34 and onward. That forecast was consumed by PR #33, which is now open and unmerged with both feature gates green; scope and verification are recorded in the Plan 7F closeout and roadmap v2.11 entry.
 
 ---
 
 ## 6. Synchronized planning references
 
-The current sequence and scope are synchronized in:
+The PR sequence, current status, and scope are synchronized in:
 
 - `plan-01-master-index.md` §2 and its 2026-10-05 reforecast note;
-- `plan-2026-09-24-remaining-pr-roadmap-v2.md` overview, §§4.7e-4.7f, §4.12, §5, and v2.9 note;
-- `plan-04-to-09-writer-fidelity.md` current forecast, Plan 7E record, and sequence table;
-- `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md` forecast, commit gates, and explicit non-goals; and
+- `plan-2026-09-24-remaining-pr-roadmap-v2.md` overview, §§4.7e-4.7f, §4.12, §5, and v2.11 implementation note;
+- `plan-04-to-09-writer-fidelity.md` current sequence, Plan 7E record, and implementation table;
+- `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md` PR status, commit gates, implementation closeout, and explicit non-goals; and
 - `plan-11-hybrid-experience-design.md` forward PR references.

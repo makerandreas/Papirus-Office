@@ -170,7 +170,7 @@ Sub-item IDs keep their plan identity (E = Plan 5, F = 6, G = 7, H = 8, I = 9). 
 | 30 | repair | Post-7D regression repair | 7D | small | **landed** (`9356212`); regression analysis in `audit-016`/`audit-017` |
 | 31 | 7E | ODF font-face aliases and final pagination calibration | 7D | medium | **landed**; declared face drives metrics/display; ODT fixture evidence refreshed |
 | 32 | corrective follow-up (not a Plan; merged, CI green) | Shared Inky editor-text projection and selection-coordinate regression fix | 7E (#31) | medium | editor initialization, selection/model edits, merging, and element windows agree; regression test covers list/table offsets and undo |
-| 33 | 7F | ODF tab leaders and body-level hidden-section layout | 7E + corrective follow-up (#32, merge-order gate) | medium | separate leader and hidden-section commit/test gates; no page-count movement |
+| 33 | 7F | ODF textual tab leaders and body-level hidden-section layout | 7E + corrective follow-up (#32, merge-order gate) | medium | **PR #33 open; both separate feature/test gates green**; no page-count movement |
 | 34 | 8A | DOCX style chain + run formatting (char-link convention, numId-suppression flag) | 7E | large | heading/body sizes from the file, no leak |
 | 35 | 8B | DOCX numbering, fields, tables, sections, TOC snapshot | 8A (+7D shared geometry) | large | Sample-6 DOCX checklist; both formats converge; windows hold |
 | 36 | 9 | Save round-trip integrity (pre-change gate first) | 6, 7E, 8B | large | open → save → reopen preserves structure |
@@ -349,7 +349,7 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 3. Cover Times New Roman/Liberation Serif and the fixture corpus's generated aliases without confusing style alias names with actual family names.
 4. Re-run the full six-ODT element dump/page matrix after 7C/7D are load-bearing. Explain every shift, tighten only with evidence, and record the final windows before 8A starts.
 5. **Tab stops and leaders (moved from 7C on 2026-10-04; split out to Plan 7F on 2026-10-04).** Positions and alignment already ship. Plan 7F adds the explicit single-character ODF `style:leader-text` subset to the paragraph-style-chain tab model and paints textual leaders in the existing tab gap; §19.490 `leader-text` precedence is honored. The TOC entries in Samples 2/4/5/6, all of which declare `.` with `dotted` line styling, are the first consumers. Line-only leader patterns and extra leader color/text-style/width styling are deferred; see `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md` for the support boundary.
-6. **Hidden-section rendering (added 2026-10-04; split out to Plan 7F on 2026-10-04).** Plan 7C lists `text:display="none"` sections and keeps jumps out of them, but the paginator still lays out their content. Exclude hidden ranges from layout. No fixture contains one, so the item cannot move the matrix and its tests are synthetic.
+6. **Hidden-section rendering (added 2026-10-04; split out to Plan 7F on 2026-10-04).** Before 7F, Plan 7C listed `text:display="none"` sections and kept jumps out of them, but the paginator still laid out their content. Plan 7F now excludes the supported body-level hidden ranges from layout. No fixture contains one, so the item cannot move the matrix and its tests are synthetic.
 
 **Tests:** declaration precedence and aliases from both XML parts; metric/display parity; all six ODT font inventories; final pagination matrix and zero unexplained empty pages. The tab-stop, leader and hidden-section tests named in earlier revisions belong to Plan 7F and are listed there.
 
@@ -386,6 +386,8 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 **Goal:** render the checked-in ODF textual tab-leader subset and omit supported hidden body-level section ranges from layout, without changing reserved tab advances or the twelve-fixture page matrix. The detailed plan is `plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`.
 
 **Delivery:** one PR with two scoped feature commits and gates: (1) leader import/model/layout/painting plus leader tests; the gate must pass before (2) hidden-section layout plus synthetic tests begins. Records-only cleanup may follow the feature commits.
+
+**Implementation status (2026-10-05):** PR #33 is open and not merged. Leader gate `37310408444` and hidden-section gate `37311218794` both passed Unit Tests and Build; exact test counts and the unchanged fixture matrix are recorded in the Plan 7F closeout and v2.11 changelog below.
 
 **Boundaries:** ODF only; textual leaders are limited to explicit single-character `style:leader-text`, with line-only leaders and `leader-color`/`leader-text-style`/`leader-width` deferred. Conditional sections remain recorded and laid out; there is no condition evaluator. Sections contained inside table cells are unsupported. DOCX `w:tabs`/`w:vanish`, hidden text runs, TOC regeneration, and UI editing remain out of scope. The plan contains no fixture with a hidden section, so these tests are synthetic and the page-count matrix must not move.
 
@@ -476,7 +478,7 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | repair | **#30 landed** | row 7 gets the regression and repair note | `audit-016` post-7D analysis, `audit-017` recovery state |
 | 7E | **#31 landed** | row 7 -> "7E font aliases/calibration landed" | Plan 7 records G-6 aliases and the final ODT matrix |
 | corrective follow-up (not a Plan) | **#32 merged as `466240e`; CI green** | row 7 notes the editor-projection correction separately from 7F | `audit-018`; selection regression record in this section |
-| 7F | **#33 forecast** | row 7 -> "7F ODF leaders/hidden-section layout" when merged | Plan 7F document; two feature commits with separate gates |
+| 7F | **#33 open; feature gates green** | row 7 -> "7F ODF textual leaders/hidden-section layout" when merged | Plan 7F document; two feature commits with separate gates |
 | 8A | **#34** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
 | 8B | **#35** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
 | 9 | **#36** | row 9 -> landed | Plan 9 structural round-trip record |
@@ -507,7 +509,7 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 | - | post-7D regression repair | **#30, merged** | - | **done:** recovery verified in `audit-017` |
 | 4 | 7E (font aliases/calibration) | **#31, merged** | research only | metrics/display parity; final ODT matrix |
 | 5 | editor-projection correction (not a Plan) | **#32 merged; CI green** | none | selection, merge, and windows use one text coordinate space |
-| 6 | 7F (ODF leaders/body-level hidden sections) | **#33** | none | leader gate then hidden-section gate; no matrix movement |
+| 6 | 7F (ODF textual leaders/body-level hidden sections) | **#33 open; both gates green** | none | leader gate then hidden-section gate; no matrix movement |
 | 7 | 8A (DOCX style chain/runs) | **#34** | none | DOCX style chain green |
 | 8 | 8B (DOCX numbering/fields/tables/sections) | **#35** | none | both-format convergence |
 | 9 | 9 (save round trip) | **#36** | Plan 10 resume decision | structural round-trip CI matrix |
@@ -556,6 +558,7 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 20. **v2.8 (2026-10-04, audit-016 and audit-017):** the post-7D refactor regression (`cb89460`) and its repair are recorded; PR #30 is the repair merge `9356212`, so the forecast from 7E onward shifts by one: 7E `#31`, 8A `#32`, 8B `#33`, Plan 9 `#34`, Plan 10 `#35`-`#36`, Plan 11 `#37`-`#41`. Plan 7E is delivered as PR #31; its first two commits compiled in CI run `37213135047` (342 tests, one corrected expectation, Build green) and the calibration is measured: the twelve-file page matrix is unchanged from PR #30, with Sample-6.odt's dump line moving from `(Aptos1)` to `(Aptos)` and no `Aptos1` left in the dump. Items 5 and 6 leave 7E for the new Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`), and decision D3 (save refusal for declared font faces) is deferred to Plan 9. Every earlier line that names a 7E slot of `#30` is superseded on that point only.
 21. **v2.9 (2026-10-05, `audit-018`).** PR #31 merged Plan 7E. The post-merge selection review found editor/model offset drift around generated list labels and structural tables; the shared projection correction is forecast separately as PR #32, followed by the still-distinct one-PR Plan 7F at #33. The forward schedule becomes 8A #34, 8B #35, Plan 9 #36, Plan 10 #37-#38, and Plan 11 #39-#43. This supersedes only the earlier PR-number forecast, not plan ownership or the Plan 7F scope boundaries. Plan 7F uses separate leader and hidden-section commits/gates; hidden sections in table cells, conditional evaluation, DOCX `w:tabs`/`w:vanish`, and UI editing remain out of scope.
 22. **v2.10 (2026-10-05, `audit-018` closeout).** The separate correction is now open as PR #32. CI run `37259378329` passed 350 unit tests across 64 suites, including `SelectionProjectionConsistencyTest` (2/2), and the Build (SemVer & Nightly) job. PR #32 is unmerged; Plan 7F remains forecast at #33 and keeps the same scope boundaries. Local test execution remains unavailable without a JDK.
+23. **v2.11 (2026-10-05, Plan 7F implementation).** PR #33 is open (not merged) with the two separately gated feature commits. Leader gate `37310408444` passed 355 tests across 65 suites plus Build; hidden-section gate `37311218794` passed 358 tests across 66 suites plus Build. The twelve-fixture matrix remained ODT `14/23/21/10/18/20` and DOCX `15/25/25/11/19/24`; synthetic hidden-section tests cover original body indices, hidden page breaks, conditional/visible ranges, and editor windows. Scope remains the checked-in ODF textual-leader subset, not general line styling.
 
 ---
 
