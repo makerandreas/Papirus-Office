@@ -273,7 +273,7 @@ CI run `37213135047` (which measured the pre-fix head `28a37fb`; commit 2 is `c3
 
 Decision D3 was reversed by the owner on 2026-10-04: the modified-save refusal for declared font faces is deferred to Plan 9, which owns writer regeneration. The recorded loss is that a regenerated `content.xml` would drop the declaration table; no writer path is touched by 7E. Items 5 and 6 of §4.7d (tab leaders, hidden-section layout) are split out to the new Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`).
 
-**Post-7E selection-coordinate correction (forecast PR #32; not Plan 7F).** Review found that editor offsets and `SelectionEngine` used different text projections around list labels and tables. One shared `DocumentTextProjection` now aligns Inky loading/reload, selection/model operations, merging, and element windows; `DeleteSelectionCommand` uses the current editor string for model offsets. `SelectionProjectionConsistencyTest` is the focused gate. Scope and PR forecast are recorded in `audit-018`; no Plan 7F feature is included in this correction.
+**Post-7E selection-coordinate correction (PR #32 open; CI green; not Plan 7F).** Review found that editor offsets and `SelectionEngine` used different text projections around list labels and tables. One shared `DocumentTextProjection` now aligns Inky loading/reload, selection/model operations, merging, and element windows; `DeleteSelectionCommand` uses the current editor string for model offsets. `SelectionProjectionConsistencyTest` is the focused gate. Scope and PR status are recorded in `audit-018`; no Plan 7F feature is included in this correction.
 
 ---
 
@@ -339,7 +339,7 @@ O-01 is real and dangerous: `DocxDocumentParser.saveDocument(file, document)` re
 | 6 | **Plan 7C** indexes/sections/navigation/status | none | authored snapshots and named ranges are navigable |
 | 7 | **Plan 7D** tables end to end | none | one table geometry reaches layout, rendering, pagination, and hit-testing |
 | 8 | **Plan 7E** fonts/calibration | none | declared aliases drive metrics/display; fixtures remeasured |
-| 9 | **Editor projection correction (PR #32; not a Plan)** | none | selection/model/merge/window offsets agree |
+| 9 | **Editor projection correction (PR #32 open; CI green; not a Plan)** | none | selection/model/merge/window offsets agree |
 | 10 | **Plan 7F (PR #33)** leaders/hidden sections | none | leader and hidden-section commits pass separate gates; matrix unchanged |
 | 11 | **Plan 8 (PR #34-#35)** OOXML structure | after **Plan 7E** and the scheduled Plan 7F | Sample-6.docx fidelity checklist; both-format convergence |
 | 12 | **Plan 9 (PR #36)** save integrity | after **Plan 8B** | round-trip test: open → save → reopen preserves text, styles, tables, images |

@@ -169,7 +169,7 @@ Sub-item IDs keep their plan identity (E = Plan 5, F = 6, G = 7, H = 8, I = 9). 
 | 29 | 7D | Table structure, measurement, pagination, rendering, cell hit-testing | 7C | large | one table geometry from parser through interaction |
 | 30 | repair | Post-7D regression repair | 7D | small | **landed** (`9356212`); regression analysis in `audit-016`/`audit-017` |
 | 31 | 7E | ODF font-face aliases and final pagination calibration | 7D | medium | **landed**; declared face drives metrics/display; ODT fixture evidence refreshed |
-| 32 | corrective follow-up (not a Plan) | Shared Inky editor-text projection and selection-coordinate regression fix | 7E (#31) | medium | editor initialization, selection/model edits, merging, and element windows agree; regression test covers list/table offsets and undo |
+| 32 | corrective follow-up (not a Plan; PR open, CI green) | Shared Inky editor-text projection and selection-coordinate regression fix | 7E (#31) | medium | editor initialization, selection/model edits, merging, and element windows agree; regression test covers list/table offsets and undo |
 | 33 | 7F | ODF tab leaders and body-level hidden-section layout | 7E + corrective follow-up (#32, merge-order gate) | medium | separate leader and hidden-section commit/test gates; no page-count movement |
 | 34 | 8A | DOCX style chain + run formatting (char-link convention, numId-suppression flag) | 7E | large | heading/body sizes from the file, no leak |
 | 35 | 8B | DOCX numbering, fields, tables, sections, TOC snapshot | 8A (+7D shared geometry) | large | Sample-6 DOCX checklist; both formats converge; windows hold |
@@ -375,9 +375,9 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Finding:** `OfficeDocument.toPlainText()` includes generated list labels and table-cell text, while Inky's flat editor projection contains paragraph/heading/list-item text and skips tables and other structural elements. `SelectionEngine` previously used the broader string for model extraction/deletion/insertion, so offsets after a list item or table could select or delete the wrong characters. Parsing also seeded the editor directly from `DocxParseResult.text` rather than the canonical editor projection.
 
-**Implementation direction:** one `DocumentTextProjection` owns the editor block set and `\n\n` separator. Inky initialization/open/reload, selection extraction and edits, `DeleteSelectionCommand`, `DocumentTextMerger`, and `DocumentTextWindows` all consume it; `toPlainText()` keeps its separate full-content semantics. Structured parse results project through the adapted model, while plain-text imports keep their raw text fallback.
+**Implementation direction:** one `DocumentTextProjection` owns the editor block set and `\n\n` separator. Inky initialization/open/reload, selection extraction and edits, `DeleteSelectionCommand`, `DocumentTextMerger`, and `DocumentTextWindows` all consume it; `toPlainText()` keeps its separate, broader plain-text semantics. Structured parse results project through the adapted model, while plain-text imports keep their raw text fallback.
 
-**Regression gate:** `SelectionProjectionConsistencyTest` exercises an imported heading/list/table/paragraph document, checks the post-table character selection, verifies the table survives deletion and undo restores the editor text, and checks the mapped element window. The full unit-test and build CI must pass before this forecast leaves #32. No local JDK is available in the current sandbox; local test execution is therefore not claimed.
+**Regression gate (passed in CI):** `SelectionProjectionConsistencyTest` exercises an imported heading/list/table/paragraph document, checks the post-table character selection, verifies the table survives deletion and undo restores the editor text, and checks the mapped element window. Run `37259378329` reported 350 tests across 64 suites with 0 failures, errors, or skips (including both tests in `SelectionProjectionConsistencyTest`); Build (SemVer & Nightly) also passed. PR #32 is open and unmerged. No local JDK is available in the current sandbox, so local test execution is not claimed.
 
 **Scope guard:** no ODF leader or hidden-section feature and no save-format redesign. No UI redesign or new controls are included; the only Inky UI-module change is routing existing editor buffers through the shared projection. The correction does not expand Plan 7F.
 
@@ -475,7 +475,7 @@ Per plan-01 §6's update rule, every PR's **final commit** contains the plan-01 
 | 7D | **#29 landed** | row 7 -> "7D tables landed" | Plan 7 records G-5 end to end |
 | repair | **#30 landed** | row 7 gets the regression and repair note | `audit-016` post-7D analysis, `audit-017` recovery state |
 | 7E | **#31 landed** | row 7 -> "7E font aliases/calibration landed" | Plan 7 records G-6 aliases and the final ODT matrix |
-| corrective follow-up (not a Plan) | **#32 forecast** | row 7 notes the editor-projection correction separately from 7F | `audit-018`; selection regression record in this section |
+| corrective follow-up (not a Plan) | **#32 open; CI green** | row 7 notes the editor-projection correction separately from 7F | `audit-018`; selection regression record in this section |
 | 7F | **#33 forecast** | row 7 -> "7F ODF leaders/hidden-section layout" when merged | Plan 7F document; two feature commits with separate gates |
 | 8A | **#34** | row 8 -> "8A landed" | Plan 8 gets H-1/H-2 |
 | 8B | **#35** | row 8 -> "8A, 8B landed" | Plan 8 gets H-3 to H-7 and convergence evidence |
@@ -506,7 +506,7 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 | 3 | 7D (tables end to end) | **#29, merged** | research only | shared geometry through cell hit-testing |
 | - | post-7D regression repair | **#30, merged** | - | **done:** recovery verified in `audit-017` |
 | 4 | 7E (font aliases/calibration) | **#31, merged** | research only | metrics/display parity; final ODT matrix |
-| 5 | editor-projection correction (not a Plan) | **#32** | none | selection, merge, and windows use one text coordinate space |
+| 5 | editor-projection correction (not a Plan) | **#32 open; CI green** | none | selection, merge, and windows use one text coordinate space |
 | 6 | 7F (ODF leaders/body-level hidden sections) | **#33** | none | leader gate then hidden-section gate; no matrix movement |
 | 7 | 8A (DOCX style chain/runs) | **#34** | none | DOCX style chain green |
 | 8 | 8B (DOCX numbering/fields/tables/sections) | **#35** | none | both-format convergence |
@@ -555,6 +555,7 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 
 20. **v2.8 (2026-10-04, audit-016 and audit-017):** the post-7D refactor regression (`cb89460`) and its repair are recorded; PR #30 is the repair merge `9356212`, so the forecast from 7E onward shifts by one: 7E `#31`, 8A `#32`, 8B `#33`, Plan 9 `#34`, Plan 10 `#35`-`#36`, Plan 11 `#37`-`#41`. Plan 7E is delivered as PR #31; its first two commits compiled in CI run `37213135047` (342 tests, one corrected expectation, Build green) and the calibration is measured: the twelve-file page matrix is unchanged from PR #30, with Sample-6.odt's dump line moving from `(Aptos1)` to `(Aptos)` and no `Aptos1` left in the dump. Items 5 and 6 leave 7E for the new Plan 7F (`plan-7f-2026-10-04-tab-stops-and-hidden-sections.md`), and decision D3 (save refusal for declared font faces) is deferred to Plan 9. Every earlier line that names a 7E slot of `#30` is superseded on that point only.
 21. **v2.9 (2026-10-05, `audit-018`).** PR #31 merged Plan 7E. The post-merge selection review found editor/model offset drift around generated list labels and structural tables; the shared projection correction is forecast separately as PR #32, followed by the still-distinct one-PR Plan 7F at #33. The forward schedule becomes 8A #34, 8B #35, Plan 9 #36, Plan 10 #37-#38, and Plan 11 #39-#43. This supersedes only the earlier PR-number forecast, not plan ownership or the Plan 7F scope boundaries. Plan 7F uses separate leader and hidden-section commits/gates; hidden sections in table cells, conditional evaluation, DOCX `w:tabs`/`w:vanish`, and UI editing remain out of scope.
+22. **v2.10 (2026-10-05, `audit-018` closeout).** The separate correction is now open as PR #32. CI run `37259378329` passed 350 unit tests across 64 suites, including `SelectionProjectionConsistencyTest` (2/2), and the Build (SemVer & Nightly) job. PR #32 is unmerged; Plan 7F remains forecast at #33 and keeps the same scope boundaries. Local test execution remains unavailable without a JDK.
 
 ---
 

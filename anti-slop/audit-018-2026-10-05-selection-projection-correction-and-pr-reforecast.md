@@ -2,7 +2,7 @@
 
 **Baseline:** PR #31 (Plan 7E), merged 2026-10-04; repository checkout is shallow at `61b0644` on `arena/01a109ef-papirus-office`.
 **Scope:** turn the post-Plan-7E selection-coordinate review into a separate corrective change, then reconcile current plan forecasts. Plan 7F remains separate and unchanged in ownership.
-**Status:** code, regression test, and planning updates are in the Arena session branch; PR #32 is a forecast only and has not been opened or merged.
+**Status:** correction committed as `987986a` and pushed as [PR #32](https://github.com/makerandreas/Papirus-Office/pull/32); the PR is open and unmerged. GitHub Actions run `37259378329` passed both Unit Tests (350 tests across 64 suites; 0 failed, errors, or skipped) and Build (SemVer & Nightly). `SelectionProjectionConsistencyTest` passed both tests.
 
 ---
 
@@ -33,7 +33,7 @@ A single `DocumentTextProjection` now defines the editor text, textual elements,
 
 ## 3. Verification status
 
-The local sandbox has no Java runtime, so the new test and Gradle build have **not** been run locally. No GitHub Actions run exists yet for this session branch. `git diff --check` passed; source search confirms the selection/merge/window paths no longer derive editor offsets from `toPlainText()`, and Inky's remaining `parseResult.text` use is metadata-only. CI must pass before PR #32 is considered ready. Do not report the regression test as passing until CI executes it.
+The local sandbox has no Java runtime, so the new test and Gradle build were **not** run locally. `git diff --check` passed; source search confirms the selection/merge/window paths no longer derive editor offsets from `toPlainText()`, and Inky's remaining `parseResult.text` use is metadata-only. CI run `37259378329` passed on PR #32's head commit `987986a`: Unit Tests reported 350 tests across 64 suites with 0 failures, errors, or skips (including both `SelectionProjectionConsistencyTest` tests), and Build (SemVer & Nightly) passed. The PR remains open and unmerged.
 
 ## 4. Plan 7F boundary and delivery shape
 
@@ -44,12 +44,12 @@ Plan 7F remains one PR with two separately gated feature commits:
 
 It does not add conditional-section evaluation, sections contained inside table cells, DOCX `w:tabs` or `w:vanish`, hidden text runs, TOC regeneration, or UI editing. The selection-coordinate correction is not folded into Plan 7F.
 
-## 5. Forward PR forecast
+## 5. PR status and forward forecast
 
-| Forecast PR | Work |
+| PR status / slot | Work |
 |---|---|
 | #31 | Plan 7E, merged |
-| #32 | Separate shared editor-text projection / selection-coordinate correction (not a Plan) |
+| #32 — open; CI green | Separate shared editor-text projection / selection-coordinate correction (not a Plan) |
 | #33 | Plan 7F, one PR with separate leader and hidden-section commits/gates |
 | #34 | Plan 8A |
 | #35 | Plan 8B |
@@ -57,7 +57,7 @@ It does not add conditional-section evaluation, sections contained inside table 
 | #37-#38 | Plan 10 resume |
 | #39-#43 | Plan 11 UI packages |
 
-Plan IDs remain authoritative and PR numbers are forecasts, not reservations. This reforecast supersedes the 2026-10-04 forward slots only; it does not alter the owners or scope of Plans 7E, 7F, or 8-11.
+Plan IDs remain authoritative; #32 is now an actual open PR, while #33 onward are forecasts, not reservations. This reforecast supersedes the 2026-10-04 forward slots only; it does not alter the owners or scope of Plans 7E, 7F, or 8-11.
 
 ---
 
