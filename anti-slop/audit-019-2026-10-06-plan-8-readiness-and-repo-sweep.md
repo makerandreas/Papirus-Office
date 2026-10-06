@@ -386,6 +386,40 @@ Samples 2 and 5 stay at 14 pt) plus the toggle, ignored-child and numbering-stat
 re-measured after commit 1 because three DOCX counts move. `DocxRunFormattingTest` and the measured
 matrix remain commit 2.
 
+### 4.3 Plan 8A delivery record, 2026-10-06
+
+Commit 1 (character properties and linkage) is `b328da7`, with `5880a8d` as the
+compile fix CI found (`OfficeDocument` exposes `body.elements`; the six errors of
+run `37454077585` were that single mistype in the new test). Commit 2 (the run
+model) is `e9c0ada`, with `e7ce0c7` and `698bc7d` correcting test expectations
+that runs `37475988884` and `37477229929` caught. The records commit is `639414c`
+and this one.
+
+Test evidence, from the CI reports rather than from this sandbox (there is still
+no JDK here):
+
+| run | head | result |
+|---|---|---|
+| `37454077585` | `b328da7` | compile failure, 6 errors, one mistyped receiver |
+| `37454972514` | `5880a8d` | 373 tests / 67 suites, 0 failed, Build green |
+| `37455734065` | `639414c` | records commit, both jobs green |
+| `37475988884` | `e9c0ada` | 383 tests, 3 failed, all in the new run test |
+| `37477229929` | `e7ce0c7` | 383 tests, 2 failed, all in the new run test |
+| `37478258709` | `698bc7d` | 383 tests / 68 suites, 0 failed, Build green |
+
+`DocxStyleChainTest` 11/11, `DocxRunFormattingTest` 10/10,
+`StyleChainMetricsTest` 8/8, `OfficeRunsTest` 11/11,
+`ParagraphStyleSemanticsTest` 13/13, `Sample5StyleFidelityTest` 4/4,
+`HeadingRunsTest` 2/2, `HyperlinkFidelityTest` 2/2, and
+`PaginationFidelityTest` green across all twelve windows with Sample-6.docx at
+24 pages inside its 15..26 window and zero empty pages.
+
+Every intermediate failure was a wrong expectation about which layer declares a
+value (a base span read where a run override was meant, a run asserted to hold a
+style's value, a heading asked of a paragraph-only helper) and each fix kept the
+assertion, moved it to the layer that holds the value, or turned the
+no-override case into an assertion of its own. No assertion was weakened.
+
 ---
 
 ## 5. Unused code sweep
