@@ -12,7 +12,9 @@ sealed class OfficeDocumentElement {
         val styleName: String? = null,
         val runs: List<TextRun> = emptyList(),
         val pageBreakOffsets: List<Int> = emptyList(),
-        val bookmarks: List<String> = emptyList()
+        val bookmarks: List<String> = emptyList(),
+        /** OOXML `w:numPr` state, resolved through the style chain; null when unnumbered. */
+        val numbering: DocxNumberingRef? = null
     ) : OfficeDocumentElement()
 
     data class Heading(
@@ -21,7 +23,9 @@ sealed class OfficeDocumentElement {
         val styleName: String? = null,
         val runs: List<TextRun> = emptyList(),
         val pageBreakOffsets: List<Int> = emptyList(),
-        val bookmarks: List<String> = emptyList()
+        val bookmarks: List<String> = emptyList(),
+        /** OOXML `w:numPr` state, resolved through the style chain; null when unnumbered. */
+        val numbering: DocxNumberingRef? = null
     ) : OfficeDocumentElement()
 
     data class ListItem(
@@ -97,13 +101,48 @@ data class TableCell(
     }
 }
 
+/**
+ * One authored run of text inside a paragraph. The three toggle properties are
+ * tri-state on purpose: `null` means this run states nothing and the paragraph
+ * or character style decides, `true` means the run turns the property on, and
+ * `false` means it turns it off, which is how OOXML writes an explicit
+ * negative (`w:b w:val="0"`, ECMA-376 Part 1 §17.7.3). The same holds for the
+ * character properties a run may override directly.
+ */
 data class TextRun(
     val text: String,
-    val isBold: Boolean = false,
-    val isItalic: Boolean = false,
-    val isUnderline: Boolean = false,
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val isUnderline: Boolean? = null,
     val styleName: String? = null,
-    val hyperlink: String? = null
+    val hyperlink: String? = null,
+    /** Direct `w:color`, `w:highlight`, `w:vanish`, `w:sz`/`w:szCs` and `w:rFonts` on the run. */
+    val colorHex: String? = null,
+    val highlight: String? = null,
+    val isHidden: Boolean? = null,
+    val fontSizeSp: Float? = null,
+    val fontFamily: String? = null
+)
+
+/**
+ * Effective OOXML numbering state of one paragraph, resolved from `w:numPr`
+ * (`w:ilvl` + `w:numId`, ECMA-376 Part 1 §17.9.6 and §17.9.18).
+ *
+ * [numId] `0` is not a definition reference: the document uses it to suppress
+ * the numbering a style would otherwise give the paragraph (`[MS-OI29500]`
+ * §17.9.18 note, p.125), so [suppressed] records that fact instead of leaving
+ * a caller to interpret the zero. [fromStyle] is true when no `w:pPr/w:numPr`
+ * is present and the reference comes from the paragraph style chain, which is
+ * the shape Word writes for headings and list styles.
+ *
+ * Plan 8A resolves and carries this state; Plan 8B reads `word/numbering.xml`
+ * and renders the label from it.
+ */
+data class DocxNumberingRef(
+    val numId: Int,
+    val ilvl: Int = 0,
+    val suppressed: Boolean = false,
+    val fromStyle: Boolean = false
 )
 
 data class OfficeParsedDocument(

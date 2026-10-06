@@ -295,14 +295,19 @@ class OdtDocumentWriter : DocumentFormatWriter {
     private fun writeRunsOrText(sb: StringBuilder, plainText: String, runs: List<OfficeTextRun>) {
         if (runs.isNotEmpty()) {
             for (run in runs) {
+                // Run flags are tri-state: only a stated property writes a span
+                // style, so a run that says nothing keeps the paragraph's style.
+                val bold = run.isBold == true
+                val italic = run.isItalic == true
+                val underline = run.isUnderline == true
                 val effectiveStyle = when {
-                    run.isBold && run.isItalic && run.isUnderline -> "T_BoldItalicUnderline"
-                    run.isBold && run.isItalic -> "T_BoldItalic"
-                    run.isBold && run.isUnderline -> "T_BoldUnderline"
-                    run.isItalic && run.isUnderline -> "T_ItalicUnderline"
-                    run.isBold -> "T_Bold"
-                    run.isItalic -> "T_Italic"
-                    run.isUnderline -> "T_Underline"
+                    bold && italic && underline -> "T_BoldItalicUnderline"
+                    bold && italic -> "T_BoldItalic"
+                    bold && underline -> "T_BoldUnderline"
+                    italic && underline -> "T_ItalicUnderline"
+                    bold -> "T_Bold"
+                    italic -> "T_Italic"
+                    underline -> "T_Underline"
                     !run.styleName.isNullOrEmpty() -> run.styleName
                     !run.characterStyle.isNullOrEmpty() -> run.characterStyle
                     else -> null

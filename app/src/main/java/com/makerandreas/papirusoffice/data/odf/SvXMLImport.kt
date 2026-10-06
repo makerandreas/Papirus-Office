@@ -111,11 +111,17 @@ data class OdfStyleInfo(
     val tableVerticalAlignment: TableVerticalAlignment? = null
 )
 
-/** Bold/italic/underline resolved from a character style, never from the style name. */
+/**
+ * Bold/italic/underline resolved from a character style, never from the style
+ * name. Tri-state like the DOCX run model: `null` means the span's own style
+ * chain states nothing and the paragraph decides, `true`/`false` mean the chain
+ * declares the property, so `fo:font-weight="normal"` can turn off bold that a
+ * paragraph style set (ODF 1.4 Part 3 §20.183 and §20.185).
+ */
 data class OdfSpanFormat(
-    val isBold: Boolean = false,
-    val isItalic: Boolean = false,
-    val isUnderline: Boolean = false
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val isUnderline: Boolean? = null
 )
 
 private class StyleDraft(
@@ -1036,9 +1042,9 @@ class SvXMLImport(
         if (styleName.isNullOrBlank()) return OdfSpanFormat()
         val cascaded = cascadeStyle(styleName, "text") ?: return OdfSpanFormat()
         return OdfSpanFormat(
-            isBold = cascaded.isBold == true,
-            isItalic = cascaded.isItalic == true,
-            isUnderline = cascaded.isUnderline == true
+            isBold = cascaded.isBold,
+            isItalic = cascaded.isItalic,
+            isUnderline = cascaded.isUnderline
         )
     }
 

@@ -35,18 +35,41 @@ sealed class SchemaValidationResult {
     data class Invalid(val reason: String, val warnings: List<String> = emptyList()) : SchemaValidationResult()
 }
 
+/**
+ * One `w:style` definition as `word/styles.xml` states it, before the
+ * `w:basedOn` chain is resolved. Every property is nullable so "this style
+ * does not set it" stays distinguishable from "this style sets it false":
+ * that distinction is what makes the owner decision of 2026-10-06 (the
+ * paragraph style wins for the properties it sets, its linked character style
+ * supplies the rest) implementable. Toggle properties are tri-state for the
+ * same reason (ECMA-376 Part 1 §17.7.3, `[MS-OI29500]` §17.7.3 p.105).
+ */
 data class DocxStyleMeta(
     val styleId: String,
     val name: String,
+    /** `paragraph`, `character`, `table` or `numbering` (`w:type`). */
+    val styleType: String = "paragraph",
     val outlineLvl: Int? = null,
     val isHeading: Boolean = false,
     val headingLevel: Int = 1,
     val basedOn: String? = null,
+    /** `w:link` target: the character style this paragraph style is linked to (§17.7.4.6). */
+    val link: String? = null,
     val fontSizeSp: Float? = null,
+    /** `w:szCs` complex-script half-point size; used only when the chain sets no `w:sz`. */
+    val fontSizeCsSp: Float? = null,
     val isBold: Boolean? = null,
     val isItalic: Boolean? = null,
     val isUnderline: Boolean? = null,
     val fontFamily: String? = null,
+    val colorHex: String? = null,
+    /** `w:highlight` colour name (`ST_HighlightColor`). */
+    val highlight: String? = null,
+    /** `w:vanish` hidden text. */
+    val isHidden: Boolean? = null,
+    /** Style-level `w:numPr` (`w:numId` 0 suppresses numbering for the style and its descendants). */
+    val numId: Int? = null,
+    val numIlvl: Int? = null,
     val spaceBeforeUnits: Float? = null,
     val spaceAfterUnits: Float? = null,
     val lineHeightFactor: Float? = null,
@@ -66,7 +89,30 @@ data class DocxStyleMeta(
 data class DocxStylesParseResult(
     val stylesMetaMap: Map<String, DocxStyleMeta> = emptyMap(),
     val paragraphStyles: Map<String, ParagraphStyle> = emptyMap(),
+    /** `w:type="character"` styles after their own `w:basedOn` chain is resolved. */
+    val characterStyles: Map<String, CharacterStyle> = emptyMap(),
+    /** Effective `w:numPr` per paragraph style, resolved through the chain; Plan 8B renders labels from it. */
+    val numberingByStyle: Map<String, DocxNumberingRef> = emptyMap(),
     val defaultParagraphStyle: ParagraphStyle? = null
+)
+
+/**
+ * Character properties of one resolved level of a `word/styles.xml` chain.
+ * Every field stays nullable so "this level does not set it" is
+ * distinguishable from "this level sets it false", which is what lets the
+ * paragraph style keep its own value and take only the gaps from its linked
+ * character style (owner decision 2026-10-06, audit-019 section 4.1).
+ */
+private data class DocxRunProps(
+    val sizeSp: Float? = null,
+    val sizeCsSp: Float? = null,
+    val fontFamily: String? = null,
+    val bold: Boolean? = null,
+    val italic: Boolean? = null,
+    val underline: Boolean? = null,
+    val colorHex: String? = null,
+    val highlight: String? = null,
+    val hidden: Boolean? = null
 )
 
 /**
@@ -86,17 +132,17 @@ class OfficeDocumentParser(private val context: Context) {
     companion object {
         private val inMemoryParsedDocCache = ConcurrentHashMap<String, ParsedCacheEntry>()
 
-        // Precompiled style-classification patterns (was: recompiled per style).
-        private val PARA_STYLE_REGEX = Regex("(?i)para[1-9]")
-        private val PARA_STYLE_ANCHORED_REGEX = Regex("(?i)^para[1-9]$")
-        private val HEADING_STYLE_REGEX = Regex("(?i)heading[1-9]")
-        private val SINGLE_DIGIT_REGEX = Regex("^[1-6]$")
-        private val DIGITS_REGEX = Regex("\\d+")
         // SpreadsheetML / PresentationML entry patterns (hoisted: matched per sheet/slide).
         private val XLSX_SHEET_FILE_REGEX = Regex("sheet(\\d+)")
         private val PPTX_SLIDE_FILE_REGEX = Regex("slide(\\d+)\\.xml")
         // Strict full-entry match: slide layouts/masters share the ppt/slides/slide prefix.
         private val PPTX_SLIDE_ENTRY_REGEX = Regex("^ppt/slides/slide\\d+\\.xml$")
+
+        /** ECMA-376 §17.7.4.17: a `styleId` longer than this is ignored by Word. */
+        private const val MAX_STYLE_ID_LENGTH = 253
+
+        /** Built-in styles whose child elements Word ignores (ECMA-376 §17.7.4.17). */
+        private val STYLES_WITH_IGNORED_CHILDREN = setOf("NoList", "DefaultParagraphFont", "TableNormal")
 
         fun clearCacheForFile(path: String) {
             inMemoryParsedDocCache.remove(path)
@@ -207,25 +253,6 @@ class OfficeDocumentParser(private val context: Context) {
         )
     }
 
-    private fun extractOdtStylesXml(file: File): String? {
-        if (!file.exists() || (!file.name.endsWith(".odt", ignoreCase = true) && !file.name.endsWith(".ott", ignoreCase = true))) return null
-        try {
-            ZipInputStream(file.inputStream()).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == "styles.xml") {
-                        return zip.readCappedBytes().toString(Charsets.UTF_8)
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-        } catch (e: Exception) {
-            // Graceful fallback
-        }
-        return null
-    }
-
     private fun extractOdtPageCount(file: File): Int? {
         if (!file.exists() || !file.name.endsWith(".odt", ignoreCase = true)) return null
         try {
@@ -273,6 +300,21 @@ class OfficeDocumentParser(private val context: Context) {
 
     private fun docxOnOff(value: String?): Boolean =
         value?.lowercase(Locale.ROOT) !in setOf("0", "false", "off")
+
+    /**
+     * ECMA-376 Part 1 §17.7.3 toggle property: present without `w:val`, or with
+     * `1`/`true`/`on`, means true; `0`/`false`/`off` means false; an absent
+     * element means inherit, which is why the caller keeps nulls around.
+     *
+     * Inside one `w:basedOn` chain the nearest definition wins, so a derived
+     * style's explicit `w:b w:val="0"` cancels an inherited bold. The
+     * cross-tier XOR of the twelve toggle properties (`[MS-OI29500]` §2.1.230,
+     * p.105) is deliberately not modelled where the paragraph style meets its
+     * linked character style: the owner decision of 2026-10-06 fixes that
+     * merge as own-properties-first, with the twin filling only the gaps
+     * (audit-019 section 4.2 records the deviation).
+     */
+    private fun docxToggle(value: String?): Boolean = docxOnOff(value)
 
     private fun parseDocxTab(parser: XmlPullParser): ParagraphTabStop? {
         val pos = getXmlAttr(parser, "pos")?.toIntOrNull() ?: return null
@@ -337,6 +379,12 @@ class OfficeDocumentParser(private val context: Context) {
                 var inDocDefaultsRPr = false
                 var inDocDefaultsPPr = false
                 var docDefaultSz: Float? = null
+                var docDefaultSzCs: Float? = null
+                var docDefaultBold: Boolean? = null
+                var docDefaultItalic: Boolean? = null
+                var docDefaultUnderline: Boolean? = null
+                var docDefaultColor: String? = null
+                var docDefaultVanish: Boolean? = null
                 var docDefaultFont: String? = null
                 var docDefaultBefore: Float? = null
                 var docDefaultAfter: Float? = null
@@ -353,14 +401,22 @@ class OfficeDocumentParser(private val context: Context) {
                 var docDefaultTabs: List<ParagraphTabStop>? = null
 
                 var inStyle = false
+                var currentStyleIgnored = false
                 var currentStyleType: String? = null
                 var currentStyleId: String? = null
                 var currentStyleName: String? = null
                 var currentBasedOn: String? = null
+                var currentLink: String? = null
                 var currentOutlineLvl: Int? = null
                 var inRPr = false
                 var inPPr = false
                 var currentSz: Float? = null
+                var currentSzCs: Float? = null
+                var currentColor: String? = null
+                var currentHighlight: String? = null
+                var currentVanish: Boolean? = null
+                var currentNumId: Int? = null
+                var currentNumIlvl: Int? = null
                 var currentBold: Boolean? = null
                 var currentItalic: Boolean? = null
                 var currentUnderline: Boolean? = null
@@ -401,6 +457,17 @@ class OfficeDocumentParser(private val context: Context) {
                                     val valStr = getXmlAttr(parser, "val")
                                     valStr?.toIntOrNull()?.let { docDefaultSz = LayoutUnits.halfPointsToPt(it) }
                                 }
+                                inDocDefaultsRPr && tagName == "szcs" -> {
+                                    getXmlAttr(parser, "val")?.toIntOrNull()?.let { docDefaultSzCs = LayoutUnits.halfPointsToPt(it) }
+                                }
+                                inDocDefaultsRPr && tagName == "b" -> { docDefaultBold = docxToggle(getXmlAttr(parser, "val")) }
+                                inDocDefaultsRPr && tagName == "i" -> { docDefaultItalic = docxToggle(getXmlAttr(parser, "val")) }
+                                inDocDefaultsRPr && tagName == "u" -> {
+                                    val uVal = getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)
+                                    docDefaultUnderline = uVal == null || uVal !in setOf("none", "0", "false", "off")
+                                }
+                                inDocDefaultsRPr && tagName == "color" -> { docDefaultColor = getXmlAttr(parser, "val") }
+                                inDocDefaultsRPr && tagName == "vanish" -> { docDefaultVanish = docxToggle(getXmlAttr(parser, "val")) }
                                 inDocDefaultsRPr && tagName == "rfonts" -> {
                                     val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
                                     if (!fontStr.isNullOrBlank()) docDefaultFont = fontStr.trim('\'', '"')
@@ -448,15 +515,25 @@ class OfficeDocumentParser(private val context: Context) {
                                     hStr?.toIntOrNull()?.let { docDefaultFirstLine = -LayoutUnits.twipsToUnits(it) }
                                 }
                                 tagName == "style" -> {
-                                    inStyle = true
+                                    val styleIdAttr = getXmlAttr(parser, "styleid")
+                                    // ECMA-376 §17.7.4.17: a styleId longer than 253 characters is ignored.
+                                    currentStyleIgnored = !styleIdAttr.isNullOrBlank() && styleIdAttr.length > MAX_STYLE_ID_LENGTH
+                                    inStyle = !currentStyleIgnored
                                     currentStyleType = getXmlAttr(parser, "type") ?: "paragraph"
-                                    currentStyleId = getXmlAttr(parser, "styleid")
+                                    currentStyleId = styleIdAttr
                                     currentStyleName = null
                                     currentBasedOn = null
+                                    currentLink = null
                                     currentOutlineLvl = null
                                     inRPr = false
                                     inPPr = false
                                     currentSz = null
+                                    currentSzCs = null
+                                    currentColor = null
+                                    currentHighlight = null
+                                    currentVanish = null
+                                    currentNumId = null
+                                    currentNumIlvl = null
                                     currentBold = null
                                     currentItalic = null
                                     currentUnderline = null
@@ -482,6 +559,9 @@ class OfficeDocumentParser(private val context: Context) {
                                 inStyle && tagName == "basedon" -> {
                                     currentBasedOn = getXmlAttr(parser, "val")
                                 }
+                                inStyle && tagName == "link" -> {
+                                    currentLink = getXmlAttr(parser, "val")
+                                }
                                 inStyle && tagName == "outlinelvl" -> {
                                     currentOutlineLvl = getXmlAttr(parser, "val")?.toIntOrNull()
                                 }
@@ -492,18 +572,19 @@ class OfficeDocumentParser(private val context: Context) {
                                     val valStr = getXmlAttr(parser, "val")
                                     valStr?.toIntOrNull()?.let { currentSz = LayoutUnits.halfPointsToPt(it) }
                                 }
-                                inStyle && inRPr && tagName == "b" -> {
-                                    val valStr = getXmlAttr(parser, "val") ?: "1"
-                                    currentBold = valStr !in listOf("0", "false", "off")
+                                inStyle && inRPr && tagName == "szcs" -> {
+                                    val valStr = getXmlAttr(parser, "val")
+                                    valStr?.toIntOrNull()?.let { currentSzCs = LayoutUnits.halfPointsToPt(it) }
                                 }
-                                inStyle && inRPr && tagName == "i" -> {
-                                    val valStr = getXmlAttr(parser, "val") ?: "1"
-                                    currentItalic = valStr !in listOf("0", "false", "off")
-                                }
+                                inStyle && inRPr && tagName == "b" -> { currentBold = docxToggle(getXmlAttr(parser, "val")) }
+                                inStyle && inRPr && tagName == "i" -> { currentItalic = docxToggle(getXmlAttr(parser, "val")) }
                                 inStyle && inRPr && tagName == "u" -> {
-                                    val valStr = getXmlAttr(parser, "val") ?: "single"
-                                    currentUnderline = valStr !in listOf("none", "0", "false", "off")
+                                    val uVal = getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)
+                                    currentUnderline = uVal == null || uVal !in setOf("none", "0", "false", "off")
                                 }
+                                inStyle && inRPr && tagName == "color" -> { currentColor = getXmlAttr(parser, "val") }
+                                inStyle && inRPr && tagName == "highlight" -> { currentHighlight = getXmlAttr(parser, "val") }
+                                inStyle && inRPr && tagName == "vanish" -> { currentVanish = docxToggle(getXmlAttr(parser, "val")) }
                                 inStyle && inRPr && tagName == "rfonts" -> {
                                     val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
                                     if (!fontStr.isNullOrBlank()) currentFont = fontStr.trim('\'', '"')
@@ -550,6 +631,13 @@ class OfficeDocumentParser(private val context: Context) {
                                 inStyle && inPPr && tagName == "tab" -> {
                                     parseDocxTab(parser)?.let { currentTabs = currentTabs.orEmpty() + it }
                                 }
+                                // Style-level numbering state: `w:numPr` inside `w:pPr` (ECMA-376 §17.9.18).
+                                inStyle && inPPr && tagName == "numid" -> {
+                                    currentNumId = getXmlAttr(parser, "val")?.toIntOrNull()
+                                }
+                                inStyle && inPPr && tagName == "ilvl" -> {
+                                    currentNumIlvl = getXmlAttr(parser, "val")?.toIntOrNull()
+                                }
                                 inStyle && inPPr && tagName == "keepnext" -> {
                                     currentKeepNext = docxOnOff(getXmlAttr(parser, "val"))
                                 }
@@ -578,48 +666,62 @@ class OfficeDocumentParser(private val context: Context) {
                                     inPPr = false
                                 }
                                 tagName == "style" -> {
-                                    if (currentStyleId != null && (currentStyleType == null || currentStyleType.equals("paragraph", ignoreCase = true))) {
-                                        val sName = currentStyleName ?: currentStyleId!!
-                                        val catalogLevel = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
-                                        val isHeading = catalogLevel > 0 ||
-                                                currentStyleId!!.matches(PARA_STYLE_REGEX) ||
-                                                currentStyleId!!.matches(HEADING_STYLE_REGEX) ||
-                                                currentOutlineLvl != null
-
+                                    val styleId = currentStyleId
+                                    if (!currentStyleIgnored && styleId != null) {
+                                        // `NoList`, `DefaultParagraphFont` and `TableNormal` are
+                                        // built-ins whose children Word ignores (ECMA-376 §17.7.4.17),
+                                        // so their definitions contribute nothing but their identity.
+                                        val childrenIgnored = styleId in STYLES_WITH_IGNORED_CHILDREN
+                                        val styleType = currentStyleType ?: "paragraph"
+                                        val sName = if (childrenIgnored) styleId else currentStyleName ?: styleId
+                                        val catalogLevel = if (childrenIgnored) 0 else
+                                            com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(sName)
                                         val level = when {
+                                            childrenIgnored -> 1
                                             currentOutlineLvl != null -> currentOutlineLvl!! + 1
-                                            else -> DIGITS_REGEX.find(sName)?.value?.toIntOrNull()
-                                                ?: DIGITS_REGEX.find(currentStyleId!!)?.value?.toIntOrNull()
-                                                ?: 1
+                                            catalogLevel > 0 -> catalogLevel
+                                            else -> 1
                                         }
+                                        val isHeading = !childrenIgnored && (catalogLevel > 0 || currentOutlineLvl != null)
 
-                                        rawStylesMap[currentStyleId!!] = DocxStyleMeta(
-                                            styleId = currentStyleId!!,
+                                        rawStylesMap[styleId] = DocxStyleMeta(
+                                            styleId = styleId,
                                             name = sName,
-                                            outlineLvl = currentOutlineLvl,
+                                            styleType = styleType,
+                                            outlineLvl = if (childrenIgnored) null else currentOutlineLvl,
                                             isHeading = isHeading,
                                             headingLevel = level.coerceIn(1, 6),
-                                            basedOn = currentBasedOn,
-                                            fontSizeSp = currentSz,
-                                            isBold = currentBold,
-                                            isItalic = currentItalic,
-                                            isUnderline = currentUnderline,
-                                            fontFamily = currentFont,
-                                            spaceBeforeUnits = currentBefore,
-                                            spaceAfterUnits = currentAfter,
-                                            lineHeightFactor = currentLineFactor,
-                                            lineHeightExactUnits = currentLineExact,
-                                            lineHeightMinimumUnits = currentLineMinimum,
-                                            indentStartUnits = currentIndentStart,
-                                            indentEndUnits = currentIndentEnd,
-                                            firstLineIndentUnits = currentFirstLine,
-                                            keepWithNext = currentKeepNext,
-                                            pageBreakBefore = currentPageBreakBefore,
-                                            alignment = currentJc?.replaceFirstChar { it.uppercase() },
-                                            keepTogether = currentKeepTogether, widowControl = currentWidowControl, tabStops = currentTabs
+                                            basedOn = if (childrenIgnored) null else currentBasedOn,
+                                            link = if (childrenIgnored) null else currentLink,
+                                            fontSizeSp = if (childrenIgnored) null else currentSz,
+                                            fontSizeCsSp = if (childrenIgnored) null else currentSzCs,
+                                            isBold = if (childrenIgnored) null else currentBold,
+                                            isItalic = if (childrenIgnored) null else currentItalic,
+                                            isUnderline = if (childrenIgnored) null else currentUnderline,
+                                            fontFamily = if (childrenIgnored) null else currentFont,
+                                            colorHex = if (childrenIgnored) null else currentColor,
+                                            highlight = if (childrenIgnored) null else currentHighlight,
+                                            isHidden = if (childrenIgnored) null else currentVanish,
+                                            numId = if (childrenIgnored) null else currentNumId,
+                                            numIlvl = if (childrenIgnored) null else currentNumIlvl,
+                                            spaceBeforeUnits = if (childrenIgnored) null else currentBefore,
+                                            spaceAfterUnits = if (childrenIgnored) null else currentAfter,
+                                            lineHeightFactor = if (childrenIgnored) null else currentLineFactor,
+                                            lineHeightExactUnits = if (childrenIgnored) null else currentLineExact,
+                                            lineHeightMinimumUnits = if (childrenIgnored) null else currentLineMinimum,
+                                            indentStartUnits = if (childrenIgnored) null else currentIndentStart,
+                                            indentEndUnits = if (childrenIgnored) null else currentIndentEnd,
+                                            firstLineIndentUnits = if (childrenIgnored) null else currentFirstLine,
+                                            keepWithNext = if (childrenIgnored) null else currentKeepNext,
+                                            pageBreakBefore = if (childrenIgnored) null else currentPageBreakBefore,
+                                            alignment = if (childrenIgnored) null else currentJc?.replaceFirstChar { it.uppercase() },
+                                            keepTogether = if (childrenIgnored) null else currentKeepTogether,
+                                            widowControl = if (childrenIgnored) null else currentWidowControl,
+                                            tabStops = if (childrenIgnored) null else currentTabs
                                         )
                                     }
                                     inStyle = false
+                                    currentStyleIgnored = false
                                 }
                             }
                         }
@@ -627,22 +729,149 @@ class OfficeDocumentParser(private val context: Context) {
                     eventType = parser.next()
                 }
 
-                fun cascadeDocxStyle(meta: DocxStyleMeta): ParagraphStyle {
+                // `w:basedOn` chain, leaf first. Resolution is name-aware because
+                // some writers point `w:basedOn` at the style *name* ("Normal")
+                // rather than the id.
+                fun chainOf(meta: DocxStyleMeta): List<DocxStyleMeta> {
                     val chain = mutableListOf<DocxStyleMeta>()
                     var curr: String? = meta.styleId
                     val seen = mutableSetOf<String>()
                     while (curr != null && seen.add(curr.lowercase(Locale.ROOT))) {
-                        val st = rawStylesMap[curr] ?: rawStylesMap.values.firstOrNull { it.styleId.equals(curr, ignoreCase = true) || it.name.equals(curr, ignoreCase = true) }
-                        if (st == null) break
+                        val st = rawStylesMap[curr]
+                            ?: rawStylesMap.values.firstOrNull { it.styleId.equals(curr, ignoreCase = true) || it.name.equals(curr, ignoreCase = true) }
+                            ?: break
                         chain.add(st)
                         curr = st.basedOn
                     }
+                    return chain
+                }
 
-                    var sz = docDefaultSz ?: 12f
-                    var font = docDefaultFont
-                    var bold = false
-                    var italic = false
-                    var underline = false
+                // Nearest level that sets a property wins; `w:docDefaults` is the
+                // base and anything nobody sets stays null for the caller.
+                fun runPropsOf(chain: List<DocxStyleMeta>): DocxRunProps {
+                    var props = DocxRunProps(
+                        sizeSp = docDefaultSz,
+                        sizeCsSp = docDefaultSzCs,
+                        fontFamily = docDefaultFont,
+                        bold = docDefaultBold,
+                        italic = docDefaultItalic,
+                        underline = docDefaultUnderline,
+                        colorHex = docDefaultColor,
+                        hidden = docDefaultVanish
+                    )
+                    for (i in chain.lastIndex downTo 0) {
+                        val st = chain[i]
+                        props = DocxRunProps(
+                            sizeSp = st.fontSizeSp ?: props.sizeSp,
+                            sizeCsSp = st.fontSizeCsSp ?: props.sizeCsSp,
+                            fontFamily = st.fontFamily ?: props.fontFamily,
+                            bold = st.isBold ?: props.bold,
+                            italic = st.isItalic ?: props.italic,
+                            underline = st.isUnderline ?: props.underline,
+                            colorHex = st.colorHex ?: props.colorHex,
+                            highlight = st.highlight ?: props.highlight,
+                            hidden = st.isHidden ?: props.hidden
+                        )
+                    }
+                    return props
+                }
+
+                // ECMA-376 §17.7.4.6 with the Word notes that bind it
+                // ([MS-OI29500] §2.1.235(a)-(b), p.106): when two styles link to
+                // the same target, Word ignores all but the last link, and a
+                // singly linked pairing is read as bi-directional. Both notes are
+                // implemented here: a later claimant wins its target, and a
+                // character style whose own `w:link` points back at a paragraph
+                // style pairs that paragraph style even without a forward link.
+                val charTwinByParagraphStyle = run {
+                    val claimantByTarget = mutableMapOf<String, String>()
+                    for (st in rawStylesMap.values) {
+                        if (st.styleType != "paragraph") continue
+                        val target = st.link ?: continue
+                        if (target.isBlank()) continue
+                        claimantByTarget[target.lowercase(Locale.ROOT)] = st.styleId
+                    }
+                    val pairs = mutableMapOf<String, String>()
+                    for ((target, claimant) in claimantByTarget) {
+                        pairs[claimant.lowercase(Locale.ROOT)] = target
+                    }
+                    for (st in rawStylesMap.values) {
+                        if (st.styleType != "character") continue
+                        val back = st.link ?: continue
+                        if (back.isBlank()) continue
+                        val paragraph = rawStylesMap[back]
+                            ?: rawStylesMap.values.firstOrNull { it.styleId.equals(back, ignoreCase = true) }
+                            ?: continue
+                        if (paragraph.styleType != "paragraph") continue
+                        pairs.putIfAbsent(paragraph.styleId.lowercase(Locale.ROOT), st.styleId)
+                    }
+                    pairs
+                }
+
+                fun linkedCharacterStyle(meta: DocxStyleMeta): DocxStyleMeta? {
+                    if (meta.styleType != "paragraph") return null
+                    val explicit = charTwinByParagraphStyle[meta.styleId.lowercase(Locale.ROOT)]
+                        ?.let { target ->
+                            rawStylesMap[target]
+                                ?: rawStylesMap.values.firstOrNull { it.styleId.equals(target, ignoreCase = true) }
+                        }
+                    if (explicit != null && explicit.styleType == "character") return explicit
+                    // No `w:link` (or a dangling one): Word's linked-style naming
+                    // convention is "<paragraph style name> Char", which is how
+                    // Samples 1, 2, 5 and 6 pair a heading with its character twin.
+                    val wanted = meta.name + " Char"
+                    return rawStylesMap.values.firstOrNull {
+                        it.styleType == "character" && it.name.equals(wanted, ignoreCase = true)
+                    } ?: rawStylesMap.values.firstOrNull {
+                        it.styleType == "character" && it.name.equals(meta.name + "Char", ignoreCase = true)
+                    }
+                }
+
+                /** Only the properties this very style element declares. */
+                fun ownRunProps(meta: DocxStyleMeta): DocxRunProps = DocxRunProps(
+                    sizeSp = meta.fontSizeSp,
+                    sizeCsSp = meta.fontSizeCsSp,
+                    fontFamily = meta.fontFamily,
+                    bold = meta.isBold,
+                    italic = meta.isItalic,
+                    underline = meta.isUnderline,
+                    colorHex = meta.colorHex,
+                    highlight = meta.highlight,
+                    hidden = meta.isHidden
+                )
+
+                /**
+                 * Precedence for a paragraph style's run properties, in the
+                 * order the owner decision of 2026-10-06 fixes it: the style's
+                 * **own** `w:rPr` first (Sample-2 and Sample-5 declare their own
+                 * 14 pt level-1 size and win), then its linked character style,
+                 * which is where M365 writes the built-in heading formatting,
+                 * then the `w:basedOn` chain with `w:docDefaults` behind it.
+                 * The chain is last because a parent style must not outrank the
+                 * style's own character identity.
+                 */
+                fun mergeRunProps(chain: DocxRunProps, twin: DocxRunProps?, own: DocxRunProps): DocxRunProps =
+                    DocxRunProps(
+                        sizeSp = own.sizeSp ?: twin?.sizeSp ?: chain.sizeSp,
+                        sizeCsSp = own.sizeCsSp ?: twin?.sizeCsSp ?: chain.sizeCsSp,
+                        fontFamily = own.fontFamily ?: twin?.fontFamily ?: chain.fontFamily,
+                        bold = own.bold ?: twin?.bold ?: chain.bold,
+                        italic = own.italic ?: twin?.italic ?: chain.italic,
+                        underline = own.underline ?: twin?.underline ?: chain.underline,
+                        colorHex = own.colorHex ?: twin?.colorHex ?: chain.colorHex,
+                        highlight = own.highlight ?: twin?.highlight ?: chain.highlight,
+                        hidden = own.hidden ?: twin?.hidden ?: chain.hidden
+                    )
+
+                fun cascadeDocxStyle(meta: DocxStyleMeta): ParagraphStyle {
+                    val chain = chainOf(meta)
+                    val twin = linkedCharacterStyle(meta)
+                    val props = mergeRunProps(
+                        chain = runPropsOf(chain),
+                        twin = twin?.let { runPropsOf(chainOf(it)) },
+                        own = ownRunProps(meta)
+                    )
+
                     var before = docDefaultBefore ?: 0f
                     var after = docDefaultAfter ?: 0f
                     var lineFactor = docDefaultLineFactor ?: 1f
@@ -660,11 +889,6 @@ class OfficeDocumentParser(private val context: Context) {
 
                     for (i in chain.lastIndex downTo 0) {
                         val s = chain[i]
-                        s.fontSizeSp?.let { sz = it }
-                        s.fontFamily?.let { font = it }
-                        s.isBold?.let { bold = it }
-                        s.isItalic?.let { italic = it }
-                        s.isUnderline?.let { underline = it }
                         s.spaceBeforeUnits?.let { before = it }
                         s.spaceAfterUnits?.let { after = it }
                         // A newly declared mode replaces the entire inherited line-spacing
@@ -687,12 +911,17 @@ class OfficeDocumentParser(private val context: Context) {
 
                     return ParagraphStyle(
                         name = meta.name,
-                        fontSizeSp = sz,
-                        isBold = bold,
-                        isItalic = italic,
-                        isUnderline = underline,
+                        // `w:szCs` is the complex-script size and only stands in
+                        // when no `w:sz` exists anywhere in the resolved chain.
+                        fontSizeSp = props.sizeSp ?: props.sizeCsSp ?: 12f,
+                        isBold = props.bold ?: false,
+                        isItalic = props.italic ?: false,
+                        isUnderline = props.underline ?: false,
+                        colorHex = props.colorHex,
+                        highlight = props.highlight,
+                        isHidden = props.hidden ?: false,
                         alignment = alignment,
-                        fontFamily = font,
+                        fontFamily = props.fontFamily,
                         parentStyleName = meta.basedOn,
                         spaceBeforeUnits = before,
                         spaceAfterUnits = after,
@@ -710,28 +939,80 @@ class OfficeDocumentParser(private val context: Context) {
                     )
                 }
 
+                fun cascadeCharacterStyle(meta: DocxStyleMeta): CharacterStyle {
+                    // A character style resolves from its own element and its own
+                    // `w:basedOn` chain; its `w:link` points back at the paragraph
+                    // style it is paired with and is not a formatting source here.
+                    val props = mergeRunProps(
+                        chain = runPropsOf(chainOf(meta)),
+                        twin = null,
+                        own = ownRunProps(meta)
+                    )
+                    return CharacterStyle(
+                        name = meta.name,
+                        fontSizeSp = props.sizeSp ?: props.sizeCsSp,
+                        isBold = props.bold == true,
+                        isItalic = props.italic == true,
+                        isUnderline = props.underline == true,
+                        colorHex = props.colorHex,
+                        highlight = props.highlight,
+                        isHidden = props.hidden == true,
+                        fontFamily = props.fontFamily,
+                        parentStyleName = meta.basedOn
+                    )
+                }
+
+                // Effective numbering of a style chain: the nearest level that sets
+                // `w:numPr` wins, and `numId 0` is a suppression rather than a
+                // definition ([MS-OI29500] §17.9.18, p.125). Descendants inherit it,
+                // which is what makes Sample-4 `Judul4` inherit `Judul3`'s suppression.
+                fun resolveNumbering(meta: DocxStyleMeta): DocxNumberingRef? {
+                    for (st in chainOf(meta)) {
+                        val numId = st.numId ?: continue
+                        val ilvl = st.numIlvl ?: 0
+                        return if (numId == 0) {
+                            DocxNumberingRef(numId = 0, ilvl = ilvl, suppressed = true, fromStyle = true)
+                        } else {
+                            DocxNumberingRef(numId = numId, ilvl = ilvl, fromStyle = true)
+                        }
+                    }
+                    return null
+                }
+
                 val stylesMetaMap = mutableMapOf<String, DocxStyleMeta>()
                 val resolvedParagraphStyles = mutableMapOf<String, ParagraphStyle>()
+                val resolvedCharacterStyles = mutableMapOf<String, CharacterStyle>()
+                val numberingByStyle = mutableMapOf<String, DocxNumberingRef>()
 
                 for ((id, meta) in rawStylesMap) {
-                    stylesMetaMap[id] = meta
-                    stylesMetaMap[id.lowercase(Locale.ROOT)] = meta
-                    stylesMetaMap[meta.name] = meta
-                    stylesMetaMap[meta.name.lowercase(Locale.ROOT)] = meta
-
-                    val cascaded = cascadeDocxStyle(meta)
-                    resolvedParagraphStyles[id] = cascaded
-                    resolvedParagraphStyles[id.lowercase(Locale.ROOT)] = cascaded
-                    resolvedParagraphStyles[meta.name] = cascaded
-                    resolvedParagraphStyles[meta.name.lowercase(Locale.ROOT)] = cascaded
+                    val keys = listOf(id, id.lowercase(Locale.ROOT), meta.name, meta.name.lowercase(Locale.ROOT))
+                    when (meta.styleType) {
+                        "character" -> {
+                            val cascaded = cascadeCharacterStyle(meta)
+                            for (key in keys) resolvedCharacterStyles[key] = cascaded
+                        }
+                        "paragraph" -> {
+                            for (key in keys) stylesMetaMap[key] = meta
+                            val cascaded = cascadeDocxStyle(meta)
+                            for (key in keys) resolvedParagraphStyles[key] = cascaded
+                            resolveNumbering(meta)?.let { ref ->
+                                for (key in keys) numberingByStyle[key] = ref
+                            }
+                        }
+                        // `table` and `numbering` styles are recorded in the meta map
+                        // only; Plans 8B and 9 own their consumers.
+                        else -> for (key in keys) stylesMetaMap[key] = meta
+                    }
                 }
 
                 val normalMeta = rawStylesMap.values.firstOrNull { it.styleId.equals("Normal", ignoreCase = true) || it.name.equals("Normal", ignoreCase = true) }
                 val defaultParaStyle = normalMeta?.let { cascadeDocxStyle(it) }
                     ?: ParagraphStyle(
                         name = "Normal",
-                        fontSizeSp = docDefaultSz ?: 12f,
+                        fontSizeSp = docDefaultSz ?: docDefaultSzCs ?: 12f,
                         fontFamily = docDefaultFont,
+                        colorHex = docDefaultColor,
+                        isHidden = docDefaultVanish ?: false,
                         spaceBeforeUnits = docDefaultBefore ?: 0f,
                         spaceAfterUnits = docDefaultAfter ?: 0f,
                         lineHeightFactor = docDefaultLineFactor ?: 1f,
@@ -751,6 +1032,8 @@ class OfficeDocumentParser(private val context: Context) {
                 return DocxStylesParseResult(
                     stylesMetaMap = stylesMetaMap,
                     paragraphStyles = resolvedParagraphStyles,
+                    characterStyles = resolvedCharacterStyles,
+                    numberingByStyle = numberingByStyle,
                     defaultParagraphStyle = defaultParaStyle
                 )
             }
@@ -1271,6 +1554,7 @@ class OfficeDocumentParser(private val context: Context) {
         val inlinePageBreaks = mutableListOf<Int>()
         val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
         val docxStylesMap = docxStylesResult.stylesMetaMap
+        val docxNumberingMap = docxStylesResult.numberingByStyle
         val docxParagraphStyles = docxStylesResult.paragraphStyles.toMutableMap()
         val docxDefaultParagraphStyle = docxStylesResult.defaultParagraphStyle
         val docxRelsMap = if (isDocx) extractDocxRelationships(file) else emptyMap()
@@ -1297,11 +1581,24 @@ class OfficeDocumentParser(private val context: Context) {
             val currentCellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
 
             val currentText = StringBuilder()
-            val currentRuns = mutableListOf<TextRun>()
-            val currentRunText = StringBuilder()
-            var isBold = false
-            var isItalic = false
-            var isUnderline = false
+            // One entry per authored `w:r`, keyed by the offset in `currentText`
+            // where its text starts. Tiling them back into runs at `</w:p>`
+            // keeps `runs.joinToString("") == paragraph.text`, which is what
+            // every consumer of runs (measure, display, slice) requires.
+            val currentRuns = mutableListOf<Pair<Int, TextRun>>()
+            var inDocxRun = false
+            var inRunRPr = false
+            var runStartOffset = 0
+            var runBold: Boolean? = null
+            var runItalic: Boolean? = null
+            var runUnderline: Boolean? = null
+            var runStyle: String? = null
+            var runColor: String? = null
+            var runHighlight: String? = null
+            var runVanish: Boolean? = null
+            var runSizeSp: Float? = null
+            var runSizeCsSp: Float? = null
+            var runFont: String? = null
 
             var inPPr = false
             var currentPStyle: String? = null
@@ -1320,6 +1617,9 @@ class OfficeDocumentParser(private val context: Context) {
             var directWidowControl: Boolean? = null
             var directTabs: List<ParagraphTabStop>? = null
             var directJc: String? = null
+            var directNumId: Int? = null
+            var directNumIlvl: Int? = null
+            var inNumPr = false
             var paraHasSectPr = false
 
             // Standard supported tag set for warning/unsupported tag diagnostic logging
@@ -1403,6 +1703,8 @@ class OfficeDocumentParser(private val context: Context) {
                                 headingLevel = 1
                                 currentText.clear()
                                 currentRuns.clear()
+                                inDocxRun = false
+                                inRunRPr = false
                                 inPPr = false
                                 currentPStyle = null
                                 hasDirectPPr = false
@@ -1420,6 +1722,8 @@ class OfficeDocumentParser(private val context: Context) {
                                 directWidowControl = null
                                 directTabs = null
                                 directJc = null
+                                directNumId = null
+                                directNumIlvl = null
                                 paraHasSectPr = false
                                 inlinePageBreaks.clear()
                             }
@@ -1428,7 +1732,11 @@ class OfficeDocumentParser(private val context: Context) {
                                 inPPr = true
                             }
 
-                            // DOCX / Word Style & Outline Level detection
+                            // DOCX / Word Style & Outline Level detection. Heading
+                            // classification comes from the style table (`w:outlineLvl`,
+                            // style name) rather than from guessing at the id shape: the
+                            // checked-in fixtures use localised ids like `Judul1`, and an
+                            // id-shape regex matched none of them (audit-019 section 3.2).
                             tagLocal == "pstyle" -> {
                                 val styleVal = getXmlAttr(parser, "val") ?: ""
                                 currentPStyle = styleVal
@@ -1437,13 +1745,10 @@ class OfficeDocumentParser(private val context: Context) {
                                     inHeading = true
                                     headingLevel = meta.headingLevel
                                 } else {
-                                    val isHeadingStyle = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleVal) > 0 ||
-                                            styleVal.matches(PARA_STYLE_ANCHORED_REGEX) ||
-                                            styleVal.matches(SINGLE_DIGIT_REGEX)
-                                    if (isHeadingStyle) {
+                                    val level = com.makerandreas.papirusoffice.data.navigation.NavigatorStringCatalog.headingLevelFromStyleName(styleVal)
+                                    if (level > 0) {
                                         inHeading = true
-                                        val levelDigit = DIGITS_REGEX.find(styleVal)?.value?.toIntOrNull()
-                                        headingLevel = levelDigit ?: 1
+                                        headingLevel = level
                                     }
                                 }
                             }
@@ -1498,6 +1803,21 @@ class OfficeDocumentParser(private val context: Context) {
                                 }
                             }
 
+                            // Direct numbering state: `w:numPr` children (`w:ilvl`,
+                            // `w:numId`). The state is read where the loop already sees
+                            // the element, so the existing placeholder bullet text stays
+                            // exactly as it is until Plan 8B renders real labels.
+                            // Numbering is not a metric override, so it does not
+                            // trigger the synthetic "inline-p-*" style the way direct
+                            // spacing or indents do: the paragraph keeps its own style
+                            // name and carries the reference in `numbering` instead.
+                            inNumPr && tagLocal == "numid" -> {
+                                directNumId = getXmlAttr(parser, "val")?.toIntOrNull()
+                            }
+                            inNumPr && tagLocal == "ilvl" -> {
+                                directNumIlvl = getXmlAttr(parser, "val")?.toIntOrNull()
+                            }
+
                             inPPr && tagLocal == "keeplines" -> { directKeepTogether = docxOnOff(getXmlAttr(parser, "val")); hasDirectPPr = true }
                             inPPr && tagLocal == "widowcontrol" -> { directWidowControl = docxOnOff(getXmlAttr(parser, "val")); hasDirectPPr = true }
                             inPPr && tagLocal == "tab" -> {
@@ -1534,15 +1854,51 @@ class OfficeDocumentParser(private val context: Context) {
                                 // Ignored: soft page breaks are layout hints, not authored breaks
                             }
 
-                            // Text formatting
-                            tagLocal == "b" || tagLocal == "text-properties" -> {
-                                isBold = true
+                            // Runs. One run per `w:r`: the run owns its own
+                            // character properties, so a flag cannot leak into
+                            // the next run, and the run's text is the slice of
+                            // the paragraph buffer it appended (flushed at
+                            // `</w:r>`). Direct formatting is tri-state
+                            // (ECMA-376 Part 1 §17.7.3), so `w:val="0"` is an
+                            // explicit negative that has to survive to display.
+                            isDocx && tagLocal == "r" -> {
+                                inDocxRun = true
+                                inRunRPr = false
+                                runStartOffset = currentText.length
+                                runBold = null
+                                runItalic = null
+                                runUnderline = null
+                                runStyle = null
+                                runColor = null
+                                runHighlight = null
+                                runVanish = null
+                                runSizeSp = null
+                                runSizeCsSp = null
+                                runFont = null
                             }
-                            tagLocal == "i" -> {
-                                isItalic = true
+                            isDocx && inDocxRun && tagLocal == "rpr" -> { inRunRPr = true }
+                            // `w:rPr` directly inside `w:pPr` is the paragraph
+                            // mark's own formatting and applies to no run, so
+                            // every arm below is scoped to a run.
+                            isDocx && inRunRPr && tagLocal == "rstyle" -> { runStyle = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "b" -> { runBold = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "i" -> { runItalic = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "u" -> {
+                                val uVal = getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)
+                                runUnderline = uVal == null || uVal !in setOf("none", "0", "false", "off")
                             }
-                            tagLocal == "u" -> {
-                                isUnderline = true
+                            isDocx && inRunRPr && tagLocal == "color" -> { runColor = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "highlight" -> { runHighlight = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "vanish" -> { runVanish = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "sz" -> {
+                                getXmlAttr(parser, "val")?.toIntOrNull()?.let { runSizeSp = LayoutUnits.halfPointsToPt(it) }
+                            }
+                            isDocx && inRunRPr && tagLocal == "szcs" -> {
+                                getXmlAttr(parser, "val")?.toIntOrNull()?.let { runSizeCsSp = LayoutUnits.halfPointsToPt(it) }
+                            }
+                            isDocx && inRunRPr && tagLocal == "rfonts" -> {
+                                val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
+                                if (!fontStr.isNullOrBlank()) runFont = fontStr.trim('\'', '"')
                             }
 
                             // Tables
@@ -1565,8 +1921,10 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            // Lists
+                            // Lists. The bullet text is the placeholder that Plan 8B
+                            // replaces with the numbering definition's real label.
                             tagLocal == "list-item" || tagLocal == "numpr" -> {
+                                if (tagLocal == "numpr") inNumPr = true
                                 currentText.append("• ")
                             }
 
@@ -1640,7 +1998,6 @@ class OfficeDocumentParser(private val context: Context) {
                         val txt = parser.text ?: ""
                         if (txt.isNotEmpty() && (!isDocx || inDocxText)) {
                             currentText.append(txt)
-                            currentRunText.append(txt)
                         }
                     }
 
@@ -1666,18 +2023,87 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             isDocx && tagLocal == "t" -> { inDocxText = false }
+                            isDocx && tagLocal == "rpr" -> { inRunRPr = false }
+                            isDocx && tagLocal == "r" -> {
+                                val runText = if (runStartOffset <= currentText.length) {
+                                    currentText.substring(runStartOffset)
+                                } else {
+                                    ""
+                                }
+                                if (runText.isNotEmpty()) {
+                                    currentRuns += runStartOffset to TextRun(
+                                        text = runText,
+                                        isBold = runBold,
+                                        isItalic = runItalic,
+                                        isUnderline = runUnderline,
+                                        styleName = runStyle,
+                                        colorHex = runColor,
+                                        highlight = runHighlight,
+                                        isHidden = runVanish,
+                                        // `w:szCs` only stands in when the run
+                                        // sets no `w:sz`, matching the style path.
+                                        fontSizeSp = runSizeSp ?: runSizeCsSp,
+                                        fontFamily = runFont
+                                    )
+                                }
+                                inDocxRun = false
+                                inRunRPr = false
+                            }
                             tagLocal == "sectpr" -> {
                                 sectionStarts += SectionStart(currentSectionStart, sectionKind)
                                 inSectionProperties = false
                             }
+                            tagLocal == "numpr" -> {
+                                inNumPr = false
+                            }
+
                             tagLocal == "ppr" -> {
                                 inPPr = false
+                                inNumPr = false
                             }
 
                             tagLocal == "p" -> {
                                 inParagraph = false
                                 inPPr = false
+                                inNumPr = false
+                                // Effective numbering: a direct `w:numPr` wins, `numId 0`
+                                // suppresses, and otherwise the paragraph inherits the
+                                // reference its style chain resolves to (Plan 8A carries
+                                // this state; Plan 8B renders the label from it).
+                                val styleNumbering = currentPStyle?.let { style ->
+                                    docxNumberingMap[style] ?: docxNumberingMap[style.lowercase(Locale.ROOT)]
+                                }
+                                val paragraphNumbering: DocxNumberingRef? = when {
+                                    // A direct `w:ilvl` alone re-levels the numbering the
+                                    // paragraph inherits; `w:numId` stays from the style
+                                    // chain (ECMA-376 Part 1 section 17.9.23).
+                                    directNumId == null -> styleNumbering?.let { ref ->
+                                        if (directNumIlvl != null) ref.copy(ilvl = directNumIlvl) else ref
+                                    }
+                                    directNumId == 0 -> DocxNumberingRef(numId = 0, ilvl = directNumIlvl ?: 0, suppressed = true)
+                                    else -> DocxNumberingRef(numId = directNumId ?: 0, ilvl = directNumIlvl ?: 0)
+                                }
                                 val paraText = currentText.toString()
+                                // Tile the authored runs onto the paragraph text.
+                                // Text the file wrote outside any `w:r` (the
+                                // placeholder bullet, for instance) becomes a
+                                // neutral run, so the run list always covers the
+                                // paragraph exactly and consumers may use it.
+                                val paragraphRuns: List<TextRun> = if (currentRuns.isEmpty()) {
+                                    if (paraText.isEmpty()) emptyList() else listOf(TextRun(paraText))
+                                } else {
+                                    val tiled = mutableListOf<TextRun>()
+                                    var cursor = 0
+                                    for ((offset, run) in currentRuns) {
+                                        val start = offset.coerceAtLeast(cursor)
+                                        if (start > cursor) tiled += TextRun(paraText.substring(cursor, start))
+                                        val end = (start + run.text.length).coerceAtMost(paraText.length)
+                                        if (end > start) tiled += run
+                                        cursor = end
+                                    }
+                                    if (cursor < paraText.length) tiled += TextRun(paraText.substring(cursor))
+                                    tiled
+                                }
                                 val resolvedStyleName: String? = when {
                                     hasDirectPPr -> {
                                         val baseStyle = currentPStyle?.let { docxParagraphStyles[it] ?: docxParagraphStyles[it.lowercase(Locale.ROOT)] }
@@ -1719,7 +2145,9 @@ class OfficeDocumentParser(private val context: Context) {
                                             text = paraText,
                                             level = headingLevel,
                                             styleName = headingStyle,
-                                            pageBreakOffsets = inlinePageBreaks.toList()
+                                            runs = paragraphRuns,
+                                            pageBreakOffsets = inlinePageBreaks.toList(),
+                                            numbering = paragraphNumbering
                                         )
                                     )
                                     if (paraText.isNotEmpty()) {
@@ -1730,9 +2158,8 @@ class OfficeDocumentParser(private val context: Context) {
                                         text = paraText,
                                         styleName = resolvedStyleName,
                                         pageBreakOffsets = inlinePageBreaks.toList(),
-                                        runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
-                                            TextRun(paraText, isBold, isItalic, isUnderline)
-                                        )
+                                        runs = paragraphRuns,
+                                        numbering = paragraphNumbering
                                     )
                                     if (inTable) {
                                         currentCellParagraphs.add(paragraphObj)
@@ -1747,9 +2174,8 @@ class OfficeDocumentParser(private val context: Context) {
                                 inHeading = false
                                 currentText.clear()
                                 currentRuns.clear()
-                                isBold = false
-                                isItalic = false
-                                isUnderline = false
+                                inDocxRun = false
+                                inRunRPr = false
                             }
 
                             tagLocal == "tc" || tagLocal == "table-cell" -> {
@@ -1839,6 +2265,7 @@ class OfficeDocumentParser(private val context: Context) {
         val docxDocumentStyles = if (isDocx) {
             DocumentStyles(
                 paragraphStyles = allParagraphStyles,
+                characterStyles = docxStylesResult.characterStyles,
                 defaultPageStyle = extractDocxPageStyleSpec(xmlContent),
                 defaultParagraphStyle = docxDefaultParagraphStyle
             )

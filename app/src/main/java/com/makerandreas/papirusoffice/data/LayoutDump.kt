@@ -194,12 +194,6 @@ object LayoutDump {
         )
     }
 
-    /** True when the element after [lastPlacedIndex] (in document order) is a page break. */
-    private fun nextElementIsBreak(elements: List<OfficeElement>, lastPlacedIndex: Int): Boolean {
-        val next = lastPlacedIndex + 1
-        return next < elements.size && elements[next] is OfficePageBreak
-    }
-
     private fun kindsSummary(placed: List<PageElementLayout>): String {
         var p = 0; var h = 0; var l = 0; var t = 0; var i = 0; var o = 0
         for (item in placed) {

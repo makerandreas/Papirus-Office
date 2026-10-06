@@ -37,7 +37,7 @@ class HeadingRunsTest {
         val mwsHeading = sample4Headings.first { it.text.contains("Mean World Syndrome") }
         assertTrue(
             "Mean World Syndrome heading must preserve italic span run: ${mwsHeading.runs}",
-            mwsHeading.runs.any { it.text.contains("Mean World Syndrome") && it.isItalic }
+            mwsHeading.runs.any { it.text.contains("Mean World Syndrome") && it.isItalic == true }
         )
 
         val sample5 = parser.parseDocument(SampleMatrix.findTestFile("Sample-5.odt"), bypassCache = true).toOfficeDocument()
@@ -51,7 +51,7 @@ class HeadingRunsTest {
         // Sample-5 declares four headings whose text is wrapped in the italic
         // auto-style T2 (Supergrup Excavata / SAR / Archaeplastida / ...); the
         // first heading merely containing the word "Supergrup" is not one of them.
-        val italicHeadings = sample5Headings.filter { h -> h.runs.any { it.isItalic } }
+        val italicHeadings = sample5Headings.filter { h -> h.runs.any { it.isItalic == true } }
         assertTrue(
             "Sample-5 must preserve at least one italic heading span: " +
                 sample5Headings.map { it.text to it.runs.map { r -> r.isItalic } }.take(8),
@@ -81,7 +81,7 @@ class HeadingRunsTest {
                 item.text,
                 item.runs.joinToString("") { it.text }
             )
-            if (item.runs.any { it.isBold }) {
+            if (item.runs.any { it.isBold == true }) {
                 boldRunCount++
                 val asPara = OfficeParagraph(text = item.text, styleName = item.styleName, runs = item.runs)
                 val annotated = OfficeRuns.toAnnotatedString(asPara, doc.styles, 1f, Color.Black)

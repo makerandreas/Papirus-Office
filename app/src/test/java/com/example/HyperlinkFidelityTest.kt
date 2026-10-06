@@ -64,8 +64,8 @@ class HyperlinkFidelityTest {
         val linkedRuns = para.runs.filter { it.hyperlink == "https://example.org/docs" }
         assertEquals("Official Guide\t1", linkedRuns.joinToString("") { it.text })
         val guideRun = linkedRuns.first { it.text == "Guide" }
-        assertTrue("Nested TBold span inside text:a must remain bold", guideRun.isBold)
-        assertTrue("Hyperlink runs must be underlined", guideRun.isUnderline)
+        assertTrue("Nested TBold span inside text:a must remain bold", guideRun.isBold == true)
+        assertTrue("Hyperlink runs must be underlined", guideRun.isUnderline == true)
     }
 
     @Test

@@ -461,7 +461,9 @@ class OdfHyperlinkContext(
                 text = text,
                 isBold = format.isBold,
                 isItalic = format.isItalic,
-                isUnderline = format.isUnderline || href != null,
+                // A hyperlink run is underlined by the app's own convention;
+                // the span's declaration still wins when it makes one.
+                isUnderline = if (href != null) true else format.isUnderline,
                 styleName = styleName,
                 hyperlink = href
             )
@@ -535,7 +537,7 @@ class OdfSpanContext(
             text = text,
             isBold = format.isBold,
             isItalic = format.isItalic,
-            isUnderline = format.isUnderline || inheritedHyperlink != null,
+            isUnderline = if (inheritedHyperlink != null) true else format.isUnderline,
             styleName = styleName.takeIf { it.isNotBlank() },
             hyperlink = inheritedHyperlink
         )
