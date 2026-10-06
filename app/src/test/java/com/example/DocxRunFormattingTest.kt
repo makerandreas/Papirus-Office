@@ -3,6 +3,7 @@ package com.example
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.CharacterStyle
@@ -95,11 +96,11 @@ class DocxRunFormattingTest {
 
     /**
      * Span the run override added for `[start, end)`. The base span covers the
-     * whole paragraph, so a test that wants the run's own values has to select
-     * the slice rather than the first span.
+     * whole paragraph, and a run that covers the whole paragraph has the same
+     * range, so take the last match: overrides are appended after the base.
      */
     private fun spanFor(annotated: AnnotatedString, start: Int, end: Int) =
-        annotated.spanStyles.first { it.start == start && it.end == end }.item
+        annotated.spanStyles.last { it.start == start && it.end == end }.item
 
     @Test
     fun oneRunPerAuthoredRunAndNoFlagLeaks() {
@@ -186,9 +187,9 @@ class DocxRunFormattingTest {
             )
         )
         val paragraph = firstParagraph(parsed)
-        assertEquals(12f, paragraph.runs[0].fontSizeSp!!, 0.01f)
-        assertEquals(false, paragraph.runs[0].isBold)
-        assertEquals(20f, paragraph.runs[1].fontSizeSp!!, 0.01f)
+        assertEquals("the direct w:sz is the run's own value", 12f, paragraph.runs[0].fontSizeSp!!, 0.01f)
+        assertEquals("the explicit negative is the run's own value", false, paragraph.runs[0].isBold)
+        assertNull("the second run states nothing; its style supplies the 20 pt", paragraph.runs[1].fontSizeSp)
 
         val (displayed, styles) = displayParagraph(parsed)
         val annotated = OfficeRuns.toAnnotatedString(displayed, styles, 1f, Color.Black)
@@ -266,8 +267,17 @@ class DocxRunFormattingTest {
         val heading = firstHeading(parsed)
         assertEquals("Heading mix", heading.text)
         assertEquals(heading.text, heading.runs.joinToString("") { it.text })
-        assertEquals(true, heading.runs[0].isBold)
-        assertEquals(true, heading.runs[1].isItalic)
+        assertNull("the heading style states bold, not the run", heading.runs[0].isBold)
+        assertEquals("the italic is the second run's own declaration", true, heading.runs[1].isItalic)
+
+        // The same paragraph shape the paginator builds, so display resolves the
+        // heading style's bold over run 1 and the run's italic over run 2.
+        val (displayed, styles) = displayParagraph(parsed)
+        val annotated = OfficeRuns.toAnnotatedString(displayed, styles, 1f, Color.Black)
+        assertEquals(FontWeight.Bold, annotated.spanStyles.first().item.fontWeight)
+        val italicRun = spanFor(annotated, "Heading ".length, heading.text.length)
+        assertEquals(FontWeight.Bold, italicRun.fontWeight)
+        assertEquals(FontStyle.Italic, italicRun.fontStyle)
     }
 
     /**
