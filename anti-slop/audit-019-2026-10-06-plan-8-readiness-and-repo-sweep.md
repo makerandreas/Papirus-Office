@@ -39,6 +39,9 @@ not change PR or plan ownership.
   merged 2026-10-05 17:54 UTC, #32 (selection projection) merged 2026-10-05 06:33 UTC, #31 (Plan 7E)
   merged 2026-10-04 22:23 UTC, and #26 to #30 before them. Plan 7F closed out inside its own PR; the
   forward schedule therefore starts at the slot forecast for 8A.
+* **PR #34 (this pass) is open and green.** The preparation commit `cf82081` was pushed to
+  `arena/5f73bf06-papirus-office`; run `37430436955` on merge ref `435f26d` passed 358 unit tests across
+  66 suites with zero failures, errors or skips, plus the Build (SemVer & Nightly) job. Details in §6.
 * **The earlier ledger, from the same call and the plans that own it:** #1 2026-09-18 audit-fix
   round (security, crash, build, correctness); #2 opened and closed without merging, superseded by
   #3 2026-09-20 (LOKit simulated seam, streaming zip guards, undo race); #4 2026-09-21 structural
@@ -353,9 +356,12 @@ UI ships in this deliverable.
   for references and windows, the Plan 7F closeout for the CI matrix, `gh` for PR and run identifiers,
   and this session's own raw-package measurements where the number is new.
 * **R-36 PASS:** the audit states plainly that no build, test or Gradle run happened in this sandbox,
-  and labels every claim that comes from reading source. The deletions are reference-verified here;
-  compile and test verification is CI's when the branch is pushed, and no result is claimed before
-  that run exists.
+  and labels every claim that comes from reading source. The deletions are reference-verified here,
+  and the compile and test evidence came from CI once the branch was pushed.
+* **CI PASS (executed evidence):** the pass opened as **PR #34** (`Plan 8 preparation: shelve the OOXML references and re-derive the 8A/8B scope`) and run
+  [`37430436955`](https://github.com/makerandreas/Papirus-Office/actions/runs/37430436955) on merge ref `435f26d` passed
+  **358 unit tests across 66 suites, 0 failed, 0 errors, 0 skipped** (32.08 s of JUnit time) and the Build (SemVer & Nightly) job, in 5m57s and 5m23s.
+  That is the same test and suite count as the Plan 7F closeout, so the removals cost no coverage.
 * **R-38 PASS:** nothing fabricated; the only new prose describes the repository.
 * **C-5 PASS:** the two stale claims in earlier plan text are corrected in place rather than repeated.
 * **R-26, R-27, R-32, R-34, R-35 N/A:** no UI shipped in this deliverable.
@@ -373,6 +379,6 @@ UI ships in this deliverable.
 | `app/src/main/java/com/makerandreas/papirusoffice/data/LayoutDump.kt` | Deleted the unused private `nextElementIsBreak`. |
 | `app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentParser.kt` | Deleted the unused private `extractOdtStylesXml`. |
 | `anti-slop/audit-019-2026-10-06-plan-8-readiness-and-repo-sweep.md` | This file. |
-| `anti-slop/plan-01-master-index.md` | A 2026-10-06 entry recording the shelf move, the 8A re-scope and the deletions, plus the registry and forecast refresh in §2. |
-| `anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md` | v2.12 amendment line, correction blocks in Plan 8A and 8B, and §7 changelog item 24. |
+| `anti-slop/plan-01-master-index.md` | A 2026-10-06 entry recording the shelf move, the 8A re-scope and the deletions, plus the registry rows and the §2 forecast refresh after PR #34. |
+| `anti-slop/plan-2026-09-24-remaining-pr-roadmap-v2.md` | v2.12 and v2.13 amendment lines, correction blocks in Plan 8A and 8B, and §7 changelog items 24 and 25. |
 | `AGENTS.md` | The reference-editions line now names `docs/ooxml` for the Microsoft implementation notes. |
