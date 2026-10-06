@@ -315,6 +315,23 @@ rest. Smaller reviews, two extra merge cycles, and the PR forecast shifts by one
 Either way, 8B keeps its scope (numbering reader and rendering, fields, TOC snapshot, table geometry,
 per-paragraph `sectPr`, `pgNumType`, `lastRenderedPageBreak`) and gains its page citations from §2.3.
 
+### 4.1 Owner decisions, 2026-10-06
+
+1. **PR #34 stays open for the owner's review.** It is not merged by the agent; its CI is green and the
+   branch is pushed.
+2. **Option 1 is approved.** 8A is one PR with two gated feature commits (character properties and
+   linkage first, the run model second) plus the records commit.
+3. **The paragraph style wins over the linked character style for properties it sets**, with the linked
+   character style supplying only the properties the paragraph style leaves unset. Samples 2 and 5
+   therefore render their level-1 headings at 14 pt, not 20 pt, and the new `DocxCharLinkTest` carries
+   this case as a named assertion rather than a comment. This decision is scoped to the DOCX reader;
+   it does not change the ODF side, which already resolves `style:parent-style-name` by cascade.
+   Rationale for the record: the paragraph style's `w:rPr` is the more specific statement about that
+   style's own run properties, and treating a linked style as an override would make the effective size
+   of a heading depend on whether a file happened to be authored with links (Sample 2 and 5) or through
+   the name convention only (Samples 1 and 6), which is one document behaving two ways for no reason
+   the file states.
+
 ---
 
 ## 5. Unused code sweep

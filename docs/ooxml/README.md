@@ -134,8 +134,10 @@ Measured on 2026-10-06 by unpacking the six `tests/inky/*.docx` packages directl
    `Sample-2.docx` and `Sample-5.docx` put `sz 28` (14 pt) on the `Judul1` paragraph style while
    `Heading1Char` still says 20 pt. A reader has to decide whether the paragraph style's own value
    or the linked character style wins for a property both set; the fixtures cannot be satisfied by
-   an "either" rule. Recommended: the paragraph style's own `w:rPr` wins for properties it sets,
-   and the linked character style supplies the rest. Record the decision in `DocxCharLinkTest`.
+   an "either" rule. **Decided by the owner on 2026-10-06 (audit-019 §4.1): the paragraph style's own
+   `w:rPr` wins for properties it sets, and the linked character style supplies only the rest.** So
+   Samples 2 and 5 render their level-1 headings at 14 pt. The decision is carried by
+   `DocxCharLinkTest` as a named assertion.
 4. **`w:docDefaults` carries Aptos 12 pt in all six files**, but the paragraph spacing lives in
    different places: Samples 1 and 3 keep only `suppressAutoHyphens` in `pPrDefault` and put the
    effective spacing on `Normal`; Samples 2, 4, 5 and 6 set `spacing` (and in Sample 4 `ind`, in
