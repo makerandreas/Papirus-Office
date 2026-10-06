@@ -374,8 +374,9 @@ class DocxStyleChainTest {
             body = paragraph("Highlighted", text = "Marker") + paragraph("Hidden", text = "Ghost")
         )
         val document = parsed.toOfficeDocument()
-        val highlighted = document.elements.filterIsInstance<OfficeParagraph>()[0]
-        val hidden = document.elements.filterIsInstance<OfficeParagraph>()[1]
+        val bodyElements = document.body.elements
+        val highlighted = bodyElements.filterIsInstance<OfficeParagraph>()[0]
+        val hidden = bodyElements.filterIsInstance<OfficeParagraph>()[1]
 
         val highlightedSpan = OfficeRuns.toAnnotatedString(highlighted, document.styles, 1f, Color.Black)
             .spanStyles.first().item
