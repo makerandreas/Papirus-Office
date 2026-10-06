@@ -160,6 +160,20 @@ the mirror image of the OOXML notes and are the natural reference for Plan 9 (wr
 cross-format convergence acceptance in 8B, where the two representations of one document have to agree.
 No plan currently cites them; this audit records them as available rather than as owned work.
 
+### 2.5 Online sources checked for the linked-style question
+
+* The .NET **Open XML SDK** reference for the `Style` class (`documentformat.openxml.wordprocessing.style`,
+  `openxml-3.0.1`) confirms the `w:style` children this plan needs: `StyleName`, `Aliases`, `BasedOn`,
+  `NextParagraphStyle`, **`LinkedStyle`** (the `w:link` element), plus `StyleRunProperties` and
+  `StyleParagraphProperties`. It is the SDK-side view of the same element `[MS-OI29500]` §17.7.4.17
+  constrains, and it is why the reader can treat `w:link` as an ordinary child element rather than a
+  special case. URL: `https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.style`.
+* The LibreOffice API (`api.libreoffice.org`, 26.8 SDK reference, `style::CharacterStyle`) and the
+  LibreOffice Writer help were opened for the linked-style semantics and returned navigation text
+  only in extraction, so they are not cited for a behaviour here. The ODF-side evidence stays with
+  `docs/odf` and the LibreOffice 26.2 guides in `docs/lo-guides`, which are already pinned by
+  `AGENTS.md` and are readable offline.
+
 ---
 
 ## 3. Where the documented Plan 8 assumptions stand against the tree
