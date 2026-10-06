@@ -207,25 +207,6 @@ class OfficeDocumentParser(private val context: Context) {
         )
     }
 
-    private fun extractOdtStylesXml(file: File): String? {
-        if (!file.exists() || (!file.name.endsWith(".odt", ignoreCase = true) && !file.name.endsWith(".ott", ignoreCase = true))) return null
-        try {
-            ZipInputStream(file.inputStream()).use { zip ->
-                var entry = zip.nextEntry
-                while (entry != null) {
-                    if (entry.name == "styles.xml") {
-                        return zip.readCappedBytes().toString(Charsets.UTF_8)
-                    }
-                    zip.closeEntry()
-                    entry = zip.nextEntry
-                }
-            }
-        } catch (e: Exception) {
-            // Graceful fallback
-        }
-        return null
-    }
-
     private fun extractOdtPageCount(file: File): Int? {
         if (!file.exists() || !file.name.endsWith(".odt", ignoreCase = true)) return null
         try {

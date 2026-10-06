@@ -300,26 +300,6 @@ fun OfficeSidebar(
 // --- Small helper widgets ---
 
 @Composable
-private fun FormatButton(icon: ImageVector, desc: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
-        Icon(icon, contentDescription = desc)
-    }
-}
-
-@Composable
-private fun VerticalSeparator() {
-    Spacer(modifier = Modifier.width(4.dp))
-    Box(
-        modifier = Modifier
-            .width(1.dp)
-            .height(24.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-    )
-    Spacer(modifier = Modifier.width(4.dp))
-}
-
-
-@Composable
 private fun FctButton(label: String, icon: ImageVector, onClick: () -> Unit) {
     IconButton(onClick = onClick) {
         Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))

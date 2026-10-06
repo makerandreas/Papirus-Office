@@ -58,9 +58,6 @@ class MainActivity : ComponentActivity() {
          * does not reopen the last file.
          */
         var pendingNewDocument by mutableStateOf(false)
-
-        /** Maximum accepted size for an incoming shared/opened document (250 MB). */
-        const val MAX_INCOMING_FILE_BYTES = 250L * 1024 * 1024
     }
 
     private val notificationPermissionLauncher =
@@ -84,26 +81,6 @@ class MainActivity : ComponentActivity() {
         val safe = base.replace("[^A-Za-z0-9 _.,+()\\[\\]-]".toRegex(), "_").take(120)
         val withExt = if (safe.contains('.')) safe else "$safe.odt"
         return withExt.ifBlank { "document.odt" }
-    }
-
-    private fun copyCapped(
-        input: java.io.InputStream,
-        output: java.io.OutputStream,
-        displayName: String
-    ) {
-        val buffer = ByteArray(8192)
-        var total = 0L
-        while (true) {
-            val n = input.read(buffer)
-            if (n == -1) break
-            total += n
-            if (total > MAX_INCOMING_FILE_BYTES) {
-                throw java.io.IOException(
-                    "File exceeds ${MAX_INCOMING_FILE_BYTES / 1024 / 1024} MB limit: $displayName"
-                )
-            }
-            output.write(buffer, 0, n)
-        }
     }
 
     private fun handleIntent(intent: Intent?) {
