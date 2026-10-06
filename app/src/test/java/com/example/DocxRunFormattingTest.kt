@@ -10,6 +10,7 @@ import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
+import com.makerandreas.papirusoffice.data.OfficeHeading
 import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.OfficeParsedDocument
 import com.makerandreas.papirusoffice.data.OfficeRuns
@@ -93,6 +94,29 @@ class DocxRunFormattingTest {
         val paragraph = document.body.elements.filterIsInstance<OfficeParagraph>().single()
         return paragraph to document.styles
     }
+
+    /**
+     * The single heading projected the way the paginator projects it
+     * (`LayoutEngine` maps a heading to a paragraph before measuring).
+     */
+    private fun displayHeading(parsed: OfficeParsedDocument): Pair<OfficeParagraph, DocumentStyles> {
+        val document = parsed.toOfficeDocument()
+        val heading = document.body.elements.filterIsInstance<OfficeHeading>().single()
+        return OfficeParagraph(
+            text = heading.text,
+            styleName = heading.styleName ?: "Heading ${heading.level}",
+            runs = heading.runs,
+            pageBreakOffsets = heading.pageBreakOffsets
+        ) to document.styles
+    }
+
+    /** The style a run resolves to, the same call the measurer and display make. */
+    private fun resolvedRun(paragraph: OfficeParagraph, index: Int, styles: DocumentStyles): ParagraphStyle =
+        OfficeRuns.mergeRun(
+            paragraph.runs[index],
+            StyleResolver.resolveParagraphStyle(paragraph.styleName, styles),
+            styles
+        )
 
     /**
      * Span the run override added for `[start, end)`. The base span covers the
@@ -192,13 +216,24 @@ class DocxRunFormattingTest {
         assertNull("the second run states nothing; its style supplies the 20 pt", paragraph.runs[1].fontSizeSp)
 
         val (displayed, styles) = displayParagraph(parsed)
+        // The first run's own values are exactly the paragraph base, so its
+        // resolved style needs no override span; the merge is what to assert.
+        val direct = resolvedRun(displayed, 0, styles)
+        assertEquals("direct w:sz 24 wins over the run style", 12f, direct.fontSizeSp, 0.01f)
+        assertFalse("and the explicit negative wins too", direct.isBold)
+
+        val styled = resolvedRun(displayed, 1, styles)
+        assertEquals("the run style supplies the size the run leaves unset", 20f, styled.fontSizeSp, 0.01f)
+        assertTrue(styled.isBold)
+
         val annotated = OfficeRuns.toAnnotatedString(displayed, styles, 1f, Color.Black)
-        val direct = spanFor(annotated, 0, 6)
-        val styled = spanFor(annotated, 6, 12)
-        assertEquals("direct w:sz 24 wins over the run style", 12f, direct.fontSize!!.value, 0.01f)
-        assertEquals(FontWeight.Normal, direct.fontWeight)
-        assertEquals(20f, styled.fontSize!!.value, 0.01f)
-        assertEquals(FontWeight.Bold, styled.fontWeight)
+        val styledSpan = spanFor(annotated, 6, 12)
+        assertEquals(20f, styledSpan.fontSize!!.value, 0.01f)
+        assertEquals(FontWeight.Bold, styledSpan.fontWeight)
+        assertTrue(
+            "the first run resolves to the base, so display adds no override for it",
+            annotated.spanStyles.none { it.start == 0 && it.end == 6 }
+        )
     }
 
     @Test
@@ -272,11 +307,12 @@ class DocxRunFormattingTest {
 
         // The same paragraph shape the paginator builds, so display resolves the
         // heading style's bold over run 1 and the run's italic over run 2.
-        val (displayed, styles) = displayParagraph(parsed)
+        val (displayed, styles) = displayHeading(parsed)
+        assertEquals("Heading mix", displayed.text)
         val annotated = OfficeRuns.toAnnotatedString(displayed, styles, 1f, Color.Black)
-        assertEquals(FontWeight.Bold, annotated.spanStyles.first().item.fontWeight)
-        val italicRun = spanFor(annotated, "Heading ".length, heading.text.length)
-        assertEquals(FontWeight.Bold, italicRun.fontWeight)
+        assertEquals("the base span carries the heading style's bold", FontWeight.Bold, annotated.spanStyles.first().item.fontWeight)
+        val italicRun = spanFor(annotated, "Heading ".length, displayed.text.length)
+        assertEquals("the heading's bold still applies inside the run override", FontWeight.Bold, italicRun.fontWeight)
         assertEquals(FontStyle.Italic, italicRun.fontStyle)
     }
 
