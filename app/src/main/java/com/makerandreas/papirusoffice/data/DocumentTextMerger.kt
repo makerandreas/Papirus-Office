@@ -197,6 +197,11 @@ object DocumentTextMerger {
                 prev.isBold == run.isBold &&
                 prev.isItalic == run.isItalic &&
                 prev.isUnderline == run.isUnderline &&
+                prev.colorHex == run.colorHex &&
+                prev.highlight == run.highlight &&
+                prev.isHidden == run.isHidden &&
+                prev.fontSizeSp == run.fontSizeSp &&
+                prev.fontFamily == run.fontFamily &&
                 prev.styleName == run.styleName &&
                 prev.characterStyle == run.characterStyle &&
                 prev.hyperlink == run.hyperlink

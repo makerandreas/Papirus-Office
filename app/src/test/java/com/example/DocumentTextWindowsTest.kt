@@ -185,8 +185,8 @@ class DocumentTextMergerEditTest {
         )
         val merged = DocumentTextMerger.mergeEditedText(doc, "Hellox World")
         val runs = merged.body.elements.filterIsInstance<OfficeParagraph>().single().runs
-        assertTrue("inserted x must inherit the bold prefix run: $runs", runs.any { it.text.contains("x") && it.isBold })
-        assertTrue("World suffix stays unbold: $runs", runs.any { it.text.contains("World") && !it.isBold })
+        assertTrue("inserted x must inherit the bold prefix run: $runs", runs.any { it.text.contains("x") && it.isBold == true })
+        assertTrue("World suffix stays unbold: $runs", runs.any { it.text.contains("World") && it.isBold != true })
     }
 
     @Test
@@ -201,9 +201,9 @@ class DocumentTextMergerEditTest {
             newText = "aaaXXCCC"
         )
         assertEquals("CCC", sliced.last().text)
-        assertTrue(sliced.last().isUnderline)
+        assertTrue(sliced.last().isUnderline == true)
         val middle = sliced.first { it.text.contains("XX") }
-        assertTrue("middle inherits prefix-1 (bold a)", middle.isBold)
+        assertTrue("middle inherits prefix-1 (bold a)", middle.isBold == true)
         assertEquals("aaaXX", sliced.first().text)
     }
 }

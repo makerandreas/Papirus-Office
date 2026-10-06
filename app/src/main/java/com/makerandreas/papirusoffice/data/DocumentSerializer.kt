@@ -237,7 +237,12 @@ private fun OfficeTextRun.toParsedRun(): TextRun = TextRun(
     isItalic = isItalic,
     isUnderline = isUnderline,
     styleName = styleName ?: characterStyle,
-    hyperlink = hyperlink
+    hyperlink = hyperlink,
+    colorHex = colorHex,
+    highlight = highlight,
+    isHidden = isHidden,
+    fontSizeSp = fontSizeSp,
+    fontFamily = fontFamily
 )
 
 private fun OfficeImage.toParsedImage(): OfficeDocumentElement.ImageElement =

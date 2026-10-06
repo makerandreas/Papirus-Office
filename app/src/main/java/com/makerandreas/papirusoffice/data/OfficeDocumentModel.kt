@@ -101,13 +101,27 @@ data class TableCell(
     }
 }
 
+/**
+ * One authored run of text inside a paragraph. The three toggle properties are
+ * tri-state on purpose: `null` means this run states nothing and the paragraph
+ * or character style decides, `true` means the run turns the property on, and
+ * `false` means it turns it off, which is how OOXML writes an explicit
+ * negative (`w:b w:val="0"`, ECMA-376 Part 1 §17.7.3). The same holds for the
+ * character properties a run may override directly.
+ */
 data class TextRun(
     val text: String,
-    val isBold: Boolean = false,
-    val isItalic: Boolean = false,
-    val isUnderline: Boolean = false,
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val isUnderline: Boolean? = null,
     val styleName: String? = null,
-    val hyperlink: String? = null
+    val hyperlink: String? = null,
+    /** Direct `w:color`, `w:highlight`, `w:vanish`, `w:sz`/`w:szCs` and `w:rFonts` on the run. */
+    val colorHex: String? = null,
+    val highlight: String? = null,
+    val isHidden: Boolean? = null,
+    val fontSizeSp: Float? = null,
+    val fontFamily: String? = null
 )
 
 /**

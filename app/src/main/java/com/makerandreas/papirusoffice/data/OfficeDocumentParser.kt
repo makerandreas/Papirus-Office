@@ -1581,11 +1581,24 @@ class OfficeDocumentParser(private val context: Context) {
             val currentCellParagraphs = mutableListOf<OfficeDocumentElement.Paragraph>()
 
             val currentText = StringBuilder()
-            val currentRuns = mutableListOf<TextRun>()
-            val currentRunText = StringBuilder()
-            var isBold = false
-            var isItalic = false
-            var isUnderline = false
+            // One entry per authored `w:r`, keyed by the offset in `currentText`
+            // where its text starts. Tiling them back into runs at `</w:p>`
+            // keeps `runs.joinToString("") == paragraph.text`, which is what
+            // every consumer of runs (measure, display, slice) requires.
+            val currentRuns = mutableListOf<Pair<Int, TextRun>>()
+            var inDocxRun = false
+            var inRunRPr = false
+            var runStartOffset = 0
+            var runBold: Boolean? = null
+            var runItalic: Boolean? = null
+            var runUnderline: Boolean? = null
+            var runStyle: String? = null
+            var runColor: String? = null
+            var runHighlight: String? = null
+            var runVanish: Boolean? = null
+            var runSizeSp: Float? = null
+            var runSizeCsSp: Float? = null
+            var runFont: String? = null
 
             var inPPr = false
             var currentPStyle: String? = null
@@ -1690,6 +1703,8 @@ class OfficeDocumentParser(private val context: Context) {
                                 headingLevel = 1
                                 currentText.clear()
                                 currentRuns.clear()
+                                inDocxRun = false
+                                inRunRPr = false
                                 inPPr = false
                                 currentPStyle = null
                                 hasDirectPPr = false
@@ -1839,15 +1854,51 @@ class OfficeDocumentParser(private val context: Context) {
                                 // Ignored: soft page breaks are layout hints, not authored breaks
                             }
 
-                            // Text formatting
-                            tagLocal == "b" || tagLocal == "text-properties" -> {
-                                isBold = true
+                            // Runs. One run per `w:r`: the run owns its own
+                            // character properties, so a flag cannot leak into
+                            // the next run, and the run's text is the slice of
+                            // the paragraph buffer it appended (flushed at
+                            // `</w:r>`). Direct formatting is tri-state
+                            // (ECMA-376 Part 1 §17.7.3), so `w:val="0"` is an
+                            // explicit negative that has to survive to display.
+                            isDocx && tagLocal == "r" -> {
+                                inDocxRun = true
+                                inRunRPr = false
+                                runStartOffset = currentText.length
+                                runBold = null
+                                runItalic = null
+                                runUnderline = null
+                                runStyle = null
+                                runColor = null
+                                runHighlight = null
+                                runVanish = null
+                                runSizeSp = null
+                                runSizeCsSp = null
+                                runFont = null
                             }
-                            tagLocal == "i" -> {
-                                isItalic = true
+                            isDocx && inDocxRun && tagLocal == "rpr" -> { inRunRPr = true }
+                            // `w:rPr` directly inside `w:pPr` is the paragraph
+                            // mark's own formatting and applies to no run, so
+                            // every arm below is scoped to a run.
+                            isDocx && inRunRPr && tagLocal == "rstyle" -> { runStyle = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "b" -> { runBold = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "i" -> { runItalic = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "u" -> {
+                                val uVal = getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)
+                                runUnderline = uVal == null || uVal !in setOf("none", "0", "false", "off")
                             }
-                            tagLocal == "u" -> {
-                                isUnderline = true
+                            isDocx && inRunRPr && tagLocal == "color" -> { runColor = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "highlight" -> { runHighlight = getXmlAttr(parser, "val") }
+                            isDocx && inRunRPr && tagLocal == "vanish" -> { runVanish = docxToggle(getXmlAttr(parser, "val")) }
+                            isDocx && inRunRPr && tagLocal == "sz" -> {
+                                getXmlAttr(parser, "val")?.toIntOrNull()?.let { runSizeSp = LayoutUnits.halfPointsToPt(it) }
+                            }
+                            isDocx && inRunRPr && tagLocal == "szcs" -> {
+                                getXmlAttr(parser, "val")?.toIntOrNull()?.let { runSizeCsSp = LayoutUnits.halfPointsToPt(it) }
+                            }
+                            isDocx && inRunRPr && tagLocal == "rfonts" -> {
+                                val fontStr = getXmlAttr(parser, "ascii") ?: getXmlAttr(parser, "hansi")
+                                if (!fontStr.isNullOrBlank()) runFont = fontStr.trim('\'', '"')
                             }
 
                             // Tables
@@ -1947,7 +1998,6 @@ class OfficeDocumentParser(private val context: Context) {
                         val txt = parser.text ?: ""
                         if (txt.isNotEmpty() && (!isDocx || inDocxText)) {
                             currentText.append(txt)
-                            currentRunText.append(txt)
                         }
                     }
 
@@ -1973,6 +2023,32 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             isDocx && tagLocal == "t" -> { inDocxText = false }
+                            isDocx && tagLocal == "rpr" -> { inRunRPr = false }
+                            isDocx && tagLocal == "r" -> {
+                                val runText = if (runStartOffset <= currentText.length) {
+                                    currentText.substring(runStartOffset)
+                                } else {
+                                    ""
+                                }
+                                if (runText.isNotEmpty()) {
+                                    currentRuns += runStartOffset to TextRun(
+                                        text = runText,
+                                        isBold = runBold,
+                                        isItalic = runItalic,
+                                        isUnderline = runUnderline,
+                                        styleName = runStyle,
+                                        colorHex = runColor,
+                                        highlight = runHighlight,
+                                        isHidden = runVanish,
+                                        // `w:szCs` only stands in when the run
+                                        // sets no `w:sz`, matching the style path.
+                                        fontSizeSp = runSizeSp ?: runSizeCsSp,
+                                        fontFamily = runFont
+                                    )
+                                }
+                                inDocxRun = false
+                                inRunRPr = false
+                            }
                             tagLocal == "sectpr" -> {
                                 sectionStarts += SectionStart(currentSectionStart, sectionKind)
                                 inSectionProperties = false
@@ -2008,6 +2084,26 @@ class OfficeDocumentParser(private val context: Context) {
                                     else -> DocxNumberingRef(numId = directNumId ?: 0, ilvl = directNumIlvl ?: 0)
                                 }
                                 val paraText = currentText.toString()
+                                // Tile the authored runs onto the paragraph text.
+                                // Text the file wrote outside any `w:r` (the
+                                // placeholder bullet, for instance) becomes a
+                                // neutral run, so the run list always covers the
+                                // paragraph exactly and consumers may use it.
+                                val paragraphRuns: List<TextRun> = if (currentRuns.isEmpty()) {
+                                    if (paraText.isEmpty()) emptyList() else listOf(TextRun(paraText))
+                                } else {
+                                    val tiled = mutableListOf<TextRun>()
+                                    var cursor = 0
+                                    for ((offset, run) in currentRuns) {
+                                        val start = offset.coerceAtLeast(cursor)
+                                        if (start > cursor) tiled += TextRun(paraText.substring(cursor, start))
+                                        val end = (start + run.text.length).coerceAtMost(paraText.length)
+                                        if (end > start) tiled += run
+                                        cursor = end
+                                    }
+                                    if (cursor < paraText.length) tiled += TextRun(paraText.substring(cursor))
+                                    tiled
+                                }
                                 val resolvedStyleName: String? = when {
                                     hasDirectPPr -> {
                                         val baseStyle = currentPStyle?.let { docxParagraphStyles[it] ?: docxParagraphStyles[it.lowercase(Locale.ROOT)] }
@@ -2049,6 +2145,7 @@ class OfficeDocumentParser(private val context: Context) {
                                             text = paraText,
                                             level = headingLevel,
                                             styleName = headingStyle,
+                                            runs = paragraphRuns,
                                             pageBreakOffsets = inlinePageBreaks.toList(),
                                             numbering = paragraphNumbering
                                         )
@@ -2061,9 +2158,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         text = paraText,
                                         styleName = resolvedStyleName,
                                         pageBreakOffsets = inlinePageBreaks.toList(),
-                                        runs = if (currentRuns.isNotEmpty()) currentRuns.toList() else listOf(
-                                            TextRun(paraText, isBold, isItalic, isUnderline)
-                                        ),
+                                        runs = paragraphRuns,
                                         numbering = paragraphNumbering
                                     )
                                     if (inTable) {
@@ -2079,9 +2174,8 @@ class OfficeDocumentParser(private val context: Context) {
                                 inHeading = false
                                 currentText.clear()
                                 currentRuns.clear()
-                                isBold = false
-                                isItalic = false
-                                isUnderline = false
+                                inDocxRun = false
+                                inRunRPr = false
                             }
 
                             tagLocal == "tc" || tagLocal == "table-cell" -> {

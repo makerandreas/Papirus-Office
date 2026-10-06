@@ -140,9 +140,15 @@ data class OfficeTextRun(
     val field: String? = null,
     val language: String = "en-US",
     val styleName: String? = null,
-    val isBold: Boolean = false,
-    val isItalic: Boolean = false,
-    val isUnderline: Boolean = false
+    /** Tri-state direct formatting; see [TextRun] (null = the styles decide). */
+    val isBold: Boolean? = null,
+    val isItalic: Boolean? = null,
+    val isUnderline: Boolean? = null,
+    val colorHex: String? = null,
+    val highlight: String? = null,
+    val isHidden: Boolean? = null,
+    val fontSizeSp: Float? = null,
+    val fontFamily: String? = null
 )
 
 data class OfficeTable(
@@ -536,6 +542,26 @@ data class OfficeFile(
 // ==========================================
 // LAYER 8: Rich Adapter (OfficeParsedDocument -> OfficeDocument)
 // ==========================================
+/**
+ * Parsed run to display run. One mapping for body paragraphs, headings, list
+ * items and table-cell paragraphs so a property added to [TextRun] cannot
+ * reach only some of the four paths (audit-019 §4.2, generalisation).
+ */
+private fun TextRun.toOfficeTextRun(): OfficeTextRun = OfficeTextRun(
+    text = text,
+    characterStyle = styleName,
+    styleName = styleName,
+    hyperlink = hyperlink,
+    isBold = isBold,
+    isItalic = isItalic,
+    isUnderline = isUnderline,
+    colorHex = colorHex,
+    highlight = highlight,
+    isHidden = isHidden,
+    fontSizeSp = fontSizeSp,
+    fontFamily = fontFamily
+)
+
 fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
     val allBookmarkNames = LinkedHashSet<String>()
     allBookmarkNames.addAll(this.bookmarks.filter { it.isNotBlank() })
@@ -552,17 +578,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     bookmark = elemBookmarks.firstOrNull(),
                     bookmarks = elemBookmarks.map { OfficeBookmark(it) },
                     numbering = elem.numbering,
-                    runs = elem.runs.map { run ->
-                        OfficeTextRun(
-                            text = run.text,
-                            characterStyle = run.styleName,
-                            styleName = run.styleName,
-                            hyperlink = run.hyperlink,
-                            isBold = run.isBold,
-                            isItalic = run.isItalic,
-                            isUnderline = run.isUnderline
-                        )
-                    }
+                    runs = elem.runs.map { it.toOfficeTextRun() }
                 )
             }
             is OfficeDocumentElement.Heading -> {
@@ -572,17 +588,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     text = elem.text,
                     level = elem.level,
                     styleName = elem.styleName ?: "Heading ${elem.level}",
-                    runs = elem.runs.map { run ->
-                        OfficeTextRun(
-                            text = run.text,
-                            characterStyle = run.styleName,
-                            styleName = run.styleName,
-                            hyperlink = run.hyperlink,
-                            isBold = run.isBold,
-                            isItalic = run.isItalic,
-                            isUnderline = run.isUnderline
-                        )
-                    },
+                    runs = elem.runs.map { it.toOfficeTextRun() },
                     pageBreakOffsets = elem.pageBreakOffsets,
                     bookmarks = elemBookmarks.map { OfficeBookmark(it) },
                     numbering = elem.numbering
@@ -600,17 +606,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     labelFontSizeSp = elem.labelFontSizeSp,
                     labelFontFamily = elem.labelFontFamily,
                     bookmarks = elemBookmarks.map { OfficeBookmark(it) },
-                    runs = elem.runs.map { run ->
-                        OfficeTextRun(
-                            text = run.text,
-                            characterStyle = run.styleName,
-                            styleName = run.styleName,
-                            hyperlink = run.hyperlink,
-                            isBold = run.isBold,
-                            isItalic = run.isItalic,
-                            isUnderline = run.isUnderline
-                        )
-                    }
+                    runs = elem.runs.map { it.toOfficeTextRun() }
                 )
             }
             is OfficeDocumentElement.Table -> {
@@ -647,17 +643,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                                             styleName = cellPara.styleName,
                                             bookmark = cellBookmarks.firstOrNull(),
                                             bookmarks = cellBookmarks.map { OfficeBookmark(it) },
-                                            runs = cellPara.runs.map { cellRun ->
-                                                OfficeTextRun(
-                                                    text = cellRun.text,
-                                                    characterStyle = cellRun.styleName,
-                                                    styleName = cellRun.styleName,
-                                                    hyperlink = cellRun.hyperlink,
-                                                    isBold = cellRun.isBold,
-                                                    isItalic = cellRun.isItalic,
-                                                    isUnderline = cellRun.isUnderline
-                                                )
-                                            }
+                                            runs = cellPara.runs.map { it.toOfficeTextRun() }
                                         )
                                     }
                                 )

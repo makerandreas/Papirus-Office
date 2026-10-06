@@ -17,6 +17,7 @@ import com.makerandreas.papirusoffice.data.toOfficeDocument
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -102,13 +103,13 @@ class Sample5StyleFidelityTest {
 
         val parsed = importer.parseOdfXml(contentXml, "d2.odt", stylesXmlContent = stylesXml)
         assertFalse(parsed.isParsingFailed)
-        assertFalse("empty Tabel1 must not inherit bold from the letter b", importer.resolveSpanFormatting("Tabel1").isBold)
-        assertTrue(importer.resolveSpanFormatting("TBold").isBold)
+        assertNotEquals("empty Tabel1 must not declare bold", true, importer.resolveSpanFormatting("Tabel1").isBold)
+        assertEquals("TBold declares bold", true, importer.resolveSpanFormatting("TBold").isBold)
         val para = parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().single()
         val tabel = para.runs.first { it.text == "table" }
         val bold = para.runs.first { it.text == "bold" }
-        assertFalse("Tabel1 run must not be bold: $tabel", tabel.isBold)
-        assertTrue("TBold run must be bold: $bold", bold.isBold)
+        assertNotEquals("Tabel1 run must not be bold: $tabel", true, tabel.isBold)
+        assertEquals("TBold run must be bold: $bold", true, bold.isBold)
         assertEquals("Tabel1", tabel.styleName)
         val charStyles = parsed.styles.characterStyles
         assertFalse(charStyles.getValue("Tabel1").isBold)
