@@ -332,6 +332,60 @@ per-paragraph `sectPr`, `pgNumType`, `lastRenderedPageBreak`) and gains its page
    the name convention only (Samples 1 and 6), which is one document behaving two ways for no reason
    the file states.
 
+### 4.2 Standing generalisation requirement, 2026-10-06
+
+Owner instruction, recorded before commit 1 of 8A is written: the fidelity work must not be
+fixture-specific. A rule may use only declarations inside the file being read (the style chain, `w:link`,
+`w:numPr`, `w:rPr` toggles, `w:outlineLvl`, `w:docDefaults`), so the same rule is correct for documents
+the repository has never seen:
+
+1. **Newly created blank documents.** A document created in the app starts from the untitled template
+   and has no Word style table beyond what the app itself writes. The DOCX reader falls back to
+   `w:docDefaults` and then to the app default `Normal`; it must never need a fixture style id to exist.
+2. **Documents created from templates later (Plan 9 and beyond).** The save path writes the styles it
+   creates, and the reader resolves them from their own declarations, including `w:link` pairs it has
+   never seen and `w:name`/`w:outlineLvl` rather than the shape of an id.
+3. **Any other document the owner opens, including the Realme C3 pass after Plan 11.** Localised ids
+   (`Judul1`, `DaftarParagraf`) resolve through their `w:name`, their `w:basedOn` chain and their
+   `w:outlineLvl`. Neither fixture style ids nor fixture numbers may appear in behaviour.
+
+Enforcement, binding on both 8A commits:
+
+- **Behaviour reads declarations only.** Fixture names may appear in comments as rationale (for example
+  the Sample-4 note on `resolveNumbering`), but no branch may test a fixture id, name or `numId`. The
+  retired `PARA_STYLE_REGEX`, `HEADING_STYLE_REGEX` and single-digit heuristic are the pattern this
+  requirement exists to prevent (section 3.2).
+- **Every new rule is asserted with a synthetic style table built inside the test** (short XML strings
+  fed to the reader), so the assertion is about the rule. The fixture tests stay regression evidence for
+  the six samples and are not the proof of the rule; this is also what makes the deferred device pass
+  meaningful on unseen files.
+- **Unmatched input keeps a defined fallback:** a style id the file's own style table does not contain
+  resolves to the Normal-based default, never to a heading and never to a fixture value.
+- **Numbering state follows the file's own declaration:** the nearest `w:numPr` in the chain wins,
+  `w:numId` 0 suppresses ([MS-OI29500] section 17.9.18, p.125), and a direct `w:numPr` beats the style
+  chain. No `numId` value seen in a fixture is special-cased.
+- **The ODF reader keeps the same bar** through the `style:parent-style-name` cascade
+  (`SvXMLImport.kt`), and commit 1 must not regress `Sample5StyleFidelityTest`.
+
+**Recorded deviation from two ECMA-376 tier rules (commit 1).** Inside one `w:basedOn` chain the
+reader takes the nearest definition, which is the standard rule. Across tiers, §17.7.2 orders the
+character style above the paragraph style and §17.7.3 combines the twelve toggle run properties
+(`b`, `i`, `caps`, `smallCaps`, `strike`, `vanish`, and the rest) by XOR (`[MS-OI29500]` §2.1.230,
+p.105), while this reader lets the paragraph style's own `w:rPr` win and its linked character style
+fill only the gaps. That is the owner decision in section 4.1 and it is a deliberate deviation: a
+linked pair is one logical Word style written twice, the decision is what keeps Samples 2 and 5 at
+14 pt, and un-modelled cross-tier XOR must not be claimed as support. Direct run formatting (commit 2)
+still overrides both tiers.
+
+**Test naming, reconciled.** Option 1 above and section 4.1 name the commit-1 gate differently. The
+commit-1 gate is one new class, `DocxStyleChainTest`, holding the linkage cases from section 4.1 item 3
+(`w:link` beats the name convention; the name convention when no link exists; a back link declared on
+the character style still pairs; the paragraph style's own `w:rPr` beats the linked character style, so
+Samples 2 and 5 stay at 14 pt) plus the toggle, ignored-child and numbering-state cases. The extended
+`StyleChainMetricsTest` keeps the fixture-chain numbers, and the twelve-fixture page matrix is
+re-measured after commit 1 because three DOCX counts move. `DocxRunFormattingTest` and the measured
+matrix remain commit 2.
+
 ---
 
 ## 5. Unused code sweep

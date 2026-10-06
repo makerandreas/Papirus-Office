@@ -78,20 +78,54 @@ object OfficeRuns {
             isItalic = charHit?.isItalic == true || run.isItalic || base.isItalic,
             isUnderline = charHit?.isUnderline == true || run.isUnderline || base.isUnderline,
             colorHex = charHit?.colorHex ?: base.colorHex,
+            highlight = charHit?.highlight ?: base.highlight,
+            isHidden = charHit?.isHidden == true || base.isHidden,
             fontFamily = charHit?.fontFamily ?: base.fontFamily
         )
     }
 
     fun spanFor(style: ParagraphStyle, scale: Float, defaultColor: Color): SpanStyle {
-        val color = style.colorHex?.let(::parseColorHex) ?: defaultColor
+        // Hidden text stays in the string so caret and selection offsets keep
+        // matching the model; Word paints nothing for it, so display does not
+        // either. The reserved line box is the interim shape until Plan 8B
+        // settles hidden-run text projection.
+        val color = if (style.isHidden) Color.Transparent else style.colorHex?.let(::parseColorHex) ?: defaultColor
         return SpanStyle(
             fontSize = (style.fontSizeSp * scale).sp,
             fontWeight = if (style.isBold) FontWeight.Bold else FontWeight.Normal,
             fontStyle = if (style.isItalic) FontStyle.Italic else FontStyle.Normal,
             textDecoration = if (style.isUnderline) TextDecoration.Underline else TextDecoration.None,
             color = color,
+            background = highlightColor(style.highlight) ?: Color.Unspecified,
             fontFamily = fontFamilyFor(style.fontFamily)
         )
+    }
+
+    /**
+     * Background for an OOXML `w:highlight` colour name (ECMA-376 Part 1
+     * §17.18.40 `ST_HighlightColor`). Names are the document's own values, so
+     * every consumer of a style sees one mapping; unknown names fall through
+     * to no background rather than a guessed colour.
+     */
+    fun highlightColor(name: String?): Color? = when (name?.trim()?.lowercase(Locale.ROOT)) {
+        "black" -> Color(0xFF000000)
+        "blue" -> Color(0xFF0000FF)
+        "cyan" -> Color(0xFF00FFFF)
+        "darkblue" -> Color(0xFF000080)
+        "darkcyan" -> Color(0xFF008080)
+        "darkgray", "darkgrey" -> Color(0xFF808080)
+        "darkgreen" -> Color(0xFF008000)
+        "darkmagenta" -> Color(0xFF800080)
+        "darkred" -> Color(0xFF800000)
+        "darkyellow" -> Color(0xFF808000)
+        "green" -> Color(0xFF00FF00)
+        "lightgray", "lightgrey" -> Color(0xFFC0C0C0)
+        "magenta" -> Color(0xFFFF00FF)
+        "red" -> Color(0xFFFF0000)
+        "white" -> Color(0xFFFFFFFF)
+        "yellow" -> Color(0xFFFFFF00)
+        "none" -> null
+        else -> null
     }
 
     /**

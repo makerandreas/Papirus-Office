@@ -12,7 +12,9 @@ sealed class OfficeDocumentElement {
         val styleName: String? = null,
         val runs: List<TextRun> = emptyList(),
         val pageBreakOffsets: List<Int> = emptyList(),
-        val bookmarks: List<String> = emptyList()
+        val bookmarks: List<String> = emptyList(),
+        /** OOXML `w:numPr` state, resolved through the style chain; null when unnumbered. */
+        val numbering: DocxNumberingRef? = null
     ) : OfficeDocumentElement()
 
     data class Heading(
@@ -21,7 +23,9 @@ sealed class OfficeDocumentElement {
         val styleName: String? = null,
         val runs: List<TextRun> = emptyList(),
         val pageBreakOffsets: List<Int> = emptyList(),
-        val bookmarks: List<String> = emptyList()
+        val bookmarks: List<String> = emptyList(),
+        /** OOXML `w:numPr` state, resolved through the style chain; null when unnumbered. */
+        val numbering: DocxNumberingRef? = null
     ) : OfficeDocumentElement()
 
     data class ListItem(
@@ -104,6 +108,27 @@ data class TextRun(
     val isUnderline: Boolean = false,
     val styleName: String? = null,
     val hyperlink: String? = null
+)
+
+/**
+ * Effective OOXML numbering state of one paragraph, resolved from `w:numPr`
+ * (`w:ilvl` + `w:numId`, ECMA-376 Part 1 §17.9.6 and §17.9.18).
+ *
+ * [numId] `0` is not a definition reference: the document uses it to suppress
+ * the numbering a style would otherwise give the paragraph (`[MS-OI29500]`
+ * §17.9.18 note, p.125), so [suppressed] records that fact instead of leaving
+ * a caller to interpret the zero. [fromStyle] is true when no `w:pPr/w:numPr`
+ * is present and the reference comes from the paragraph style chain, which is
+ * the shape Word writes for headings and list styles.
+ *
+ * Plan 8A resolves and carries this state; Plan 8B reads `word/numbering.xml`
+ * and renders the label from it.
+ */
+data class DocxNumberingRef(
+    val numId: Int,
+    val ilvl: Int = 0,
+    val suppressed: Boolean = false,
+    val fromStyle: Boolean = false
 )
 
 data class OfficeParsedDocument(

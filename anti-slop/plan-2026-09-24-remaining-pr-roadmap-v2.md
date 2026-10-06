@@ -393,7 +393,7 @@ Closes F-07, F-18, the image half of save integrity (refusal per §0), O-01's mi
 
 **Boundaries:** ODF only; textual leaders are limited to explicit single-character `style:leader-text`, with line-only leaders and `leader-color`/`leader-text-style`/`leader-width` deferred. Conditional sections remain recorded and laid out; there is no condition evaluator. Sections contained inside table cells are unsupported. DOCX `w:tabs`/`w:vanish`, hidden text runs, TOC regeneration, and UI editing remain out of scope. The plan contains no fixture with a hidden section, so these tests are synthetic and the page-count matrix must not move.
 
-### 4.8 PR #34, Plan 8A: DOCX style chain + run formatting
+### 4.8 PR #35, Plan 8A: DOCX style chain + run formatting
 
 Closes
 
@@ -403,6 +403,8 @@ Closes
 1. **H-1:** parse `w:docDefaults` (`rPrDefault`/`pPrDefault`) and every `w:style` with its `basedOn` chain and full `w:rPr`/`w:pPr`; `pStyle` keeps the DOCX style id. `para1` resolves to 20 pt Aptos Display `#0f4761` via the chain (§2.3 item 2); body resolves to docDefaults' 12 pt, not the 24/20/16 fallback or 14 sp.
 2. **⚑ H-1b (new) · Character-style linkage.** Resolution precedence: explicit `w:link` wins (Sample-4: 27 of them); then Word's **naming convention** (paragraph style `X` ↔ character style `X Char`, case-insensitive, trailing-space tolerant); if neither matches, the paragraph style's own `w:rPr` applies unchanged; Sample-6 has no `w:link` attribute at all (§2.3 item 2), so convention-only files must resolve. The resolved character properties (font, size, colour, bold) merge into the paragraph's default run properties; a direct run `w:rPr` always overrides both.
 3. **⚑ H-1c (new) · Numbering state per paragraph.** While numbering *rendering* is Plan 8B, the style-chain work must record per paragraph one of: **inherited** (`numId`/`ilvl` from the style chain, walked through `w:basedOn` (Sample-6 headings: `numId 15` inside `w:style/w:pPr`), **explicit** (a direct `w:numPr`, 42 paragraphs), or **suppressed** (direct `w:numId 0`, ECMA-376 §17.9.18, 3 paragraphs). Plan 8A resolves; Plan 8B renders. This is why H-1 must read `w:numPr` inside styles at all.
+**2026-10-06 naming and precedence (audit-019 §4.1 and §4.2):** the commit-1 gate class is `DocxStyleChainTest` (the `DocxCharLinkTest` name in this section and in §4.1 is superseded); the paragraph style's own `w:rPr` beats its linked character style, so Samples 2 and 5 stay at 14 pt; and the whole section is bound by the fixture-independence requirement in §6, so every rule is asserted against a synthetic style table and no branch may test a fixture id, name, or number. Commit 1 also records its one bounded deviation: cross-tier XOR of the twelve toggle run properties (ECMA-376 §17.7.3, `[MS-OI29500]` §2.1.230) is not modelled at the paragraph-style/character-style boundary, because the owner decision fixes that merge as own-properties-first (audit-019 §4.2).
+
 4. **H-2:** `TextRun`s built per `w:r` from resolved character properties; `w:val="0"|"false"` is an explicit negative (negative-flag support in `OfficeRuns.mergeRun`); run flags stop leaking past their run (reset at run end, not at `</w:p>`); **`currentRuns` actually reaches the paragraph** (today it is declared at `OfficeDocumentParser.kt:800` and never populated, so every DOCX paragraph is one flat run).
 5. **⚑ H-2b (new) · Retire the sample-tuned regexes.** `PARA_STYLE_REGEX` (`para[1-9]`), `HEADING_STYLE_REGEX` (`heading[1-9]`) and the `SINGLE_DIGIT` heuristic (`OfficeDocumentParser.kt:55-57` and the `w:pStyle` arm) are replaced by the real style-table lookup (H-1); a styleId absent from the file's own style table resolves to the Normal-based default (not a heading). The regexes were tuned to the samples' styleId shape; the lookup is what the spec says.
 **Files:** `OfficeDocumentParser.kt` (new `word/styles.xml` reader + run path), `data/OfficeDocument.kt` (run + numbering-state fields), `data/DocxDocumentParser.kt` (nothing, since the save path is Plan 9).
@@ -410,7 +412,7 @@ Closes
 **Acceptance:** heading/body sizes and fonts come from the file in every sample; no run-flag leak; Sample-3 control green.
 **Size:** large.
 
-### 4.9 PR #35, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
+### 4.9 PR #36, Plan 8B: DOCX numbering, fields, tables, sections, and TOC snapshot
 
 Closes
 
@@ -429,7 +431,7 @@ Closes
 **Acceptance:** Sample-6.docx fidelity checklist; Sample-6's two formats (the one metric-identical pair, audit-007 §1) converge on the same page window, the other pairs hold their per-format windows; **the §0 staged-tightening commit lands here** (windows move toward ±10 % of the audit-007 §1 references, never below).
 **Size:** large.
 
-### 4.10 PR #36, Plan 9: save round-trip integrity (pre-change gate first)
+### 4.10 PR #37, Plan 9: save round-trip integrity (pre-change gate first)
 
 Closes O-01, the non-destructive-package rule, plan-03 3.13, 3.19, 3.20, 3.26, 3.27, and retires F-2 (`OfficeDocElement`).
 
@@ -536,7 +538,7 @@ One-time plan-1 changes made with PR 13's commits (they described state then): r
 
 ## 6. Cross-plan invariants (unchanged from plan-01 §5)
 
-One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one unit system (`LayoutUnits`), one style resolver (`StyleResolver` plus `OfficeRuns`), one numbering model, one media store. A plan that adds a second path deletes the first in the same PR; Plan 5e did exactly that when it retired the second `BasicTextField` renderer and replaced raw Paint sizing. No new hard-coded copy or `contentDescription` literal (the PR 12 guard enforces this mechanically). 48 dp targets, token colours only, verified at 320 dp. No em dash in user-visible strings. Evidence, not claims: every PR body lists the findings it closes, the suite it ran, and, for UI, the Delivery Gate with device evidence. The 12-file sample matrix (§2) is the floor.
+One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one unit system (`LayoutUnits`), one style resolver (`StyleResolver` plus `OfficeRuns`), one numbering model, one media store. A plan that adds a second path deletes the first in the same PR; Plan 5e did exactly that when it retired the second `BasicTextField` renderer and replaced raw Paint sizing. No new hard-coded copy or `contentDescription` literal (the PR 12 guard enforces this mechanically). 48 dp targets, token colours only, verified at 320 dp. No em dash in user-visible strings. Evidence, not claims: every PR body lists the findings it closes, the suite it ran, and, for UI, the Delivery Gate with device evidence. The 12-file sample matrix (§2) is the floor. **Fixture independence (2026-10-06, audit-019 §4.2):** a fidelity rule must be derived from declarations inside the file being read, never from a fixture style id, name, or number, so it also holds for a new blank document, for a document created from a template later, and for any unseen document opened on a device; every new rule ships with a synthetic-style-table test, and the fixture tests remain regression evidence.
 
 ---
 
@@ -571,6 +573,7 @@ One paginator (`LayoutEngine`), one measurement backend (`TextMetrics`), one uni
 24. **v2.12 (2026-10-06, Plan 8 preparation).** The OOXML shelf moved to `docs/ooxml/` with `docs/ooxml/README.md` (inventory, page maps, fixture notes); `AGENTS.md` names the directory. Plan 8A's scope is corrected against the regenerated fixtures and the current tree: Plan 5d already shipped `w:docDefaults` and the `w:basedOn` chain, so 8A is character-style linkage, the run model, numbering state and regex retirement; the 20 pt Aptos Display value lives in `Heading1Char`, not on the paragraph style; Sample-4 has 34 `w:link` elements; Sample-6's numbering is 42 inherited, 91 direct, 3 suppressed; Samples 2 and 5 decide the precedence rule. Three DOCX page counts move with the heading-size fix and 8A must measure them. Five unused private members and one dead constant were deleted. Evidence: `audit-019` §2, §3, §5, §6.
 
 25. **v2.13 (2026-10-06, PR #34 preparation pass, this change).** The next slot is spent on preparation rather than on 8A: the twenty `[MS-*]` PDFs move to `docs/ooxml/` behind `docs/ooxml/README.md`, `AGENTS.md` names the directory, `audit-019` records the readiness sweep, and five unused private members plus one dead constant are deleted. The forecast shifts by one: 8A `#35`, 8B `#36`, Plan 9 `#37`, Plan 10 `#38`-`#39`, Plan 11 `#40`-`#44`. CI run `37430436955` (merge ref `435f26d`) passed 358 unit tests across 66 suites with zero failures, errors or skips, plus the Build (SemVer & Nightly) job; the timer is 32.08 s of JUnit time and is a runner figure, not a device measurement. Nothing in the 8A or 8B scope text changes, and no plan ID moves. The one pre-existing em dash in the Plan 6 status row of §4.12 is also removed, so this file is now clean under R-02.
+26. **v2.14 (2026-10-06, Plan 8A commit 1, this change).** 8A starts with the record rather than the code: the owner's fixture-independence requirement is written into `audit-019` §4.2 and into §6 above, and the commit-1 gate class is reconciled to `DocxStyleChainTest` (§4.8). The prep-pass forecast headings in §4.8 to §4.10 are corrected to the v2.13 slot (`#35` 8A, `#36` 8B, `#37` Plan 9). Commit 1 then lands character properties and linkage: an own-properties-first run-property merge (`ownRunProps`/`mergeRunProps`), a `w:link` map that accepts a link declared on either element of the pair, `w:color`/`w:highlight`/`w:vanish`/`w:szCs`, the linked character styles exposed through `DocumentStyles.characterStyles`, per-paragraph numbering state (`numId`, `ilvl`, suppression from a style `numId 0`), and the retirement of the id-shape heading heuristics in favour of the style table plus `NavigatorStringCatalog`. Because the Arena session is fixed to a single branch, the 8A commits land on the branch PR #34 already heads, so the forecast 8A slot `#35` collapses into `#34`; the 8A closeout reconciles the forecast and the PR text. Evidence is CI on the next run; local compilation remains unavailable without a JDK.
 
 ---
 

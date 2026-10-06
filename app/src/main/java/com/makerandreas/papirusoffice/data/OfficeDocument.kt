@@ -105,7 +105,9 @@ data class OfficeParagraph(
     val runs: List<OfficeTextRun> = emptyList(),
     val bookmark: String? = null,
     val pageBreakOffsets: List<Int> = emptyList(),
-    val bookmarks: List<OfficeBookmark> = emptyList()
+    val bookmarks: List<OfficeBookmark> = emptyList(),
+    /** OOXML `w:numPr` state resolved by Plan 8A; null for unnumbered paragraphs. */
+    val numbering: DocxNumberingRef? = null
 ) : OfficeElement
 
 data class OfficeHeading(
@@ -114,7 +116,9 @@ data class OfficeHeading(
     val level: Int = 1,
     val runs: List<OfficeTextRun> = emptyList(),
     val pageBreakOffsets: List<Int> = emptyList(),
-    val bookmarks: List<OfficeBookmark> = emptyList()
+    val bookmarks: List<OfficeBookmark> = emptyList(),
+    /** OOXML `w:numPr` state resolved by Plan 8A; null for unnumbered headings. */
+    val numbering: DocxNumberingRef? = null
 ) : OfficeElement
 
 data class OfficeListItem(
@@ -320,6 +324,19 @@ data class ParagraphStyle(
     val isItalic: Boolean = false,
     val isUnderline: Boolean = false,
     val colorHex: String? = null,
+    /**
+     * OOXML `w:highlight` colour name resolved from the style chain or its
+     * linked character style (`yellow`, `green`, `cyan`, `magenta`, `blue`,
+     * `red`, the `dark*` variants, `lightGray`, `darkGray`, `black`). Display
+     * maps the name; unset is null.
+     */
+    val highlight: String? = null,
+    /**
+     * OOXML `w:vanish`: text the document marks hidden. Word shows nothing for
+     * it, so display renders it transparent (the glyphs stay in the text
+     * stream, which keeps caret and selection offsets meaningful).
+     */
+    val isHidden: Boolean = false,
     val alignment: String = "Left",
     val fontFamily: String? = null,
     val parentStyleName: String? = null,
@@ -376,6 +393,10 @@ data class CharacterStyle(
     val isItalic: Boolean = false,
     val isUnderline: Boolean = false,
     val colorHex: String? = null,
+    /** OOXML `w:highlight` colour name; see [ParagraphStyle.highlight]. */
+    val highlight: String? = null,
+    /** OOXML `w:vanish`; see [ParagraphStyle.isHidden]. */
+    val isHidden: Boolean = false,
     val fontFamily: String? = null,
     val parentStyleName: String? = null
 )
@@ -530,6 +551,7 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                     pageBreakOffsets = elem.pageBreakOffsets,
                     bookmark = elemBookmarks.firstOrNull(),
                     bookmarks = elemBookmarks.map { OfficeBookmark(it) },
+                    numbering = elem.numbering,
                     runs = elem.runs.map { run ->
                         OfficeTextRun(
                             text = run.text,
@@ -562,7 +584,8 @@ fun OfficeParsedDocument.toOfficeDocument(): OfficeDocument {
                         )
                     },
                     pageBreakOffsets = elem.pageBreakOffsets,
-                    bookmarks = elemBookmarks.map { OfficeBookmark(it) }
+                    bookmarks = elemBookmarks.map { OfficeBookmark(it) },
+                    numbering = elem.numbering
                 )
             }
             is OfficeDocumentElement.ListItem -> {
