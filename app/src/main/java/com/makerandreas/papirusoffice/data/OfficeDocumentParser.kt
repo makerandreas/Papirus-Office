@@ -2410,11 +2410,6 @@ class OfficeDocumentParser(private val context: Context) {
                                 inFieldResult = false
                             }
 
-                            tagLocal == "tblpr" -> { inTblPr = false }
-                            tagLocal == "tblgrid" -> { inTblGrid = false }
-                            tagLocal == "trpr" -> { inTrPr = false }
-                            tagLocal == "tcpr" -> { inTcPr = false }
-
                             isDocx && tagLocal == "rpr" -> { inRunRPr = false }
                             isDocx && tagLocal == "r" -> {
                                 val runText = if (runStartOffset <= currentText.length) {
