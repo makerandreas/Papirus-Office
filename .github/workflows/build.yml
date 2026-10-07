@@ -40,6 +40,8 @@ jobs:
       # step never fails the job.
       - name: Native inventory (read-only)
         continue-on-error: true
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           chmod +x scripts/native-inventory.sh
           scripts/native-inventory.sh build/native-inventory.txt
@@ -70,11 +72,21 @@ jobs:
       # dump, the native inventory) into one PR comment, because the agent
       # sandbox this repository is worked from can reach api.github.com but
       # not the Actions log/artifact storage (AGENTS.md, GitHub API approach).
+      #
+      # HEAD_SHA is the commit the reader has to check out. On a pull_request
+      # event GITHUB_SHA is the ephemeral refs/pull/N/merge commit GitHub made
+      # for this run ("Merge <head> into <base>"): it is on no branch, so a
+      # reader cannot resolve it with git. Naming the head SHA keeps the report
+      # tied to code (see AGENTS.md, "Reading the CI report").
       - name: Post CI report to the pull request
         if: always() && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           python3 scripts/ci-dump-comment.py app/build/test-results/testDebugUnitTest build/gradle-test.log build/native-inventory.txt > build/ci-report.md || true
           if [ -s build/ci-report.md ]; then

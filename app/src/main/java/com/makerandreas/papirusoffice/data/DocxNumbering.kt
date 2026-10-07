@@ -1,13 +1,15 @@
 package com.makerandreas.papirusoffice.data
 
-import com.makerandreas.papirusoffice.data.LayoutUnits
+// `Charsets.UTF_8` below is `kotlin.text.Charsets`, a Kotlin default import for
+// JVM targets. There is no `java.nio.charset.Charsets` type: the Java classes are
+// `Charset` and `StandardCharsets`. Adding `import java.nio.charset.Charsets`
+// here breaks `:app:compileDebugKotlin` (it did, twice, on PR #35).
 import com.makerandreas.papirusoffice.data.util.ZipSafe
 import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.nio.charset.Charsets
 import java.util.Locale
 import java.util.zip.ZipInputStream
 

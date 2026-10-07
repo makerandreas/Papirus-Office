@@ -2,7 +2,6 @@ package com.example
 
 import com.makerandreas.papirusoffice.data.DocxNumberingReader
 import com.makerandreas.papirusoffice.data.NumberingCounterState
-import com.makerandreas.papirusoffice.data.NumberingSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
