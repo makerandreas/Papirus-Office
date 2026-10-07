@@ -316,6 +316,118 @@ class OfficeDocumentParser(private val context: Context) {
      */
     private fun docxToggle(value: String?): Boolean = docxOnOff(value)
 
+    /**
+     * Post-process a DOCX body: for every Paragraph or Heading that carries a
+     * non-suppressed [DocxNumberingRef], advance the per-numId counter and
+     * prepend the rendered label to its text, runs and plainText. Suppressed
+     * paragraphs (numId=0) get no label and do not advance any counter, which
+     * matches Word's behaviour for "KATA PENGANTAR" in Sample-6.
+     *
+     * Counters are shared across paragraphs and headings, mirroring Word's
+     * single numbering sequence per abstractNum ([MS-OI29500] §17.9). Headings
+     * inherit the level from their ilvl (0-based); paragraphs do the same.
+     */
+    private fun applyDocxNumberingLabels(
+        elements: MutableList<OfficeDocumentElement>,
+        plainTextBuilder: StringBuilder,
+        numSpecs: Map<Int, NumberingSpec>
+    ) {
+        val counters = LinkedHashMap<Int, NumberingCounterState>()
+        // Rebuild plainText from the updated elements below, because prepending
+        // labels changes every paragraph's text offset.
+        val newPlain = StringBuilder()
+
+        for (i in elements.indices) {
+            val el = elements[i]
+            val numbered = when (el) {
+                is OfficeDocumentElement.Paragraph -> el.numbering
+                is OfficeDocumentElement.Heading -> el.numbering
+                else -> null
+            }
+            val labeled = when {
+                numbered == null -> el
+                numbered.suppressed -> el
+                numbered.numId < 1 -> el
+                else -> {
+                    val spec = numSpecs[numbered.numId]
+                    if (spec == null) {
+                        el
+                    } else {
+                        val counter = counters.getOrPut(numbered.numId) { NumberingCounterState() }
+                        // ilvl is 0-based in the file; levels in NumberingSpec are 1-based.
+                        val oneBased = (numbered.ilvl + 1).coerceIn(1, NumberingSpec.MAX_NUMBERING_LEVELS)
+                        val raw = counter.advance(spec, oneBased)
+                        if (raw.isEmpty()) {
+                            el
+                        } else {
+                            // Apply a trailing separator that matches w:suff. Word's
+                            // default is a tab; our simplified renderer uses a space so
+                            // the label stays on the same line without the tab-to-
+                            // indent machinery that Plan 7F already supplies for tabs.
+                            val levelSpec = spec.level(oneBased)
+                            val separator = when (levelSpec?.labelFollowedBy?.lowercase(Locale.ROOT)) {
+                                "nothing", "none" -> ""
+                                "space" -> " "
+                                else -> "\t"
+                            }
+                            val labelWithSep = "$raw$separator"
+                            prependLabel(el, labelWithSep)
+                        }
+                    }
+                }
+            }
+            elements[i] = labeled
+            when (labeled) {
+                is OfficeDocumentElement.Paragraph -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.Heading -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.ListItem -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.bullet).append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.Table -> {
+                    for (row in labeled.rows) for (cell in row.cells) {
+                        if (cell.text.isNotEmpty()) newPlain.append(cell.text).append("\n")
+                    }
+                    newPlain.append("\n")
+                }
+                is OfficeDocumentElement.ImageElement -> { /* images contribute no plain text */ }
+                OfficeDocumentElement.PageBreak -> { /* breaks contribute no plain text */ }
+            }
+        }
+        // Replace the plain text with the relabeled version, so consumers that
+        // read only plainText (search, word count) agree with the rendered body.
+        plainTextBuilder.setLength(0)
+        plainTextBuilder.append(newPlain.trimEnd())
+    }
+
+    /** Prepend [label] to a Paragraph or Heading element's text and first run. */
+    private fun prependLabel(el: OfficeDocumentElement, label: String): OfficeDocumentElement = when (el) {
+        is OfficeDocumentElement.Paragraph -> {
+            val newRuns = el.runs.toMutableList()
+            if (newRuns.isEmpty()) {
+                newRuns += TextRun(label)
+            } else {
+                val first = newRuns.first()
+                newRuns[0] = first.copy(text = label + first.text)
+            }
+            el.copy(text = label + el.text, runs = newRuns)
+        }
+        is OfficeDocumentElement.Heading -> {
+            val newRuns = el.runs.toMutableList()
+            if (newRuns.isEmpty()) {
+                newRuns += TextRun(label)
+            } else {
+                val first = newRuns.first()
+                newRuns[0] = first.copy(text = label + first.text)
+            }
+            el.copy(text = label + el.text, runs = newRuns)
+        }
+        else -> el
+    }
+
     private fun parseDocxTab(parser: XmlPullParser): ParagraphTabStop? {
         val pos = getXmlAttr(parser, "pos")?.toIntOrNull() ?: return null
         val alignment = when (getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)) {
@@ -1553,6 +1665,7 @@ class OfficeDocumentParser(private val context: Context) {
         var inDocxText = false
         val inlinePageBreaks = mutableListOf<Int>()
         val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
+        val docxNumberingResult = if (isDocx) DocxNumberingReader.read(file) else DocxNumberingReader.NumberingParseResult()
         val docxStylesMap = docxStylesResult.stylesMetaMap
         val docxNumberingMap = docxStylesResult.numberingByStyle
         val docxParagraphStyles = docxStylesResult.paragraphStyles.toMutableMap()
@@ -1921,11 +2034,11 @@ class OfficeDocumentParser(private val context: Context) {
                                 currentText.clear()
                             }
 
-                            // Lists. The bullet text is the placeholder that Plan 8B
-                            // replaces with the numbering definition's real label.
+                            // Lists. ODF still emits its bullet through list-item;
+                            // DOCX numbering is resolved per-paragraph from
+                            // `DocxNumberingRef` and never prepends a fake bullet here.
                             tagLocal == "list-item" || tagLocal == "numpr" -> {
                                 if (tagLocal == "numpr") inNumPr = true
-                                currentText.append("• ")
                             }
 
                             // Spaces & Tabs
@@ -1942,6 +2055,16 @@ class OfficeDocumentParser(private val context: Context) {
                                 if (brType?.equals("page", ignoreCase = true) == true) {
                                     inlinePageBreaks += currentText.length
                                 } else {
+                                    // `w:br` without a type or with type other than
+                                    // "page" is a line break. In a heading authored
+                                    // with a line break between the numbering label
+                                    // and the title text (the user's "BAB I\nPENDAHULUAN"
+                                    // pattern), keep the break so both lines render
+                                    // but the numbering label still prepends the
+                                    // level; the numbering prefix we add at post
+                                    // process does not duplicate what the file
+                                    // wrote because the line sits inside the label
+                                    // content rather than a number.
                                     currentText.append("\n")
                                 }
                             }
@@ -2267,12 +2390,23 @@ class OfficeDocumentParser(private val context: Context) {
                 paragraphStyles = allParagraphStyles,
                 characterStyles = docxStylesResult.characterStyles,
                 defaultPageStyle = extractDocxPageStyleSpec(xmlContent),
-                defaultParagraphStyle = docxDefaultParagraphStyle
+                defaultParagraphStyle = docxDefaultParagraphStyle,
+                docxNumStyles = docxNumberingResult.numSpecs
             )
         } else DocumentStyles()
         if (currentSectionStart > 0 && currentSectionStart < elements.size && sectionStarts.none { it.elementIndex == currentSectionStart }) {
             sectionStarts += SectionStart(currentSectionStart, SectionStartKind.NEXT_PAGE)
         }
+
+        // Plan 8B Commit 1: apply DOCX numbering labels to paragraphs and
+        // headings. Walk the element list in document order, maintaining one
+        // counter per numId like Word does. Suppressed refs (numId=0) emit no
+        // label and do not advance a counter; unknown numIds degrade to no
+        // label rather than crashing.
+        if (isDocx && docxNumberingResult.numSpecs.isNotEmpty()) {
+            applyDocxNumberingLabels(elements, plainTextBuilder, docxNumberingResult.numSpecs)
+        }
+
         val parsedDoc = OfficeParsedDocument(
             sectionStarts = sectionStarts.toList(),
             elements = elements,

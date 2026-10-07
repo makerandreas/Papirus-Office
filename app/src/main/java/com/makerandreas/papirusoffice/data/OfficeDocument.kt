@@ -291,6 +291,12 @@ data class DocumentStyles(
     val listStyles: Map<String, NumberingSpec> = emptyMap(),
     /** Document-level ODF `<text:outline-style>` definition, if present. */
     val outlineStyle: NumberingSpec? = null,
+    /**
+     * DOCX `word/numbering.xml` definitions keyed by `w:numId` (>=1).
+     * Populated by Plan 8B; null/empty when the file has no numbering part
+     * (e.g. Sample-3) or when parsing a non-DOCX document.
+     */
+    val docxNumStyles: Map<Int, NumberingSpec> = emptyMap(),
     /** ODF font-face declarations keyed by their style:name alias. Populated by Plan 7E. */
     val fontFaces: Map<String, OfficeFontFace> = emptyMap(),
     /** Named and automatic ODF table-family declarations populated by Plan 7D. */
