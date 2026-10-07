@@ -522,6 +522,20 @@ data class DocumentProperties(
 enum class SectionStartKind { NEXT_PAGE, CONTINUOUS, NEXT_COLUMN, ODD_PAGE, EVEN_PAGE }
 data class SectionStart(val elementIndex: Int, val kind: SectionStartKind)
 
+/**
+ * Plan 8B H-6/H-6b: WordprocessingML section-break metadata parsed from a
+ * `<w:sectPr>` and aligned 1:1 with [OfficeParsedDocument.sectionStarts] by
+ * index. `titlePg` mirrors w:titlePg (different first-page header/footer);
+ * `pageNumberFormat` mirrors w:pgNumType w:fmt (decimal, upperRoman,
+ * lowerRoman, upperLetter, lowerLetter); `pageNumberStart` mirrors w:start
+ * (restart value).
+ */
+data class DocxSectionBreakSpec(
+    val titlePg: Boolean = false,
+    val pageNumberFormat: String? = null,
+    val pageNumberStart: Int? = null
+)
+
 data class DocumentSection(
     val name: String = "",
     val elements: List<OfficeElement> = emptyList()
