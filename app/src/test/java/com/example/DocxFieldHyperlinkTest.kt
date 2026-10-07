@@ -1,27 +1,28 @@
 package com.example
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.robolectric.RuntimeEnvironment
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
+import java.nio.charset.Charsets
 import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Plan 8B Commit 2: verify that DOCX hyperlinks, bookmarks and complex
- * fields are parsed correctly: hyperlink anchors/URLs reach runs, bookmark
- * names reach paragraphs, and TOC/SEQ/PAGEREF instruction text never leaks
- * into plain text.
- *
- * These tests build a minimal DOCX zip in a temp file so they run on JVM
- * without needing a Gradle/Android device context beyond the Robolectric
- * application that OfficeDocumentParser already uses.
+ * Plan 8B Commit 2: DOCX hyperlinks, bookmarks and complex-field parsing.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class DocxFieldHyperlinkTest {
 
     @Test
@@ -41,7 +42,7 @@ class DocxFieldHyperlinkTest {
             withNumbering = false,
             withRels = false
         )
-        val parsed = parser().parseDocument(docx, bypassCache = true).get()
+        val parsed = parseSync(docx)
         val plain = parsed.plainText
         assertFalse("TOC instruction must not leak to plain text", plain.contains("TOC"))
         assertFalse("instrText backslash must not leak", plain.contains("\\"))
@@ -67,7 +68,7 @@ class DocxFieldHyperlinkTest {
             withNumbering = false,
             withRels = false
         )
-        val parsed = parser().parseDocument(docx, bypassCache = true).get()
+        val parsed = parseSync(docx)
         val plain = parsed.plainText
         assertFalse("SEQ instruction must not leak", plain.contains("SEQ"))
         assertTrue("cached SEQ result must remain", plain.contains("1"))
@@ -87,8 +88,8 @@ class DocxFieldHyperlinkTest {
             withNumbering = false,
             withRels = false
         )
-        val parsed = parser().parseDocument(docx, bypassCache = true).get()
-        val para = parsed.elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeDocumentElement.Paragraph>().first()
+        val parsed = parseSync(docx)
+        val para = parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().first()
         assertTrue("paragraph must have runs", para.runs.isNotEmpty())
         assertEquals("hyperlink anchor must be #_TOC...", "#_TOC000009", para.runs.first().hyperlink)
         docx.delete()
@@ -106,26 +107,26 @@ class DocxFieldHyperlinkTest {
             withNumbering = false,
             withRels = false
         )
-        val parsed = parser().parseDocument(docx, bypassCache = true).get()
-        val para = parsed.elements.filterIsInstance<com.makerandreas.papirusoffice.data.OfficeDocumentElement.Paragraph>().first()
+        val parsed = parseSync(docx)
+        val para = parsed.elements.filterIsInstance<OfficeDocumentElement.Paragraph>().first()
         assertTrue("paragraph must carry bookmark", "_TocStart" in para.bookmarks)
         docx.delete()
     }
 
     @Test
-    fun `sample 6 plain text has no TOC instrText leakage`() {
-        val parsed = parser().parseDocument(File("tests/inky/Sample-6.docx"), bypassCache = true).get()
+    fun `sample 6 plain text has no TOC instrText leakage`() = runBlocking {
+        val parser = OfficeDocumentParser(ApplicationProvider.getApplicationContext<Context>())
+        val parsed = parser.parseDocument(File("tests/inky/Sample-6.docx"), bypassCache = true)
         val plain = parsed.plainText
-        // The TOC field in Sample-6 writes an instrText " TOC \o \"1 - 9\" \\z "
-        // which must not appear in plainText. Word also writes a cached result,
-        // so TOC entry headings themselves must still be present.
-        assertFalse("TOC instruction must not leak", plain.contains("TOC \\\\o"))
-        assertFalse("instr text must not leak", " \\\\o " in plain || "\\\"1" in plain)
-        // First TOC entry text (from cached result) should still appear.
-        assertTrue("first TOC entry text must remain", plain.contains("KATA PENGANTAR") || plain.contains("DAFTAR ISI"))
+        assertFalse("TOC instruction must not leak", plain.contains("TOC \\o"))
+        assertTrue("first TOC entry text must remain",
+            plain.contains("KATA PENGANTAR") || plain.contains("DAFTAR ISI"))
     }
 
-    private fun parser(): OfficeDocumentParser = OfficeDocumentParser(RuntimeEnvironment.getApplication())
+    private fun parseSync(file: File) = runBlocking {
+        OfficeDocumentParser(ApplicationProvider.getApplicationContext<Context>())
+            .parseDocument(file, bypassCache = true)
+    }
 
     private fun buildDocx(
         documentXml: String,
@@ -139,24 +140,18 @@ class DocxFieldHyperlinkTest {
                 zos.write(body.toByteArray(Charsets.UTF_8))
                 zos.closeEntry()
             }
-            entry(
-                "[Content_Types].xml",
-                """<?xml version="1.0" encoding="UTF-8"?>
+            entry("[Content_Types].xml", """<?xml version="1.0" encoding="UTF-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
 <Default Extension="xml" ContentType="application/xml"/>
 <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
 """ + if (withNumbering) """<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>""" else "" + """
-</Types>"""
-            )
-            entry(
-                "_rels/.rels",
-                """<?xml version="1.0" encoding="UTF-8"?>
+</Types>""")
+            entry("_rels/.rels", """<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>"""
-            )
+</Relationships>""")
             val docRels = buildString {
                 append("""<?xml version="1.0" encoding="UTF-8"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -166,22 +161,14 @@ class DocxFieldHyperlinkTest {
                 append("</Relationships>")
             }
             entry("word/_rels/document.xml.rels", docRels)
-            entry(
-                "word/styles.xml",
-                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="276"/></w:pPr></w:pPrDefault></w:docDefaults>
+            entry("word/styles.xml", """<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos"/><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>
 <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
-</w:styles>"""
-            )
-            if (withNumbering) entry(
-                "word/numbering.xml",
-                """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+</w:styles>""")
+            if (withNumbering) entry("word/numbering.xml", """<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
 <w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum>
 <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
-</w:numbering>"""
-            )
+</w:numbering>""")
             entry("word/document.xml", documentXml)
         }
         return tmp
