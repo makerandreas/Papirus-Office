@@ -52,7 +52,10 @@ Implementation and PR sequencing are in `anti-slop/plan-11-hybrid-experience-des
 ---
 
 ## 🔗 Links used:
-> Use this as a reference. For `github.com` repos, a `git clone` command can be executed if needed.
+> Use this as a reference. For `git` repos, Run these 3 commands to check the repo before opening it with `git clone`.
+> 1. `ls -la .git/hooks` → Active file = one that does not end in `.sample` suffix.
+> 2. `cat .git/config` → Alert `hooksPath`, `fsmonitor`, `pager`, alias "!".
+> 3. `grep -rnE "curl|wget|base64|eval"` → If you find the four commands you are looking for in this command = skip.
 
 - LibreOffice Gerrit:
   - Main repo: https://gerrit.libreoffice.org/
