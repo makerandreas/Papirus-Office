@@ -29,7 +29,7 @@ class DocxTableTocTest {
 
     @Test
     fun `sample 6 table parses 5 columns from tblGrid with header row`() {
-        val parsed = parseSync(File("tests/inky/Sample-6.docx"))
+        val parsed = parseSync(SampleMatrix.findTestFile("Sample-6.docx"))
         val tables = parsed.elements.filterIsInstance<OfficeDocumentElement.Table>()
         assertEquals("Sample-6 has 1 table", 1, tables.size)
         val table = tables.first()
@@ -66,7 +66,7 @@ class DocxTableTocTest {
 
     @Test
     fun `sample 6 TOC snapshot is detected with toc1 toc2 toc3 entries`() {
-        val parsed = parseSync(File("tests/inky/Sample-6.docx"))
+        val parsed = parseSync(SampleMatrix.findTestFile("Sample-6.docx"))
         val toc = parsed.authoredIndexes.firstOrNull { it.kind == DocumentIndexKind.TABLE_OF_CONTENT }
         assertNotNull("Sample-6 must expose a TOC index", toc)
         assertEquals("45 TOC entries (6+11+28)", 45, toc!!.entries.size)
@@ -78,7 +78,7 @@ class DocxTableTocTest {
 
     @Test
     fun `sample 4 TOC does not list unused toc 3-9 style definitions`() {
-        val parsed = parseSync(File("tests/inky/Sample-4.docx"))
+        val parsed = parseSync(SampleMatrix.findTestFile("Sample-4.docx"))
         val toc = parsed.authoredIndexes.firstOrNull { it.kind == DocumentIndexKind.TABLE_OF_CONTENT }
         assertNotNull("Sample-4 must expose a TOC index", toc)
         assertEquals("Sample-4 has 21 authored TOC entries", 21, toc!!.entries.size)

@@ -115,7 +115,7 @@ class DocxFieldHyperlinkTest {
     @Test
     fun `sample 6 plain text keeps cached TOC entries without PAGEREF leakage`() = runBlocking {
         val parser = OfficeDocumentParser(ApplicationProvider.getApplicationContext<Context>())
-        val parsed = parser.parseDocument(File("tests/inky/Sample-6.docx"), bypassCache = true)
+        val parsed = parser.parseDocument(SampleMatrix.findTestFile("Sample-6.docx"), bypassCache = true)
         val plain = parsed.plainText
         assertFalse("PAGEREF must not leak into plain text", plain.contains("PAGEREF"))
         assertTrue("cached TOC/body text must remain",

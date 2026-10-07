@@ -13,7 +13,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.io.File
 
 /**
  * Plan 8B end-to-end smoke tests pinning the three user-authored shapes
@@ -68,6 +67,6 @@ class DocxAuthoredShapeTest {
 
     private fun parseSync() = runBlocking {
         OfficeDocumentParser(ApplicationProvider.getApplicationContext<Context>())
-            .parseDocument(File("tests/inky/Sample-6.docx"), bypassCache = true)
+            .parseDocument(SampleMatrix.findTestFile("Sample-6.docx"), bypassCache = true)
     }
 }

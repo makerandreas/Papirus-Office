@@ -26,7 +26,7 @@ class DocxSectionsTest {
 
     @Test
     fun `sample 6 sectPr blocks expose titlePg and lowerRoman then arabic page numbering`() {
-        val parsed = parseSync(File("tests/inky/Sample-6.docx"))
+        val parsed = parseSync(SampleMatrix.findTestFile("Sample-6.docx"))
         assertTrue("at least two sections found", parsed.sectionStarts.size >= 2)
         assertEquals("specs line up with sections",
             parsed.sectionStarts.size, parsed.docxSectionBreakSpecs.size)

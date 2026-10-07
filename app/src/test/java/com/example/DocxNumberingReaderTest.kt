@@ -74,7 +74,12 @@ class DocxNumberingReaderTest {
         assertNull("numId 0 must never be a spec (it is suppression)", result.numSpecs[0])
     }
 
-    private fun fixture(name: String): File = File("tests/inky", name).let {
+    /**
+     * `SampleMatrix.findTestFile` is the repository's fixture resolver: Gradle runs
+     * unit tests with the working directory at the `app` module, so a bare
+     * `File("tests/inky/...")` resolves to `app/tests/inky/...` and does not exist.
+     */
+    private fun fixture(name: String): File = SampleMatrix.findTestFile(name).let {
         require(it.exists()) { "fixture ${it.absolutePath} not found; run tests from the repo root" }
         it
     }
