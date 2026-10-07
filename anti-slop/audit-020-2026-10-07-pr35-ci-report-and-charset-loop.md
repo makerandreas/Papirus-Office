@@ -28,6 +28,9 @@ history; source reading; `python3` execution of `scripts/ci-dump-comment.py` and
 | G | **One real behavioural failure was ever measured**, at run `37620042554`: 383 tests, 1 failed, `DocxRunFormattingTest.textTheFileWroteOutsideARunBecomesANeutralRun`. Plan 8B deleted the placeholder bullet that test asserted. | §6 | The test now writes its own out-of-run text, and a second case states the new rule for a dangling `w:numId`. |
 | H | **A real type-check is possible in the sandbox after all.** A Temurin 25 JRE from PyPI plus `npm pack kotlin-compiler@2.4.20` gives a working `kotlinc`. | §7 | `DocxNumbering.kt` and the new assertions were compiled here, with negative controls that reproduce the CI diagnostics. `AGENTS.md` records the route. |
 | I | **122 imports across 47 files are unused**, plus four write-only locals in the new `DocxNumbering.kt`. | §9 | Recorded as safely deletable; only the one inside a file this PR adds was removed here. |
+| J | **Every new Plan 8B test resolved its fixture from the wrong directory.** All eight call sites used `File("tests/inky/Sample-N.docx")`, but Gradle runs unit tests with the working directory at the `app` module. | §12.1 | Seven of eleven failures in run `37634131669`. All eight now go through `SampleMatrix.findTestFile`, the resolver the rest of the suite already used. |
+| K | **A real Word table of contents was invisible to index detection.** Every TOC entry carries `w:tabs` for its dot-leader page-number stop, which flips `hasDirectPPr` and replaces the entry's style with a synthetic `inline-p-N`. | §12.2 | Three failures. `collectDocxAuthoredIndexes` now follows `parentStyleName` back to the authored style. |
+| L | **`DocxNumberingReaderTest` had no Robolectric runner, and three of its four cases could not tell.** `XmlPullParserFactory.newInstance()` throws without the Android runtime, the reader's `catch` returned an empty result, and three cases assert on emptiness. | §12.3 | The one failure that remained after J and K. `catch (_: Exception)` made an empty result and a crash indistinguishable; `NumberingParseResult.parseError` now keeps them apart. |
 
 ---
 
@@ -438,6 +441,17 @@ to a Plan 8C decision about label alignment and legal numbering, not to a cleanu
 | `AGENTS.md` | New section "Reading the CI report (the GitHub API approach, in full)"; the JNI notice now points at it |
 | `anti-slop/audit-020-2026-10-07-pr35-ci-report-and-charset-loop.md` | This file |
 
+Added while closing out PR #36's four runs (§12):
+
+| File | Change |
+|---|---|
+| `app/src/main/java/com/makerandreas/papirusoffice/data/OfficeDocumentParser.kt` | New `docxStyleName` helper at `:514`; `collectDocxAuthoredIndexes` resolves a paragraph's style through `parentStyleName` instead of reading the synthetic name (§12.2) |
+| `app/src/main/java/com/makerandreas/papirusoffice/data/DocxNumbering.kt` | `NumberingParseResult.parseError`; `read()` names the throwable instead of swallowing it (§12.3) |
+| `app/src/test/java/com/example/DocxNumberingReaderTest.kt` | `@RunWith(RobolectricTestRunner::class)` + `@Config(sdk = [34])`; `fixture()` delegates to `SampleMatrix.findTestFile`; `numSuffix` expectation corrected to `""`; the numId 15 message carries `parseError` (§12.1, §12.3, §12.4) |
+| `app/src/test/java/com/example/DocxAuthoredShapeTest.kt` | Fixture resolution through `SampleMatrix.findTestFile`; the then-unused `import java.io.File` removed |
+| `app/src/test/java/com/example/DocxFieldHyperlinkTest.kt`, `DocxSectionsTest.kt`, `DocxTableTocTest.kt` | Fixture resolution through `SampleMatrix.findTestFile` |
+| `anti-slop/audit-016-2026-10-04-post-7d-unit-test-analysis.md`, `audit-017-2026-10-04-plan-7e-recovery-and-7f-shape.md` | Both said the PR comment was the only durable log and left the impression a past PR was a dead end. A merged PR's report is still retrievable through the API; verified on PR #32 on 2026-10-07, two days after its merge. What is unrecoverable is narrower: the raw step log and the `unit-test-reports` artifact |
+
 ---
 
 ## 11. Delivery decision and the PR-number deviation
@@ -464,3 +478,124 @@ This PR is deliberately not a Plan. It is CI hygiene plus five line-level compil
 plus one test correction. It carries no feature scope, so it should not be read as
 advancing Plan 8B: the numbering, field, TOC, table and section work in PR #35 is
 unchanged by it, and PR #35's own acceptance is unchanged.
+
+---
+
+## 12. PR #36: four runs, three root causes
+
+The CI-triage pass above landed on PR #36 (head `arena/0c0a43a2-papirus-office`,
+base `main` at `37302a9`). Four runs closed it out. Every number below is read from the
+`github-actions[bot]` comment on that PR, not from a local run, because Gradle cannot
+run here.
+
+| Run | Head | Result | Failing |
+|---|---|---|---|
+| `37634131669` | `b1a24f7` | 402 run, **11 failed** | compile fixes held; 11 behavioural/path failures appeared for the first time |
+| `37635562268` | `dfb7b0d` | 402 run, **4 failed** | fixture resolution fixed (§12.1) removed 7 |
+| `37638803729` | `03cc8ee` | 402 run, **1 failed** | TOC style resolution fixed (§12.2) removed 3 |
+| `37640269667` | `ecfa42f` | **402 run, 0 failed, 0 errors, 0 skipped, 35.33 s, 73 suites** | Robolectric runner added (§12.3) |
+
+All seven Plan 8B and 8A suites are green in the last run: `DocxAuthoredShapeTest` 3/3,
+`DocxFieldHyperlinkTest` 5/5, `DocxNumberingReaderTest` 4/4, `DocxRunFormattingTest`
+11/11, `DocxSectionsTest` 2/2, `DocxStyleChainTest` 11/11, `DocxTableTocTest` 4/4.
+
+None of the three causes was a wrong expectation in a new test, which is what §4 found
+for PR #35. Two were the new code not meeting a contract the fixtures already stated,
+and one was a test harness that could not fail.
+
+### 12.1 Fixture resolution
+
+`Gradle` runs `:app:testDebugUnitTest` with the working directory at `app/`, so
+`File("tests/inky/Sample-6.docx")` resolved to `app/tests/inky/Sample-6.docx`, which
+does not exist. The repository already had the answer: `SampleMatrix.findTestFile`
+(`app/src/test/java/com/example/SampleMatrix.kt:92-100`) tries `""`, `"../"` and
+`"../../"` and returns the first candidate that exists with a non-zero length. In CI it
+returns `../tests/inky/<name>`.
+
+All eight call sites now delegate to it: `DocxAuthoredShapeTest:71`,
+`DocxFieldHyperlinkTest:118`, `DocxSectionsTest:29`, `DocxTableTocTest:32,69,81`, and
+`DocxNumberingReaderTest.fixture()`. `java.io.File` became unused in
+`DocxAuthoredShapeTest.kt` as a result and was removed.
+
+### 12.2 A table of contents that resolved to nothing
+
+`collectDocxAuthoredIndexes` (`OfficeDocumentParser.kt:442`) matched a paragraph's style
+name against the `toc N` values in `word/styles.xml`. Sample-6 declares `TOC1`/`TOC2`/
+`TOC3` with `w:name` values `toc 1`/`toc 2`/`toc 3`, so the match was reachable in
+principle.
+
+It never happened, because of the paragraph the parser built. Any paragraph with direct
+paragraph formatting gets a synthetic `inline-p-N` style
+(`OfficeDocumentParser.kt:2501-2530`), and `hasDirectPPr` is set by `w:tabs` at `:2063`.
+Read from the fixture, every one of Sample-6's 45 TOC paragraphs carries
+`<w:pPr><w:pStyle .../><w:tabs/></w:pPr>`, so every one arrived under a synthetic name
+that `stylesMetaMap` has no entry for.
+
+Word writes `w:tabs` on every TOC entry to hold the right-aligned dot-leader stop that
+aligns its page number, so this is not a quirk of one file: the branch was unreachable
+for any real producer's table of contents.
+
+The synthetic style already records the authored style as `parentStyleName`
+(`:2509`). `collectDocxAuthoredIndexes` now walks that chain through a new
+`docxStyleName` helper (`OfficeDocumentParser.kt:514`), bounded at 16 hops so a
+malformed cycle cannot hang it.
+
+Fixture counts confirm the expectation the tests already carried: Sample-6 has 45
+top-level TOC paragraphs (6 `TOC1`, 11 `TOC2`, 28 `TOC3`) and Sample-4 has 21
+(7 `TOC1`, 14 `TOC2`), with none nested inside a table in either file.
+
+### 12.3 A test that could not fail
+
+After §12.1 and §12.2 one failure was left:
+
+```text
+DocxNumberingReaderTest.sample 6 numId 15 resolves a multi-level spec with BAB prefix on level 1
+java.lang.AssertionError: numId 15 must resolve (numToAbstract={}, abstracts=[])
+```
+
+The parenthetical was added for exactly this run. An empty `numToAbstract` and an empty
+`abstractSpecs` mean `read()` returned a bare `NumberingParseResult()` for the whole
+file, not a spec that was missing numId 15.
+
+Three things then lined up. `DocxNumberingReaderTest` was the only class in
+`app/src/test/java/com/example/` that reached a parser without
+`@RunWith(RobolectricTestRunner::class)`; `DocxNumberingReader.read()` ends in
+`catch (_: Exception) { NumberingParseResult() }`; and three of the class's four cases
+assert on emptiness, so an empty result satisfied them:
+
+| Case | Assertion | Passes on an empty result? |
+|---|---|---|
+| `sample 3 has no numbering xml so result is empty` | `assertTrue(result.isEmpty())` | yes |
+| `negative abstractNumId is ignored per MS-OI29500` | `assertNull(result.numSpecs[1])` | yes |
+| `numId zero is the suppression sentinel and has no spec` | `assertNull(result.numSpecs[0])` | yes |
+| `sample 6 numId 15 resolves ...` | `assertNotNull(result.numSpecs[15])` | **no** |
+
+Without the Android runtime `org.xmlpull.v1` has no implementation, so
+`XmlPullParserFactory.newInstance()` throws, the catch swallows it, and the reader
+reports "this document has no lists". The class now runs under Robolectric like every
+other suite that touches a parser.
+
+The production side is changed too, because the same collapse would happen on a device:
+`NumberingParseResult` carries `parseError`, set to the throwable's class and message on
+failure and to `no word/numbering.xml entry` when the part is genuinely absent. Callers
+can now tell a document with no lists apart from a reader that broke. The early return
+for a missing file is unchanged, so `Sample-3`'s expectation still holds without a
+`parseError`.
+
+### 12.4 What this session could not verify locally
+
+`DocxNumberingReader.read()` was run here against the real fixture through a StAX-backed
+`XmlPullParser` standing in for `org.xmlpull.v1` (`/tmp/ktreal/`, production
+`DocxNumbering.kt`, `Numbering.kt`, `LayoutUnits.kt`, `ZipSafe.kt` copied verbatim,
+`kotlinc-jvm -include-runtime`). It resolves all 21 `numSpecs`, `numToAbstract` matching
+the fixture exactly, and `numSpecs[15]` as `NumberingSpec(name=num15, displayName=Makalah
+Default, ...)` with level 1 `numPrefix="BAB "`, `numSuffix=""`, `displayLevels=1`.
+
+That is why `DocxNumberingReaderTest` asserted `assertEquals(".", lvl2.numSuffix)`: the
+expectation was wrong, not the reader. `abstractNum 14` ilvl 1 declares
+`lvlText="%1.%2"`, so the separator sits between the placeholders and nothing follows
+the last one. Corrected to `assertEquals("", lvl2.numSuffix)`.
+
+The stand-in parser is not `KXmlParser`, which is why it hid §12.3: the harness had an
+implementation and CI did not. Treat the harness as evidence about the parse logic only,
+never about parser availability.
