@@ -2250,7 +2250,7 @@ class OfficeDocumentParser(private val context: Context) {
                             tagLocal == "tr" || tagLocal == "table-row" -> {
                                 currentCells.clear()
                                 if (isDocx) {
-                                    inTrPr = true
+                                    inTrPr = false
                                     currentRowIsHeader = false
                                     cellColumnCursor = 0
                                 }
