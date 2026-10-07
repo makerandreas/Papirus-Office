@@ -1,11 +1,11 @@
 package com.makerandreas.papirusoffice.data
 
 import com.makerandreas.papirusoffice.data.util.ZipSafe
+import com.makerandreas.papirusoffice.data.util.readCappedBytes
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.nio.charset.Charsets
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
@@ -124,8 +124,8 @@ object DocxNumberingReader {
             // Parse lvlText into prefix, placeholders, suffix
             val parsed = parseLvlText(lvlLvlText, lvlIsBullet)
             val displayLevels = parsed.displayLevels.coerceAtLeast(1).coerceAtMost(MAX_LEVELS)
-            val indentStartUnits = lvlIndentLeft?.let { LayoutUnits.twipsToUnits(it) }
-            val hangingUnits = lvlIndentHanging?.let { LayoutUnits.twipsToUnits(it) }
+            val indentStartUnits = lvlIndentLeft
+            val hangingUnits = lvlIndentHanging
             // Bullet glyph for bullet formats; when numFmt is "bullet", prefer the
             // explicitly-declared bulletChar.  Otherwise let the formatter default.
             val bulletChar = when {
@@ -243,7 +243,7 @@ object DocxNumberingReader {
                             // merge only the start value - the base level keeps its
                             // other format properties (Word keeps the original formatting
                             // but restarts the count).
-                            val start = attrSubInt(parser, "start")
+                            val start = attrInt(parser, "val")
                             if (start != null) {
                                 val nid = currentNumId ?: 0
                                 if (nid >= MIN_NUM_ID) {
@@ -281,8 +281,8 @@ object DocxNumberingReader {
                     }
                     "ind" -> if (inLvlPPr) {
                         // Word allows only ind (and jc/tabs) in level pPr per [MS-OI29500] p.125
-                        lvlIndentLeft = attrInt(parser, "left")
-                        lvlIndentHanging = attrInt(parser, "hanging")
+                        lvlIndentLeft = attrInt(parser, "left")?.let { LayoutUnits.twipsToUnits(it) }
+                        lvlIndentHanging = attrInt(parser, "hanging")?.let { LayoutUnits.twipsToUnits(it) }
                     }
                     "jc" -> if (inLvlPPr) {
                         // ignored for label formatting; alignment of paragraph content

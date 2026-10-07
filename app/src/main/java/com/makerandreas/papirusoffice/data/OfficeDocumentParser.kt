@@ -439,7 +439,6 @@ class OfficeDocumentParser(private val context: Context) {
      * single numbering sequence per abstractNum ([MS-OI29500] §17.9). Headings
      * inherit the level from their ilvl (0-based); paragraphs do the same.
      */
-     */
     private fun collectDocxAuthoredIndexes(
         elements: List<OfficeDocumentElement>,
         stylesMetaMap: Map<String, DocxStyleMeta>,
@@ -1857,19 +1856,6 @@ class OfficeDocumentParser(private val context: Context) {
             var currentCellOccupancy = TableCellOccupancy.ORIGIN
             var currentCellVMerge: String? = null
             var cellColumnCursor = 0
-
-            // Plan 8B commit 2: hyperlink / bookmark / field state.
-            // Hyperlinks form a stack because nested hyperlinks are not valid
-            // but nested bookmark ranges are, and runs inside a hyperlink
-            // carry the hyperlink URL/anchor on the produced TextRun. Bookmarks
-            // are attached to the current paragraph/heading list. Field state
-            // (begin/separate/end) keeps instruction text out of body text.
-            val currentBookmarks = mutableListOf<String>()
-            var currentHyperlink: String? = null
-            var inField = false        // between fldChar begin and end
-            var inFieldInstr = false  // between begin and separate (instruction)
-            var inFieldResult = false // between separate and end (visible result)
-            var inInstrText = false   // inside w:instrText (swallow text)
 
             // Standard supported tag set for warning/unsupported tag diagnostic logging
             val supportedTags = setOf(
