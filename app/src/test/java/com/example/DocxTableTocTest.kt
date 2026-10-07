@@ -79,7 +79,7 @@ class DocxTableTocTest {
         assertEquals(11, byLevel[2]?.size ?: 0)
         assertEquals(28, byLevel[3]?.size ?: 0)
         assertTrue("TOC entries carry _TOC anchors",
-            toc.entries.all { it.targetAnchor?.startsWith("_Toc") == true || it.targetAnchor?.startsWith("_TOC") == true })
+            toc.entries.all { it.targetAnchor?.startsWith("_TOC") == true })
     }
 
     @Test
