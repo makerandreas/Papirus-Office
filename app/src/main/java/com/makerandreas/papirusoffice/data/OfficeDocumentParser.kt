@@ -1735,6 +1735,19 @@ class OfficeDocumentParser(private val context: Context) {
             var inNumPr = false
             var paraHasSectPr = false
 
+            // Plan 8B commit 2: hyperlink / bookmark / field state.
+            // Hyperlinks form a stack because nested hyperlinks are not valid
+            // but nested bookmark ranges are, and runs inside a hyperlink
+            // carry the hyperlink URL/anchor on the produced TextRun. Bookmarks
+            // are attached to the current paragraph/heading list. Field state
+            // (begin/separate/end) keeps instruction text out of body text.
+            val currentBookmarks = mutableListOf<String>()
+            var currentHyperlink: String? = null
+            var inField = false        // between fldChar begin and end
+            var inFieldInstr = false  // between begin and separate (instruction)
+            var inFieldResult = false // between separate and end (visible result)
+            var inInstrText = false   // inside w:instrText (swallow text)
+
             // Standard supported tag set for warning/unsupported tag diagnostic logging
             val supportedTags = setOf(
                 "p", "h", "text:p", "text:h", "w:p", "w:h", "w:t", "t", "a:t", "a:p", "a:r", "text:span", "w:r",
@@ -1839,6 +1852,10 @@ class OfficeDocumentParser(private val context: Context) {
                                 directNumIlvl = null
                                 paraHasSectPr = false
                                 inlinePageBreaks.clear()
+                                currentBookmarks.clear()
+                                // Hyperlinks are paragraph-scoped in WordprocessingML;
+                                // w:hyperlink closes at the end of the paragraph it wraps.
+                                currentHyperlink = null
                             }
 
                             tagLocal == "ppr" -> {
@@ -1946,7 +1963,65 @@ class OfficeDocumentParser(private val context: Context) {
                                 hasDirectPPr = true
                             }
 
+                            // ---- Plan 8B commit 2: hyperlinks, bookmarks, fields ----
+                            isDocx && tagLocal == "hyperlink" -> {
+                                // w:hyperlink carries either r:id (external target,
+                                // resolved through docxRelsMap) or w:anchor
+                                // (intra-document bookmark). Bookmark anchors are
+                                // prefixed with "#" to match the ODF hyperlink shape.
+                                val relId = getXmlAttr(parser, "id")
+                                val anchor = getXmlAttr(parser, "anchor")
+                                currentHyperlink = when {
+                                    !anchor.isNullOrBlank() -> "#$anchor"
+                                    !relId.isNullOrBlank() -> docxRelsMap[relId]
+                                    else -> null
+                                }
+                            }
+                            isDocx && tagLocal == "bookmarkstart" -> {
+                                val name = getXmlAttr(parser, "name")
+                                if (!name.isNullOrBlank()) currentBookmarks += name
+                            }
+                            isDocx && tagLocal == "fldchar" -> {
+                                val fldType = getXmlAttr(parser, "fldchartype")?.lowercase(Locale.ROOT)
+                                when (fldType) {
+                                    "begin" -> {
+                                        inField = true
+                                        inFieldInstr = true
+                                        inFieldResult = false
+                                    }
+                                    "separate" -> {
+                                        inFieldInstr = false
+                                        inFieldResult = true
+                                    }
+                                    "end" -> {
+                                        inField = false
+                                        inFieldInstr = false
+                                        inFieldResult = false
+                                        inInstrText = false
+                                    }
+                                }
+                            }
+                            isDocx && tagLocal == "fldsimple" -> {
+                                // w:fldSimple is an inline field with an instr
+                                // attribute; its w:r children are the cached
+                                // result and must be kept, but the instr itself
+                                // must not appear in body text. There is nothing
+                                // to toggle beyond marking that we are inside a
+                                // field result; fldSimple does not have begin/end.
+                                inField = true
+                                inFieldInstr = false
+                                inFieldResult = true
+                            }
+
                             isDocx && tagLocal == "t" -> { inDocxText = true }
+                            isDocx && tagLocal == "instrtext" -> {
+                                // w:instrText contains field instruction text.
+                                // Only enter inDocxText when between fldChar
+                                // begin and separate (instruction portion); the
+                                // TEXT event handler suppresses actual append in
+                                // that region so instructions never reach body.
+                                inDocxText = inFieldInstr
+                            }
                             tagLocal == "sectpr" -> {
                                 paraHasSectPr = inPPr
                                 inSectionProperties = true
@@ -2119,7 +2194,14 @@ class OfficeDocumentParser(private val context: Context) {
 
                     XmlPullParser.TEXT -> {
                         val txt = parser.text ?: ""
-                        if (txt.isNotEmpty() && (!isDocx || inDocxText)) {
+                        // In DOCX, swallow text that belongs to field
+                        // instructions (between fldChar begin and separate).
+                        // w:instrText is the canonical instruction carrier;
+                        // defensive: also drop plain w:t text that sits inside
+                        // the instruction portion of a field in case a producer
+                        // writes instructions without w:instrText wrapping.
+                        val isDocxInstructionText = isDocx && inField && inFieldInstr
+                        if (txt.isNotEmpty() && (!isDocx || (inDocxText && !isDocxInstructionText))) {
                             currentText.append(txt)
                         }
                     }
@@ -2146,6 +2228,13 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             isDocx && tagLocal == "t" -> { inDocxText = false }
+                            isDocx && tagLocal == "instrtext" -> { inInstrText = false; inDocxText = false }
+                            isDocx && tagLocal == "hyperlink" -> { currentHyperlink = null }
+                            isDocx && tagLocal == "fldsimple" -> {
+                                inField = false
+                                inFieldInstr = false
+                                inFieldResult = false
+                            }
                             isDocx && tagLocal == "rpr" -> { inRunRPr = false }
                             isDocx && tagLocal == "r" -> {
                                 val runText = if (runStartOffset <= currentText.length) {
@@ -2160,6 +2249,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         isItalic = runItalic,
                                         isUnderline = runUnderline,
                                         styleName = runStyle,
+                                        hyperlink = currentHyperlink,
                                         colorHex = runColor,
                                         highlight = runHighlight,
                                         isHidden = runVanish,
@@ -2270,6 +2360,7 @@ class OfficeDocumentParser(private val context: Context) {
                                             styleName = headingStyle,
                                             runs = paragraphRuns,
                                             pageBreakOffsets = inlinePageBreaks.toList(),
+                                            bookmarks = currentBookmarks.toList(),
                                             numbering = paragraphNumbering
                                         )
                                     )
@@ -2282,6 +2373,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         styleName = resolvedStyleName,
                                         pageBreakOffsets = inlinePageBreaks.toList(),
                                         runs = paragraphRuns,
+                                        bookmarks = currentBookmarks.toList(),
                                         numbering = paragraphNumbering
                                     )
                                     if (inTable) {
