@@ -45,7 +45,16 @@ object DocxNumberingReader {
         /** numId -> abstractNumId reference. */
         val numToAbstract: Map<Int, Int> = emptyMap(),
         /** numId -> per-ilvl startOverride (when a w:lvlOverride is present). */
-        val startOverrides: Map<Pair<Int, Int>, Int> = emptyMap()
+        val startOverrides: Map<Pair<Int, Int>, Int> = emptyMap(),
+        /**
+         * Why the read produced nothing, when it was not simply "no numbering part".
+         *
+         * A reader that swallows a parse failure and reports "this document has
+         * no lists" makes every list label silently vanish, and the two states
+         * look identical to a caller. Naming the throwable keeps them apart
+         * without changing the empty-result contract callers already rely on.
+         */
+        val parseError: String? = null
     ) {
         fun isEmpty() = numSpecs.isEmpty()
     }
@@ -66,9 +75,10 @@ object DocxNumberingReader {
                     entry = zip.nextEntry
                 }
             }
-            numberingXml?.let { parseNumberingXml(it) } ?: NumberingParseResult()
-        } catch (_: Exception) {
-            NumberingParseResult()
+            numberingXml?.let { parseNumberingXml(it) }
+                ?: NumberingParseResult(parseError = "no word/numbering.xml entry")
+        } catch (t: Exception) {
+            NumberingParseResult(parseError = "${t::class.simpleName}: ${t.message}")
         }
     }
 

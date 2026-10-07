@@ -7,13 +7,25 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 import java.nio.file.Files
 
 /**
  * Tests for [DocxNumberingReader], covering the synthetic reader cases plus
  * the real six fixtures in `tests/inky/`.
+ *
+ * Robolectric is not optional here. The reader drives `org.xmlpull.v1`, whose
+ * only implementation ships inside the Android runtime; on a bare JVM classpath
+ * `XmlPullParserFactory.newInstance()` throws, the reader's catch turns that
+ * into an empty result, and three of these four cases assert on emptiness, so
+ * they pass while proving nothing. Every other suite that touches a parser runs
+ * under the same runner for the same reason.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class DocxNumberingReaderTest {
 
     @Test
@@ -26,10 +38,11 @@ class DocxNumberingReaderTest {
     fun `sample 6 numId 15 resolves a multi-level spec with BAB prefix on level 1`() {
         val result = DocxNumberingReader.read(fixture("Sample-6.docx"))
         val spec = result.numSpecs[15]
-        // NumberingParseResult is empty rather than an error when numbering.xml
-        // could not be read at all, so carry the two maps that would show it.
+        // An empty result cannot be told apart from a swallowed parse failure
+        // by looking at the maps alone, so carry the reason the reader recorded.
         assertNotNull(
-            "numId 15 must resolve (numToAbstract=${result.numToAbstract}, " +
+            "numId 15 must resolve (parseError=${result.parseError}, " +
+                "numToAbstract=${result.numToAbstract}, " +
                 "abstracts=${result.abstractSpecs.keys})",
             spec
         )

@@ -65,6 +65,8 @@ The repair shipped with audit-016 and an `AGENTS.md` toolchain note, but no plan
 The ledger is consistent with the tree except for the drift in section 2. Three conventions still shape any review here, restated because they cost time when forgotten:
 
 1. **The only durable test log is the PR comment.** `.github/workflows/build.yml` posts `scripts/ci-dump-comment.py` output on `pull_request` events only (60,000-character cap). A push to `main` produces no mirror.
+
+   > **Corrected 2026-10-07 (audit-020 §1).** The comment is durable in the useful sense: it survives the merge and stays readable through the API, so "only durable log" should not be read as "hard to get at". `gh api repos/makerandreas/Papirus-Office/issues/<pr>/comments` returns every report for any PR, merged or not — verified on PR #32 on 2026-10-07, two days after its merge. The `main`-only gap is real and unchanged. Read path and caveats: `AGENTS.md`, "Reading the CI report".
 2. **Forecast slots are not reservations.** 7D took `#29` as forecast; the repair took `#30` unplanned. Numbers move, plan IDs do not.
 3. **Absence of evidence is not evidence of delivery.** The 7E commits were real in their sandbox and still failed every check that matters here: a ref, a PR, a CI comment.
 
