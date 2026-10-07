@@ -382,7 +382,7 @@ A scan of all 285 Kotlin files under `app/src` (excluding `src/compileOnly`) for
 imports whose simple name never appears in the file body, with the implicit
 `androidx.compose.runtime.getValue`/`setValue`/`provideDelegate` family excluded,
 finds **122 unused imports across 47 files** on the tree as this session leaves it.
-The same scan before the §8.1 deletion found 123 across 48. Deleting an unused import
+The same scan before the §9.1 deletion found 123 across 48. Deleting an unused import
 cannot change behaviour; the risk is scope, not correctness, so they belong in their
 own PR rather than in Plan 8B. The largest clusters:
 
