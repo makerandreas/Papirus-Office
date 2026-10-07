@@ -468,8 +468,33 @@ The product goal is useful ODF-first editing with practical OOXML compatibility,
     - User provides API key from Google AI Studio  
     - Direct link to Google AI Studio provided for key retrieval  
     - Configuration stored locally, only used when AI features are invoked
-  - Ability to choose between any models (2.5 flash, 2.5 pro, etc.)
+  - Ability to choose between any models.
     - Auto switch to Nano Banana model to insert AI-generated image
+
+#### 🔵 Cloud & Google Workspace Integration
+- Firebase Authentication
+  - Papirus account authentication (will remains saved on local device if this feature is disabled)
+  - Google Sign-In support
+  - User identity and account management
+- Cloud Firestore
+  - User preferences
+  - Papirus configuration
+  - Recent files metadata
+  - Sync metadata
+  - Future collaboration metadata
+- Google Drive Integration
+  - Open documents from Google Drive
+  - Save documents to Google Drive
+  - Upload/download documents
+  - Browse Drive files and folders
+  - Recent Drive documents
+  - Use least-privilege OAuth scopes where possible
+- Google Docs Integration
+  - Read Google Docs as external document sources
+  - Create/edit Google Docs where API capabilities and authorization permit
+  - Convert/import content into Papirus documents where supported
+
+> **Note**: Firebase is *not* the primary document storage, Google Drive remains an external document storage provider, and Papirus local storage remains available for offline-first editing.
 
 ---
 
