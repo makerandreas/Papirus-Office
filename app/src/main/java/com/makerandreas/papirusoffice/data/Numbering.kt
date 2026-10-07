@@ -160,18 +160,8 @@ object NumberingFormatter {
     }
 
     fun formatOrdinal(value: Int, numFormat: String): String {
-        val raw = numFormat.trim()
-        if (raw.isEmpty() || raw.equals("none", ignoreCase = true)) return ""
-        val fmt = when (raw.lowercase(Locale.ROOT)) {
-            "decimal", "cardinaltext", "ordinal" -> "1"
-            "lowerletter", "lowerletterfull" -> "a"
-            "upperletter", "upperletterfull" -> "A"
-            "lowerroman" -> "i"
-            "upperroman" -> "I"
-            "bullet" -> ""
-            else -> raw
-        }
-        if (fmt.isEmpty()) return ""
+        val fmt = numFormat.trim()
+        if (fmt.isEmpty() || fmt.equals("none", ignoreCase = true)) return ""
         val safe = value.coerceAtLeast(0)
         return when (fmt) {
             "1" -> safe.toString()
