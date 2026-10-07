@@ -202,12 +202,12 @@ is the ephemeral `refs/pull/<N>/merge` commit GitHub builds for the run ("Merge
 in a normal clone, and it does not appear in `gh pr view --json commits`. Every
 one of the twelve PR #35 reports was labelled that way, which is why the failure
 looked like twelve attempts at commits that did not exist and why no report
-could be lined up with the code it described. The workflow now passes
-`HEAD_SHA`/`HEAD_REF`/`BASE_SHA`/`BASE_REF` to the script, the header names the
-pull-request head, and the next line states the merge the run used. If a report
-still shows an unresolvable SHA, it predates that change: map it through
-`gh run list --branch` or `gh api .../actions/runs/<id>` (`head_sha`) instead of
-trusting the header.
+could be lined up with the code it described. From the Plan 8B CI-triage commit
+onward the workflow passes `HEAD_SHA`/`HEAD_REF`/`BASE_SHA`/`BASE_REF` to the
+script, the header names the pull-request head, and the next line states the
+merge the run used. Reports posted before that commit still show a merge-ref
+SHA: map those through `gh run list --branch` or
+`gh api .../actions/runs/<id>` (`head_sha`) instead of trusting the header.
 
 ### What is in the report
 
