@@ -21,6 +21,10 @@ jobs:
       pull-requests: write # CI report comment on the pull request (see the last step)
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+      GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+      GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -93,9 +97,48 @@ jobs:
             gh pr comment "$PR_NUMBER" --body-file build/ci-report.md || echo "could not post the CI report comment (token permissions?)"
           fi
 
+  lint:
+    name: Lint Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+      GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+      GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Run Android Lint
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:lintDebug
+
+      - name: Upload Lint Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-reports
+          path: |
+            app/build/reports/lint-results*
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
     name: Build (SemVer & Nightly)
     runs-on: ubuntu-latest
+    needs: [test, lint]
     permissions:
       contents: write
     env:

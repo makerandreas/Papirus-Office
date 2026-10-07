@@ -37,7 +37,7 @@ object PapirusApiClient {
             .build()
     }
 
-    val apiService: PapirusCloudApiService by lazy {
+    private val defaultApiService: PapirusCloudApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
@@ -45,6 +45,12 @@ object PapirusApiClient {
             .build()
             .create(PapirusCloudApiService::class.java)
     }
+
+    @Volatile
+    var customApiService: PapirusCloudApiService? = null
+
+    val apiService: PapirusCloudApiService
+        get() = customApiService ?: defaultApiService
 
     /**
      * Helper to fetch document templates with built-in fallback mock data if offline or endpoint unreachable.

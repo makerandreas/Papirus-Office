@@ -90,10 +90,6 @@ object DocxNumberingReader {
 
         // abstractNumId -> raw (pre-override) NumberingSpec
         val abstractSpecs = LinkedHashMap<Int, NumberingSpec>()
-        // abstractNumId -> abstract display name (w:name)
-        val abstractNames = LinkedHashMap<Int, String>()
-        // Temporary level accumulators, keyed by abstractNumId
-        val abstractLevels = LinkedHashMap<Int, LinkedHashMap<Int, NumberingLevelSpec>>()
 
         // numId -> abstractNumId
         val numToAbstract = LinkedHashMap<Int, Int>()
@@ -196,13 +192,11 @@ object DocxNumberingReader {
                 if (id != null && id >= 0) {
                     val name = currentAbstractName ?: "abstractNum$id"
                     val levels = currentLevels.toMap()
-                    abstractLevels[id] = LinkedHashMap(levels)
                     abstractSpecs[id] = NumberingSpec(
                         name = "abstractNum$id",
                         displayName = name,
                         levels = levels
                     )
-                    abstractNames[id] = name
                 }
             }
             inAbstractNum = false

@@ -11,9 +11,9 @@ import java.io.File
  * Repository layer managing local Room document caching operations.
  * Validates file timestamp and size to prevent stale cache hits.
  */
-class DocumentCacheRepository(context: Context) {
+class DocumentCacheRepository(private val cacheDao: DocumentCacheDao) {
 
-    private val cacheDao = DocumentDatabase.getInstance(context).documentCacheDao()
+    constructor(context: Context) : this(DocumentDatabase.getInstance(context).documentCacheDao())
 
     suspend fun getCachedDocument(file: File): DocumentCacheEntity? = withContext(Dispatchers.IO) {
         if (!file.exists()) return@withContext null
