@@ -833,21 +833,24 @@ private fun NavigatorLanguageSettingCard(context: Context) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Navigator Language",
+                text = stringResource(R.string.options_navigator_language_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Choose whether Navigator labels (Table, Image…) follow the app language or the document language. Headings like Judul1 are always recognized.",
+                text = stringResource(R.string.options_navigator_language_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(12.dp))
             // Segmented control: Follow app language vs Follow document
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                val options = listOf(true to "App language", false to "Document")
+                val options = listOf(
+                    true to stringResource(R.string.options_navigator_language_app),
+                    false to stringResource(R.string.options_navigator_language_document)
+                )
                 options.forEachIndexed { index, (followApp, label) ->
                     SegmentedButton(
                         selected = viewOptions.navigatorFollowAppLocale == followApp,

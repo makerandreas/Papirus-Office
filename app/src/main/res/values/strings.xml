@@ -812,4 +812,8 @@
     <string name="toast_failed_to_share_crash_report_e_message">Failed to share crash report: %1$s</string>
     <string name="settings_reset_success">App settings have been reset.</string>
     <string name="inky_flow_view_unavailable">Flow view is not available yet. Use paginated view.</string>
+    <string name="options_navigator_language_title">Navigator Language</string>
+    <string name="options_navigator_language_description">Choose whether Navigator labels (Table, Image…) follow the app language or the document language. Headings like Judul1 are always recognized.</string>
+    <string name="options_navigator_language_app">App language</string>
+    <string name="options_navigator_language_document">Document</string>
 </resources>
