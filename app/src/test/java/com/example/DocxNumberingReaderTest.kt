@@ -29,6 +29,11 @@ class DocxNumberingReaderTest {
         val spec = result.numSpecs[15]
         assertNotNull("numId 15 must resolve", spec)
         val lvl1 = spec!!.level(1)!!
+        // The Judul1-bound multi-level list uses decimal numbering with the
+        // literal prefix "BAB " from lvlText (not upperRoman - the user's
+        // recollection of roman numerals was a description; the fixture
+        // stores decimal + BAB prefix). The suff=space separator puts one
+        // space between label and title, matching the authored shape.
         assertEquals("decimal", lvl1.numFormat)
         assertEquals("BAB ", lvl1.numPrefix)
         assertEquals("", lvl1.numSuffix)
@@ -39,7 +44,7 @@ class DocxNumberingReaderTest {
         assertEquals(2, lvl2.displayLevels)
 
         val counter = NumberingCounterState()
-        // First chapter heading (ilvl=0 -> oneBased 1): should render "BAB 1".
+        // First chapter heading (ilvl=0 -> oneBased 1): renders "BAB 1".
         assertEquals("BAB 1", counter.advance(spec, 1))
         // Sub-heading level 2 immediately after: "1.1".
         assertEquals("1.1", counter.advance(spec, 2))
