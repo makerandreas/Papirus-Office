@@ -6,6 +6,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.ByteArrayInputStream
 import java.io.File
+import java.nio.charset.Charsets
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
