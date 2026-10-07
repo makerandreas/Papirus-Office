@@ -147,6 +147,7 @@ data class DocxNumberingRef(
 
 data class OfficeParsedDocument(
     val sectionStarts: List<SectionStart> = emptyList(),
+    val docxSectionBreakSpecs: List<DocxSectionBreakSpec> = emptyList(),
     val elements: List<OfficeDocumentElement> = emptyList(),
     val rawXml: String = "",
     val plainText: String = "",

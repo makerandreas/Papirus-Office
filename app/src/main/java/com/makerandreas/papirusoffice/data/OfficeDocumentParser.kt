@@ -316,6 +316,218 @@ class OfficeDocumentParser(private val context: Context) {
      */
     private fun docxToggle(value: String?): Boolean = docxOnOff(value)
 
+    /**
+     * Post-process a DOCX body: for every Paragraph or Heading that carries a
+     * non-suppressed [DocxNumberingRef], advance the per-numId counter and
+     * prepend the rendered label to its text, runs and plainText. Suppressed
+     * paragraphs (numId=0) get no label and do not advance any counter, which
+     * matches Word's behaviour for "KATA PENGANTAR" in Sample-6.
+     *
+     * Counters are shared across paragraphs and headings, mirroring Word's
+     * single numbering sequence per abstractNum ([MS-OI29500] §17.9). Headings
+     * inherit the level from their ilvl (0-based); paragraphs do the same.
+     */
+    private fun applyDocxNumberingLabels(
+        elements: MutableList<OfficeDocumentElement>,
+        plainTextBuilder: StringBuilder,
+        numSpecs: Map<Int, NumberingSpec>
+    ) {
+        val counters = LinkedHashMap<Int, NumberingCounterState>()
+        // Rebuild plainText from the updated elements below, because prepending
+        // labels changes every paragraph's text offset.
+        val newPlain = StringBuilder()
+
+        for (i in elements.indices) {
+            val el = elements[i]
+            val numbered = when (el) {
+                is OfficeDocumentElement.Paragraph -> el.numbering
+                is OfficeDocumentElement.Heading -> el.numbering
+                else -> null
+            }
+            val labeled = when {
+                numbered == null -> el
+                numbered.suppressed -> el
+                numbered.numId < 1 -> el
+                else -> {
+                    val spec = numSpecs[numbered.numId]
+                    if (spec == null) {
+                        el
+                    } else {
+                        val counter = counters.getOrPut(numbered.numId) { NumberingCounterState() }
+                        // ilvl is 0-based in the file; levels in NumberingSpec are 1-based.
+                        val oneBased = (numbered.ilvl + 1).coerceIn(1, NumberingSpec.MAX_NUMBERING_LEVELS)
+                        val raw = counter.advance(spec, oneBased)
+                        if (raw.isEmpty()) {
+                            el
+                        } else {
+                            // Apply a trailing separator that matches w:suff. Word's
+                            // default is a tab; our simplified renderer uses a space so
+                            // the label stays on the same line without the tab-to-
+                            // indent machinery that Plan 7F already supplies for tabs.
+                            val levelSpec = spec.level(oneBased)
+                            val separator = when (levelSpec?.labelFollowedBy?.lowercase(Locale.ROOT)) {
+                                "nothing", "none" -> ""
+                                "space" -> " "
+                                else -> "\t"
+                            }
+                            val labelWithSep = "$raw$separator"
+                            prependLabel(el, labelWithSep)
+                        }
+                    }
+                }
+            }
+            elements[i] = labeled
+            when (labeled) {
+                is OfficeDocumentElement.Paragraph -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.Heading -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.ListItem -> {
+                    if (labeled.text.isNotEmpty()) newPlain.append(labeled.bullet).append(labeled.text).append("\n\n")
+                }
+                is OfficeDocumentElement.Table -> {
+                    for (row in labeled.rows) for (cell in row.cells) {
+                        if (cell.text.isNotEmpty()) newPlain.append(cell.text).append("\n")
+                    }
+                    newPlain.append("\n")
+                }
+                is OfficeDocumentElement.ImageElement -> { /* images contribute no plain text */ }
+                OfficeDocumentElement.PageBreak -> { /* breaks contribute no plain text */ }
+            }
+        }
+        // Replace the plain text with the relabeled version, so consumers that
+        // read only plainText (search, word count) agree with the rendered body.
+        plainTextBuilder.setLength(0)
+        plainTextBuilder.append(newPlain.trimEnd())
+    }
+
+    /** Prepend [label] to a Paragraph or Heading element's text and first run. */
+    private fun prependLabel(el: OfficeDocumentElement, label: String): OfficeDocumentElement = when (el) {
+        is OfficeDocumentElement.Paragraph -> {
+            val newRuns = el.runs.toMutableList()
+            if (newRuns.isEmpty()) {
+                newRuns += TextRun(label)
+            } else {
+                val first = newRuns.first()
+                newRuns[0] = first.copy(text = label + first.text)
+            }
+            el.copy(text = label + el.text, runs = newRuns)
+        }
+        is OfficeDocumentElement.Heading -> {
+            val newRuns = el.runs.toMutableList()
+            if (newRuns.isEmpty()) {
+                newRuns += TextRun(label)
+            } else {
+                val first = newRuns.first()
+                newRuns[0] = first.copy(text = label + first.text)
+            }
+            el.copy(text = label + el.text, runs = newRuns)
+        }
+        else -> el
+    }
+
+    /**
+     * Post-process a DOCX body: for every Paragraph or Heading that carries a
+     * non-suppressed [DocxNumberingRef], advance the per-numId counter and
+     * prepend the rendered label to its text, runs and plainText. Suppressed
+     * paragraphs (numId=0) get no label and do not advance any counter, which
+     * matches Word's behaviour for "KATA PENGANTAR" in Sample-6.
+     *
+     * Counters are shared across paragraphs and headings, mirroring Word's
+     * single numbering sequence per abstractNum ([MS-OI29500] §17.9). Headings
+     * inherit the level from their ilvl (0-based); paragraphs do the same.
+     */
+    private fun collectDocxAuthoredIndexes(
+        elements: List<OfficeDocumentElement>,
+        stylesMetaMap: Map<String, DocxStyleMeta>,
+        paragraphStyles: Map<String, ParagraphStyle>
+    ): MutableList<DocumentIndexRange> {
+        val indexes = mutableListOf<DocumentIndexRange>()
+        var runStart: Int? = null
+        val entries = mutableListOf<DocumentIndexEntry>()
+        fun flushRun(endExclusive: Int) {
+            val start = runStart ?: return
+            if (entries.isEmpty()) { runStart = null; return }
+            indexes += DocumentIndexRange(
+                id = "docx-toc-${indexes.size + 1}",
+                kind = DocumentIndexKind.TABLE_OF_CONTENT,
+                bodyRange = BodyElementRange(start, endExclusive),
+                entries = entries.toList()
+            )
+            entries.clear()
+            runStart = null
+        }
+        for ((idx, el) in elements.withIndex()) {
+            val styleName = when (el) {
+                is OfficeDocumentElement.Paragraph -> el.styleName
+                is OfficeDocumentElement.Heading -> el.styleName
+                else -> null
+            }
+            val wName = docxStyleName(styleName, stylesMetaMap, paragraphStyles)
+                ?.trim()?.lowercase(Locale.ROOT)
+            // toc N with N 1..9; "toc 0" / "TOC Heading" excluded.
+            val level = if (wName != null && wName.startsWith("toc ")) {
+                wName.removePrefix("toc ").trim().toIntOrNull()?.takeIf { it in 1..9 }
+            } else null
+            if (level != null) {
+                if (runStart == null) runStart = idx
+                val anchor = when (el) {
+                    is OfficeDocumentElement.Paragraph -> el.runs.firstNotNullOfOrNull { it.hyperlink }
+                        ?.takeIf { it.startsWith("#") }?.removePrefix("#")
+                    is OfficeDocumentElement.Heading -> el.runs.firstNotNullOfOrNull { it.hyperlink }
+                        ?.takeIf { it.startsWith("#") }?.removePrefix("#")
+                    else -> null
+                }
+                val entryText = when (el) {
+                    is OfficeDocumentElement.Paragraph -> el.text
+                    is OfficeDocumentElement.Heading -> el.text
+                    else -> ""
+                }
+                entries += DocumentIndexEntry(
+                    elementIndex = idx,
+                    level = level,
+                    targetAnchor = anchor,
+                    text = entryText
+                )
+            } else {
+                if (runStart != null) flushRun(idx)
+            }
+        }
+        if (runStart != null) flushRun(elements.size)
+        return indexes
+    }
+
+    /**
+     * The `w:name` a paragraph's style declares, following `parentStyleName`.
+     *
+     * A paragraph with any direct paragraph formatting gets a synthetic
+     * `inline-p-N` style from the `hasDirectPPr` branch in `extractDocxContent`,
+     * and `stylesMetaMap` has no entry for that name. Every table-of-contents
+     * entry a real producer writes carries `w:tabs` for the dot-leader stop that
+     * aligns its page number, so without this walk each entry resolves to a
+     * synthetic name and the whole TOC is invisible to index detection. The
+     * synthetic style records the authored style as `parentStyleName`, so follow
+     * the chain; the hop bound only exists to survive a malformed cycle.
+     */
+    private fun docxStyleName(
+        styleName: String?,
+        stylesMetaMap: Map<String, DocxStyleMeta>,
+        paragraphStyles: Map<String, ParagraphStyle>
+    ): String? {
+        var current = styleName
+        var hops = 0
+        while (current != null && hops < 16) {
+            val meta = stylesMetaMap[current] ?: stylesMetaMap[current.lowercase(Locale.ROOT)]
+            if (meta != null) return meta.name
+            val style = paragraphStyles[current] ?: paragraphStyles[current.lowercase(Locale.ROOT)]
+            current = style?.parentStyleName
+            hops++
+        }
+        return null
+    }
+
     private fun parseDocxTab(parser: XmlPullParser): ParagraphTabStop? {
         val pos = getXmlAttr(parser, "pos")?.toIntOrNull() ?: return null
         val alignment = when (getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)) {
@@ -327,6 +539,25 @@ class OfficeDocumentParser(private val context: Context) {
             else -> TabAlignment.LEFT
         }
         return ParagraphTabStop(LayoutUnits.twipsToUnits(pos), alignment)
+    }
+
+    /** Parse a `w:tblW` or `w:tcW` width attribute into a [TableColumnWidthSpec]. */
+    private fun parseDocxTableWidth(parser: XmlPullParser): TableColumnWidthSpec {
+        val type = getXmlAttr(parser, "type")?.lowercase(Locale.ROOT)
+        val w = getXmlAttr(parser, "w")?.toIntOrNull()
+        return when {
+            w == null -> TableColumnWidthSpec(kind = TableColumnWidthKind.AUTO)
+            type == "dxa" -> TableColumnWidthSpec(
+                kind = TableColumnWidthKind.ABSOLUTE,
+                value = LayoutUnits.twipsToUnits(w)
+            )
+            type == "pct" -> TableColumnWidthSpec(
+                kind = TableColumnWidthKind.RELATIVE,
+                value = w.toFloat()
+            )
+            type == "nil" || type == "none" -> TableColumnWidthSpec(kind = TableColumnWidthKind.AUTO)
+            else -> TableColumnWidthSpec(kind = TableColumnWidthKind.AUTO)
+        }
     }
 
     private fun mergeTabs(base: List<ParagraphTabStop>, over: List<ParagraphTabStop>?): List<ParagraphTabStop> =
@@ -1547,12 +1778,17 @@ class OfficeDocumentParser(private val context: Context) {
         val elements = mutableListOf<OfficeDocumentElement>()
         val plainTextBuilder = StringBuilder()
         val sectionStarts = mutableListOf<SectionStart>()
+        val docxSectionBreakSpecs = mutableListOf<DocxSectionBreakSpec>()
         var currentSectionStart = 0
         var sectionKind = SectionStartKind.NEXT_PAGE
         var inSectionProperties = false
+        var sectionTitlePg = false
+        var sectionPgNumFmt: String? = null
+        var sectionPgNumStart: Int? = null
         var inDocxText = false
         val inlinePageBreaks = mutableListOf<Int>()
         val docxStylesResult = if (isDocx) extractDocxStyles(file) else DocxStylesParseResult()
+        val docxNumberingResult = if (isDocx) DocxNumberingReader.read(file) else DocxNumberingReader.NumberingParseResult()
         val docxStylesMap = docxStylesResult.stylesMetaMap
         val docxNumberingMap = docxStylesResult.numberingByStyle
         val docxParagraphStyles = docxStylesResult.paragraphStyles.toMutableMap()
@@ -1621,6 +1857,34 @@ class OfficeDocumentParser(private val context: Context) {
             var directNumIlvl: Int? = null
             var inNumPr = false
             var paraHasSectPr = false
+
+            // Plan 8B commit 2: hyperlink / bookmark / field state.
+            // Hyperlinks form a stack because nested hyperlinks are not valid
+            // but nested bookmark ranges are, and runs inside a hyperlink
+            // carry the hyperlink URL/anchor on the produced TextRun. Bookmarks
+            // are attached to the current paragraph/heading list. Field state
+            // (begin/separate/end) keeps instruction text out of body text.
+            val currentBookmarks = mutableListOf<String>()
+            var currentHyperlink: String? = null
+            var inField = false        // between fldChar begin and end
+            var inFieldInstr = false  // between begin and separate (instruction)
+            var inFieldResult = false // between separate and end (visible result)
+            var inInstrText = false   // inside w:instrText (swallow text)
+
+            // Plan 8B commit 3: DOCX table geometry (H-5).
+            val currentTableColumns = mutableListOf<OfficeTableColumnSpec>()
+            var currentTableWidth: TableColumnWidthSpec = TableColumnWidthSpec()
+            var inTblPr = false
+            var inTblGrid = false
+            var inTrPr = false
+            var currentRowIsHeader = false
+            var inTcPr = false
+            var currentCellStartCol = 0
+            var currentCellColSpan = 1
+            var currentCellRowSpan = 1
+            var currentCellOccupancy = TableCellOccupancy.ORIGIN
+            var currentCellVMerge: String? = null
+            var cellColumnCursor = 0
 
             // Standard supported tag set for warning/unsupported tag diagnostic logging
             val supportedTags = setOf(
@@ -1726,6 +1990,10 @@ class OfficeDocumentParser(private val context: Context) {
                                 directNumIlvl = null
                                 paraHasSectPr = false
                                 inlinePageBreaks.clear()
+                                currentBookmarks.clear()
+                                // Hyperlinks are paragraph-scoped in WordprocessingML;
+                                // w:hyperlink closes at the end of the paragraph it wraps.
+                                currentHyperlink = null
                             }
 
                             tagLocal == "ppr" -> {
@@ -1833,11 +2101,80 @@ class OfficeDocumentParser(private val context: Context) {
                                 hasDirectPPr = true
                             }
 
+                            // ---- Plan 8B commit 2: hyperlinks, bookmarks, fields ----
+                            isDocx && tagLocal == "hyperlink" -> {
+                                // w:hyperlink carries either r:id (external target,
+                                // resolved through docxRelsMap) or w:anchor
+                                // (intra-document bookmark). Bookmark anchors are
+                                // prefixed with "#" to match the ODF hyperlink shape.
+                                val relId = getXmlAttr(parser, "id")
+                                val anchor = getXmlAttr(parser, "anchor")
+                                currentHyperlink = when {
+                                    !anchor.isNullOrBlank() -> "#$anchor"
+                                    !relId.isNullOrBlank() -> docxRelsMap[relId]
+                                    else -> null
+                                }
+                            }
+                            isDocx && tagLocal == "bookmarkstart" -> {
+                                val name = getXmlAttr(parser, "name")
+                                if (!name.isNullOrBlank()) currentBookmarks += name
+                            }
+                            isDocx && tagLocal == "fldchar" -> {
+                                val fldType = getXmlAttr(parser, "fldchartype")?.lowercase(Locale.ROOT)
+                                when (fldType) {
+                                    "begin" -> {
+                                        inField = true
+                                        inFieldInstr = true
+                                        inFieldResult = false
+                                    }
+                                    "separate" -> {
+                                        inFieldInstr = false
+                                        inFieldResult = true
+                                    }
+                                    "end" -> {
+                                        inField = false
+                                        inFieldInstr = false
+                                        inFieldResult = false
+                                        inInstrText = false
+                                    }
+                                }
+                            }
+                            isDocx && tagLocal == "fldsimple" -> {
+                                // w:fldSimple is an inline field with an instr
+                                // attribute; its w:r children are the cached
+                                // result and must be kept, but the instr itself
+                                // must not appear in body text. There is nothing
+                                // to toggle beyond marking that we are inside a
+                                // field result; fldSimple does not have begin/end.
+                                inField = true
+                                inFieldInstr = false
+                                inFieldResult = true
+                            }
+
                             isDocx && tagLocal == "t" -> { inDocxText = true }
+                            isDocx && tagLocal == "instrtext" -> {
+                                // w:instrText contains field instruction text.
+                                // Only enter inDocxText when between fldChar
+                                // begin and separate (instruction portion); the
+                                // TEXT event handler suppresses actual append in
+                                // that region so instructions never reach body.
+                                inDocxText = inFieldInstr
+                            }
+
                             tagLocal == "sectpr" -> {
                                 paraHasSectPr = inPPr
                                 inSectionProperties = true
                                 sectionKind = SectionStartKind.NEXT_PAGE
+                                sectionTitlePg = false
+                                sectionPgNumFmt = null
+                                sectionPgNumStart = null
+                            }
+                            inSectionProperties && tagLocal == "titlepg" -> {
+                                sectionTitlePg = docxOnOff(getXmlAttr(parser, "val"))
+                            }
+                            inSectionProperties && tagLocal == "pgnumtype" -> {
+                                sectionPgNumFmt = getXmlAttr(parser, "fmt")
+                                sectionPgNumStart = getXmlAttr(parser, "start")?.toIntOrNull()
                             }
                             inSectionProperties && tagLocal == "type" -> {
                                 sectionKind = when (getXmlAttr(parser, "val")?.lowercase(Locale.ROOT)) {
@@ -1905,7 +2242,33 @@ class OfficeDocumentParser(private val context: Context) {
                             tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = true
                                 currentRows.clear()
+                                currentTableColumns.clear()
+                                currentTableWidth = TableColumnWidthSpec()
                                 currentTableName = getXmlAttr(parser, "name")
+                                cellColumnCursor = 0
+                            }
+                            isDocx && inTable && tagLocal == "tblpr" -> { inTblPr = true }
+                            isDocx && inTable && inTblPr && tagLocal == "tblw" -> {
+                                currentTableWidth = parseDocxTableWidth(parser)
+                            }
+                            isDocx && inTable && tagLocal == "tblgrid" -> { inTblGrid = true }
+                            isDocx && inTblGrid && tagLocal == "gridcol" -> {
+                                val wTwips = getXmlAttr(parser, "w")?.toIntOrNull()
+                                val spec = OfficeTableColumnSpec(
+                                    width = TableColumnWidthSpec(
+                                        kind = TableColumnWidthKind.ABSOLUTE,
+                                        value = wTwips?.let { LayoutUnits.twipsToUnits(it) } ?: 0f
+                                    ),
+                                    repeatCount = 1
+                                )
+                                currentTableColumns.add(spec)
+                            }
+                            isDocx && inTable && tagLocal == "trpr" -> {
+                                inTrPr = true
+                                currentRowIsHeader = false
+                            }
+                            isDocx && inTrPr && tagLocal == "tblheader" -> {
+                                currentRowIsHeader = true
                             }
                             tagLocal == "frame" -> {
                                 lastGraphicName = getXmlAttr(parser, "name")
@@ -1915,17 +2278,45 @@ class OfficeDocumentParser(private val context: Context) {
                             }
                             tagLocal == "tr" || tagLocal == "table-row" -> {
                                 currentCells.clear()
+                                if (isDocx) {
+                                    inTrPr = false
+                                    currentRowIsHeader = false
+                                    cellColumnCursor = 0
+                                }
                             }
                             tagLocal == "tc" || tagLocal == "table-cell" -> {
                                 currentCellParagraphs.clear()
                                 currentText.clear()
+                                if (isDocx) {
+                                    inTcPr = false
+                                    currentCellStartCol = cellColumnCursor
+                                    currentCellColSpan = 1
+                                    currentCellRowSpan = 1
+                                    currentCellOccupancy = TableCellOccupancy.ORIGIN
+                                    currentCellVMerge = null
+                                }
+                            }
+                            isDocx && inTable && tagLocal == "tcpr" -> { inTcPr = true }
+                            isDocx && inTcPr && tagLocal == "tcw" -> { /* cell widths feed into column widths below */ }
+                            isDocx && inTcPr && tagLocal == "gridspan" -> {
+                                currentCellColSpan = getXmlAttr(parser, "val")?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                            }
+                            isDocx && inTcPr && tagLocal == "vmerge" -> {
+                                currentCellVMerge = getXmlAttr(parser, "val")
+                                if (currentCellVMerge == null || currentCellVMerge.equals("restart", ignoreCase = true)) {
+                                    currentCellOccupancy = TableCellOccupancy.ORIGIN
+                                    currentCellRowSpan = 1 // placeholder; end tag for vMerge cannot reflow, so rowspan merging is deferred.
+                                } else {
+                                    // `w:vMerge` without val (or val="continue") means this cell is covered by the row above.
+                                    currentCellOccupancy = TableCellOccupancy.COVERED
+                                }
                             }
 
-                            // Lists. The bullet text is the placeholder that Plan 8B
-                            // replaces with the numbering definition's real label.
+                            // Lists. ODF still emits its bullet through list-item;
+                            // DOCX numbering is resolved per-paragraph from
+                            // `DocxNumberingRef` and never prepends a fake bullet here.
                             tagLocal == "list-item" || tagLocal == "numpr" -> {
                                 if (tagLocal == "numpr") inNumPr = true
-                                currentText.append("• ")
                             }
 
                             // Spaces & Tabs
@@ -1942,6 +2333,16 @@ class OfficeDocumentParser(private val context: Context) {
                                 if (brType?.equals("page", ignoreCase = true) == true) {
                                     inlinePageBreaks += currentText.length
                                 } else {
+                                    // `w:br` without a type or with type other than
+                                    // "page" is a line break. In a heading authored
+                                    // with a line break between the numbering label
+                                    // and the title text (the user's "BAB I\nPENDAHULUAN"
+                                    // pattern), keep the break so both lines render
+                                    // but the numbering label still prepends the
+                                    // level; the numbering prefix we add at post
+                                    // process does not duplicate what the file
+                                    // wrote because the line sits inside the label
+                                    // content rather than a number.
                                     currentText.append("\n")
                                 }
                             }
@@ -1996,7 +2397,14 @@ class OfficeDocumentParser(private val context: Context) {
 
                     XmlPullParser.TEXT -> {
                         val txt = parser.text ?: ""
-                        if (txt.isNotEmpty() && (!isDocx || inDocxText)) {
+                        // In DOCX, swallow text that belongs to field
+                        // instructions (between fldChar begin and separate).
+                        // w:instrText is the canonical instruction carrier;
+                        // defensive: also drop plain w:t text that sits inside
+                        // the instruction portion of a field in case a producer
+                        // writes instructions without w:instrText wrapping.
+                        val isDocxInstructionText = isDocx && inField && inFieldInstr
+                        if (txt.isNotEmpty() && (!isDocx || (inDocxText && !isDocxInstructionText))) {
                             currentText.append(txt)
                         }
                     }
@@ -2023,6 +2431,14 @@ class OfficeDocumentParser(private val context: Context) {
                             }
 
                             isDocx && tagLocal == "t" -> { inDocxText = false }
+                            isDocx && tagLocal == "instrtext" -> { inInstrText = false; inDocxText = false }
+                            isDocx && tagLocal == "hyperlink" -> { currentHyperlink = null }
+                            isDocx && tagLocal == "fldsimple" -> {
+                                inField = false
+                                inFieldInstr = false
+                                inFieldResult = false
+                            }
+
                             isDocx && tagLocal == "rpr" -> { inRunRPr = false }
                             isDocx && tagLocal == "r" -> {
                                 val runText = if (runStartOffset <= currentText.length) {
@@ -2037,6 +2453,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         isItalic = runItalic,
                                         isUnderline = runUnderline,
                                         styleName = runStyle,
+                                        hyperlink = currentHyperlink,
                                         colorHex = runColor,
                                         highlight = runHighlight,
                                         isHidden = runVanish,
@@ -2051,6 +2468,11 @@ class OfficeDocumentParser(private val context: Context) {
                             }
                             tagLocal == "sectpr" -> {
                                 sectionStarts += SectionStart(currentSectionStart, sectionKind)
+                                docxSectionBreakSpecs += DocxSectionBreakSpec(
+                                    titlePg = sectionTitlePg,
+                                    pageNumberFormat = sectionPgNumFmt,
+                                    pageNumberStart = sectionPgNumStart
+                                )
                                 inSectionProperties = false
                             }
                             tagLocal == "numpr" -> {
@@ -2147,6 +2569,7 @@ class OfficeDocumentParser(private val context: Context) {
                                             styleName = headingStyle,
                                             runs = paragraphRuns,
                                             pageBreakOffsets = inlinePageBreaks.toList(),
+                                            bookmarks = currentBookmarks.toList(),
                                             numbering = paragraphNumbering
                                         )
                                     )
@@ -2159,6 +2582,7 @@ class OfficeDocumentParser(private val context: Context) {
                                         styleName = resolvedStyleName,
                                         pageBreakOffsets = inlinePageBreaks.toList(),
                                         runs = paragraphRuns,
+                                        bookmarks = currentBookmarks.toList(),
                                         numbering = paragraphNumbering
                                     )
                                     if (inTable) {
@@ -2184,31 +2608,69 @@ class OfficeDocumentParser(private val context: Context) {
                                 } else {
                                     currentText.toString().trim()
                                 }
-                                currentCells.add(
-                                    TableCell(
-                                        text = cellText,
-                                        paragraphs = currentCellParagraphs.toList()
+                                if (isDocx) {
+                                    currentCells.add(
+                                        TableCell(
+                                            text = cellText,
+                                            paragraphs = currentCellParagraphs.toList(),
+                                            startColumn = currentCellStartCol,
+                                            columnSpan = currentCellColSpan,
+                                            rowSpan = currentCellRowSpan,
+                                            occupancy = currentCellOccupancy,
+                                            sourceCellOrdinal = currentCells.size
+                                        )
                                     )
-                                )
+                                    cellColumnCursor += currentCellColSpan
+                                } else {
+                                    currentCells.add(
+                                        TableCell(
+                                            text = cellText,
+                                            paragraphs = currentCellParagraphs.toList()
+                                        )
+                                    )
+                                }
                                 currentCellParagraphs.clear()
                                 currentText.clear()
                             }
 
                             tagLocal == "tr" || tagLocal == "table-row" -> {
                                 if (currentCells.isNotEmpty()) {
-                                    currentRows.add(TableRow(cells = currentCells.toList()))
+                                    if (isDocx) {
+                                        currentRows.add(
+                                            TableRow(
+                                                cells = currentCells.toList(),
+                                                isHeader = currentRowIsHeader,
+                                                repeatCount = if (currentRowIsHeader) 1 else 1,
+                                                sourceRowOrdinal = currentRows.size
+                                            )
+                                        )
+                                    } else {
+                                        currentRows.add(TableRow(cells = currentCells.toList()))
+                                    }
                                     currentCells.clear()
                                 }
+                                inTrPr = false
                             }
 
                             tagLocal == "table" || tagLocal == "tbl" -> {
                                 inTable = false
                                 if (currentRows.isNotEmpty()) {
-                                    val maxCols = currentRows.maxOfOrNull { it.cells.size } ?: 0
+                                    val maxCols = if (isDocx && currentTableColumns.isNotEmpty()) {
+                                        currentTableColumns.size
+                                    } else {
+                                        currentRows.maxOfOrNull { it.cells.size } ?: 0
+                                    }
+                                    // Compute column widths for DOCX: if tblGrid
+                                    // is present use it as the column spec.
+                                    val columns: List<OfficeTableColumnSpec> = if (isDocx && currentTableColumns.isNotEmpty()) {
+                                        currentTableColumns.toList()
+                                    } else emptyList()
                                     val tableObj = OfficeDocumentElement.Table(
                                         rows = currentRows.toList(),
                                         numColumns = maxCols,
-                                        name = currentTableName
+                                        name = currentTableName,
+                                        columns = columns,
+                                        tableWidth = currentTableWidth
                                     )
                                     currentTableName = null
                                     elements.add(tableObj)
@@ -2218,8 +2680,16 @@ class OfficeDocumentParser(private val context: Context) {
                                     }
                                     plainTextBuilder.append("\n")
                                     currentRows.clear()
+                                    currentTableColumns.clear()
+                                    currentTableWidth = TableColumnWidthSpec()
                                 }
+                                inTblPr = false
+                                inTblGrid = false
                             }
+                            isDocx && tagLocal == "tblpr" -> { inTblPr = false }
+                            isDocx && tagLocal == "tblgrid" -> { inTblGrid = false }
+                            isDocx && tagLocal == "trpr" -> { inTrPr = false }
+                            isDocx && tagLocal == "tcpr" -> { inTcPr = false }
                         }
                     }
                 }
@@ -2258,7 +2728,6 @@ class OfficeDocumentParser(private val context: Context) {
         }
 
         val detectedDocPageCount = (if (isDocx) extractDocxPageCount(file) else if (isOdt) extractOdtPageCount(file) else null) ?: 0
-        val plainTextResult = plainTextBuilder.toString().trim()
         val allParagraphStyles = LinkedHashMap<String, ParagraphStyle>()
         allParagraphStyles.putAll(docxParagraphStyles)
         allParagraphStyles.putAll(generatedStyles)
@@ -2267,17 +2736,44 @@ class OfficeDocumentParser(private val context: Context) {
                 paragraphStyles = allParagraphStyles,
                 characterStyles = docxStylesResult.characterStyles,
                 defaultPageStyle = extractDocxPageStyleSpec(xmlContent),
-                defaultParagraphStyle = docxDefaultParagraphStyle
+                defaultParagraphStyle = docxDefaultParagraphStyle,
+                docxNumStyles = docxNumberingResult.numSpecs
             )
         } else DocumentStyles()
         if (currentSectionStart > 0 && currentSectionStart < elements.size && sectionStarts.none { it.elementIndex == currentSectionStart }) {
             sectionStarts += SectionStart(currentSectionStart, SectionStartKind.NEXT_PAGE)
+            if (isDocx && docxSectionBreakSpecs.size < sectionStarts.size) {
+                docxSectionBreakSpecs += DocxSectionBreakSpec()
+            }
         }
+
+        // Plan 8B Commit 1: apply DOCX numbering labels to paragraphs and
+        // headings. Walk the element list in document order, maintaining one
+        // counter per numId like Word does. Suppressed refs (numId=0) emit no
+        // label and do not advance a counter; unknown numIds degrade to no
+        // label rather than crashing.
+        if (isDocx && docxNumberingResult.numSpecs.isNotEmpty()) {
+            applyDocxNumberingLabels(elements, plainTextBuilder, docxNumberingResult.numSpecs)
+        }
+
+        // Plan 8B Commit 3: detect the authored TOC snapshot. Entries are
+        // paragraphs whose style's w:name is "toc N" (case-insensitive).
+        // Detection is by style *name*, not styleId, because the ids are
+        // localised in some producers (audit-019 §fixture note 1). "TOC Heading"
+        // is a title style, not an entry. Consecutive toc-styled paragraphs
+        // form one authored index range; non-toc paragraphs between them
+        // (e.g. a stray title) break the range.
+        val authoredIndexes = if (isDocx) {
+            collectDocxAuthoredIndexes(elements, docxStylesMap, allParagraphStyles)
+        } else mutableListOf()
+
+        val finalPlainText = plainTextBuilder.toString().trim()
         val parsedDoc = OfficeParsedDocument(
             sectionStarts = sectionStarts.toList(),
+            docxSectionBreakSpecs = docxSectionBreakSpecs.toList(),
             elements = elements,
             rawXml = xmlContent,
-            plainText = if (plainTextResult.isBlank()) "" else plainTextResult,
+            plainText = if (finalPlainText.isBlank()) "" else finalPlainText,
             extractedImages = extractedImages,
             isOdt = isOdt,
             isDocx = isDocx,
@@ -2287,7 +2783,8 @@ class OfficeDocumentParser(private val context: Context) {
             isPptx = detectedPptx,
             isParsingFailed = false,
             pageCount = detectedDocPageCount,
-            styles = docxDocumentStyles
+            styles = docxDocumentStyles,
+            authoredIndexes = authoredIndexes
         )
         inMemoryParsedDocCache[file.absolutePath] = ParsedCacheEntry(file.lastModified(), file.length(), parsedDoc)
         cacheRepository.saveCachedDocument(file, parsedDoc)

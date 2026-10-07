@@ -9,6 +9,13 @@ plan 5 element dump (`Plan5ElementDumpTest` system-out) and the native
 inventory. Everything is best-effort; a missing input just leaves its
 section out. Output goes to stdout as Markdown.
 
+Environment the workflow supplies: `GITHUB_RUN_ID`, `GITHUB_REPOSITORY`,
+`GITHUB_SHA` and, on pull-request runs, `HEAD_SHA`, `HEAD_REF`, `BASE_SHA`
+and `BASE_REF`. `HEAD_SHA` is the pull-request head commit and is what the
+comment header names; `GITHUB_SHA` is only the fallback, because on a
+pull_request event it is the ephemeral `refs/pull/N/merge` commit, which is
+on no branch and cannot be checked out by a reader.
+
 Usage: ci-dump-comment.py <test-results-dir> <gradle-log> <native-inventory>
 """
 import glob
@@ -35,16 +42,35 @@ def details(summary, body, lang=""):
     return f"<details><summary>{summary}</summary>\n\n```{lang}\n{body.rstrip()}\n```\n\n</details>\n"
 
 
+def shorten_paths(line):
+    """Rewrite the runner's absolute source paths as repo-relative ones.
+
+    The compiler prints `file:///home/runner/work/<repo>/<repo>/app/...`. A
+    reader in a sandbox has the checkout at some other root, so the repo-
+    relative form is the one that can be opened or grepped directly.
+    """
+    return re.sub(r"file://[^ ]*?/app/src/", "app/src/", line)
+
+
 def gradle_section(log):
     if not log:
         return "", False
-    lines = log.splitlines()
+    lines = [shorten_paths(l) for l in log.splitlines()]
     errors = [l for l in lines if re.match(r"^e: ", l) or "error:" in l.lower() and ".kt" in l]
     failed_tasks = [l for l in lines if l.startswith("> Task") and l.rstrip().endswith("FAILED")]
     ok = any("BUILD SUCCESSFUL" in l for l in lines)
     parts = []
     if errors:
-        parts.append(details(f"Kotlin compile errors ({len(errors)})", "\n".join(errors[:200])))
+        # One line per distinct message: the same error is reported once per
+        # compilation pass, and a repeated block hides the errors below it.
+        seen = []
+        for l in errors:
+            if l not in seen:
+                seen.append(l)
+        label = f"Kotlin compile errors ({len(seen)}"
+        if len(seen) != len(errors):
+            label += f" distinct, {len(errors)} reported"
+        parts.append(details(label + ")", "\n".join(seen[:200])))
     if failed_tasks:
         parts.append("Failed tasks: " + ", ".join(t.replace("> Task ", "") for t in failed_tasks) + "\n")
     if not ok:
@@ -106,14 +132,28 @@ def main():
     inventory = read(sys.argv[3]) if len(sys.argv) > 3 else ""
 
     run_id = os.environ.get("GITHUB_RUN_ID", "?")
-    sha = os.environ.get("GITHUB_SHA", "?")[:7]
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     run_url = f"https://github.com/{repo}/actions/runs/{run_id}" if repo else ""
+
+    # Name the commit the reader can check out. On a pull_request event
+    # GITHUB_SHA is the ephemeral refs/pull/N/merge commit GitHub built for the
+    # run; it sits on no branch, so a reader in a sandbox cannot resolve it with
+    # git and cannot line the report up with the code it describes. The workflow
+    # passes the pull-request head SHA as HEAD_SHA for exactly that reason.
+    head_sha = (os.environ.get("HEAD_SHA") or os.environ.get("GITHUB_SHA") or "?")[:7]
+    head_ref = os.environ.get("HEAD_REF", "")
+    base_sha = (os.environ.get("BASE_SHA") or "")[:7]
+    base_ref = os.environ.get("BASE_REF", "")
 
     gradle_md, gradle_ok = gradle_section(gradle_log)
     rows, total, total_time, failures, dump, plan6c_out = test_sections(results_dir)
 
-    head = [f"### CI report for `{sha}` ([run {run_id}]({run_url}))\n"]
+    head = [f"### CI report for `{head_sha}` ([run {run_id}]({run_url}))\n"]
+    if head_ref:
+        provenance = f"Head `{head_sha}` on `{head_ref}`"
+        if base_sha:
+            provenance += f", merged onto `{base_ref or 'base'}` at `{base_sha}` for this run"
+        head.append(provenance + ".\n")
     if rows:
         verdict = "all tests passed" if total["failures"] == 0 and total["errors"] == 0 else "there are failing tests"
         head.append(

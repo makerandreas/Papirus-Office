@@ -21,6 +21,7 @@ import com.makerandreas.papirusoffice.data.toOfficeDocument
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -278,6 +279,34 @@ class DocxRunFormattingTest {
 
     @Test
     fun textTheFileWroteOutsideARunBecomesANeutralRun() {
+        // Plan 8B removed the placeholder bullet the parser used to push into the
+        // paragraph buffer for `w:numPr` (see applyDocxNumberingLabels, which now
+        // renders the real label from `word/numbering.xml` and prepends it to the
+        // first run). This case writes its loose text directly instead, so it still
+        // covers the tiling rule it was written for: whatever the paragraph buffer
+        // holds outside an authored `w:r` becomes a neutral run.
+        val parsed = docx(
+            styles = style("Numbered", rPr = "<w:b/>"),
+            body = paragraph(
+                "<w:pStyle w:val=\"Numbered\"/>",
+                "<w:t>loose </w:t>",
+                run("item")
+            )
+        )
+        val paragraph = firstParagraph(parsed)
+        val runs = paragraph.runs
+        assertEquals("text the file wrote outside a run tiles into its own run", "loose ", runs.first().text)
+        assertNull("the filler run states nothing", runs.first().isBold)
+        assertEquals("item", runs.last().text)
+        assertEquals(paragraph.text, runs.joinToString("") { it.text })
+    }
+
+    @Test
+    fun aNumberedParagraphGetsNoLabelWhenThePackageHasNoNumberingPart() {
+        // The package this helper builds carries `styles.xml` and `document.xml`
+        // only, so `w:numId 7` is a dangling reference. Plan 8B renders a label
+        // from `word/numbering.xml` and nothing else, so the paragraph keeps its
+        // authored text and its single authored run instead of gaining a bullet.
         val parsed = docx(
             styles = style("Numbered", rPr = "<w:b/>"),
             body = paragraph(
@@ -286,11 +315,12 @@ class DocxRunFormattingTest {
             )
         )
         val paragraph = firstParagraph(parsed)
-        val runs = paragraph.runs
-        assertEquals("the placeholder bullet is not authored run text", "\u2022 ", runs.first().text)
-        assertNull("the filler run states nothing", runs.first().isBold)
-        assertEquals("item", runs.last().text)
-        assertEquals(paragraph.text, runs.joinToString("") { it.text })
+        assertEquals("item", paragraph.text)
+        assertEquals(1, paragraph.runs.size)
+        assertEquals("item", paragraph.runs.single().text)
+        assertNotNull("the unresolved reference is still carried for the Navigator", paragraph.numbering)
+        assertEquals(7, paragraph.numbering?.numId)
+        assertFalse(paragraph.numbering?.suppressed ?: true)
     }
 
     @Test

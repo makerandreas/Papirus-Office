@@ -291,6 +291,12 @@ data class DocumentStyles(
     val listStyles: Map<String, NumberingSpec> = emptyMap(),
     /** Document-level ODF `<text:outline-style>` definition, if present. */
     val outlineStyle: NumberingSpec? = null,
+    /**
+     * DOCX `word/numbering.xml` definitions keyed by `w:numId` (>=1).
+     * Populated by Plan 8B; null/empty when the file has no numbering part
+     * (e.g. Sample-3) or when parsing a non-DOCX document.
+     */
+    val docxNumStyles: Map<Int, NumberingSpec> = emptyMap(),
     /** ODF font-face declarations keyed by their style:name alias. Populated by Plan 7E. */
     val fontFaces: Map<String, OfficeFontFace> = emptyMap(),
     /** Named and automatic ODF table-family declarations populated by Plan 7D. */
@@ -515,6 +521,20 @@ data class DocumentProperties(
 
 enum class SectionStartKind { NEXT_PAGE, CONTINUOUS, NEXT_COLUMN, ODD_PAGE, EVEN_PAGE }
 data class SectionStart(val elementIndex: Int, val kind: SectionStartKind)
+
+/**
+ * Plan 8B H-6/H-6b: WordprocessingML section-break metadata parsed from a
+ * `<w:sectPr>` and aligned 1:1 with [OfficeParsedDocument.sectionStarts] by
+ * index. `titlePg` mirrors w:titlePg (different first-page header/footer);
+ * `pageNumberFormat` mirrors w:pgNumType w:fmt (decimal, upperRoman,
+ * lowerRoman, upperLetter, lowerLetter); `pageNumberStart` mirrors w:start
+ * (restart value).
+ */
+data class DocxSectionBreakSpec(
+    val titlePg: Boolean = false,
+    val pageNumberFormat: String? = null,
+    val pageNumberStart: Int? = null
+)
 
 data class DocumentSection(
     val name: String = "",

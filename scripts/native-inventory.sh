@@ -26,7 +26,19 @@ mkdir -p "$(dirname "$OUT")"
 have() { command -v "$1" >/dev/null 2>&1; }
 
 inventory() {
-  echo "# native inventory, $(date -u +%Y-%m-%dT%H:%M:%SZ), commit $(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  # On a pull_request run the checkout is refs/pull/N/merge, so `git rev-parse
+  # HEAD` names a merge commit that is on no branch. The workflow passes the
+  # pull-request head as HEAD_SHA; prefer it so the header points at code a
+  # reader can actually check out (AGENTS.md, "Reading the CI report").
+  local checked_out head
+  checked_out=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
+  if [ -n "${HEAD_SHA:-}" ]; then
+    head="${HEAD_SHA:0:7}"
+    [ "$head" = "$checked_out" ] || head="$head (checked out as merge commit $checked_out)"
+  else
+    head="$checked_out"
+  fi
+  echo "# native inventory, $(date -u +%Y-%m-%dT%H:%M:%SZ), commit $head"
   echo "# libs: $LIBS"
   for tool in readelf nm sha256sum; do
     have "$tool" || echo "# missing tool: $tool (install binutils/coreutils)"
