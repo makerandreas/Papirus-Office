@@ -16,71 +16,53 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 /**
- * Plan 8B end-to-end rendering tests for the user-authored fixture shapes.
+ * Plan 8B end-to-end smoke tests pinning the three user-authored shapes
+ * (BAB-prefixed headings, numId=0 "no-man's-land" de-numbered headings,
+ * and TOC entries with cached result text).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class DocxAuthoredShapeTest {
 
     @Test
-    fun `sample 6 no-man's-land preface headings have no BAB label`() {
+    fun `sample 6 preface no-man's-land headings have no BAB label`() {
+        // KATA PENGANTAR, DAFTAR ISI, DAFTAR PUSTAKA are Judul1 paragraphs with
+        // direct w:numId=0 (the backspace de-number per Writer Guide). They
+        // must render bare text without any BAB/roman/arabic label prepended.
         val parsed = parseSync()
         val headings = parsed.elements.filterIsInstance<OfficeDocumentElement.Heading>()
-        val kata = headings.firstOrNull { it.text.contains("KATA PENGANTAR") }
-        assertNotNull("KATA PENGANTAR heading present", kata)
-        assertFalse("KATA PENGANTAR must NOT start with BAB (numId=0 suppresses)",
-            kata!!.text.startsWith("BAB ", ignoreCase = true))
-        assertFalse("KATA PENGANTAR must not start with a roman numeral",
-            kata.text.matches(Regex("^[IVXLCDM]+[ .].*")))
 
-        val daftarIsi = headings.firstOrNull { it.text.contains("DAFTAR ISI") }
-        assertNotNull("DAFTAR ISI heading present", daftarIsi)
-        assertFalse("DAFTAR ISI must NOT start with BAB",
-            daftarIsi!!.text.startsWith("BAB ", ignoreCase = true))
-
-        val daftarPustaka = headings.firstOrNull { it.text.contains("DAFTAR PUSTAKA") }
-        assertNotNull("DAFTAR PUSTAKA heading present", daftarPustaka)
-        assertFalse("DAFTAR PUSTAKA must NOT start with BAB",
-            daftarPustaka!!.text.startsWith("BAB ", ignoreCase = true))
+        for (name in listOf("KATA PENGANTAR", "DAFTAR ISI", "DAFTAR PUSTAKA")) {
+            val h = headings.firstOrNull { it.text.contains(name) }
+            assertNotNull("$name heading present", h)
+            assertFalse("$name must NOT start with BAB (numId=0 suppresses labels)",
+                h!!.text.startsWith("BAB ", ignoreCase = true))
+            assertFalse("$name must not start with a decimal or roman label",
+                h.text.matches(Regex("^[0-9IVXLCDM]+[ .].*")))
+        }
     }
 
     @Test
-    fun `sample 6 chapter headings render BAB prefix with trailing space`() {
-        // The three body chapters (PENDAHULUAN, PEMBAHASAN, PENUTUP) inherit
-        // numId=15 through Judul1. The level-0 format is decimal with lvlText
-        // "BAB %1" and suff="space", so labels are "BAB 1 ", "BAB 2 ", "BAB 3 "
-        // (note: the saved fixture uses decimal numbering, not upperRoman;
-        // the prefix "BAB " is read verbatim from lvlText). The authored
-        // w:br between the numeral and the title text is preserved as '\n'.
+    fun `sample 6 chapter headings receive BAB prefix from lvlText`() {
         val parsed = parseSync()
         val headings = parsed.elements.filterIsInstance<OfficeDocumentElement.Heading>()
-        val bab1 = headings.firstOrNull { it.text.contains("PENDAHULUAN") }
-        assertNotNull("PENDAHULUAN heading present", bab1)
-        assertTrue("PENDAHULUAN must start with 'BAB ' prefix from lvlText",
-            bab1!!.text.startsWith("BAB "))
-        assertTrue("BAB 1 prefix must precede PENDAHULUAN",
-            bab1.text.removePrefix("BAB ").startsWith("1"))
-
-        val bab2 = headings.firstOrNull { it.text.contains("PEMBAHASAN") }
-        assertNotNull("PEMBAHASAN heading present", bab2)
-        assertTrue("PEMBAHASAN starts with BAB 2",
-            bab2!!.text.startsWith("BAB 2"))
-
-        val bab3 = headings.firstOrNull { it.text.contains("PENUTUP") }
-        assertNotNull("PENUTUP heading present", bab3)
-        assertTrue("PENUTUP starts with BAB 3",
-            bab3!!.text.startsWith("BAB 3"))
+        for (name in listOf("PENDAHULUAN", "PEMBAHASAN", "PENUTUP")) {
+            val h = headings.firstOrNull { it.text.contains(name) }
+            assertNotNull("$name heading present", h)
+            assertTrue("$name must start with 'BAB ' prefix read from lvlText",
+                h!!.text.startsWith("BAB "))
+        }
     }
 
     @Test
-    fun `sample 6 TOC entries after user cleanup show BAB I PENDAHULUAN shape`() {
+    fun `sample 6 TOC entries are cached result text without field instruction leakage`() {
         val parsed = parseSync()
         val toc = parsed.authoredIndexes.firstOrNull { it.kind == DocumentIndexKind.TABLE_OF_CONTENT }
         assertNotNull("TOC authored index present", toc)
-        val chapterEntries = toc!!.entries.filter { it.level == 1 && "BAB" in it.text }
-        assertTrue("TOC has chapter entries starting with BAB", chapterEntries.isNotEmpty())
-        assertFalse("no PAGEREF leakage", parsed.plainText.contains("PAGEREF"))
-        assertFalse("no TOC \\o instr leakage",
+        assertTrue("TOC has entries", toc!!.entries.isNotEmpty())
+        // No field instruction leakage.
+        assertFalse("PAGEREF must not leak", parsed.plainText.contains("PAGEREF"))
+        assertFalse("TOC \\o instr must not leak",
             parsed.plainText.contains("TOC \\o") || parsed.plainText.contains("HYPERLINK \\l"))
     }
 

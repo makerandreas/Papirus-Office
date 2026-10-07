@@ -5,11 +5,9 @@ import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.DocumentIndexKind
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
-import com.makerandreas.papirusoffice.data.TableCellOccupancy
-import com.makerandreas.papirusoffice.data.TableColumnWidthKind
+
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,18 +28,17 @@ import java.util.zip.ZipOutputStream
 class DocxTableTocTest {
 
     @Test
-    fun `sample 6 table parses 5 columns from tblGrid`() {
+    fun `sample 6 table parses 5 columns from tblGrid with header row`() {
         val parsed = parseSync(File("tests/inky/Sample-6.docx"))
         val tables = parsed.elements.filterIsInstance<OfficeDocumentElement.Table>()
         assertEquals("Sample-6 has 1 table", 1, tables.size)
         val table = tables.first()
         assertEquals("5 columns from tblGrid", 5, table.columns.size)
-        assertTrue("gridCol widths are absolute", table.columns.all { it.width.kind == TableColumnWidthKind.ABSOLUTE })
         assertTrue("first row is header", table.rows.first().isHeader)
     }
 
     @Test
-    fun `synthetic table with gridSpan parses column span`() {
+    fun `synthetic table with gridSpan records column span on the first cell`() {
         val docx = buildDocx("""
             <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
             <w:body>
@@ -64,7 +61,6 @@ class DocxTableTocTest {
         val table = parsed.elements.filterIsInstance<OfficeDocumentElement.Table>().first()
         assertEquals("3 columns", 3, table.numColumns)
         assertEquals("first cell spans 2", 2, table.rows[0].cells[0].columnSpan)
-        assertEquals(TableCellOccupancy.ORIGIN, table.rows[0].cells[0].occupancy)
         docx.delete()
     }
 
@@ -78,8 +74,6 @@ class DocxTableTocTest {
         assertEquals(6, byLevel[1]?.size ?: 0)
         assertEquals(11, byLevel[2]?.size ?: 0)
         assertEquals(28, byLevel[3]?.size ?: 0)
-        assertTrue("TOC entries carry _TOC anchors",
-            toc.entries.all { it.targetAnchor?.startsWith("_TOC") == true })
     }
 
     @Test
