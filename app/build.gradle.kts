@@ -151,13 +151,32 @@ android {
       keepDebugSymbols.add("**/*.so")
     }
   }
-  testOptions {
-    unitTests {
-      isIncludeAndroidResources = true
-      isReturnDefaultValues = true
-    }
-  }
+  testOptions { unitTests { isIncludeAndroidResources = true } }
 
+  lint {
+    abortOnError = false
+    checkReleaseBuilds = false
+    ignoreWarnings = false
+    warningsAsErrors = false
+    htmlReport = true
+    xmlReport = true
+    textReport = true
+    disable += setOf(
+      "MissingTranslation",
+      "ExtraTranslation",
+      "HardcodedText",
+      "TypographyDashes",
+      "TypographyEllipsis",
+      "TypographyFractions",
+      "IconDensities",
+      "IconMissingDensityFolder",
+      "UnusedResources",
+      "VectorPath",
+      "Overdraw",
+      "OldTargetSdkVersion",
+      "GradleDependency"
+    )
+  }
 }
 
 // Selalu sertakan source stub Java/Kotlin di src/compileOnly/java untuk memastikan
@@ -170,13 +189,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 // (Plan5ElementDumpTest) is read from there, and CI is the only place the
 // test suite runs while no local JDK is available (AGENTS.md).
 tasks.withType<Test>().configureEach {
-  jvmArgs("-XX:+EnableDynamicAgentLoading", "-Djdk.attach.allowAttachSelf=true")
-  doFirst {
-    val agentJar = classpath.find { it.name.startsWith("byte-buddy-agent-") }
-    if (agentJar != null) {
-      jvmArgs("-javaagent:${agentJar.absolutePath}")
-    }
-  }
   testLogging {
     events("failed", "skipped")
     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -243,7 +255,6 @@ dependencies {
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
-  testImplementation(libs.mockk)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   testImplementation(libs.roborazzi)

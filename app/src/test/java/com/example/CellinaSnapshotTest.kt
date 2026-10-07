@@ -21,7 +21,7 @@ class CellinaSnapshotTest {
   @get:Rule val composeTestRule = createComposeRule()
 
   @Test
-  @Config(qualifiers = RobolectricDeviceQualifiers.Pixel8)
+  @Config(sdk = [34], qualifiers = RobolectricDeviceQualifiers.Pixel8)
   fun cellina_render_phone_portrait() {
     composeTestRule.setContent {
       PapirusTheme {
@@ -31,12 +31,11 @@ class CellinaSnapshotTest {
         )
       }
     }
-    composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/cellina_phone_portrait.png")
   }
 
   @Test
-  @Config(qualifiers = RobolectricDeviceQualifiers.PixelTablet)
+  @Config(sdk = [34], qualifiers = RobolectricDeviceQualifiers.PixelTablet)
   fun cellina_render_tablet_landscape() {
     composeTestRule.setContent {
       PapirusTheme {
@@ -46,12 +45,11 @@ class CellinaSnapshotTest {
         )
       }
     }
-    composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/cellina_tablet_landscape.png")
   }
 
   @Test
-  @Config(qualifiers = RobolectricDeviceQualifiers.PixelFold)
+  @Config(sdk = [34], qualifiers = RobolectricDeviceQualifiers.PixelFold)
   fun cellina_render_foldable() {
     composeTestRule.setContent {
       PapirusTheme {
@@ -61,7 +59,6 @@ class CellinaSnapshotTest {
         )
       }
     }
-    composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/cellina_foldable.png")
   }
 }

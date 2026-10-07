@@ -22,7 +22,7 @@ import com.example.R
  * [percent] is a coarse, fixed position for each stage, not a measured
  * fraction of work.
  */
-enum class LoadingStage(val percent: Int, @StringRes val messageRes: Int) {
+enum class LoadingStage(val percent: Int, @param:StringRes val messageRes: Int) {
     OPENING_PACKAGE(10, R.string.loading_stage_opening_package),
     VALIDATING(20, R.string.loading_stage_validating),
     EXTRACTING_MEDIA(35, R.string.loading_stage_extracting_media),
