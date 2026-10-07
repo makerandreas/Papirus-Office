@@ -333,6 +333,12 @@ case sees a null `numSpecs[7]`) is derived from reading
 `OfficeDocumentParser.kt:2378`, `:2414-2425`, `:2485-2500` and `:1762`, not from a run.
 The next CI run on this branch is the evidence for it.
 
+The owner has accepted that gap and named what covers it: Google AI Studio runs the
+real `testDebugUnitTest` suite and has an Android cloud device emulator for UI checks,
+with the Realme C3 device pass after Plan 11. `AGENTS.md` now records that as a
+four-tier evidence ladder, so a claim is labelled with the tier it came from instead of
+being presented as verified when it was only read.
+
 ---
 
 ## 8. Delivery Gate
@@ -431,3 +437,30 @@ to a Plan 8C decision about label alignment and legal numbering, not to a cleanu
 | `scripts/native-inventory.sh` | Header prefers `HEAD_SHA` and names the merge commit when it differs |
 | `AGENTS.md` | New section "Reading the CI report (the GitHub API approach, in full)"; the JNI notice now points at it |
 | `anti-slop/audit-020-2026-10-07-pr35-ci-report-and-charset-loop.md` | This file |
+
+---
+
+## 11. Delivery decision and the PR-number deviation
+
+The owner's decision, 2026-10-07: this pass opens as its **own pull request** rather
+than being pushed onto `arena/5dab2315-papirus-office`, and the owner closes **PR #35**
+himself after review and merge.
+
+That consumes a PR slot the forecast had assigned to something else, so the ledger
+deviates in a known way:
+
+| Document | What it says | What is now true |
+|---|---|---|
+| `plan-01-master-index.md` §2 row 8 | "Forecast **PR #35 (8A)** and **PR #36 (8B)**" | 8A already landed inside PR #34 (recorded in item 12). 8B is PR #35. This CI-triage pass takes the next slot. |
+| `plan-01-master-index.md` item 12 | "8B remains forecast at `#36`" | 8B opened as #35, not #36. This pass is the new slot after it. |
+| `plan-2026-09-24-remaining-pr-roadmap-v2.md` §4.8, §4.9 | the v2.13 slot table `#35 8A, #36 8B, #37 Plan 9` | shifted by one for everything from Plan 9 onward |
+
+Plan IDs stay authoritative; PR numbers remain forecasts, not reservations. The rows
+above are recorded here rather than rewritten in place, because the roadmap and the
+index are dated documents and the deviation is this session's, not theirs. The next
+pass that touches the forecast should renumber from this point.
+
+This PR is deliberately not a Plan. It is CI hygiene plus five line-level compile fixes
+plus one test correction. It carries no feature scope, so it should not be read as
+advancing Plan 8B: the numbering, field, TOC, table and section work in PR #35 is
+unchanged by it, and PR #35's own acceptance is unchanged.

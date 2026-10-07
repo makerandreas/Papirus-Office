@@ -144,6 +144,16 @@ If JNI is available on the agent for unit tests, use it. Otherwise, use the GitH
 ### Local toolchain check (2026-10-04, audit-016 §8)
 A JDK is not obtainable in the agent sandbox: `java`, `javac` and `/usr/lib/jvm` are absent, the Debian mirrors and every JDK vendor host are unreachable, and the one PyPI reachable JDK package (`jdk4py 25.0.2.1`) ships a runtime without `javac`. The Gradle distribution host, Maven Central, Google Maven and JitPack are unreachable as well and no `~/.gradle` cache exists, so `./gradlew testDebugUnitTest` cannot run locally even with a JDK. GitHub Actions is the compile and test evidence path; Google AI Studio runs the same suite locally for the owner. Statements derived only from source reading must say so instead of reporting a build or test result.
 
+### The three-tier evidence ladder (owner's arrangement, 2026-10-07)
+The owner has confirmed that the agent sandbox missing the Android suite is acceptable, because the tier above it covers what the sandbox cannot:
+
+1. **Agent sandbox.** Source reading, `gh` against `api.github.com` (the CI report, see below), and a standalone `kotlinc` type-check of dependency-light engine files. Cannot reach Compose, Robolectric, JUnit, the Android SDK or Gradle.
+2. **Google AI Studio, the owner's build environment.** Runs the real `testDebugUnitTest` suite, and has an Android cloud device emulator for UI-level checks. This is where a test count, a Robolectric result or an interaction claim gets verified when GitHub Actions is not enough.
+3. **GitHub Actions.** The compile and test record that is attached to a commit and citable by run id, and the only evidence an audit can point at later.
+4. **The owner's Realme C3.** Scheduled after Plan 11. The only source of visual, gesture and IME evidence, and the reason the fixture-independence rule in audit-019 section 4.2 exists.
+
+Do not report a UI behaviour, a Robolectric result or a device measurement as verified when the evidence came from tier 1. Say which tier the claim came from.
+
 ### A type-check is still possible without Gradle (2026-10-07, audit-020 §7)
 The paragraph above is right about `./gradlew` and wrong to read as "nothing here can compile". Two allowlisted hosts give a working Kotlin compiler:
 
