@@ -26,7 +26,13 @@ class DocxNumberingReaderTest {
     fun `sample 6 numId 15 resolves a multi-level spec with BAB prefix on level 1`() {
         val result = DocxNumberingReader.read(fixture("Sample-6.docx"))
         val spec = result.numSpecs[15]
-        assertNotNull("numId 15 must resolve", spec)
+        // NumberingParseResult is empty rather than an error when numbering.xml
+        // could not be read at all, so carry the two maps that would show it.
+        assertNotNull(
+            "numId 15 must resolve (numToAbstract=${result.numToAbstract}, " +
+                "abstracts=${result.abstractSpecs.keys})",
+            spec
+        )
         val lvl1 = spec!!.level(1)!!
         // The Judul1-bound multi-level list carries the literal prefix "BAB "
         // from lvlText (read verbatim, never hard-coded). Level 1 uses one
@@ -36,7 +42,9 @@ class DocxNumberingReaderTest {
         assertEquals(1, lvl1.displayLevels)
 
         val lvl2 = spec.level(2)!!
-        assertEquals(".", lvl2.numSuffix)
+        // abstractNum 14 ilvl 1 declares lvlText="%1.%2", so the separator dot
+        // sits *between* the placeholders and nothing follows the last one.
+        assertEquals("", lvl2.numSuffix)
         assertEquals(2, lvl2.displayLevels)
 
         val counter = NumberingCounterState()

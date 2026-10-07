@@ -465,8 +465,8 @@ class OfficeDocumentParser(private val context: Context) {
                 is OfficeDocumentElement.Heading -> el.styleName
                 else -> null
             }
-            val meta = styleName?.let { stylesMetaMap[it] ?: stylesMetaMap[it.lowercase(Locale.ROOT)] }
-            val wName = meta?.name?.trim()?.lowercase(Locale.ROOT)
+            val wName = docxStyleName(styleName, stylesMetaMap, paragraphStyles)
+                ?.trim()?.lowercase(Locale.ROOT)
             // toc N with N 1..9; "toc 0" / "TOC Heading" excluded.
             val level = if (wName != null && wName.startsWith("toc ")) {
                 wName.removePrefix("toc ").trim().toIntOrNull()?.takeIf { it in 1..9 }
@@ -497,6 +497,35 @@ class OfficeDocumentParser(private val context: Context) {
         }
         if (runStart != null) flushRun(elements.size)
         return indexes
+    }
+
+    /**
+     * The `w:name` a paragraph's style declares, following `parentStyleName`.
+     *
+     * A paragraph with any direct paragraph formatting gets a synthetic
+     * `inline-p-N` style from the `hasDirectPPr` branch in `extractDocxContent`,
+     * and `stylesMetaMap` has no entry for that name. Every table-of-contents
+     * entry a real producer writes carries `w:tabs` for the dot-leader stop that
+     * aligns its page number, so without this walk each entry resolves to a
+     * synthetic name and the whole TOC is invisible to index detection. The
+     * synthetic style records the authored style as `parentStyleName`, so follow
+     * the chain; the hop bound only exists to survive a malformed cycle.
+     */
+    private fun docxStyleName(
+        styleName: String?,
+        stylesMetaMap: Map<String, DocxStyleMeta>,
+        paragraphStyles: Map<String, ParagraphStyle>
+    ): String? {
+        var current = styleName
+        var hops = 0
+        while (current != null && hops < 16) {
+            val meta = stylesMetaMap[current] ?: stylesMetaMap[current.lowercase(Locale.ROOT)]
+            if (meta != null) return meta.name
+            val style = paragraphStyles[current] ?: paragraphStyles[current.lowercase(Locale.ROOT)]
+            current = style?.parentStyleName
+            hops++
+        }
+        return null
     }
 
     private fun parseDocxTab(parser: XmlPullParser): ParagraphTabStop? {
