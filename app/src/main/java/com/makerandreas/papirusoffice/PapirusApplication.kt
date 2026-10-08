@@ -10,7 +10,6 @@ import android.os.StrictMode
 import com.example.BuildConfig
 import com.makerandreas.papirusoffice.data.PapirusLogger
 import com.makerandreas.papirusoffice.data.crash.CrashHandlerManager
-import java.io.File
 
 /**
  * PapirusApplication

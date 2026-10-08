@@ -29,7 +29,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.ai.GeminiAiService
 import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
 

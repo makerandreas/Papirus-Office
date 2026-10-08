@@ -3,8 +3,6 @@ package com.makerandreas.papirusoffice.core.fonts
 import android.graphics.Typeface
 import androidx.compose.ui.text.font.FontFamily
 import java.io.File
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontStyle
 
 class FontLoader {
     fun loadFontFamily(fontFiles: List<Pair<File, String>>): FontFamily? {

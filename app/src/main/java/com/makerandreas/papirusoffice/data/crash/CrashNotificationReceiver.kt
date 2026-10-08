@@ -1,8 +1,5 @@
 package com.makerandreas.papirusoffice.data.crash
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -13,8 +10,6 @@ import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
-import androidx.core.app.NotificationCompat
-import com.example.MainActivity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date

@@ -4,7 +4,6 @@ import com.makerandreas.papirusoffice.data.DocumentBody
 import com.makerandreas.papirusoffice.data.DocumentEngine
 import com.makerandreas.papirusoffice.data.DocumentMetadata
 import com.makerandreas.papirusoffice.data.DocumentSession
-import com.makerandreas.papirusoffice.data.EditingEngine
 import com.makerandreas.papirusoffice.data.OfficeBookmark
 import com.makerandreas.papirusoffice.data.OfficeComment
 import com.makerandreas.papirusoffice.data.OfficeDocument
@@ -28,7 +27,6 @@ import com.makerandreas.papirusoffice.data.navigation.NavigatorNotice
 import com.makerandreas.papirusoffice.data.navigation.VisibilityState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationEngineTest {

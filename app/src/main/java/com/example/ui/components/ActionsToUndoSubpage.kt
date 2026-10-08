@@ -19,15 +19,9 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.makerandreas.papirusoffice.data.undo.HistoryEntry
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Redo
 import androidx.compose.material.icons.rounded.Undo
-import androidx.compose.material3.Icon
-import androidx.compose.ui.draw.clip
 
 /**
  * Standard Bottom Sheet - Actions to Undo

@@ -2,7 +2,6 @@ package com.makerandreas.papirusoffice.data.bridge
 
 import android.content.Context
 import android.util.Log
-import com.makerandreas.papirusoffice.data.FontInfo
 import com.makerandreas.papirusoffice.data.FontProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

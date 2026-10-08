@@ -2,7 +2,6 @@ package com.makerandreas.papirusoffice.data
 
 import java.io.File
 import java.util.UUID
-import java.util.Stack
 
 // ==========================================================
 // PHASE 4: Document Commands & Transactions Framework

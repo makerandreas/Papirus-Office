@@ -1,6 +1,5 @@
 package com.makerandreas.papirusoffice.data.framework
 
-import android.content.Context
 import android.util.Log
 import java.io.StringWriter
 import java.text.SimpleDateFormat
@@ -8,7 +7,6 @@ import java.util.*
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.Node
-import org.w3c.dom.NodeList
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**

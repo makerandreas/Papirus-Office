@@ -6,9 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,7 +25,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.Chart2Templates
 import com.makerandreas.papirusoffice.data.framework.ChartDataModel
-import com.makerandreas.papirusoffice.data.framework.ChartSeriesData
 import com.makerandreas.papirusoffice.data.framework.CrossModuleChartEngine
 import androidx.compose.ui.res.stringResource
 import com.example.R

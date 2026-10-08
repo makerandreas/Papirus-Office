@@ -1,6 +1,5 @@
 package com.example.ui.options
 
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
