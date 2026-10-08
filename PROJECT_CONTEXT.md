@@ -345,4 +345,4 @@ Papirus Office (codenamed LibreDroid Office during conceptualization) follows a 
 5. **Testing Verification**:
    - Execute local JVM tests via `gradle :app:testDebugUnitTest`.
    - Never attempt to launch emulators or run instrumented tests requiring `adb`.
-   - There is no local compile helper in this repository. CI (`.github/workflows/build.yml`) runs `./gradlew testDebugUnitTest` on every push and pull request; a sandbox without a JDK cannot compile, so say so and rely on CI plus the owner's device test.
+   - There is no local compile helper in this repository. CI (`.github/workflows/ci.yml`) runs `./gradlew testDebugUnitTest` and `./gradlew :app:lintDebug` on every push to a branch and on every pull request, and posts the results as two pull-request comments; `.github/workflows/build.yml` is distribution only (nightly cron, tags, releases) and runs no checks except verifying a tagged commit before it publishes. A sandbox without a JDK cannot compile, so say so and rely on the CI and lint report comments plus the owner's device test.
