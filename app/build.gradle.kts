@@ -151,7 +151,14 @@ android {
       keepDebugSymbols.add("**/*.so")
     }
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      // PapirusApiClientMockTest has no Robolectric runner, so android.util.Log
+      // reaches it as the android.jar stub. Return defaults instead of throwing.
+      isReturnDefaultValues = true
+    }
+  }
 
   lint {
     abortOnError = false
@@ -189,6 +196,15 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 // (Plan5ElementDumpTest) is read from there, and CI is the only place the
 // test suite runs while no local JDK is available (AGENTS.md).
 tasks.withType<Test>().configureEach {
+  // MockK's inline mock maker attaches a Byte Buddy agent at runtime; loading
+  // it explicitly keeps the JDK from warning about dynamic agent loading.
+  jvmArgs("-XX:+EnableDynamicAgentLoading", "-Djdk.attach.allowAttachSelf=true")
+  doFirst {
+    val agentJar = classpath.find { it.name.startsWith("byte-buddy-agent-") }
+    if (agentJar != null) {
+      jvmArgs("-javaagent:${agentJar.absolutePath}")
+    }
+  }
   testLogging {
     events("failed", "skipped")
     exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
@@ -255,6 +271,9 @@ dependencies {
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
+  // Four test classes import io.mockk. TestDependencyGuardTest fails the build
+  // if this line goes while those imports are still in the test source set.
+  testImplementation(libs.mockk)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   testImplementation(libs.roborazzi)

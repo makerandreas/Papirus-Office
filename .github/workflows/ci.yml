@@ -1,24 +1,27 @@
 name: Papirus Office CI
 
+# Verification only. Every commit on a branch or in a pull request is compiled,
+# tested, linted and packaged here, and this is the one workflow that comments
+# on a pull request. Publishing (nightly, tags, releases) lives in build.yml,
+# which no longer runs on push or pull_request, so a pull request gets one CI
+# report and one lint report instead of two of each.
 on:
   push:
     branches: [ main, develop ]
-    tags: [ 'v*', '*.*.*' ]
   pull_request:
     branches: [ main, develop ]
   workflow_dispatch:
 
 env:
   GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
-  # Environment variables defined in app/build.gradle.kts
+  # Read by app/build.gradle.kts as buildConfigField values. The keystore
+  # secrets are not exported here: this workflow assembles a debug APK with the
+  # auto-generated debug key, and release signing belongs to build.yml.
   GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
   GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
   GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API || secrets.GOOGLE_FONTS_API_KEY }}
   GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY || secrets.GOOGLE_FONTS_REST_API }}
-  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-  KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-  KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
 jobs:
   test:
@@ -39,17 +42,24 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # Read-only inspection of bundled native libraries (.so)
+      # Read-only inspection of the bundled native libraries (.so): sizes, ELF
+      # header, NEEDED chain, JNI and LibreOfficeKit exports, and whether the
+      # `external fun` declarations in LibreOfficeCore.kt have a symbol. The LFS
+      # checkout above is what makes the binaries inspectable at all; the step
+      # never fails the job.
       - name: Native inventory (read-only)
         continue-on-error: true
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ -f scripts/native-inventory.sh ]; then
-            chmod +x scripts/native-inventory.sh
-            scripts/native-inventory.sh build/native-inventory.txt || true
-          fi
+          chmod +x scripts/native-inventory.sh
+          scripts/native-inventory.sh build/native-inventory.txt
 
+      # roborazzi.test.record is passed here rather than set in gradle.properties
+      # on purpose. The Roborazzi plugin forwards roborazzi.* Gradle properties
+      # into the test JVM, so the gradle.properties form also makes every local
+      # `./gradlew testDebugUnitTest` overwrite the tracked
+      # app/src/test/screenshots/greeting.png and leave 12 new PNGs in the tree.
       - name: Run Unit & Roborazzi Snapshot Tests
         run: |
           chmod +x gradlew
@@ -59,7 +69,7 @@ jobs:
 
       - name: Upload Test Reports and Roborazzi Screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-and-snapshot-reports
           path: |
@@ -67,13 +77,18 @@ jobs:
             app/build/test-results/
             app/build/outputs/roborazzi/
             app/src/test/screenshots/
-            src/test/screenshots/
             build/native-inventory.txt
             build/gradle-test.log
           if-no-files-found: ignore
           retention-days: 14
 
-      # Post CI report to pull request comment
+      # Mirrors what the log shows (compile errors, failing tests, the plan 5
+      # dump, the native inventory) into one PR comment, because the agent
+      # sandbox this repository is worked from can reach api.github.com but not
+      # the Actions log and artifact storage (AGENTS.md, "Reading the CI
+      # report"). HEAD_SHA is the commit a reader has to check out: on a
+      # pull_request event GITHUB_SHA is the ephemeral refs/pull/N/merge commit,
+      # which is on no branch.
       - name: Post CI report to the pull request
         if: always() && github.event_name == 'pull_request'
         env:
@@ -84,11 +99,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [ -f scripts/ci-dump-comment.py ]; then
-            python3 scripts/ci-dump-comment.py app/build/test-results/testDebugUnitTest build/gradle-test.log build/native-inventory.txt > build/ci-report.md || true
-            if [ -s build/ci-report.md ]; then
-              gh pr comment "$PR_NUMBER" --body-file build/ci-report.md || echo "could not post the CI report comment"
-            fi
+          python3 scripts/ci-dump-comment.py app/build/test-results/testDebugUnitTest build/gradle-test.log build/native-inventory.txt > build/ci-report.md || true
+          if [ -s build/ci-report.md ]; then
+            gh pr comment "$PR_NUMBER" --body-file build/ci-report.md || echo "could not post the CI report comment (token permissions?)"
           fi
 
   lint:
@@ -96,6 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write # Lint report comment on the pull request
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -111,26 +125,47 @@ jobs:
       - name: Run Android Lint
         run: |
           chmod +x gradlew
-          ./gradlew lintDebug
+          mkdir -p build
+          set -o pipefail
+          ./gradlew :app:lintDebug 2>&1 | tee build/gradle-lint.log
 
       - name: Upload Lint Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lint-reports
           path: |
             app/build/reports/lint-results-debug.html
             app/build/reports/lint-results-debug.xml
             app/build/reports/lint-results-debug.txt
+            build/gradle-lint.log
           if-no-files-found: ignore
           retention-days: 14
 
+      # app/build.gradle.kts sets lint { abortOnError = false }, so a lint error
+      # leaves this job green and the run status says nothing. This comment is
+      # the only place the errors are readable from the sandbox.
+      - name: Post lint report to the pull request
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          python3 scripts/lint-dump-comment.py app/build/reports/lint-results-debug.xml app/build/reports/lint-results-debug.txt > build/lint-report.md || true
+          if [ -s build/lint-report.md ]; then
+            gh pr comment "$PR_NUMBER" --body-file build/lint-report.md || echo "could not post the lint report comment (token permissions?)"
+          fi
+
   build:
-    name: Build & Package APK
+    name: Build & Package Debug APK
     runs-on: ubuntu-latest
     needs: [test, lint]
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -149,49 +184,25 @@ jobs:
         run: |
           DATE_STR=$(date +'%d%m%Y')
           RUN_NUM="${{ github.run_number }}"
-          if [[ "${{ github.ref }}" == refs/tags/* ]] || [[ "${{ github.event_name }}" == "release" ]]; then
-            TAG_NAME="${{ github.ref_name }}"
-            VERSION_NAME="${TAG_NAME#v}"
-            if [ -z "$VERSION_NAME" ]; then
-              VERSION_NAME="1.0.0-${RUN_NUM}"
-            fi
-            VERSION_CODE=$((1000000 + RUN_NUM))
-          else
-            VERSION_NAME="1.0-nightly_${DATE_STR}_${RUN_NUM}"
-            VERSION_CODE=$((100000 + RUN_NUM))
-          fi
+          VERSION_NAME="1.0-nightly_${DATE_STR}_${RUN_NUM}"
+          VERSION_CODE=$((100000 + RUN_NUM))
           echo "APP_VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "APP_VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "Calculated Version Name: $VERSION_NAME"
           echo "Calculated Version Code: $VERSION_CODE"
 
-      - name: Decode Keystore and Google Services
-        run: |
-          if [ -n "${{ secrets.SIGNING_KEY }}" ]; then
-            echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/papirus-release.jks
-          fi
-          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
-            echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
-          fi
-
+      # Packaging check only. The release APK and the nightly release are
+      # produced by build.yml from a tag, a release event or the daily schedule.
       - name: Assemble Debug APK
-        if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Assemble Release APK
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease
-
       - name: Upload Built APK Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apks
           path: |
             app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
           retention-days: 14

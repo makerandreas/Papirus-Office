@@ -1,148 +1,33 @@
 name: Papirus Office CI/CD
 
+# Distribution only: the nightly build, tagged releases and published releases.
+# Verification (compile, unit tests, Roborazzi snapshots, lint, debug packaging)
+# lives in ci.yml, which runs on every push to a branch and on every pull
+# request and is the only workflow that comments on a pull request. This file
+# deliberately has no `push: branches` and no `pull_request` trigger, so a merge
+# to main no longer runs the whole suite twice and no longer drops nine nightly
+# releases for nine documentation commits.
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*', '*.*.*' ]
-  pull_request:
-    branches: [ main, develop ]
   schedule:
-    - cron: '0 2 * * *' # Daily nightly builds at 2:00 AM UTC
+    - cron: '0 2 * * *' # Daily nightly build of main at 02:00 UTC
+  push:
+    tags: [ 'v*', '*.*.*' ]
   release:
     types: [ published, created ]
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write # CI report comment on the pull request (see the last step)
-    env:
-      GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
-      GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-      GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-        with:
-          lfs: true
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      # Read-only look at the bundled .so files (roadmap PR 15): sizes, ELF
-      # header, NEEDED chain, JNI and LibreOfficeKit exports, and whether the
-      # `external fun` declarations in LibreOfficeCore.kt have a symbol. The
-      # LFS checkout above is what makes the binaries inspectable at all; the
-      # step never fails the job.
-      - name: Native inventory (read-only)
-        continue-on-error: true
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          chmod +x scripts/native-inventory.sh
-          scripts/native-inventory.sh build/native-inventory.txt
-
-      - name: Run Unit Tests
-        run: |
-          chmod +x gradlew
-          mkdir -p build
-          set -o pipefail
-          ./gradlew testDebugUnitTest 2>&1 | tee build/gradle-test.log
-
-      # Test XML/HTML reports and the plan 5 dump (Plan5ElementDumpTest prints
-      # to system-out) plus the native inventory, kept two weeks.
-      - name: Upload test reports and native inventory
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: |
-            app/build/reports/tests/
-            app/build/test-results/
-            build/native-inventory.txt
-            build/gradle-test.log
-          if-no-files-found: ignore
-          retention-days: 14
-
-      # Mirrors what the log shows (compile errors, failing tests, the plan 5
-      # dump, the native inventory) into one PR comment, because the agent
-      # sandbox this repository is worked from can reach api.github.com but
-      # not the Actions log/artifact storage (AGENTS.md, GitHub API approach).
-      #
-      # HEAD_SHA is the commit the reader has to check out. On a pull_request
-      # event GITHUB_SHA is the ephemeral refs/pull/N/merge commit GitHub made
-      # for this run ("Merge <head> into <base>"): it is on no branch, so a
-      # reader cannot resolve it with git. Naming the head SHA keeps the report
-      # tied to code (see AGENTS.md, "Reading the CI report").
-      - name: Post CI report to the pull request
-        if: always() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-        run: |
-          python3 scripts/ci-dump-comment.py app/build/test-results/testDebugUnitTest build/gradle-test.log build/native-inventory.txt > build/ci-report.md || true
-          if [ -s build/ci-report.md ]; then
-            gh pr comment "$PR_NUMBER" --body-file build/ci-report.md || echo "could not post the CI report comment (token permissions?)"
-          fi
-
-  lint:
-    name: Lint Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
-      GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-      GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-        with:
-          lfs: true
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Run Android Lint
-        run: |
-          chmod +x gradlew
-          ./gradlew :app:lintDebug
-
-      - name: Upload Lint Reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lint-reports
-          path: |
-            app/build/reports/lint-results*
-          if-no-files-found: ignore
-          retention-days: 14
-
   build:
     name: Build (SemVer & Nightly)
     runs-on: ubuntu-latest
-    needs: [test, lint]
     permissions:
       contents: write
     env:
       GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+      GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+      GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
     steps:
       - name: Checkout Code
@@ -157,21 +42,25 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      # Kompilasi sekarang menggunakan stub java/kotlin di src/compileOnly/java
-      # yang selalu disertakan dalam build.gradle.kts baik lokal maupun di GitHub Actions.
-      # Dengan begitu, kita tidak perlu menginstal LibreOffice yang sangat lambat dan tidak stabil di CI.
+      # The nightly path is built from a branch head that ci.yml already
+      # verified on push. A tag or a release event has no ci.yml run behind it
+      # in this workflow, so the published APK is verified here first.
+      - name: Verify the tagged commit before publishing
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest
 
+      # Compilation uses the stub java/kotlin sources in src/compileOnly/java,
+      # which app/build.gradle.kts always adds to the Kotlin source set, both
+      # locally and here. LibreOffice is never installed on the runner.
       - name: Generate SemVer and Release Info
         id: version_calc
         run: |
-          # Ambil tanggal rilis dalam format DDMMYYYY
           DATE_STR=$(date +'%d%m%Y')
-          
-          # Gunakan RUN_NUMBER untuk NN
           RUN_NUM="${{ github.run_number }}"
-          
+
           if [[ "${{ github.ref }}" == refs/tags/* ]] || [[ "${{ github.event_name }}" == "release" ]]; then
-            # Jika dipicu oleh tag rilis baru atau pembuatan release manual
             TAG_NAME="${{ github.ref_name }}"
             VERSION_NAME="${TAG_NAME#v}"
             if [ -z "$VERSION_NAME" ]; then
@@ -179,11 +68,10 @@ jobs:
             fi
             VERSION_CODE=$((1000000 + RUN_NUM))
           else
-            # Jika push biasa atau pull request, format: 1.0-nightly_DDMMYYYY_NN
             VERSION_NAME="1.0-nightly_${DATE_STR}_${RUN_NUM}"
             VERSION_CODE=$((100000 + RUN_NUM))
           fi
-          
+
           echo "APP_VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo "APP_VERSION_CODE=$VERSION_CODE" >> $GITHUB_ENV
           echo "Calculated Version Name: $VERSION_NAME"
@@ -220,7 +108,7 @@ jobs:
           cat /tmp/nightly_body.md
 
       - name: Purge stale nightly assets and release
-        if: github.event_name != 'pull_request' && github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
+        if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -235,7 +123,7 @@ jobs:
             echo "Deleting old nightly release and remote tag..."
             gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
           fi
-          # Prune remote tag so softprops or git creates it fresh at current commit SHA
+          # Prune remote tag so softprops or git creates it fresh at current SHA
           git push origin :refs/tags/nightly 2>/dev/null || true
           # Create and force-push fresh tag at current SHA
           git tag -f nightly ${{ github.sha }} 2>/dev/null || true
@@ -253,8 +141,8 @@ jobs:
             echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > app/google-services.json
           fi
 
-      # 1. Otomatis setelah Commit Push / Nightly: Generate APK debug per-ABI (arm64-v8a & armeabi-v7a)
-      - name: Build Debug APK (Automated Push / Nightly)
+      # Nightly and workflow_dispatch: per-ABI debug APKs (arm64-v8a & armeabi-v7a)
+      - name: Build Debug APK (Nightly)
         if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         run: |
           chmod +x gradlew
@@ -263,13 +151,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
-          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
-      # 2. Release Manual: HANYA generate app-release.apk
-      - name: Build Release APK (Manual Release)
+      # Tag or published release: app-release.apk only
+      - name: Build Release APK (Tag or Release)
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         run: |
           chmod +x gradlew
@@ -278,14 +162,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
-          GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
-          GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API }}
 
-      # Upload HANYA APK debug per-ABI (arm64-v8a & armeabi-v7a) untuk nightly/commit push
       - name: Drop Papirus Nightly Release (Debug APK Only)
-        if: github.event_name != 'pull_request' && github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
+        if: github.event_name != 'release' && !startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
         with:
           tag_name: "nightly"
@@ -302,7 +181,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Upload HANYA app-release.apk untuk Release Manual
       - name: Upload Assets to Manual Release (Release APK Only)
         if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v3
@@ -311,4 +189,3 @@ jobs:
             app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
