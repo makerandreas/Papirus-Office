@@ -60,7 +60,15 @@
                 <data android:mimeType="text/csv" />
                 <data android:mimeType="application/pdf" />
             </intent-filter>
-            <intent-filter>
+            <!-- tools:ignore="AppLinkUrlError": this is a file:// deep link, not an App
+                 Link, and it declares no android:host on purpose. An IntentFilter with no
+                 data authority ignores the URI authority entirely, so any file manager
+                 matches, including the empty authority of a file:/// URI. Adding
+                 android:host="*" would require a non-empty host and can stop matching
+                 those, which is a behaviour change this filter cannot absorb. The check
+                 is written for http/https App Links; the reason lives here rather than in
+                 a global lint disable so the next reader finds it at the element. -->
+            <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.EDIT" />
                 <category android:name="android.intent.category.DEFAULT" />

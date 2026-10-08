@@ -8,6 +8,11 @@ lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewmodelCompose = "2.8.7"
 lifecycleRuntimeCompose = "2.8.7"
 activityCompose = "1.10.1"
+# Constraint only, not a direct dependency: firebase-auth pulls androidx.fragment:fragment:1.1.0
+# (2019) and nothing in app/src/main/java imports androidx.fragment. 1.8.9 is the newest line
+# whose own requirements (activity 1.8.1, lifecycle 2.6.1, core-ktx 1.2.0) are all already
+# superseded by the versions this catalog pins, so the constraint moves fragment alone.
+fragment = "1.8.9"
 kotlin = "2.2.10"
 composeBom = "2024.09.00"
 googleDevtoolsKsp = "2.3.6"
@@ -55,6 +60,7 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecyc
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "fragment" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }

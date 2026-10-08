@@ -441,7 +441,7 @@
     <string name="toast_outer_box_border_applied">Outer Box border applied</string>
     <string name="toast_inner_grid_border_applied">Inner Grid border applied</string>
     <string name="toast_applied_style_stylename">Applied style %1$s</string>
-    <string name="toast_drop_cap_set_to_lines_lines">Drop Cap set to %1$s lines</string>
+    <string name="toast_drop_cap_set_to_lines_lines">Drop Cap set to %1$d lines</string>
     <string name="toast_new_style_created_successfully">New style created successfully</string>
     <string name="toast_new_style_from_selected_text_saved_successfully">New style from selected text saved successfully</string>
     <string name="toast_editing_style_stylename">Editing style %1$s...</string>
@@ -497,7 +497,7 @@
     <string name="toast_nothing_to_redo">Nothing to Redo</string>
     <string name="toast_actions_undone">Actions undone</string>
     <string name="toast_actions_redone">Actions redone</string>
-    <string name="toast_found_match_at_character_index">Found match at character %1$s</string>
+    <string name="toast_found_match_at_character_index">Found match at character %1$d</string>
     <string name="toast_no_match_found">No match found</string>
     <string name="toast_replaced_successfully">Replaced successfully</string>
     <string name="toast_nothing_to_replace">Nothing to replace</string>
@@ -513,15 +513,10 @@
     <string name="toast_add_comment_unavailable">Adding comments is not available in this build</string>
     <string name="toast_ribbon_tab_unavailable">%1$s is not available in this build</string>
     <string name="toast_more_options_will_be_developed_soon">More Options will be developed soon</string>
-    <string name="toast_document_properties_room_db_n_file_meta_filename">Document Properties (Room DB):\n\" +
-                                                                 \"File: %1$s (%2$s)\n\" +
-                                                                 \"Author: %3$s\n\" +
-                                                                 \"Created: %7$s\n\" +
-                                                                 \"Modified: %8$s\n\" +
-                                                                 \"Words: %4$s | Chars: %5$s | Paragraphs: %6$s</string>
+    <string name="toast_document_properties">Document properties. File: %1$s (%2$s). Author: %3$s. Created: %7$s. Modified: %8$s. Words: %4$d, characters: %5$d, paragraphs: %6$d.</string>
     <string name="toast_no_metadata_available_for_this_document">No metadata available for this document</string>
     <string name="toast_formula_inserted_successfully">Formula inserted successfully!</string>
-    <string name="toast_font_size_changed">Font size changed to %1$s pt</string>
+    <string name="toast_font_size_changed">Font size changed to %1$d pt</string>
     <string name="toast_pasted_as">Pasted as %1$s</string>
     <string name="toast_opened_file_name">Opened %1$s</string>
     <string name="toast_page_style_section_options_opened">Page Style (Section Options) opened</string>
@@ -531,7 +526,7 @@
     <string name="toast_tab_stop_settings_opened">Tab stop settings opened</string>
     <string name="toast_selected_synonym_synonym">Selected synonym: %1$s</string>
     <string name="toast_text_inserted_from_gemini_copilot">Text inserted from Gemini Copilot!</string>
-    <string name="toast_reminder_set_at_paragraph_cursorpara">Reminder set at paragraph %1$s</string>
+    <string name="toast_reminder_set_at_paragraph_cursorpara">Reminder set at paragraph %1$d</string>
     <string name="toast_template_downloaded_successfully">Template downloaded successfully!</string>
     <string name="toast_download_failed_please_try_again">Download failed. Please try again.</string>
     <string name="toast_document_finalized">Document finalized!</string>
@@ -602,7 +597,7 @@
     <string name="toast_created_new_blank_form">Created new blank form</string>
     <string name="toast_exported_responses_to_spreadsheet_table">Exported responses to spreadsheet table</string>
     <string name="toast_inserted_sdk_form_summary_into_activemodulename">Inserted SDK Form Summary into %1$s</string>
-    <string name="toast_built_sdk_form_with_res_totalcontrolscreated">Built SDK Form with %1$s controls!</string>
+    <string name="toast_built_sdk_form_with_res_totalcontrolscreated">Built SDK Form with %1$d controls!</string>
     <string name="cd_odf_icon">ODF Icon</string>
     <string name="cd_close_odf_dialog">Close ODF dialog</string>
     <string name="cd_copy_example_code">Copy Example Code</string>
@@ -686,7 +681,7 @@
     <string name="toast_download_complete_opening">Download complete! Opening...</string>
     <string name="toast_download_failed_please_check_your_connection">Download failed. Please check your connection.</string>
     <string name="cd_open_subpage">Open subpage</string>
-    <string name="toast_auto_recovery_set_to_every_validminutes_minutes">Auto Recovery set to every %1$s minutes</string>
+    <string name="toast_auto_recovery_set_to_every_validminutes_minutes">Auto Recovery set to every %1$d minutes</string>
     <string name="toast_theme_set_to_label">Theme set to %1$s</string>
     <string name="toast_macro_warning_updated">Macro warning updated</string>
     <string name="toast_dynamic_color_enabled">Dynamic Color Enabled</string>
@@ -723,7 +718,7 @@
     <string name="toast_border_added">Border added</string>
     <string name="toast_converted_dm_to_eur_factor_1_95583">Converted DM to EUR (Factor 1.95583)</string>
     <string name="toast_inserted_newsheet">Inserted %1$s</string>
-    <string name="toast_inserted_row_above_row_activecellrow">Inserted Row above row %1$s</string>
+    <string name="toast_inserted_row_above_row_activecellrow">Inserted Row above row %1$d</string>
     <string name="toast_inserted_column_at_columnslabels_getornull">Inserted Column at %1$s</string>
     <string name="toast_inserted_2d_array_setarray">Inserted 2D Array (setArray)</string>
     <string name="toast_inserted_image_xdrawpagesupplier">Inserted Image (XDrawPageSupplier)</string>
@@ -786,7 +781,7 @@
     <string name="cd_play_pause_auto_advance">Play/Pause Auto Advance</string>
     <string name="cd_toggle_laser_pen">Toggle Laser Pen</string>
     <string name="toast_printing_presentation">Printing presentation...</string>
-    <string name="toast_exported_slide_activeslideindex_1_as_png_image">Exported Slide %1$s as PNG image!</string>
+    <string name="toast_exported_slide_activeslideindex_1_as_png_image">Exported Slide %1$d as PNG image!</string>
     <string name="toast_slide_duplicated">Slide duplicated!</string>
     <string name="toast_slide_deleted">Slide deleted!</string>
     <string name="toast_cannot_delete_sole_slide">Cannot delete sole slide</string>
@@ -795,12 +790,12 @@
     <string name="toast_copied_to_clipboard">Copied to clipboard!</string>
     <string name="toast_appended_2_slides_from_external_template">Appended 2 slides from external template!</string>
     <string name="toast_updated_master_page_footer_for_all_slides">Updated master page footer for all slides</string>
-    <string name="toast_custom_show_customshowname_created_with_parsed_size">Custom Show \'%2$s\' created with %1$s slides!</string>
+    <string name="toast_custom_show_customshowname_created_with_parsed_size">Custom Show \'%2$s\' created with %1$d slides!</string>
     <string name="toast_invalid_slide_numbers">Invalid slide numbers</string>
     <string name="toast_end_of_presentation">End of presentation</string>
     <string name="toast_mobile_view">Mobile View</string>
     <string name="toast_normal_view">Normal View</string>
-    <string name="toast_frozen_pane_at_col_row">Frozen pane at Col %1$s, Row %2$s</string>
+    <string name="toast_frozen_pane_at_col_row">Frozen pane at Col %1$d, Row %2$d</string>
     <string name="toast_unfrozen_panes">Unfrozen panes</string>
     <string name="toast_opening_displayname_2">Opening: %1$s</string>
     <string name="toast_failed_to_resolve_file_e_message">Failed to resolve file: %1$s</string>
