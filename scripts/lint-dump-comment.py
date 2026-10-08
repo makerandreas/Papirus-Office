@@ -27,6 +27,11 @@ import xml.etree.ElementTree as ET
 COMMENT_LIMIT = 60000
 MAX_ERRORS_LISTED = 200
 
+# Set by the runner. Lint writes some locations as absolute runner paths
+# (gradle-wrapper.properties, libs.versions.toml) and others relative to the
+# module, so the workspace root is what turns both into repo-relative paths.
+WORKSPACE = os.environ.get("GITHUB_WORKSPACE", "").rstrip("/")
+
 
 def read(path):
     try:
@@ -49,6 +54,8 @@ def repo_relative(path):
     if not path:
         return ""
     path = path.replace("\\", "/")
+    if WORKSPACE and path.startswith(WORKSPACE + "/"):
+        return path[len(WORKSPACE) + 1:]
     marker = "/app/"
     idx = path.rfind(marker)
     if idx >= 0:

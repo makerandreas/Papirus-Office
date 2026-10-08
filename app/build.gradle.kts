@@ -180,7 +180,9 @@ android {
       "UnusedResources",
       "VectorPath",
       "Overdraw",
-      "OldTargetSdkVersion",
+      // The id is OldTargetApi. "OldTargetSdkVersion" is not a lint issue id,
+      // and lint reports each unknown id in the disable set as UnknownIssueId.
+      "OldTargetApi",
       "GradleDependency"
     )
   }
