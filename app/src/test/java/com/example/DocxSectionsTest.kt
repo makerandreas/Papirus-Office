@@ -34,9 +34,15 @@ class DocxSectionsTest {
         val first = parsed.docxSectionBreakSpecs.first()
         assertTrue("cover has titlePg", first.titlePg)
         assertEquals("cover uses lowerRoman", "lowerRoman", first.pageNumberFormat)
-        // At least one later section restarts numbering at 1 (TOC or body).
-        val restart = parsed.docxSectionBreakSpecs.firstOrNull { it.pageNumberStart == 1 }
-        assertNotNull("some section restarts page numbers at 1", restart)
+        // At least one later section restarts page numbering at 1 in arabic, that is,
+        // with no w:fmt on its pgNumType. Measured from the fixture: Sample-6.docx
+        // carries five sectPr blocks, the first start=1/lowerRoman/titlePg, the second
+        // start=1 with no fmt, the last three with no start and no fmt. Requiring the
+        // format to be absent is what separates "restarts in arabic" from "restarts in
+        // some other numbering", which the cover section also does at start=1.
+        val arabicRestart = parsed.docxSectionBreakSpecs
+            .firstOrNull { it.pageNumberStart == 1 && it.pageNumberFormat == null }
+        assertNotNull("a body section restarts arabic page numbers at 1", arabicRestart)
     }
 
     @Test

@@ -1,8 +1,6 @@
 package com.makerandreas.papirusoffice.data
 
 import java.util.Locale
-import kotlin.math.max
-import kotlin.math.min
 
 // ==========================================
 // PHASE 1 & 2: Paragraph & Line Layout Models

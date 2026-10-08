@@ -1,7 +1,6 @@
 package com.makerandreas.papirusoffice.data.framework
 
 import android.util.Log
-import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.*
 

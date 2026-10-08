@@ -1,6 +1,5 @@
 package com.example.ui.home
 
-import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -14,7 +13,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -28,6 +26,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -80,6 +79,7 @@ fun CrashLogsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val clipboardManager = LocalClipboardManager.current
 
     val crashLogFile = remember { File(context.filesDir, "crash.log") }
@@ -97,7 +97,7 @@ fun CrashLogsScreen(
                     }
                     Toast.makeText(context, R.string.toast_log_saved_successfully_via_saf, Toast.LENGTH_SHORT).show()
                 } catch (e: java.lang.Exception) {
-                    Toast.makeText(context, context.getString(R.string.toast_failed_to_save_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, resources.getString(R.string.toast_failed_to_save_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -214,7 +214,7 @@ fun CrashLogsScreen(
             }
             context.startActivity(shareIntent)
         } catch (e: Exception) {
-            Toast.makeText(context, context.getString(R.string.toast_failed_to_share_e_message, e.message), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.toast_failed_to_share_e_message, e.message), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -240,7 +240,7 @@ fun CrashLogsScreen(
             Toast.makeText(context, R.string.toast_log_deleted, Toast.LENGTH_SHORT).show()
             readLogsFromFile()
         } catch (e: Exception) {
-            Toast.makeText(context, context.getString(R.string.toast_failed_to_delete_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.toast_failed_to_delete_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -252,7 +252,7 @@ fun CrashLogsScreen(
             initialLogs.clear()
             Toast.makeText(context, R.string.toast_all_logs_deleted_successfully, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Toast.makeText(context, context.getString(R.string.toast_failed_to_delete_logs_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.toast_failed_to_delete_logs_e_localizedmessage, e.localizedMessage), Toast.LENGTH_SHORT).show()
         }
     }
 

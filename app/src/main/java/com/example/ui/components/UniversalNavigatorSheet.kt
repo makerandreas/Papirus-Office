@@ -16,17 +16,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
 import com.makerandreas.papirusoffice.data.DocumentIndexKind
 import com.makerandreas.papirusoffice.data.navigation.*
@@ -47,6 +46,7 @@ fun NavigatorSheetContent(
     canRedo: Boolean = true
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val navState by navEngine.state.collectAsState()
 
     // Engine notices are typed; the strings live in strings.xml (audit-015 F-11).
@@ -58,7 +58,7 @@ fun NavigatorSheetContent(
                 NavigatorNotice.HIDDEN_SECTION_NEAREST_VISIBLE -> R.string.navigator_notice_hidden_section
                 NavigatorNotice.NO_ITEMS_IN_MODE, NavigatorNotice.NO_ITEMS_IN_CATEGORY -> R.string.navigator_notice_no_items
             }
-            Toast.makeText(context, context.getString(res), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(res), Toast.LENGTH_SHORT).show()
             navEngine.clearNotice()
         }
     }
@@ -263,7 +263,7 @@ fun NavigatorSheetContent(
                                 isHidden = table.visibility == VisibilityState.HIDDEN,
                                 onClick = {
                                     if (table.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                     }
                                     navEngine.goToTable(table.id)
                                 }
@@ -297,7 +297,7 @@ fun NavigatorSheetContent(
                                 isHidden = frame.visibility == VisibilityState.HIDDEN,
                                 onClick = {
                                     if (frame.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                     }
                                     navEngine.goToFrame(frame.id)
                                 }
@@ -330,7 +330,7 @@ fun NavigatorSheetContent(
                                 isHidden = img.visibility == VisibilityState.HIDDEN,
                                 onClick = {
                                     if (img.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                     }
                                     navEngine.goToImage(img.id)
                                 }
@@ -364,7 +364,7 @@ fun NavigatorSheetContent(
                                 isHidden = ole.visibility == VisibilityState.HIDDEN,
                                 onClick = {
                                     if (ole.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                     }
                                     navEngine.goToOle(ole.id)
                                 }
@@ -584,7 +584,7 @@ fun NavigatorSheetContent(
                                 isHidden = sh.visibility == VisibilityState.HIDDEN,
                                 onClick = {
                                     if (sh.visibility == VisibilityState.HIDDEN) {
-                                        Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                     }
                                     navEngine.goToShape(sh.id)
                                 }
@@ -649,7 +649,7 @@ fun NavigatorSheetContent(
                                     startPadding = 16.dp,
                                     onClick = {
                                         if (table.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                         }
                                         navEngine.goToTable(table.id)
                                     }
@@ -670,7 +670,7 @@ fun NavigatorSheetContent(
                                     startPadding = 16.dp,
                                     onClick = {
                                         if (frame.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                         }
                                         navEngine.goToFrame(frame.id)
                                     }
@@ -691,7 +691,7 @@ fun NavigatorSheetContent(
                                     startPadding = 16.dp,
                                     onClick = {
                                         if (img.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                         }
                                         navEngine.goToImage(img.id)
                                     }
@@ -712,7 +712,7 @@ fun NavigatorSheetContent(
                                     startPadding = 16.dp,
                                     onClick = {
                                         if (ole.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                         }
                                         navEngine.goToOle(ole.id)
                                     }
@@ -800,7 +800,7 @@ fun NavigatorSheetContent(
                                     startPadding = 16.dp,
                                     onClick = {
                                         if (sh.visibility == VisibilityState.HIDDEN) {
-                                            Toast.makeText(context, context.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.object_is_hidden), Toast.LENGTH_SHORT).show()
                                         }
                                         navEngine.goToShape(sh.id)
                                     }

@@ -3,11 +3,9 @@ package com.example.modules.inky
 import androidx.compose.material.icons.automirrored.rounded.*
 import android.content.Context
 import android.widget.Toast
-import com.makerandreas.papirusoffice.data.PapirusAssetEngine
-import com.makerandreas.papirusoffice.data.FontProvider
+import androidx.core.graphics.toColorInt
 import com.makerandreas.papirusoffice.data.FontViewModel
 import com.makerandreas.papirusoffice.data.FontUiState
-import com.makerandreas.papirusoffice.data.FontInfo
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.*
@@ -27,15 +25,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.res.stringResource
 import com.example.R
@@ -1494,7 +1489,7 @@ fun ColorPickerSubpage(
                 if (input.length <= 7) {
                     hex = input
                     try {
-                        val parsed = Color(android.graphics.Color.parseColor(input))
+                        val parsed = Color(input.toColorInt())
                         r = (parsed.red * 255).toInt()
                         g = (parsed.green * 255).toInt()
                         b = (parsed.blue * 255).toInt()

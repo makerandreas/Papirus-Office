@@ -9,18 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalResources
+import androidx.core.content.edit
 import com.example.core.jni.LibreOfficeCore
 import com.example.modules.cellina.CellinaModule
 import com.example.modules.inky.InkyModule
@@ -217,6 +213,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PapirusAppletContainer(modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     
     // Adaptive device size calculation: Width >= 600dp represents tablets or foldables
@@ -342,7 +339,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     "welcome" -> WelcomeScreen(
                         onAccessGranted = {
                             context.getSharedPreferences("papirus_first_run", android.content.Context.MODE_PRIVATE)
-                                .edit().putBoolean("is_first_run", false).apply()
+                                .edit { putBoolean("is_first_run", false) }
                             currentWorkspace = "home"
                         }
                     )
@@ -410,7 +407,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     "Cellina" -> CellinaModule(
                         isTablet = isTablet,
                         onFormulaSelected = { formula ->
-                            Toast.makeText(context, context.getString(R.string.toast_formula_formula, formula), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.toast_formula_formula, formula), Toast.LENGTH_SHORT).show()
                         },
                         onBack = { currentWorkspace = "home" }
                     )

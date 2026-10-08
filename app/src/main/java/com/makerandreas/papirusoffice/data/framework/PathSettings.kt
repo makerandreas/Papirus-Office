@@ -6,8 +6,15 @@ import java.io.File
 /**
  * Manages the paths of LibreOffice/PapirusOffice.
  * Matches com.sun.star.util.PathSettings and com.sun.star.util.PathSubstitution
+ *
+ * `context` is a plain constructor parameter, not a property, on purpose: it is read
+ * only in `init` to resolve two directories, and the sole owner of this instance is the
+ * `PapirusAssetEngine` object, which lives for the whole process. Holding a `Context`
+ * property here is the static field leak lint reports as `StaticFieldLeak` at
+ * `PapirusAssetEngine.kt`. Do not add `val` back without giving the engine a non-static
+ * owner.
  */
-class PathSettings(private val context: Context) {
+class PathSettings(context: Context) {
 
     private val predefinedPaths = mutableMapOf<String, String>()
 

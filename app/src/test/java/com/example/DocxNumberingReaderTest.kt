@@ -53,25 +53,29 @@ class DocxNumberingReaderTest {
         assertEquals("BAB ", lvl1.numPrefix)
         assertEquals("", lvl1.numSuffix)
         assertEquals(1, lvl1.displayLevels)
+        // abstractNum 14 declares w:numFmt="decimal" on every level, which
+        // mapNumFmt reads as the arabic format token "1". Asserting the token
+        // is the cheapest pin on the reader's numFmt mapping.
+        assertEquals("1", lvl1.numFormat)
 
         val lvl2 = spec.level(2)!!
         // abstractNum 14 ilvl 1 declares lvlText="%1.%2", so the separator dot
         // sits *between* the placeholders and nothing follows the last one.
         assertEquals("", lvl2.numSuffix)
         assertEquals(2, lvl2.displayLevels)
+        assertEquals("1", lvl2.numFormat)
 
+        // Exact labels, measured by running the shipped NumberingCounterState
+        // against this spec (audit-022 §5.2). These are deterministic: a
+        // prefix-only check would let all three chapters render "BAB 1" and
+        // pass, and only the "2.1" case proves the deeper levels reset when a
+        // new chapter starts.
         val counter = NumberingCounterState()
-        val first = counter.advance(spec, 1)
-        assertTrue("first chapter label starts with BAB prefix", first.startsWith("BAB "))
-        // Sub-heading level 2: starts with the digit "1".
-        val sub1 = counter.advance(spec, 2)
-        assertTrue("first sub-heading starts with '1.'", sub1.startsWith("1."))
-        // Sub-sub-heading level 3: "1.1.1"-style.
-        val sub2 = counter.advance(spec, 3)
-        assertTrue("sub-sub has two dots", sub2.count { it == '.' } == 2)
-        // Back to chapter 2: prefix BAB with a higher digit and counter reset.
-        val second = counter.advance(spec, 1)
-        assertTrue("second chapter label starts with BAB prefix", second.startsWith("BAB "))
+        assertEquals("BAB 1", counter.advance(spec, 1))
+        assertEquals("1.1", counter.advance(spec, 2))
+        assertEquals("1.1.1", counter.advance(spec, 3))
+        assertEquals("BAB 2", counter.advance(spec, 1))
+        assertEquals("2.1", counter.advance(spec, 2))
     }
 
     @Test

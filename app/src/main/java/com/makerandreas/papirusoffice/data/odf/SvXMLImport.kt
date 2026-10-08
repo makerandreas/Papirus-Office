@@ -3,14 +3,11 @@ package com.makerandreas.papirusoffice.data.odf
 import com.makerandreas.papirusoffice.data.CharacterStyle
 import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.LayoutUnits
-import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
 import com.makerandreas.papirusoffice.data.TableBorder
 import com.makerandreas.papirusoffice.data.TableBorderLineStyle
 import com.makerandreas.papirusoffice.data.TableCellBoxStyle
 import com.makerandreas.papirusoffice.data.TableColumnWidthKind
 import com.makerandreas.papirusoffice.data.TableColumnWidthSpec
-import com.makerandreas.papirusoffice.data.TableDiagnostic
-import com.makerandreas.papirusoffice.data.TableDiagnosticCode
 import com.makerandreas.papirusoffice.data.TableInsets
 import com.makerandreas.papirusoffice.data.TableRowStyle
 import com.makerandreas.papirusoffice.data.TableStyleSpec

@@ -6,6 +6,7 @@ import com.makerandreas.papirusoffice.data.DocumentIndexKind
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -42,15 +43,28 @@ class DocxAuthoredShapeTest {
     }
 
     @Test
-    fun `sample 6 chapter headings receive BAB prefix from lvlText`() {
+    fun `sample 6 chapter headings receive BAB prefix and a chapter number from lvlText`() {
         val parsed = parseSync()
         val headings = parsed.elements.filterIsInstance<OfficeDocumentElement.Heading>()
+        // Sample-6.docx carries exactly three paragraphs whose effective numbering is
+        // numId 15 at ilvl 0, in this document order (measured from the fixture: 42
+        // paragraphs inherit numId 15 through Judul1/Judul2/Judul3, three of them at
+        // level 0). NumberingCounterState therefore hands them BAB 1, BAB 2 and BAB 3,
+        // and asserting the ordered triple is what proves the counter advanced instead
+        // of repeating one label three times.
+        val numbers = mutableListOf<String>()
         for (name in listOf("PENDAHULUAN", "PEMBAHASAN", "PENUTUP")) {
             val h = headings.firstOrNull { it.text.contains(name) }
             assertNotNull("$name heading present", h)
             assertTrue("$name must start with 'BAB ' prefix read from lvlText",
                 h!!.text.startsWith("BAB "))
+            val digits = h.text.removePrefix("BAB ").takeWhile { it.isDigit() }
+            assertTrue("$name must carry a chapter number after 'BAB ', got '${h.text}'",
+                digits.isNotEmpty())
+            numbers.add(digits)
         }
+        assertEquals("the three chapters number 1, 2, 3 in document order",
+            listOf("1", "2", "3"), numbers)
     }
 
     @Test
@@ -58,7 +72,14 @@ class DocxAuthoredShapeTest {
         val parsed = parseSync()
         val toc = parsed.authoredIndexes.firstOrNull { it.kind == DocumentIndexKind.TABLE_OF_CONTENT }
         assertNotNull("TOC authored index present", toc)
+        // Stronger than isNotEmpty(): the cached entry text in the fixture carries the
+        // BAB chapter labels, so a TOC parsed as empty or as bare page numbers fails
+        // here. The per-level counts are deliberately not pinned: which level an entry
+        // lands on is a property of the authoredIndexes model, and pinning a number
+        // this sandbox cannot execute would be a guess dressed as an assertion.
         assertTrue("TOC has entries", toc!!.entries.isNotEmpty())
+        assertTrue("TOC entries keep the cached BAB chapter labels",
+            toc.entries.any { "BAB" in it.text })
         // No field instruction leakage.
         assertFalse("PAGEREF must not leak", parsed.plainText.contains("PAGEREF"))
         assertFalse("TOC \\o instr must not leak",

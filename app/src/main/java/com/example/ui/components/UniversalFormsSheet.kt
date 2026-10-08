@@ -20,9 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.*
@@ -43,6 +43,7 @@ fun UniversalFormsSheet(
     onInsertFormToDoc: (FormSchema) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val formsEngine = remember { PapirusFormsEngine.getInstance() }
 
     var allForms by remember { mutableStateOf(formsEngine.getAllForms()) }
@@ -274,7 +275,7 @@ fun UniversalFormsSheet(
                             onInsertToDoc = { summaryText ->
                                 val schema = formsEngine.createNewForm("Programmatic Form (SDK Ch. 40)", summaryText)
                                 onInsertFormToDoc(schema)
-                                Toast.makeText(context, context.getString(R.string.toast_inserted_sdk_form_summary_into_activemodulename, activeModuleName), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, resources.getString(R.string.toast_inserted_sdk_form_summary_into_activemodulename, activeModuleName), Toast.LENGTH_SHORT).show()
                                 onDismiss()
                             }
                         )
@@ -975,6 +976,7 @@ private fun ProgrammaticFormSdkTab(
     var dbName by remember { mutableStateOf("liang.odb") }
     var buildResult by remember { mutableStateOf<ProgrammaticFormBuildResult?>(null) }
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     Column(
         modifier = Modifier
@@ -1022,7 +1024,7 @@ private fun ProgrammaticFormSdkTab(
                 onClick = {
                     val res = formsEngine.buildFormProgrammatically(databaseName = dbName)
                     buildResult = res
-                    Toast.makeText(context, context.getString(R.string.toast_built_sdk_form_with_res_totalcontrolscreated, res.totalControlsCreated), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, resources.getString(R.string.toast_built_sdk_form_with_res_totalcontrolscreated, res.totalControlsCreated), Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.height(56.dp)
             ) {

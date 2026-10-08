@@ -1,8 +1,6 @@
 package com.makerandreas.papirusoffice.data.framework
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
@@ -15,9 +13,7 @@ import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.util.Log
-import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 
 /**
  * LibreOffice SDK Chapter 41 & Java Print Service (JPS) Framework implementation for Papirus Office.

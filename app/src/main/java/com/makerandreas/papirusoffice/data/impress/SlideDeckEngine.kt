@@ -1,6 +1,5 @@
 package com.makerandreas.papirusoffice.data.impress
 
-import java.io.File
 
 // ============================================================================
 // LibreOffice SDK Guide: Chapter 17. Slide Deck Manipulation

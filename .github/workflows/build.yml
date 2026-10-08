@@ -19,7 +19,11 @@ on:
 jobs:
   build:
     name: Build (SemVer & Nightly)
-    runs-on: ubuntu-latest
+    # Pinned off `ubuntu-latest`: actions/runner-images#14748 rolls the label from
+    # Ubuntu 24.04 to 26.04 starting 2026-10-19 and finishing by 2026-11-19, and the
+    # Roborazzi native rendering, the NDK and the JVM on the image all move with it.
+    # Pinning makes an image change a decision in a commit instead of a red Monday.
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:

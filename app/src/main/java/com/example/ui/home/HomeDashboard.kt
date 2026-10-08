@@ -1,35 +1,33 @@
 package com.example.ui.home
 
+import android.os.LocaleList
 import androidx.compose.material.icons.automirrored.filled.*
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.widget.Toast
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalResources
+import androidx.core.content.edit
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.res.stringResource
 import com.example.R
 import com.example.ui.theme.*
 import com.makerandreas.papirusoffice.data.PapirusConfigManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.*
@@ -38,7 +36,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -55,7 +52,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.ai.GeminiAiService
 import com.example.ui.theme.ThemeSettings
 import org.json.JSONArray
 import org.json.JSONObject
@@ -156,7 +152,7 @@ object RecentFilesTracker {
             }
             jsonArray.put(obj)
         }
-        prefs.edit().putString(KEY_RECENTS, jsonArray.toString()).apply()
+        prefs.edit { putString(KEY_RECENTS, jsonArray.toString()) }
     }
 }
 
@@ -657,6 +653,7 @@ fun HomeDashboard(
         onNavigateToModule: (String) -> Unit
     ) {
         val context = LocalContext.current
+        val resources = LocalResources.current
         var selectedFilter by remember { mutableStateOf("All") }
 
         var recentFiles by remember(searchQuery) {
@@ -714,11 +711,15 @@ fun HomeDashboard(
                 title = { Text(stringResource(R.string.doc_props_title), fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // LocalConfiguration rather than Locale.getDefault(): a read of the
+                        // default locale during composition does not recompose when the
+                        // locale changes, so the formatted date would go stale.
+                        val docPropsLocale = displayLocale(LocalConfiguration.current.locales)
                         Text("${stringResource(R.string.doc_props_name)}: ${doc.name}", fontWeight = FontWeight.SemiBold)
                         Text("${stringResource(R.string.doc_props_path)}: ${doc.path}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${stringResource(R.string.doc_props_size)}: ${doc.size}")
                         Text("${stringResource(R.string.doc_props_type)}: ${doc.fileType}")
-                        Text("${stringResource(R.string.doc_props_modified)}: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(doc.lastOpened))}")
+                        Text("${stringResource(R.string.doc_props_modified)}: ${SimpleDateFormat("dd MMM yyyy, HH:mm", docPropsLocale).format(Date(doc.lastOpened))}")
                     }
                 },
                 confirmButton = {
@@ -897,7 +898,7 @@ fun HomeDashboard(
                                         com.example.MainActivity.openedFilePath = file.path
                                         com.example.MainActivity.openedFileType = file.fileType
                                         onNavigateToModule(file.fileType)
-                                        val toastMsg = context.getString(R.string.opening_file, displayNameWithSuffix)
+                                        val toastMsg = resources.getString(R.string.opening_file, displayNameWithSuffix)
                                         Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 }
@@ -1028,7 +1029,7 @@ fun HomeDashboard(
                                                 if (!File(file.path).exists()) {
                                                     showFileNotFoundDialog = true
                                                 } else {
-                                                    Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_pdf, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, resources.getString(R.string.toast_exported_displaynamewithsuffix_to_pdf, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
@@ -1041,7 +1042,7 @@ fun HomeDashboard(
                                                     if (!File(file.path).exists()) {
                                                         showFileNotFoundDialog = true
                                                     } else {
-                                                        Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_epub, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, resources.getString(R.string.toast_exported_displaynamewithsuffix_to_epub, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             )
@@ -1276,3 +1277,16 @@ fun GoogleDriveSubPage() {
         }
     }
 }
+
+/**
+ * The locale to format user-visible dates in.
+ *
+ * Deliberately a plain function and not a composable. `Locale.getDefault()` read inside a
+ * composable is what lint's `NonObservableLocale` reports, and correctly so: composition
+ * does not re-run when the JVM default locale changes, so a date formatted with it goes
+ * stale. Callers pass `LocalConfiguration.current.locales`, which *is* observable, and the
+ * default is only reached when that list is empty, which an Android Configuration does not
+ * produce in practice.
+ */
+private fun displayLocale(locales: LocaleList): Locale =
+    if (locales.isEmpty) Locale.getDefault() else locales.get(0)

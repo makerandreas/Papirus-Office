@@ -6,9 +6,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,7 +26,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.makerandreas.papirusoffice.data.framework.Chart2Templates
 import com.makerandreas.papirusoffice.data.framework.ChartDataModel
-import com.makerandreas.papirusoffice.data.framework.ChartSeriesData
 import com.makerandreas.papirusoffice.data.framework.CrossModuleChartEngine
 import androidx.compose.ui.res.stringResource
 import com.example.R
@@ -47,6 +45,7 @@ fun UniversalChartSheet(
     onInsertChart: (ChartDataModel) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val engine = remember { CrossModuleChartEngine.getInstance() }
 
     var chartState by remember {
@@ -230,7 +229,7 @@ fun UniversalChartSheet(
                         onClick = {
                             val file = engine.exportChartAsPng(context, chartState)
                             if (file != null) {
-                                Toast.makeText(context, context.getString(R.string.toast_saved_png_file_name, file.name), Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, resources.getString(R.string.toast_saved_png_file_name, file.name), Toast.LENGTH_LONG).show()
                             }
                         }
                     ) {
@@ -245,7 +244,7 @@ fun UniversalChartSheet(
                     Button(
                         onClick = {
                             onInsertChart(chartState)
-                            Toast.makeText(context, context.getString(R.string.toast_embedded_chartstate_title_into_activemodulename, chartState.title, activeModuleName), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.toast_embedded_chartstate_title_into_activemodulename, chartState.title, activeModuleName), Toast.LENGTH_SHORT).show()
                             onDismiss()
                         }
                     ) {

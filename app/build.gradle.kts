@@ -11,7 +11,13 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  // 36.1 to 37 because Compose 1.12.1 requires it, not because anything here uses an
+  // Android 17 API. androidx states it as a hard floor in the AAR metadata of
+  // animation-core, foundation-layout, material-ripple and the rest, and
+  // checkDebugAarMetadata fails the build on it before a single Kotlin file compiles.
+  // compileSdk moves on its own: targetSdk stays 36, so no runtime behaviour opts in,
+  // and minSdk stays 24, so no device loses support.
+  compileSdk { version = release(37) }
 
   defaultConfig {
     applicationId = "com.makerandreas.papirusoffice"
@@ -161,7 +167,11 @@ android {
   }
 
   lint {
-    abortOnError = false
+    // True again as of the 2026-10-08 lint pass: the seventeen errors the split-workflow
+    // report exposed are closed, so a red lint job means a new finding rather than the
+    // backlog. Warnings stay warnings (warningsAsErrors = false) because the 58-warning
+    // tail, 35 of them UseKtx, is a separate and much larger pass.
+    abortOnError = true
     checkReleaseBuilds = false
     ignoreWarnings = false
     warningsAsErrors = false
@@ -231,6 +241,18 @@ dependencies {
 
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
+  // firebase-auth 24.1.0 pulls androidx.fragment:fragment:1.1.0 (2019) onto the runtime
+  // classpath. Nothing here imports androidx.fragment, but the androidx.activity lint check
+  // InvalidFragmentVersionForActivityResult walks every resolved coordinate of the main
+  // artifact and reports a Fatal when the fragment version sorts below 1.3.0, so the stale
+  // artifact is a real finding and not a lint bug. A constraint lifts the resolved version
+  // without adding a direct dependency: if nothing pulls fragment in, this is a no-op.
+  // Note the check compares versions as strings, so a future 1.10.x would sort below 1.3.0
+  // and re-fire on a newer version. If that happens the answer is a lint disable entry with
+  // this comment as its reason, never a downgrade.
+  constraints {
+    implementation(libs.androidx.fragment)
+  }
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)

@@ -26,7 +26,7 @@ class HyphenationEngine private constructor(
         val n = w.length
         if (n < leftMin + rightMin) return emptyList()
 
-        val best = IntArray(n) { 0 }
+        val best = IntArray(n)
         for (i in 0 until n) {
             var matched: Pattern? = null
             var prefix = ""

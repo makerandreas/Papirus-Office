@@ -1,5 +1,4 @@
 package com.makerandreas.papirusoffice.data.odf
-import java.util.Locale
 
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeTableColumnSpec
@@ -9,7 +8,6 @@ import com.makerandreas.papirusoffice.data.TableDiagnostic
 import com.makerandreas.papirusoffice.data.TableDiagnosticCode
 import com.makerandreas.papirusoffice.data.TableRow
 import com.makerandreas.papirusoffice.data.TextRun
-import java.io.File
 
 /**
  * Base class for element contexts maintained in a stack during ODF XML import,

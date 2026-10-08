@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
+import androidx.core.graphics.createBitmap
 import com.example.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -98,7 +99,7 @@ fun PagellaModule(
                     val scaleFactor = (zoomLevel / 100f).coerceIn(0.5f, 2.5f)
                     val bmpW = (page.width * 2f * scaleFactor).toInt().coerceIn(300, 2048)
                     val bmpH = (page.height * 2f * scaleFactor).toInt().coerceIn(300, 2048)
-                    val out = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+                    val out = createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
                     out.eraseColor(android.graphics.Color.WHITE)
                     page.render(out, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     page.close()

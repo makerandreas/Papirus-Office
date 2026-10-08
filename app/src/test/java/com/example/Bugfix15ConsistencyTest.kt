@@ -11,7 +11,6 @@ import com.makerandreas.papirusoffice.data.undo.UndoAction
 import com.makerandreas.papirusoffice.data.writer.EditingEngine
 import com.makerandreas.papirusoffice.data.writer.SelectionEngine
 import com.makerandreas.papirusoffice.data.writer.SelectionRange
-import com.makerandreas.papirusoffice.data.writer.commands.DeleteSelectionCommand
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

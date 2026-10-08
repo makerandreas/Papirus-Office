@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
 import android.util.Log
+import androidx.core.graphics.toColorInt
 import java.io.OutputStream
 
 /**
@@ -51,14 +52,14 @@ object InkyPdfExporter {
             }
 
             val subtitlePaint = TextPaint().apply {
-                color = Color.parseColor("#1B5E20") // Rich primary-like green or dark color
+                color = "#1B5E20".toColorInt() // Rich primary-like green or dark color
                 textSize = 14f
                 isFakeBoldText = true
                 isAntiAlias = true
             }
 
             val bodyPaint = TextPaint().apply {
-                color = Color.parseColor("#212121") // Eye-friendly off-black
+                color = "#212121".toColorInt() // Eye-friendly off-black
                 textSize = 11f
                 isAntiAlias = true
             }
@@ -85,7 +86,7 @@ object InkyPdfExporter {
                     // Header text
                     c.drawText(docTitle, leftMargin, 40f, footerPaint)
                     val headerPaint = Paint().apply {
-                        color = Color.parseColor("#E0E0E0")
+                        color = "#E0E0E0".toColorInt()
                         strokeWidth = 1f
                     }
                     c.drawLine(leftMargin, 48f, pageWidth - rightMargin, 48f, headerPaint)
@@ -98,7 +99,7 @@ object InkyPdfExporter {
                     val footerText = "Papirus Inky • Page $pageNum"
                     c.drawText(footerText, leftMargin, pageHeight - 35f, footerPaint)
                     val dividerPaint = Paint().apply {
-                        color = Color.parseColor("#E0E0E0")
+                        color = "#E0E0E0".toColorInt()
                         strokeWidth = 0.5f
                     }
                     c.drawLine(leftMargin, pageHeight - 45f, pageWidth - rightMargin, pageHeight - 45f, dividerPaint)

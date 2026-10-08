@@ -1,6 +1,5 @@
 package com.example.ui.options
 
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -16,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -31,6 +31,7 @@ fun LoadSaveGeneralSubpage(
     onNavigateSubSubpage: (String?) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(Unit) {
         PapirusConfigManager.initialize(context)
     }
@@ -533,7 +534,7 @@ fun LoadSaveGeneralSubpage(
                         autoRecoveryInterval = validMinutes
                         PapirusConfigManager.saveValue(context, "LoadAndSave", "auto_recovery_interval", validMinutes)
                         showIntervalDialog = false
-                        Toast.makeText(context, context.getString(R.string.toast_auto_recovery_set_to_every_validminutes_minutes, validMinutes), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resources.getString(R.string.toast_auto_recovery_set_to_every_validminutes_minutes, validMinutes), Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Text(stringResource(R.string.save))

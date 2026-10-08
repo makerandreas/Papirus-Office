@@ -1,6 +1,5 @@
 package com.makerandreas.papirusoffice.data
 
-import androidx.compose.ui.graphics.Color
 
 /**
  * OpenOffice / LibreOffice Writer Core Text Formatting Data Structures

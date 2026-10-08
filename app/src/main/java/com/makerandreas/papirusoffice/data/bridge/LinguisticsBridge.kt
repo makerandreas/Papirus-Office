@@ -5,7 +5,6 @@ import android.util.Log
 import com.makerandreas.papirusoffice.data.framework.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Modern Hunspell & Hyphenation bridge service implementation for Papirus Office.

@@ -3,6 +3,7 @@ package com.example.core.ai
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.BuildConfig
@@ -80,7 +81,7 @@ object GeminiAiService {
                 apply()
             }
             // Wipe the legacy plaintext file so the key exists only encrypted.
-            legacy.edit().clear().apply()
+            legacy.edit { clear() }
             Log.i(TAG, "Migrated AI prefs to encrypted storage")
         } catch (e: Exception) {
             Log.w(TAG, "AI prefs migration skipped: ${e.message}")
@@ -105,10 +106,7 @@ object GeminiAiService {
         .build()
 
     fun setAiEnabled(context: Context, enabled: Boolean) {
-        securePrefs(context)
-            .edit()
-            .putBoolean(KEY_IS_ENABLED, enabled)
-            .apply()
+        securePrefs(context).edit { putBoolean(KEY_IS_ENABLED, enabled) }
     }
 
     fun isAiEnabled(context: Context): Boolean {
@@ -117,10 +115,7 @@ object GeminiAiService {
     }
 
     fun saveUserApiKey(context: Context, apiKey: String) {
-        securePrefs(context)
-            .edit()
-            .putString(KEY_API_KEY, apiKey.trim())
-            .apply()
+        securePrefs(context).edit { putString(KEY_API_KEY, apiKey.trim()) }
     }
 
     fun getUserApiKey(context: Context): String {
@@ -137,10 +132,7 @@ object GeminiAiService {
     }
 
     fun saveSelectedModel(context: Context, model: String) {
-        securePrefs(context)
-            .edit()
-            .putString(KEY_MODEL, model)
-            .apply()
+        securePrefs(context).edit { putString(KEY_MODEL, model) }
     }
 
     fun getSelectedModel(context: Context): String {
