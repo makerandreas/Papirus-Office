@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.graphics.createBitmap
 import com.makerandreas.papirusoffice.data.framework.PapirusClipboardEngine
 import androidx.compose.ui.res.stringResource
 import com.example.R
@@ -239,7 +240,7 @@ private fun ApiTesterTab(onRefreshLogs: () -> Unit) {
         // Generate a small decorative bitmap for testing
         val width = 120
         val height = 120
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val paint = Paint()
         paint.color = android.graphics.Color.BLUE
@@ -608,7 +609,7 @@ private fun DocumentScenariosTab(onRefreshLogs: () -> Unit) {
     LaunchedEffect(Unit) {
         val width = 150
         val height = 100
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val paint = Paint()
         paint.color = android.graphics.Color.DKGRAY

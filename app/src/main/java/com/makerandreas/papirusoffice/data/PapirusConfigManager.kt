@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import com.example.R
 import java.io.File
 
@@ -244,50 +245,50 @@ object PapirusConfigManager {
 
         when (key) {
             "theme_dynamic_color" -> {
-                if (value is Boolean) themePrefs.edit().putBoolean("dynamic_color_enabled", value).apply()
+                if (value is Boolean) themePrefs.edit { putBoolean("dynamic_color_enabled", value) }
             }
             "auto_recovery_enabled" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("auto_recovery_enabled", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("auto_recovery_enabled", value) }
             }
             "auto_recovery_interval" -> {
-                if (value is Int) optionsPrefs.edit().putInt("auto_recovery_interval", value).apply()
-                else value.toString().toIntOrNull()?.let { optionsPrefs.edit().putInt("auto_recovery_interval", it).apply() }
+                if (value is Int) optionsPrefs.edit { putInt("auto_recovery_interval", value) }
+                else value.toString().toIntOrNull()?.let { optionsPrefs.edit { putInt("auto_recovery_interval", it) } }
             }
             "auto_save_document_too" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("auto_save_document_too", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("auto_save_document_too", value) }
             }
             "always_create_backup_copy" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("always_create_backup_copy", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("always_create_backup_copy", value) }
             }
             "place_backup_in_same_folder" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("place_backup_in_same_folder", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("place_backup_in_same_folder", value) }
             }
             "load_user_specific_settings" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("load_user_specific_settings", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("load_user_specific_settings", value) }
             }
             "load_printer_settings" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("load_printer_settings", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("load_printer_settings", value) }
             }
             "edit_doc_properties_before_saving" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("edit_doc_properties_before_saving", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("edit_doc_properties_before_saving", value) }
             }
             "save_urls_relative_file_system" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("save_urls_relative_file_system", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("save_urls_relative_file_system", value) }
             }
             "save_urls_relative_internet" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("save_urls_relative_internet", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("save_urls_relative_internet", value) }
             }
             "odf_format_version" -> {
-                optionsPrefs.edit().putString("odf_format_version", valueStr(value)).apply()
+                optionsPrefs.edit { putString("odf_format_version", valueStr(value)) }
             }
             "always_save_as" -> {
-                optionsPrefs.edit().putString("always_save_as", valueStr(value)).apply()
+                optionsPrefs.edit { putString("always_save_as", valueStr(value)) }
             }
             "warn_when_not_saving_odf" -> {
-                if (value is Boolean) optionsPrefs.edit().putBoolean("warn_when_not_saving_odf", value).apply()
+                if (value is Boolean) optionsPrefs.edit { putBoolean("warn_when_not_saving_odf", value) }
             }
             "macro_protection" -> {
-                if (value is Boolean) generalPrefs.edit().putBoolean("macro_protection", value).apply()
+                if (value is Boolean) generalPrefs.edit { putBoolean("macro_protection", value) }
             }
         }
     }
@@ -324,12 +325,12 @@ object PapirusConfigManager {
         val themePrefs = context.getSharedPreferences(PREFS_THEME_NAME, Context.MODE_PRIVATE)
         val generalPrefs = context.getSharedPreferences(PREFS_GENERAL_NAME, Context.MODE_PRIVATE)
 
-        optionsPrefs.edit().clear().apply()
-        themePrefs.edit().clear().apply()
-        generalPrefs.edit().clear().apply()
+        optionsPrefs.edit { clear() }
+        themePrefs.edit { clear() }
+        generalPrefs.edit { clear() }
 
         // 5. Mark pending reset success popup flag
-        optionsPrefs.edit().putBoolean(KEY_RESET_SUCCESS_PENDING, true).apply()
+        optionsPrefs.edit { putBoolean(KEY_RESET_SUCCESS_PENDING, true) }
 
         Log.d(TAG, "Reset process completed. UserConfig.ini removed, DefaultConfig.ini active.")
 
@@ -378,7 +379,7 @@ object PapirusConfigManager {
         val isPending = optionsPrefs.getBoolean(KEY_RESET_SUCCESS_PENDING, false)
         if (isPending) {
             // Clear flag
-            optionsPrefs.edit().putBoolean(KEY_RESET_SUCCESS_PENDING, false).apply()
+            optionsPrefs.edit { putBoolean(KEY_RESET_SUCCESS_PENDING, false) }
             val message = context.getString(R.string.settings_reset_success)
             onShowPopup(message)
         }

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.core.net.toUri
 import com.example.R
 
 class OpenDocumentWithUri : ActivityResultContract<Uri?, Uri?>() {
@@ -111,7 +112,7 @@ fun FilesSubPage(
             description = "Main device storage directory",
             icon = Icons.Rounded.Folder
         ) {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3A")
+            val uri = "content://com.android.externalstorage.documents/document/primary%3A".toUri()
             openDocumentLauncher.launch(uri)
         }
 
@@ -121,7 +122,7 @@ fun FilesSubPage(
             description = "Default document drafts and sheets",
             icon = Icons.AutoMirrored.Rounded.Article
         ) {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADocuments")
+            val uri = "content://com.android.externalstorage.documents/document/primary%3ADocuments".toUri()
             openDocumentLauncher.launch(uri)
         }
 
@@ -131,7 +132,7 @@ fun FilesSubPage(
             description = "Exported files and web downloads",
             icon = Icons.Rounded.Download
         ) {
-            val uri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload")
+            val uri = "content://com.android.externalstorage.documents/document/primary%3ADownload".toUri()
             openDocumentLauncher.launch(uri)
         }
 

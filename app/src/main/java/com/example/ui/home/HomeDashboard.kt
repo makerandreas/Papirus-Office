@@ -4,6 +4,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.core.content.edit
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -148,7 +149,7 @@ object RecentFilesTracker {
             }
             jsonArray.put(obj)
         }
-        prefs.edit().putString(KEY_RECENTS, jsonArray.toString()).apply()
+        prefs.edit { putString(KEY_RECENTS, jsonArray.toString()) }
     }
 }
 

@@ -11,6 +11,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
 
 object ThemeSettings {
     private const val PREFS_NAME = "papirus_office_theme_prefs"
@@ -25,9 +26,7 @@ object ThemeSettings {
 
     fun setDynamicColorEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(KEY_DYNAMIC_COLOR, enabled)
-            .apply()
+            .edit { putBoolean(KEY_DYNAMIC_COLOR, enabled) }
     }
 
     fun getThemeMode(context: Context): String {
@@ -37,9 +36,7 @@ object ThemeSettings {
 
     fun setThemeMode(context: Context, mode: String) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_THEME_MODE, mode)
-            .apply()
+            .edit { putString(KEY_THEME_MODE, mode) }
     }
 
     fun resolveDarkTheme(context: Context, systemInDarkTheme: Boolean): Boolean {

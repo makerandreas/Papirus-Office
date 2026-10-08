@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.net.toUri
 import com.example.core.ai.GeminiAiService
 import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
@@ -310,7 +310,7 @@ fun GeminiCopilotDialog(
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     try {
-                                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(citation.url))
+                                                        val intent = Intent(Intent.ACTION_VIEW, citation.url.toUri())
                                                         context.startActivity(intent)
                                                     } catch (e: Exception) {
                                                         e.printStackTrace()

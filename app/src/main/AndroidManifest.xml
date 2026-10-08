@@ -10,6 +10,12 @@
         android:required="false" />
 
 
+    <!-- tools:targetApi on the application element, not a lint disable.
+         android:enableOnBackInvokedCallback below only exists from API 33 and this app's
+         minSdk is 24, so on 24 to 32 the platform ignores it and the older back path stays
+         in charge. Setting it is deliberate opt-in to the predictive back gesture on the
+         versions that have it, which is exactly what UnusedAttribute cannot tell apart
+         from a mistake. -->
     <application
         android:name="com.makerandreas.papirusoffice.PapirusApplication"
         android:allowBackup="true"
@@ -21,11 +27,11 @@
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
-        android:theme="@style/Theme.MyApplication">
+        android:theme="@style/Theme.MyApplication"
+        tools:targetApi="33">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher_round"
             android:windowSoftInputMode="adjustResize"

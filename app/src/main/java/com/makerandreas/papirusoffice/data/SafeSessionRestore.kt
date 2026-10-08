@@ -1,6 +1,8 @@
 package com.makerandreas.papirusoffice.data
 
+import android.annotation.SuppressLint
 import android.content.Context
+import androidx.core.content.edit
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -121,17 +123,26 @@ class SafeSessionRestore(context: Context) {
         return session
     }
 
+    // ApplySharedPref suppressed on purpose, not overlooked. These two are the only
+    // places that erase the legacy session record, and both run next to a file delete on
+    // the crash-recovery path this class exists for. `apply()` defers the write to a
+    // background thread; if the process dies between the delete and that write, the
+    // legacy record survives on disk while the session files are gone, which is the
+    // inconsistent state this migration is meant to make impossible. The synchronous
+    // write is the point.
+    @SuppressLint("ApplySharedPref")
     fun clearLastSession() {
         PapirusLogger.i("SessionRestore", "Clearing last session info")
         if (jsonFile.exists()) jsonFile.delete()
         if (draftFile.exists()) draftFile.delete()
         try {
             appContext.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
-                .edit().clear().commit()
+                .edit(commit = true) { clear() }
         } catch (_: Exception) {
         }
     }
 
+    @SuppressLint("ApplySharedPref")
     private fun migrateFromLegacyPrefs(): LastSessionInfo? {
         val prefs = appContext.getSharedPreferences(LEGACY_PREFS, Context.MODE_PRIVATE)
         val uri = prefs.getString("uri", null) ?: return null
@@ -152,7 +163,7 @@ class SafeSessionRestore(context: Context) {
             isSaved = prefs.getBoolean("isSaved", true)
         )
         saveLastSession(info)
-        prefs.edit().clear().commit()
+        prefs.edit(commit = true) { clear() }
         return info
     }
 

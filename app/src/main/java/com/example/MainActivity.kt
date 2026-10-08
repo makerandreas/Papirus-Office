@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.edit
 import com.example.core.jni.LibreOfficeCore
 import com.example.modules.cellina.CellinaModule
 import com.example.modules.inky.InkyModule
@@ -336,7 +337,7 @@ fun PapirusAppletContainer(modifier: Modifier = Modifier) {
                     "welcome" -> WelcomeScreen(
                         onAccessGranted = {
                             context.getSharedPreferences("papirus_first_run", android.content.Context.MODE_PRIVATE)
-                                .edit().putBoolean("is_first_run", false).apply()
+                                .edit { putBoolean("is_first_run", false) }
                             currentWorkspace = "home"
                         }
                     )

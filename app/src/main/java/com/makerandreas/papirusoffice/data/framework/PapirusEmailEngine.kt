@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import com.makerandreas.papirusoffice.data.api.FirebaseCloudManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -347,7 +348,7 @@ object PapirusEmailEngine {
 
         try {
             // "smsto:" maps directly to system default messages client (Google Messages / Samsung Messages)
-            val uri = Uri.parse("smsto:$phoneOrEmail")
+            val uri = "smsto:$phoneOrEmail".toUri()
             val intent = Intent(Intent.ACTION_SENDTO, uri).apply {
                 putExtra("sms_body", messageText)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

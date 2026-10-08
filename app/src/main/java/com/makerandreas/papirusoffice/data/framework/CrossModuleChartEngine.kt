@@ -7,8 +7,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.Log
+import androidx.core.graphics.createBitmap
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 /**
  * Papirus Office Cross-Module Chart Engine.
@@ -288,7 +290,7 @@ class CrossModuleChartEngine private constructor() {
      * High-quality canvas rendering engine to draw chart graphics.
      */
     fun renderChartBitmap(chart: ChartDataModel, width: Int, height: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
         // Clean white background with rounded border
@@ -467,7 +469,7 @@ class CrossModuleChartEngine private constructor() {
                         canvas.drawRoundRect(RectF(left, top, right, plotBottom), 6f, 6f, barPaint)
 
                         if (chart.showDataLabels && valD > 0) {
-                            val valText = if (valD == valD.toLong().toDouble()) valD.toLong().toString() else String.format("%.1f", valD)
+                            val valText = if (valD == valD.toLong().toDouble()) valD.toLong().toString() else String.format(Locale.getDefault(), "%.1f", valD)
                             canvas.drawText(valText, left + barWidth / 2f, top - 8f, labelPaint)
                         }
                     }

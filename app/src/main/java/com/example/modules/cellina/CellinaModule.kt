@@ -39,6 +39,7 @@ import com.example.R
 import com.example.ui.components.FloatingContextualToolbar
 import com.example.ui.components.FullPageDocumentLoadingPopup
 import com.example.ui.components.SavingProgressPopupDialog
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -1023,7 +1024,7 @@ fun CellinaModule(
                                                         // Apply DM to EUR conversion factor 1.95583f
                                                         cellValues.keys.forEach { k ->
                                                             cellValues[k]?.toDoubleOrNull()?.let { v ->
-                                                                cellValues[k] = String.format("%.2f", v / 1.95583)
+                                                                cellValues[k] = String.format(Locale.getDefault(), "%.2f", v / 1.95583)
                                                             }
                                                         }
                                                         Toast.makeText(context, R.string.toast_converted_dm_to_eur_factor_1_95583, Toast.LENGTH_SHORT).show()

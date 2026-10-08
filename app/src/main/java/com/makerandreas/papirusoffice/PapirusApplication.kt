@@ -123,9 +123,14 @@ class PapirusApplication : Application(), ComponentCallbacks2 {
                 clearTemporaryMediaCache()
                 System.gc()
             }
+            // TRIM_MEMORY_BACKGROUND (40) sits between UI_HIDDEN (20) and MODERATE (60)
+            // and means the same thing as both: our UI is gone and we are on the LRU list.
+            // Leaving it out of the when is what SwitchIntDef reported, and the omission
+            // meant the one moment we are most likely to be killed next was the one moment
+            // we did not free the extracted-media cache.
             ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN,
+            ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
             ComponentCallbacks2.TRIM_MEMORY_MODERATE -> {
-                // Moderate cleanup when app is in background or moderate pressure
                 clearTemporaryMediaCache()
             }
         }

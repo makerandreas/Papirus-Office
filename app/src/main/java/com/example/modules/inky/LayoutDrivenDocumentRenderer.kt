@@ -34,6 +34,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.toColorInt
 import com.example.R
 import com.example.ui.components.DocxEmbeddedImage
 import com.example.ui.components.LocalPendingImageDecodes
@@ -43,8 +44,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.makerandreas.papirusoffice.data.*
 import java.io.File
-import android.graphics.Color as AndroidColor
-
 /**
  * Lets the screen ask the page stack to move input focus without owning the
  * per-element [FocusRequester]s, which live inside the renderer. The screen
@@ -896,7 +895,7 @@ private fun RenderTableFragment(
 }
 
 private fun tableColor(value: String): Color = runCatching {
-    Color(AndroidColor.parseColor(value))
+    Color(value.toColorInt())
 }.getOrDefault(Color.Transparent)
 
 @Composable

@@ -3,6 +3,7 @@ package com.example.modules.inky
 import androidx.compose.material.icons.automirrored.rounded.*
 import android.content.Context
 import android.widget.Toast
+import androidx.core.graphics.toColorInt
 import com.makerandreas.papirusoffice.data.FontViewModel
 import com.makerandreas.papirusoffice.data.FontUiState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -1488,7 +1489,7 @@ fun ColorPickerSubpage(
                 if (input.length <= 7) {
                     hex = input
                     try {
-                        val parsed = Color(android.graphics.Color.parseColor(input))
+                        val parsed = Color(input.toColorInt())
                         r = (parsed.red * 255).toInt()
                         g = (parsed.green * 255).toInt()
                         b = (parsed.blue * 255).toInt()
