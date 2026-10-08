@@ -1,5 +1,6 @@
 package com.example.ui.home
 
+import android.os.LocaleList
 import androidx.compose.material.icons.automirrored.filled.*
 import android.content.Context
 import android.content.Intent
@@ -713,8 +714,7 @@ fun HomeDashboard(
                         // LocalConfiguration rather than Locale.getDefault(): a read of the
                         // default locale during composition does not recompose when the
                         // locale changes, so the formatted date would go stale.
-                        val docPropsLocale = LocalConfiguration.current.locales
-                            .let { if (it.isEmpty) Locale.getDefault() else it.get(0) }
+                        val docPropsLocale = displayLocale(LocalConfiguration.current.locales)
                         Text("${stringResource(R.string.doc_props_name)}: ${doc.name}", fontWeight = FontWeight.SemiBold)
                         Text("${stringResource(R.string.doc_props_path)}: ${doc.path}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${stringResource(R.string.doc_props_size)}: ${doc.size}")
@@ -1277,3 +1277,16 @@ fun GoogleDriveSubPage() {
         }
     }
 }
+
+/**
+ * The locale to format user-visible dates in.
+ *
+ * Deliberately a plain function and not a composable. `Locale.getDefault()` read inside a
+ * composable is what lint's `NonObservableLocale` reports, and correctly so: composition
+ * does not re-run when the JVM default locale changes, so a date formatted with it goes
+ * stale. Callers pass `LocalConfiguration.current.locales`, which *is* observable, and the
+ * default is only reached when that list is empty, which an Android Configuration does not
+ * produce in practice.
+ */
+private fun displayLocale(locales: LocaleList): Locale =
+    if (locales.isEmpty) Locale.getDefault() else locales.get(0)
