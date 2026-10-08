@@ -125,14 +125,22 @@ class PapirusApplication : Application(), ComponentCallbacks2 {
             }
             // TRIM_MEMORY_BACKGROUND (40) sits between UI_HIDDEN (20) and MODERATE (60)
             // and means the same thing as both: our UI is gone and we are on the LRU list.
-            // Leaving it out of the when is what SwitchIntDef reported, and the omission
-            // meant the one moment we are most likely to be killed next was the one moment
-            // we did not free the extracted-media cache.
+            // It was missing from this when, which meant the moment we are most likely to
+            // be killed next was the one moment the extracted-media cache was not freed.
+            // Adding it did not by itself close SwitchIntDef, because the case that check
+            // named was RUNNING_MODERATE below; both were genuinely missing.
             ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN,
             ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
             ComponentCallbacks2.TRIM_MEMORY_MODERATE -> {
                 clearTemporaryMediaCache()
             }
+            // TRIM_MEMORY_RUNNING_MODERATE (5) is the mildest of the seven and the only
+            // one that arrives while the UI is still in front of the user. Clearing the
+            // extracted-media cache here would make the next tap pay to extract again, so
+            // the answer is deliberately "nothing". Named rather than left to a fallthrough
+            // so the next reader sees it was considered, and so SwitchIntDef can see all
+            // seven cases are accounted for.
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE -> Unit
         }
     }
 
