@@ -11,7 +11,13 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  // 36.1 to 37 because Compose 1.12.1 requires it, not because anything here uses an
+  // Android 17 API. androidx states it as a hard floor in the AAR metadata of
+  // animation-core, foundation-layout, material-ripple and the rest, and
+  // checkDebugAarMetadata fails the build on it before a single Kotlin file compiles.
+  // compileSdk moves on its own: targetSdk stays 36, so no runtime behaviour opts in,
+  // and minSdk stays 24, so no device loses support.
+  compileSdk { version = release(37) }
 
   defaultConfig {
     applicationId = "com.makerandreas.papirusoffice"
