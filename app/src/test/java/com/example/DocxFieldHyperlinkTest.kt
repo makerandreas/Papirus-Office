@@ -117,9 +117,13 @@ class DocxFieldHyperlinkTest {
         val parser = OfficeDocumentParser(ApplicationProvider.getApplicationContext<Context>())
         val parsed = parser.parseDocument(SampleMatrix.findTestFile("Sample-6.docx"), bypassCache = true)
         val plain = parsed.plainText
+        // Both leakage vectors, not one or the other: PAGEREF is the entry target and
+        // TOC \o is the field instruction that opened the block. Covering only one
+        // leaves the other free to regress.
         assertFalse("PAGEREF must not leak into plain text", plain.contains("PAGEREF"))
-        assertTrue("cached TOC/body text must remain",
-            plain.contains("KATA PENGANTAR") || plain.contains("DAFTAR ISI") || plain.contains("PENDAHULUAN"))
+        assertFalse("TOC instruction must not leak into plain text", plain.contains("TOC \\o"))
+        assertTrue("first TOC entry text must remain",
+            plain.contains("KATA PENGANTAR") || plain.contains("DAFTAR ISI"))
     }
 
     private fun parseSync(file: File) = runBlocking {
