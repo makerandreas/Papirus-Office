@@ -34,6 +34,24 @@ class TestDependencyGuardTest {
             ?: error("neither $relativeToModule nor $relativeToRoot exists from ${File(".").absolutePath}")
     }
 
+    /**
+     * The build script needs a stricter rule than [resolve]. Run from the module
+     * directory, `build.gradle.kts` is the app script and both candidates point at it.
+     * Run from the repository root, the same name is the *root* script, which declares
+     * plugins and no `testImplementation` lines, so the first guard below fails on a
+     * dependency that is declared and the second one scans the wrong file. Picking by
+     * content keeps this test's verdict independent of the working directory.
+     */
+    private fun appBuildScript(): File {
+        val candidates = listOf(File("build.gradle.kts"), File("app/build.gradle.kts"))
+            .filter { it.exists() }
+        if (candidates.isEmpty()) {
+            error("no build.gradle.kts found from ${File(".").absolutePath}")
+        }
+        return candidates.firstOrNull { "android {" in it.readText() }
+            ?: error("none of ${candidates.map { it.path }} declares an `android {` block")
+    }
+
     private fun testSources(): List<File> {
         val root = resolve("src/test/java", "app/src/test/java")
         return root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
@@ -41,7 +59,7 @@ class TestDependencyGuardTest {
 
     @Test
     fun everyGuardedTestLibraryTheSuiteImportsIsDeclaredInBuildScript() {
-        val buildScript = resolve("build.gradle.kts", "app/build.gradle.kts").readText()
+        val buildScript = appBuildScript().readText()
         val declared = buildScript.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("testImplementation(") }
@@ -71,7 +89,7 @@ class TestDependencyGuardTest {
 
     @Test
     fun everyCatalogAccessorUsedByTheBuildScriptExistsInTheVersionCatalog() {
-        val buildScript = resolve("build.gradle.kts", "app/build.gradle.kts").readText()
+        val buildScript = appBuildScript().readText()
         val catalog = resolve("../gradle/libs.versions.toml", "gradle/libs.versions.toml").readText()
         val catalogAliases = Regex("""^([A-Za-z0-9._-]+)\s*=\s*\{\s*group""", RegexOption.MULTILINE)
             .findAll(catalog)
