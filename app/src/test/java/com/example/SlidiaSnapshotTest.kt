@@ -13,6 +13,26 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
+/**
+ * Composition smoke test, not a visual regression test.
+ *
+ * These three cases render `SlidiaModule` on a phone portrait, a
+ * tablet landscape and a foldable qualifier and write one PNG each under
+ * `src/test/screenshots/`.
+ *
+ * Nothing compares the PNGs to anything. CI runs `testDebugUnitTest` with
+ * `roborazzi.test.record=true`, which records, and `verifyRoborazziDebug` appears nowhere
+ * in this repository. A pixel that moves is not a failure; a green run here means the
+ * composition reached the capture call and no more.
+ *
+ * `captureRoboImage(onRoot())` resolves the root semantics node and throws when the
+ * composition produced nothing, so a broken or empty composition already fails these
+ * cases. What no case covers is a change in what that composition draws.
+ *
+ * Committing goldens and switching to `verifyRoborazziDebug` are deferred until
+ * `runs-on` is pinned to `ubuntu-24.04` and the Compose BOM upgrade lands: both move
+ * pixel rendering, and doing it before them would rebaseline for no product reason.
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34])
