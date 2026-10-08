@@ -28,9 +28,12 @@ import org.robolectric.annotation.GraphicsMode
  * composition produced nothing, so a broken or empty composition already fails these
  * cases. What no case covers is a change in what that composition draws.
  *
- * Committing goldens and switching to `verifyRoborazziDebug` are deferred until
- * `runs-on` is pinned to `ubuntu-24.04` and the Compose BOM upgrade lands: both move
- * pixel rendering, and doing it before them would rebaseline for no product reason.
+ * Committing goldens was deferred until `runs-on` was pinned to `ubuntu-24.04` and
+ * the Compose BOM upgrade landed, because both move pixel rendering and rebaselining
+ * before them would have baked in a baseline with no product reason behind it. Both
+ * have now landed (audit 024), so `.github/workflows/goldens.yml` records the PNGs on
+ * a pinned runner and opens them as a pull request. `ci.yml` still records rather than
+ * verifies; switching it to `verifyRoborazziDebug` must land after those goldens do.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
