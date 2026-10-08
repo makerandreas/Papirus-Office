@@ -229,6 +229,34 @@ class DocumentEnginesUnitTest {
     }
 
     @Test
+    fun reminderCapIsFiveAndTheSixthEvictsTheFirstInserted() {
+        // Writer Guide 26.2 Ch.1 "Setting reminders": "You can set up to 5 reminders
+        // in a document; setting a sixth causes the first to be deleted." "First" is
+        // insertion order, and getReminders() is sorted by paragraphIndex, so the
+        // paragraphs below are set out of paragraph order on purpose: an eviction keyed
+        // on list position drops ins3 (paragraph 50) and fails here.
+        val manager = ReminderManager()
+        for ((para, note) in listOf(
+            30 to "ins1", 10 to "ins2", 50 to "ins3", 20 to "ins4", 40 to "ins5"
+        )) manager.setReminder(para, 0, note)
+
+        assertEquals("five reminders fit", ReminderManager.MAX_REMINDERS, manager.getReminders().size)
+        assertEquals("the list stays sorted by paragraph while full",
+            listOf("ins2", "ins4", "ins1", "ins5", "ins3"), manager.getReminders().map { it.note })
+
+        manager.setReminder(60, 0, "ins6")
+        val notes = manager.getReminders().map { it.note }
+        assertEquals("the cap still holds after the sixth", 5, notes.size)
+        assertFalse("the first inserted reminder is gone", "ins1" in notes)
+        assertEquals("the five newest survive, in paragraph order",
+            listOf("ins2", "ins4", "ins5", "ins3", "ins6"), notes)
+
+        manager.setReminder(70, 0, "ins7")
+        assertEquals("the seventh evicts the second inserted",
+            listOf("ins4", "ins5", "ins3", "ins6", "ins7"), manager.getReminders().map { it.note })
+    }
+
+    @Test
     fun testOdtRoundTripEmptyDocument() {
         val doc = OfficeDocument(
             metadata = DocumentMetadata(title = "Empty Doc"),
