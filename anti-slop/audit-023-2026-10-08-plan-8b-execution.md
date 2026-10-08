@@ -4,10 +4,15 @@
 `arena/574ad9fd-papirus-office`. All work below is eight commits on that branch, on top of
 `audit-022`'s analysis, which was itself written against the same baseline.
 
-**Gate:** none of this session's own at the time of writing. The newest CI evidence in the
-repository is still PR #37's lint report on head `307f01a` (run `37719095501`). Nothing had
-been pushed when this document was written, so no run belongs to it. §8 separates what was
-executed here from what only the pull-request run can confirm.
+**Gate: PR #38, CI run `37824259896` on head `d7541f2`, all three jobs success.** `Unit &
+Roborazzi Snapshot Tests`, `Lint Analysis` and `Build & Package Debug APK` all green. The CI
+comment reports **435 tests, 0 failed, 0 errors, 0 skipped, 43.42 s across 82 suites**, against
+PR #37's 434 across the same 82, the +1 being the new reminder-cap case. The lint comment
+reports **`lint 9.1.1: 0 errors, 58 warnings across 11 issue ids`**, against PR #37's `17
+errors, 58 warnings across 15 issue ids` on head `307f01a` (run `37719095501`). An earlier run
+on this branch, `37822790268` on head `acf9aaf`, reads the same three conclusions and the same
+two report shapes. §8 separates what was executed here from what only those runs could confirm,
+and §8.2 records where the prediction in §8.1 was wrong.
 
 **Scope:** execute the six steps `audit-022` §11 recommended, plus the owner-approved
 deletion of every unused-code item previously marked. Where executing a step contradicted
@@ -289,21 +294,43 @@ And "the 49-file dead-code sweep" is 48 files touched: 46 with import removals a
 | Real `TestDependencyGuardTest` compiled and run, both working directories | 2 passed / 0 failed from `app/` and from the repo root |
 | Negative control: `androidx-fragment` alias removed | the accessor test fails naming `libs.androidx.fragment` and the missing alias |
 
-**Not executable here, and not claimed.** There is no JDK-beyond-a-bundled-runtime, no Gradle
-and no Android SDK in this sandbox, so `./gradlew` was never run. Specifically unverified:
+**Not executable here.** There is no Gradle and no Android SDK in this sandbox, so
+`./gradlew` was never run and everything in the list below came from the PR #38 run rather
+than from this session:
 
-* `:app:lintDebug` and therefore the actual error and warning counts. `audit-022` predicted
-  the fix takes the report from `17 errors, 58 warnings` to about `2 errors, 62 to 64
-  warnings`, because `%1$d` before a noun is a new `PluralsCandidate`. That prediction is
-  still a prediction.
+* `:app:lintDebug` and the counts, confirmed at `0 errors, 58 warnings across 11 issue ids`.
 * `compileDebugKotlin` over the 46 files whose imports changed, and `compileDebugUnitTestKotlin`
-  over the five test files edited here.
-* The resolved fragment coordinate. The owner's check is
-  `./gradlew :app:dependencies --configuration debugRuntimeClasspath | grep androidx.fragment`.
-* Whether the re-tightened assertions pass. The values are measured from the fixture and from
-  the shipped counter, but `DocxNumberingReader`'s XML mapping was not exercised here: the
-  harness in §3 ran `NumberingCounterState` against a hand-built spec, so the reader's own
-  parsing of `numFmt` and `lvlText` is assumed, not executed.
+  over the five edited test files: both green, since the test job and the packaging job passed.
+* The re-tightened assertions: `DocxNumberingReaderTest` 4/0/0/0, `DocxAuthoredShapeTest`
+  3/0/0/0, `DocxSectionsTest` 2/0/0/0, `DocxFieldHyperlinkTest` 5/0/0/0, and
+  `DocumentEnginesUnitTest` 26/0/0/0 including the new cap case.
+* `TestDependencyGuardTest` 2/0/0/0 on the runner, which is where the working directory is
+  `app` and the defect in §8.1 was already masked.
+
+**Still unverified anywhere.** The resolved fragment coordinate. The lint job going green with
+`abortOnError = true` shows the Fatal no longer fires, which is what the constraint was for,
+but it does not print the version Gradle settled on. The owner's check remains
+`./gradlew :app:dependencies --configuration debugRuntimeClasspath | grep androidx.fragment`.
+
+### 8.2 Where the prediction was wrong
+
+`audit-022` predicted the fix would take the report from `17 errors, 58 warnings` to "about
+`2 errors, 62 to 64 warnings`". The actual is **0 errors, 58 warnings**.
+
+| | predicted | actual |
+|---|---|---|
+| errors | about 2 | **0** |
+| warnings | 62 to 64 | **58** |
+| issue ids | not predicted | **11**, from 15 |
+
+The mechanism was right and the arithmetic was not. `PluralsCandidate` did rise from 2 to 6,
+the predicted +4 from `%1$d` before a noun. `StaticFieldLeak` did fall to zero. `UseKtx` fell
+by 2, and the two are identifiable: they were `StorageProvider.kt:21:53` and `:31:54`, both
+gone with the deleted file, every other `UseKtx` location in the two reports matching once the
+line shifts from the import removals are accounted for. So `-2 -2 +4 = 0` and the total held at
+58 rather than rising. The two errors that were predicted to survive did not: the
+`tools:ignore` covered `AppLinkUrlError` completely rather than partially, and no second
+`StringFormatMatches` was left behind.
 
 ### 8.1 One defect found by running the guard
 
@@ -328,9 +355,8 @@ the approved work exposed it, and it is called out here rather than folded in si
 
 ## 9. What is still owed
 
-1. **The pull-request run.** Read the CI comment and the lint comment before treating any of
-   §8's unverified list as closed. The prediction in §8 is written down here so it can be
-   checked rather than agreed with.
+1. ~~The pull-request run.~~ Done: PR #38, run `37824259896`, all three jobs green, both
+   comments read, and the prediction checked in §8.2 rather than agreed with.
 2. **The 58-warning tail.** 35 `UseKtx`, 6 `VectorRaster`, 3 `IconLocation`, 2 each of
    `AndroidGradlePluginVersion`, `ApplySharedPref`, `DefaultLocale`, `PluralsCandidate` and
    `StaticFieldLeak` (the latter now expected to fall to zero with this branch), and singles.
@@ -350,3 +376,13 @@ to carry out every recommended step: the one stating that `abortOnError` is `fal
 green job therefore proves nothing, and the one listing the seventeen errors as open. Nothing
 else in the file is touched, and both edits are restated here so they can be reviewed or
 reverted without reading the file.
+
+`scripts/lint-dump-comment.py` had the same staleness in code rather than prose: it asserted
+`abortOnError = false` in three hardcoded places, so the report PR #38 first posted told the
+reader that a lint error would not fail the job one sentence after reporting zero errors from a
+job gated on finding none. The value is now read out of `app/build.gradle.kts` at run time,
+scoped to the `lint {` block so an `abortOnError` elsewhere in the DSL is not picked up, and
+the sentence follows the flag. Verified against four cases: the current tree returns `true`,
+the pre-change script at `8796828` returns `false`, a script with no lint block returns `None`,
+and a script whose only `abortOnError` sits in a `packaging` block returns `None`. The report
+on head `d7541f2` carries the corrected sentence.
