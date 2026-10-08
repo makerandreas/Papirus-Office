@@ -4,10 +4,10 @@
 `arena/b85c4d48-papirus-office`, PR #37, head `83428ae`. The local clone was a
 shallow one-commit checkout and was deepened by 40 for this session, so the eleven
 commits after the PR #36 merge are inspectable here.
-**Gate:** CI run `37716347743` on head `83428ae`, all three jobs green,
-**434 tests run, 0 failed, 0 errors, 0 skipped, 43.41 s across 82 suites**, against
-PR #36's 402 across 73. Run `37714464091` on the preceding head `4972c3e` was green
-too. Lint reports 17 errors and 58 warnings behind a green job because
+**Gate:** CI run `37717832692` on head `b4395b1`, all three jobs green,
+**434 tests run, 0 failed, 0 errors, 0 skipped, 45.05 s across 82 suites**, against
+PR #36's 402 across 73. Two earlier runs on this branch were green as well
+(§10.1). Lint reports 17 errors and 58 warnings behind a green job because
 `abortOnError = false`; §6.2 lists them and §13 owns them.
 **Scope:** (1) establish why `main` has been red since `891d077`, (2) check the two
 Copilot suggestions the owner brought against the MockK source rather than against
@@ -405,9 +405,11 @@ lint report:
 |---|---|---|---|---|
 | `37714464091` | `4972c3e`, id still `"OldTargetSdkVersion"` | 17 errors, 61 warnings, 17 issue ids | 2 | 1 |
 | `37716347743` | `83428ae`, corrected to `"OldTargetApi"` | 17 errors, 58 warnings, 15 issue ids | absent | absent |
+| `37717832692` | `b4395b1`, docs only | 17 errors, 58 warnings, 15 issue ids | absent | absent |
 
 Three warnings and two issue ids, exactly the ones the correction targets, and the
-seventeen errors untouched. That is the whole claim about this fix: it silences one
+seventeen errors untouched. The third run holds the corrected figures, which is what
+a docs-only commit should do to a lint report. That is the whole claim about this fix: it silences one
 warning and removes one bogus id, and it does not hide an error.
 
 ### 6.4 What is still unknown
@@ -479,14 +481,16 @@ artifact sizes are the available evidence that images were written:
 | `37661728786` (`891d077`) | absent | 224,245 bytes |
 | `37714464091` (this PR, head `4972c3e`) | `-Proborazzi.test.record=true` | 794,754 bytes |
 | `37716347743` (this PR, head `83428ae`) | `-Proborazzi.test.record=true` | 794,660 bytes |
+| `37717832692` (this PR, head `b4395b1`) | `-Proborazzi.test.record=true` | 794,859 bytes |
 
-The artifact also carries nine more suites of JUnit XML in the second and third
-runs, which is a few kilobytes. The remaining ~570 KB across thirteen PNGs is
-consistent with images that were not there before, and two runs of the same tree
-agree within 94 bytes, so the delta is reproducible rather than a one-off. The
-artifact itself cannot be opened from here, so this stays an inference from size,
-and the way to confirm it is to download `unit-test-and-snapshot-reports` from run
-`37716347743` and list `app/src/test/screenshots/`.
+The artifact also carries nine more suites of JUnit XML in the later runs, which is
+a few kilobytes. The remaining ~570 KB across thirteen PNGs is consistent with
+images that were not there before, and three runs of near-identical trees agree
+within 199 bytes while the one run without the flag sits 570 KB lower, so the delta
+is reproducible rather than a one-off. The artifact itself cannot be opened from
+here, so this stays an inference from size, and the way to confirm it is to download
+`unit-test-and-snapshot-reports` from run `37717832692` and list
+`app/src/test/screenshots/`.
 
 Per-suite JUnit times for the snapshot classes in the green run:
 `CellinaSnapshotTest` 3 tests 6.65s, `InkySnapshotTest` 3 tests 1.48s,
@@ -579,22 +583,32 @@ silently dropped. Both belong to a Plan 8C numbering pass.
 
 ## 10. Evidence
 
-### 10.1 CI, two runs, base `main` at `323dc94`
+### 10.1 CI, three runs, base `main` at `323dc94`
 
 Read from the `github-actions[bot]` comments on PR #37 and from
-`gh api .../actions/runs/<id>/jobs`. The gate is the second run, on the head this
-document ships with.
+`gh api .../actions/runs/<id>/jobs`. The gate is the last run that was read before
+this file was written.
 
-| Run | Head | Unit & Roborazzi | Lint Analysis | Build & Package Debug APK |
-|---|---|---|---|---|
-| `37714464091` | `4972c3e` | success, step 5m16s | success, step 7m53s | success, step 5m52s |
-| `37716347743` | `83428ae`, the head of this PR | success, step 5m06s | success, step 7m52s | success, step 5m54s |
+| Run | Head | Unit & Roborazzi | Lint Analysis | Build & Package Debug APK | Tests |
+|---|---|---|---|---|---|
+| `37714464091` | `4972c3e` | success, step 5m16s | success, step 7m53s | success, step 5m52s | 434/0/0/0, 44.38s |
+| `37716347743` | `83428ae` | success, step 5m06s | success, step 7m52s | success, step 5m54s | 434/0/0/0, 43.41s |
+| `37717832692` | `b4395b1` | success, step 5m41s | success, step 7m37s | success, step 4m00s | 434/0/0/0, 45.05s |
 
-**Gate, run `37716347743`: 434 run, 0 failed, 0 errors, 0 skipped, 43.41s across
-82 suites.** Run `37714464091` read 434/0/0/0 at 44.38s across the same 82 suites.
+**Gate, run `37717832692`: 434 run, 0 failed, 0 errors, 0 skipped, 45.05s across 82
+suites.** All three runs read the same four counts across the same 82 suites, and
+the wall time moves by 1.6s between the fastest and the slowest, which is the
+spread to expect from runner variance rather than from anything this branch did.
 
-Lint on the gate: `17 errors, 58 warnings across 15 issue ids`, against
-`17 errors, 61 warnings across 17 issue ids` on the earlier run. §6.3.
+Lint: `17 errors, 61 warnings across 17 issue ids` on the first run, then
+`17 errors, 58 warnings across 15 issue ids` on both later runs. §6.3.
+
+A note on the regress this creates. This document ships in the commit after its own
+gate run, so the run that commit triggers cannot be named here without a further
+commit naming that one. The convention adopted is that the audit names the last run
+read before it was written, and the pull-request body, which is not part of the
+tree, carries the live list. Run `37717832692` is docs-and-config only relative to
+`83428ae`'s successor, and the body of PR #37 is where a later run is recorded.
 
 Against the PR #36 baseline of 402 across 73 suites (run `37640269667`), that is
 +32 tests and +9 suites, and the arithmetic closes exactly:
@@ -612,8 +626,13 @@ The four MockK classes are the ones that could not compile: 18 tests, all green,
 including `PapirusApiClientMockTest` 4/4 at 0.90s on the gate run.
 `TestDependencyGuardTest` 2/2 at 0.03s.
 
-Artifacts from the gate run: `apks` 262,590,327 bytes,
-`unit-test-and-snapshot-reports` 794,660, `lint-reports` 61,231.
+Artifacts across the three runs, in run order: `apks` 262,589,474, 262,590,327 and
+262,589,918 bytes; `unit-test-and-snapshot-reports` 794,754, 794,660 and 794,859;
+`lint-reports` 63,563, 61,231 and 61,233. The APK varies by 853 bytes and the
+snapshot artifact by 199 across three builds of near-identical trees, which is the
+build-stamp and archive-order noise to expect. The lint artifact drops 2,332 bytes
+between the first run and the second and holds, matching the three warnings the
+`OldTargetApi` correction removed.
 
 One workflow ran per push to this pull request, not two. That is the split,
 observed rather than asserted.
@@ -656,8 +675,9 @@ observed rather than asserted.
 * **Why lint failed at `891d077` is not established.** §6.4 gives the inference and
   names it as one.
 * **The screenshots were not seen.** §7.2 infers they were written from a ~570 KB
-  artifact delta that two runs reproduce within 94 bytes. The artifacts themselves
-  are on storage this sandbox cannot open, so the PNGs are inferred, not inspected.
+  artifact delta that three runs reproduce within 199 bytes. The artifacts
+  themselves are on storage this sandbox cannot open, so the PNGs are inferred, not
+  inspected.
 * **Nothing compares screenshots to anything.** Record mode with no goldens and no
   verify task is not a visual regression gate (§7.3).
 * **`isReturnDefaultValues` and the Byte Buddy `jvmArgs` were restored on the
