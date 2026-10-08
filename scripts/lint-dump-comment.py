@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Builds the pull-request comment the CI lint job posts after running.
 
-`app/build.gradle.kts` sets `lint { abortOnError = false }`, so a lint error
-does not fail the job and nothing in the run status says one happened. The
-report itself only reaches the `lint-reports` artifact, which the sandbox this
-repository is worked from cannot open (AGENTS.md, "Reading the CI report").
-This mirrors the errors into a comment, the same way `ci-dump-comment.py`
-mirrors the compiler output.
+A green Lint Analysis job says only what `lint { abortOnError }` in
+`app/build.gradle.kts` lets it say, and that flag has moved: it was `false`
+from `912de8e` until 2026-10-08, which is why a job could report seventeen
+errors and still pass. The report itself only reaches the `lint-reports`
+artifact, which the sandbox this repository is worked from cannot open
+(AGENTS.md, "Reading the CI report"). This mirrors the errors into a comment,
+the same way `ci-dump-comment.py` mirrors the compiler output.
+
+The `abortOnError` value quoted in the comment is read out of the build script
+at run time rather than written here, so the sentence cannot go stale the next
+time the flag moves.
 
 Reads the lint XML report first because it carries the issue id, severity and
 location as attributes; falls back to the text report when the XML is missing.
@@ -31,6 +36,39 @@ MAX_ERRORS_LISTED = 200
 # (gradle-wrapper.properties, libs.versions.toml) and others relative to the
 # module, so the workspace root is what turns both into repo-relative paths.
 WORKSPACE = os.environ.get("GITHUB_WORKSPACE", "").rstrip("/")
+
+def abort_on_error_setting():
+    """Returns "true", "false", or None, read from the app module's lint block.
+
+    Read at run time so the verdict sentence cannot outlive the flag. Scans
+    forward from `lint {` and stops at the closing brace of that block, because
+    `abortOnError` also appears in other AGP DSL blocks in other projects.
+    """
+    path = os.environ.get("GITHUB_WORKSPACE", ".")
+    script = os.path.join(path, "app", "build.gradle.kts")
+    if not os.path.exists(script):
+        script = "app/build.gradle.kts"
+    try:
+        text = read(script)
+    except OSError:
+        return None
+    if text is None:
+        return None
+    match = re.search(r"\blint\s*\{", text)
+    if not match:
+        return None
+    depth = 1
+    block = []
+    for char in text[match.end():]:
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        block.append(char)
+    found = re.search(r"abortOnError\s*=\s*(true|false)", "".join(block))
+    return found.group(1) if found else None
 
 
 def read(path):
@@ -170,16 +208,23 @@ def main():
         return
 
     errors, warnings, by_id, tool = parsed
-    if errors:
-        verdict = (
-            "`abortOnError = false`, so this job stays green with errors present; "
-            "the errors below are real and unfixed."
+    setting = abort_on_error_setting()
+    if setting is None:
+        gate = (
+            "`lint { abortOnError }` could not be read out of "
+            "`app/build.gradle.kts`, so this job's status does not say whether "
+            "an error would have failed it"
+        )
+    elif setting == "false":
+        gate = (
+            "`abortOnError = false`, so this job stays green with errors present"
         )
     else:
-        verdict = (
-            "`abortOnError = false`, so a lint error would not fail this job; "
-            "this run reported none."
-        )
+        gate = "`abortOnError = true`, so an error fails this job"
+    if errors:
+        verdict = f"{gate}; the errors below are real and unfixed."
+    else:
+        verdict = f"{gate}; this run reported none."
     head.append(
         f"{tool}: {len(errors)} errors, {len(warnings)} warnings across "
         f"{len(by_id)} issue ids. {verdict}\n"
