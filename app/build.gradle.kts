@@ -161,7 +161,11 @@ android {
   }
 
   lint {
-    abortOnError = false
+    // True again as of the 2026-10-08 lint pass: the seventeen errors the split-workflow
+    // report exposed are closed, so a red lint job means a new finding rather than the
+    // backlog. Warnings stay warnings (warningsAsErrors = false) because the 58-warning
+    // tail, 35 of them UseKtx, is a separate and much larger pass.
+    abortOnError = true
     checkReleaseBuilds = false
     ignoreWarnings = false
     warningsAsErrors = false
