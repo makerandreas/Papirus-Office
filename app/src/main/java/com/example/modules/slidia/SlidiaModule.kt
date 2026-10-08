@@ -4,6 +4,7 @@ import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalResources
 import com.example.ui.components.SaveAsDialog
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -69,6 +70,7 @@ fun SlidiaModule(
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
 
     // Room DB Metadata Repository
@@ -315,7 +317,7 @@ fun SlidiaModule(
             docTitle = savedName
             isSaved = true
             isNewDocument = false
-            Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
             pendingActionAfterSave?.invoke()
             pendingActionAfterSave = null
         }
@@ -1117,7 +1119,7 @@ fun SlidiaModule(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedButton(onClick = {
-                                            Toast.makeText(context, context.getString(R.string.toast_exported_slide_activeslideindex_1_as_png_image, activeSlideIndex + 1), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.toast_exported_slide_activeslideindex_1_as_png_image, activeSlideIndex + 1), Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(Icons.Rounded.Image, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -1277,7 +1279,7 @@ fun SlidiaModule(
                                         }
                                     }
                                     Button(
-                                        onClick = { Toast.makeText(context, context.getString(R.string.toast_applied_transitioneffect_transition_to_all_slides, transitionEffect), Toast.LENGTH_SHORT).show() },
+                                        onClick = { Toast.makeText(context, resources.getString(R.string.toast_applied_transitioneffect_transition_to_all_slides, transitionEffect), Toast.LENGTH_SHORT).show() },
                                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
                                     ) {
                                         Icon(Icons.Rounded.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -1483,7 +1485,7 @@ fun SlidiaModule(
                     if (withPassword || encryptWithGpg) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.save_as_protection_unsupported),
+                            resources.getString(R.string.save_as_protection_unsupported),
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -1783,7 +1785,7 @@ fun SlidiaModule(
                                 activePlaylistIndices = parsed
                                 playlistCurrentIndex = 0
                                 isSlideShowMode = true
-                                Toast.makeText(context, context.getString(R.string.toast_custom_show_customshowname_created_with_parsed_size, parsed.size, customShowName), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, resources.getString(R.string.toast_custom_show_customshowname_created_with_parsed_size, parsed.size, customShowName), Toast.LENGTH_SHORT).show()
                             } else {
                                 Toast.makeText(context, R.string.toast_invalid_slide_numbers, Toast.LENGTH_SHORT).show()
                             }

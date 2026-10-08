@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -634,6 +635,7 @@ fun CreateFromTemplateView(
 ) {
     val filters = listOf("All", "ODT", "ODS", "ODP")
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
 
     var templates by remember { mutableStateOf<List<TemplateManager.TemplateItem>>(emptyList()) }
@@ -892,7 +894,7 @@ fun CreateFromTemplateView(
                                         onNavigateToModule(com.example.MainActivity.openedFileType ?: "Inky")
                                     } else {
                                         // Start downloading
-                                        Toast.makeText(context, context.getString(R.string.toast_downloading_template_template_name, template.name), Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, resources.getString(R.string.toast_downloading_template_template_name, template.name), Toast.LENGTH_SHORT).show()
                                         downloadProgressMap = downloadProgressMap + (template.name to 0f)
                                         val file = TemplateManager.downloadTemplate(context, template) { prog ->
                                             downloadProgressMap = downloadProgressMap + (template.name to prog)

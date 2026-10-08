@@ -1,6 +1,7 @@
 package com.example.modules.inky
 import androidx.compose.material.icons.automirrored.rounded.*
 import android.util.Log
+import androidx.compose.ui.platform.LocalResources
 import kotlin.math.roundToInt
 import com.makerandreas.papirusoffice.data.DocumentTextProjection
 import com.makerandreas.papirusoffice.data.toOfficeDocument
@@ -92,6 +93,7 @@ fun InkyModule(
     onDynamicColorChange: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
     val preferencesRepository = remember { com.makerandreas.papirusoffice.data.InkyPreferencesRepository(context) }
     val viewOptions by preferencesRepository.viewOptionsFlow.collectAsState(initial = com.makerandreas.papirusoffice.data.InkyViewOptions())
@@ -314,7 +316,7 @@ fun InkyModule(
     // instead of closing on parse and leaving layout to an unannounced frame.
     var awaitingFirstLayout by remember { mutableStateOf(false) }
     val beginLayoutStage = {
-        loadingProgressStatus = context.getString(com.makerandreas.papirusoffice.data.LoadingStage.LAYOUT.messageRes)
+        loadingProgressStatus = resources.getString(com.makerandreas.papirusoffice.data.LoadingStage.LAYOUT.messageRes)
         awaitingFirstLayout = true
     }
     var showDocOpenFailedDialog by remember { mutableStateOf(false) }
@@ -699,8 +701,8 @@ fun InkyModule(
         statusBarObjectInfo = com.makerandreas.papirusoffice.data.navigation.StatusObjectResolver.compose(
             context = statusRanges,
             detail = statusDetail,
-            indexLabel = { kind -> context.getString(com.example.ui.components.indexKindLabelRes(kind)) },
-            join = { section, detail -> context.getString(R.string.statusbar_object_joined, section, detail) }
+            indexLabel = { kind -> resources.getString(com.example.ui.components.indexKindLabelRes(kind)) },
+            join = { section, detail -> resources.getString(R.string.statusbar_object_joined, section, detail) }
         )
         val element = if (layoutCursor.tableRow != null && layoutCursor.tableColumn != null) {
             elements.getOrNull(layoutCursor.elementIndex)
@@ -821,7 +823,7 @@ fun InkyModule(
             lastTextRecordedValue = reloadedText
             initialLoadedText = reloadedText
             isSaved = true
-            Toast.makeText(context, context.getString(R.string.toast_reload_success), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.toast_reload_success), Toast.LENGTH_SHORT).show()
             isLoadingDocument = false
             isParsingDoc = false
         }
@@ -1095,7 +1097,7 @@ fun InkyModule(
                     }
                     
                     updateInkyMetadata(it.toString(), savedName, docBodyText.text)
-                    Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, resources.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
                     pendingActionAfterSave?.invoke()
                     pendingActionAfterSave = null
                 } else {
@@ -2050,7 +2052,7 @@ fun InkyModule(
                                 docBodyText = docBodyText.copy(
                                     selection = androidx.compose.ui.text.TextRange(index, index + query.length)
                                 )
-                                Toast.makeText(context, context.getString(R.string.toast_found_match_at_character_index, index), Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, resources.getString(R.string.toast_found_match_at_character_index, index), Toast.LENGTH_SHORT).show()
                             } else if (query.isNotEmpty()) {
                                 Toast.makeText(context, R.string.toast_no_match_found, Toast.LENGTH_SHORT).show()
                             }
@@ -2191,7 +2193,7 @@ fun InkyModule(
                                                         }
                                                     } catch (e: Exception) {
                                                         e.printStackTrace()
-                                                        Toast.makeText(context, context.getString(R.string.toast_error_sharing_pdf_e_message, e.message), Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, resources.getString(R.string.toast_error_sharing_pdf_e_message, e.message), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             },
@@ -3223,7 +3225,7 @@ fun InkyModule(
                                                         // why it cannot open.
                                                         Toast.makeText(
                                                             context,
-                                                            context.getString(R.string.toast_ribbon_tab_unavailable, tab.label),
+                                                            resources.getString(R.string.toast_ribbon_tab_unavailable, tab.label),
                                                             Toast.LENGTH_SHORT
                                                         ).show()
                                                     }
@@ -3431,7 +3433,7 @@ fun InkyModule(
                                                              val dateFmt = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
                                                              val createdStr = dateFmt.format(java.util.Date(meta.createdAt))
                                                              val modifiedStr = dateFmt.format(java.util.Date(meta.lastModifiedAt))
-                                                             Toast.makeText(context, context.getString(R.string.toast_document_properties, meta.fileName, meta.fileType, meta.author, meta.wordCount, meta.characterCount, meta.paragraphCount, createdStr, modifiedStr), Toast.LENGTH_LONG).show()
+                                                             Toast.makeText(context, resources.getString(R.string.toast_document_properties, meta.fileName, meta.fileType, meta.author, meta.wordCount, meta.characterCount, meta.paragraphCount, createdStr, modifiedStr), Toast.LENGTH_LONG).show()
                                                          } else {
                                                              Toast.makeText(context, R.string.toast_no_metadata_available_for_this_document, Toast.LENGTH_SHORT).show()
                                                          }
@@ -3446,7 +3448,7 @@ fun InkyModule(
                                                  onExportPdf = {
                                                      showBottomBar = false
                                                      val baseName = docTitle.substringBeforeLast(".")
-                                                     savePdfLauncher.launch(if (baseName.isBlank()) context.getString(R.string.default_document_filename) + ".pdf" else "$baseName.pdf")
+                                                     savePdfLauncher.launch(if (baseName.isBlank()) resources.getString(R.string.default_document_filename) + ".pdf" else "$baseName.pdf")
                                                  }
                                              )
                                          }
@@ -3573,7 +3575,7 @@ fun InkyModule(
                 activeFontSize = size
                 showFontSizeDialog = false
                 triggerAutosave()
-                Toast.makeText(context, context.getString(R.string.toast_font_size_changed, size), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.toast_font_size_changed, size), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3584,7 +3586,7 @@ fun InkyModule(
             onPasteSuccess = { format ->
                 showPasteSpecialDialog = false
                 triggerAutosave()
-                Toast.makeText(context, context.getString(R.string.toast_pasted_as, format), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.toast_pasted_as, format), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -3687,7 +3689,7 @@ fun InkyModule(
                         isParsingDoc = false
                         updateActiveSession(file, parseResult.parsedDocument)
                         RecentFilesTracker.addFile(context, filePath, fileType)
-                        Toast.makeText(context, context.getString(R.string.toast_opened_file_name, file.name), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resources.getString(R.string.toast_opened_file_name, file.name), Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -3806,7 +3808,7 @@ fun InkyModule(
                 val newText = docBodyText.text.replaceRange(start, end, synonym)
                 docBodyText = docBodyText.copy(text = newText, selection = androidx.compose.ui.text.TextRange(start + synonym.length))
             } else {
-                Toast.makeText(context, context.getString(R.string.toast_selected_synonym_synonym, synonym), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.toast_selected_synonym_synonym, synonym), Toast.LENGTH_SHORT).show()
             }
         },
         onGenerateTextClick = {
@@ -3881,7 +3883,7 @@ fun InkyModule(
                                     documentNavigator.goToPage(p)
                                     showGoToPageDialog = false
                                 } else {
-                                    Toast.makeText(context, context.getString(R.string.goto_page_invalid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, resources.getString(R.string.goto_page_invalid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         ),
@@ -3897,7 +3899,7 @@ fun InkyModule(
                             documentNavigator.goToPage(p)
                             showGoToPageDialog = false
                         } else {
-                            Toast.makeText(context, context.getString(R.string.goto_page_valid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.goto_page_valid_range_toast, totalDocPages), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.testTag("btn_confirm_go_to_page")
@@ -3941,7 +3943,7 @@ fun InkyModule(
                         reminderManager.setReminder(cursorPara, cursorOffset, reminderNoteText)
                         reminderNoteText = ""
                         showSetReminderDialog = false
-                        Toast.makeText(context, context.getString(R.string.toast_reminder_set_at_paragraph_cursorpara, cursorPara), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resources.getString(R.string.toast_reminder_set_at_paragraph_cursorpara, cursorPara), Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier.testTag("btn_save_reminder")
                 ) {
@@ -4058,13 +4060,13 @@ fun InkyModule(
                     if (withPassword || encryptWithGpg) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.save_as_protection_unsupported),
+                            resources.getString(R.string.save_as_protection_unsupported),
                             Toast.LENGTH_LONG
                         ).show()
                     }
                 currentSaveMimeType = mimeType
                 val baseName = docTitle.substringBeforeLast(".")
-                currentSaveDefaultFilename = if (baseName.isBlank()) context.getString(R.string.default_document_filename) + extension else "$baseName$extension"
+                currentSaveDefaultFilename = if (baseName.isBlank()) resources.getString(R.string.default_document_filename) + extension else "$baseName$extension"
                 showSaveAsDialog = false
                 saveDocumentLauncher.launch(currentSaveDefaultFilename)
             }

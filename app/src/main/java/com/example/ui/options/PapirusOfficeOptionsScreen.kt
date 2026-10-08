@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,6 +59,7 @@ fun PapirusOfficeOptionsScreen(
     onRestartRequested: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     // Active subpage state: null means Main Options list
     var activeSubpage by remember { mutableStateOf<OptionItem?>(null) }
@@ -588,7 +590,7 @@ fun PapirusOfficeOptionsScreen(
             onDismissRequest = {
                 showResetRestartDialog = false
                 PapirusConfigManager.performReset(context, restartNow = false)
-                Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
+                Toast.makeText(context, resources.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                 onCloseOptions()
             },
             title = { Text(stringResource(R.string.restart_dialog_title), fontWeight = FontWeight.Bold) },
@@ -617,7 +619,7 @@ fun PapirusOfficeOptionsScreen(
                     onClick = {
                         showResetRestartDialog = false
                         PapirusConfigManager.performReset(context, restartNow = false)
-                        Toast.makeText(context, context.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, resources.getString(R.string.reset_prepared_toast), Toast.LENGTH_LONG).show()
                         onCloseOptions()
                     },
                     modifier = Modifier.testTag("btn_restart_later")

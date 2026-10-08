@@ -327,7 +327,9 @@ fun LayoutDrivenDocumentRenderer(
                             onViewerSelectionChange = onViewerSelectionChange,
                             onViewerToolbarRequest = onViewerToolbarRequest,
                             selectionElementIndex = selectionWindow?.elementIndex,
-                            focusRequester = focusRequesters.getOrPut(elemLayout.elementIndex) { FocusRequester() },
+                            focusRequester = remember(elemLayout.elementIndex) {
+                                focusRequesters.getOrPut(elemLayout.elementIndex) { FocusRequester() }
+                            },
                             onFieldFocused = { focusedElement = elemLayout.elementIndex }
                         )
                     }
@@ -374,7 +376,9 @@ fun LayoutDrivenDocumentRenderer(
                             onViewerSelectionChange = onViewerSelectionChange,
                             onViewerToolbarRequest = onViewerToolbarRequest,
                             selectionElementIndex = selectionWindow?.elementIndex,
-                            focusRequester = focusRequesters.getOrPut(elementIndex) { FocusRequester() },
+                            focusRequester = remember(elementIndex) {
+                                focusRequesters.getOrPut(elementIndex) { FocusRequester() }
+                            },
                             onFieldFocused = { focusedElement = elementIndex }, lineGapsBefore = gaps
                         )
                     }

@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -30,6 +31,7 @@ fun InkyViewSettingsSubpage(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
     val preferencesRepository = remember { InkyPreferencesRepository(context) }
     val viewOptions by preferencesRepository.viewOptionsFlow.collectAsState(initial = InkyViewOptions())
@@ -490,7 +492,7 @@ fun InkyViewSettingsSubpage(
                             }
                             showCustomZoomDialog = false
                         } else {
-                            Toast.makeText(context, context.getString(R.string.inky_view_custom_zoom_invalid), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.inky_view_custom_zoom_invalid), Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.testTag("btn_save_custom_zoom")

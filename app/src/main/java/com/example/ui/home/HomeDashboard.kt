@@ -4,6 +4,8 @@ import androidx.compose.material.icons.automirrored.filled.*
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.edit
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
@@ -650,6 +652,7 @@ fun HomeDashboard(
         onNavigateToModule: (String) -> Unit
     ) {
         val context = LocalContext.current
+        val resources = LocalResources.current
         var selectedFilter by remember { mutableStateOf("All") }
 
         var recentFiles by remember(searchQuery) {
@@ -707,11 +710,16 @@ fun HomeDashboard(
                 title = { Text(stringResource(R.string.doc_props_title), fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // LocalConfiguration rather than Locale.getDefault(): a read of the
+                        // default locale during composition does not recompose when the
+                        // locale changes, so the formatted date would go stale.
+                        val docPropsLocale = LocalConfiguration.current.locales
+                            .let { if (it.isEmpty) Locale.getDefault() else it.get(0) }
                         Text("${stringResource(R.string.doc_props_name)}: ${doc.name}", fontWeight = FontWeight.SemiBold)
                         Text("${stringResource(R.string.doc_props_path)}: ${doc.path}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${stringResource(R.string.doc_props_size)}: ${doc.size}")
                         Text("${stringResource(R.string.doc_props_type)}: ${doc.fileType}")
-                        Text("${stringResource(R.string.doc_props_modified)}: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(doc.lastOpened))}")
+                        Text("${stringResource(R.string.doc_props_modified)}: ${SimpleDateFormat("dd MMM yyyy, HH:mm", docPropsLocale).format(Date(doc.lastOpened))}")
                     }
                 },
                 confirmButton = {
@@ -890,7 +898,7 @@ fun HomeDashboard(
                                         com.example.MainActivity.openedFilePath = file.path
                                         com.example.MainActivity.openedFileType = file.fileType
                                         onNavigateToModule(file.fileType)
-                                        val toastMsg = context.getString(R.string.opening_file, displayNameWithSuffix)
+                                        val toastMsg = resources.getString(R.string.opening_file, displayNameWithSuffix)
                                         Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 }
@@ -1021,7 +1029,7 @@ fun HomeDashboard(
                                                 if (!File(file.path).exists()) {
                                                     showFileNotFoundDialog = true
                                                 } else {
-                                                    Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_pdf, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, resources.getString(R.string.toast_exported_displaynamewithsuffix_to_pdf, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )
@@ -1034,7 +1042,7 @@ fun HomeDashboard(
                                                     if (!File(file.path).exists()) {
                                                         showFileNotFoundDialog = true
                                                     } else {
-                                                        Toast.makeText(context, context.getString(R.string.toast_exported_displaynamewithsuffix_to_epub, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
+                                                        Toast.makeText(context, resources.getString(R.string.toast_exported_displaynamewithsuffix_to_epub, displayNameWithSuffix), Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             )

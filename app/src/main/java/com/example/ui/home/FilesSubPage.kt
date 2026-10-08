@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +49,7 @@ fun FilesSubPage(
     onNavigateToModule: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     
     val openDocumentLauncher = rememberLauncherForActivityResult(OpenDocumentWithUri()) { uri ->
         uri?.let {
@@ -78,9 +80,9 @@ fun FilesSubPage(
                 com.example.MainActivity.openedFilePath = targetFile.absolutePath
                 com.example.MainActivity.openedFileType = fileType
                 onNavigateToModule(fileType)
-                Toast.makeText(context, context.getString(R.string.toast_opening_displayname, displayName), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.toast_opening_displayname, displayName), Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(context, context.getString(R.string.toast_error_opening_file_e_message, e.message), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(R.string.toast_error_opening_file_e_message, e.message), Toast.LENGTH_SHORT).show()
             }
         }
     }

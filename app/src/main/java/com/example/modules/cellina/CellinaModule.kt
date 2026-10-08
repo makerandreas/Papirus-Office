@@ -4,6 +4,7 @@ import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalResources
 import com.example.ui.components.SaveAsDialog
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -58,6 +59,7 @@ fun CellinaModule(
     onBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val coroutineScope = rememberCoroutineScope()
     val bridge = remember { com.makerandreas.papirusoffice.data.bridge.PapirusSdkBridge.getInstance() }
 
@@ -175,7 +177,7 @@ fun CellinaModule(
             isLoadingDocument = false
 
             if (result.parsedDocument?.isParsingFailed == true) {
-                docOpenFailedError = result.parsedDocument.failureReason ?: context.getString(R.string.doc_open_failed_msg, file.name)
+                docOpenFailedError = result.parsedDocument.failureReason ?: resources.getString(R.string.doc_open_failed_msg, file.name)
                 showDocOpenFailedDialog = true
             } else if (result.text.isNotBlank()) {
                 cellValues.clear()
@@ -265,7 +267,7 @@ fun CellinaModule(
             docTitle = savedName
             isSaved = true
             isNewDocument = false
-            Toast.makeText(context, context.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, resources.getString(R.string.doc_saved_success, savedName), Toast.LENGTH_SHORT).show()
             pendingActionAfterSave?.invoke()
             pendingActionAfterSave = null
         }
@@ -1051,18 +1053,18 @@ fun CellinaModule(
                                     ) {
                                         OutlinedButton(onClick = {
                                             val newSheet = "Sheet${sheets.size + 1}"
-                                            Toast.makeText(context, context.getString(R.string.toast_inserted_newsheet, newSheet), Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, resources.getString(R.string.toast_inserted_newsheet, newSheet), Toast.LENGTH_SHORT).show()
                                         }) {
                                             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Sheet")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, context.getString(R.string.toast_inserted_row_above_row_activecellrow, activeCellRow), Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, resources.getString(R.string.toast_inserted_row_above_row_activecellrow, activeCellRow), Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.TableRows, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Row")
                                         }
-                                        OutlinedButton(onClick = { Toast.makeText(context, context.getString(R.string.toast_inserted_column_at_columnslabels_getornull, columnsLabels.getOrNull(activeCellCol - 1)), Toast.LENGTH_SHORT).show() }) {
+                                        OutlinedButton(onClick = { Toast.makeText(context, resources.getString(R.string.toast_inserted_column_at_columnslabels_getornull, columnsLabels.getOrNull(activeCellCol - 1)), Toast.LENGTH_SHORT).show() }) {
                                             Icon(Icons.Rounded.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             Text("Insert Column")
@@ -1453,7 +1455,7 @@ fun CellinaModule(
                                                 selected = selectedChartType == cType,
                                                 onClick = {
                                                     selectedChartType = cType
-                                                    Toast.makeText(context, context.getString(R.string.toast_changed_chart_to_ctype, cType), Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, resources.getString(R.string.toast_changed_chart_to_ctype, cType), Toast.LENGTH_SHORT).show()
                                                 },
                                                 label = { Text(cType.removeSuffix("Diagram")) }
                                             )
@@ -1554,7 +1556,7 @@ fun CellinaModule(
                                                 selected = currentScenarioName == scen,
                                                 onClick = {
                                                     currentScenarioName = scen
-                                                    Toast.makeText(context, context.getString(R.string.toast_switched_to_scenario_scen, scen), Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, resources.getString(R.string.toast_switched_to_scenario_scen, scen), Toast.LENGTH_SHORT).show()
                                                 },
                                                 label = { Text(scen) }
                                             )
@@ -1580,7 +1582,7 @@ fun CellinaModule(
                                                 isFrozenPane = !isFrozenPane
                                                 Toast.makeText(
                                                     context,
-                                                    if (isFrozenPane) context.getString(R.string.toast_frozen_pane_at_col_row, activeCellCol, activeCellRow) else context.getString(R.string.toast_unfrozen_panes),
+                                                    if (isFrozenPane) resources.getString(R.string.toast_frozen_pane_at_col_row, activeCellCol, activeCellRow) else resources.getString(R.string.toast_unfrozen_panes),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             },
@@ -1764,7 +1766,7 @@ fun CellinaModule(
                     if (withPassword || encryptWithGpg) {
                         Toast.makeText(
                             context,
-                            context.getString(R.string.save_as_protection_unsupported),
+                            resources.getString(R.string.save_as_protection_unsupported),
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -1819,7 +1821,7 @@ fun CellinaModule(
                         onClick = {
                             cellValues["A5"] = "Pivot Summary"
                             cellValues["B5"] = "96700"
-                            Toast.makeText(context, context.getString(R.string.toast_datapilot_pivot_table_created_aggfunc_on_rowdim_x, aggFunc, rowDim, colDim), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.toast_datapilot_pivot_table_created_aggfunc_on_rowdim_x, aggFunc, rowDim, colDim), Toast.LENGTH_SHORT).show()
                             showDataPilotDialog = false
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
@@ -1894,7 +1896,7 @@ fun CellinaModule(
                             addInResultText = "$res"
                             val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
                             cellValues[activeCellKey] = "$res"
-                            Toast.makeText(context, context.getString(R.string.toast_selectedaddinfunc_returned_res, selectedAddInFunc, res), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, resources.getString(R.string.toast_selectedaddinfunc_returned_res, selectedAddInFunc, res), Toast.LENGTH_SHORT).show()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = moduleColor)
                     ) {
@@ -1916,7 +1918,7 @@ fun CellinaModule(
                 onInsertFormToDoc = { formSchema ->
                     val activeCellKey = "${columnsLabels.getOrNull(activeCellCol - 1) ?: "A"}$activeCellRow"
                     cellValues[activeCellKey] = "[Form: ${formSchema.title}]"
-                    Toast.makeText(context, context.getString(R.string.toast_inserted_form_reference_into_activecellkey, activeCellKey), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, resources.getString(R.string.toast_inserted_form_reference_into_activecellkey, activeCellKey), Toast.LENGTH_SHORT).show()
                 }
             )
         }
