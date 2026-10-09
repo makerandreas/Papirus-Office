@@ -1,0 +1,122 @@
+name: Record Goldens
+
+# Records the Roborazzi golden screenshots and opens them as a pull request.
+#
+# Why this is a workflow and not a commit. Goldens are pixels, and pixels are
+# produced by a renderer: the Roborazzi native backend, the JVM, the NDK and the
+# Android SDK on the runner. This repository is worked from a sandbox with no
+# Gradle and no Android SDK, and Actions redirects artifact downloads to
+# productionresultssa1.blob.core.windows.net, which that sandbox cannot reach. So
+# the 13 PNGs that ci.yml records on every run are real but not retrievable from
+# here, and the only way to get them into the tree is to let a runner commit them.
+#
+# It opens a pull request rather than pushing to the branch on purpose. A
+# rebaseline is a decision: it makes whatever the app draws right now the thing
+# every later run is compared against, so a wrong pixel becomes the reference
+# instead of the failure. The owner reviews the images before that happens.
+#
+# Nothing verifies goldens yet. ci.yml runs `testDebugUnitTest` with
+# `roborazzi.test.record=true`, which overwrites rather than compares, and
+# `verifyRoborazziDebug` does not appear in this repository. Switching ci.yml to
+# verify is a separate commit that must land after the goldens this workflow
+# produces, or CI goes red on the first run.
+#
+# Manual only. Re-recording on every push would silently absorb every rendering
+# change into the baseline, which is the opposite of what a golden is for.
+on:
+  workflow_dispatch:
+    inputs:
+      base_branch:
+        description: 'Branch to record from and to open the pull request against'
+        required: true
+        default: 'main'
+        type: string
+
+env:
+  GRADLE_OPTS: "-Djava.awt.headless=true -Dfile.encoding=UTF-8"
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  GOOGLE_CSE_CX: ${{ secrets.GOOGLE_CSE_CX }}
+  GOOGLE_CSE_API_KEY: ${{ secrets.GOOGLE_CSE_API_KEY }}
+  GOOGLE_FONTS_REST_API: ${{ secrets.GOOGLE_FONTS_REST_API || secrets.GOOGLE_FONTS_API_KEY }}
+  GOOGLE_FONTS_API_KEY: ${{ secrets.GOOGLE_FONTS_API_KEY || secrets.GOOGLE_FONTS_REST_API }}
+
+jobs:
+  record:
+    name: Record Roborazzi goldens
+    # Same pin as ci.yml. A goldens baseline recorded on a different image from
+    # the one that later verifies it is a baseline nobody can reproduce, and
+    # actions/runner-images#14748 moves `ubuntu-latest` from 24.04 to 26.04
+    # between 2026-10-19 and 2026-11-19.
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write      # push the recorded PNGs
+      pull-requests: write # open them for review
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.base_branch }}
+          lfs: true
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Record goldens
+        run: |
+          chmod +x gradlew
+          mkdir -p build
+          set -o pipefail
+          ./gradlew testDebugUnitTest -Proborazzi.test.record=true 2>&1 | tee build/gradle-record.log
+
+      # Every captureRoboImage call in the five screenshot test classes writes to
+      # app/src/test/screenshots/, which is what gets committed. The 13 come from
+      # GreetingScreenshotTest (1) plus four module snapshot classes (3 each).
+      - name: Summarise what was recorded
+        run: |
+          echo "### Recorded goldens" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          git status --porcelain app/src/test/screenshots/ >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "PNGs now tracked or new:" >> "$GITHUB_STEP_SUMMARY"
+          ls -l app/src/test/screenshots/*.png | awk '{print "  " $9 " " $5 " B"}' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload goldens as an artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: recorded-goldens
+          path: app/src/test/screenshots/
+          if-no-files-found: error
+          retention-days: 14
+
+      # Both messages are single-paragraph on purpose. A multi-line commit body
+      # here would have to be indented to stay inside the `run` block scalar, and
+      # every line of that indent would end up in the commit message.
+      - name: Open a pull request with the new baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain app/src/test/screenshots/)" ]; then
+            echo "Nothing changed under app/src/test/screenshots/; not opening a pull request."
+            exit 0
+          fi
+          branch="goldens/record-${GITHUB_RUN_NUMBER}"
+          count="$(ls app/src/test/screenshots/*.png | wc -l | tr -d ' ')"
+          image="$(lsb_release -ds)"
+          short="${GITHUB_SHA:0:7}"
+          git checkout -b "$branch"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/test/screenshots/
+          git commit -m "Record Roborazzi goldens" -m "${count} PNGs recorded on ${image} by run ${GITHUB_RUN_NUMBER} from ${short}. Recorded by a runner rather than committed by hand: goldens are a product of the Roborazzi native renderer, the JVM and the Android SDK on the image, and the sandbox this repository is normally worked from has none of them."
+          git push origin "$branch"
+          gh pr create \
+            --base "${{ inputs.base_branch }}" \
+            --head "$branch" \
+            --title "Record Roborazzi goldens (run ${GITHUB_RUN_NUMBER})" \
+            --body "Baseline recorded on \`ubuntu-24.04\` by run \`${GITHUB_RUN_NUMBER}\` from \`${short}\`. Review the images before merging: whatever they show becomes what every later \`verifyRoborazziDebug\` run is compared against. \`ci.yml\` still records rather than verifies, and switching it over is a separate change that must not land before this one."
