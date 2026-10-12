@@ -1,13 +1,17 @@
 package com.makerandreas.papirusoffice.data.crash
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import java.io.File
 import java.text.SimpleDateFormat
@@ -70,6 +74,7 @@ object CrashHandlerManager {
         }
     }
 
+    @SuppressLint("NotificationPermission")
     fun sendCrashNotification(context: Context, errorSummary: String, stackTrace: String) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -161,7 +166,13 @@ object CrashHandlerManager {
                 .addAction(android.R.drawable.ic_menu_share, "Share", sharePendingIntent)
                 .build()
 
-            notificationManager.notify(CrashNotificationReceiver.NOTIFICATION_ID, notification)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationManager.notify(CrashNotificationReceiver.NOTIFICATION_ID, notification)
+            } else {
+                Log.w(TAG, "Cannot post crash notification: POST_NOTIFICATIONS permission not granted")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed sending crash notification", e)
         }
