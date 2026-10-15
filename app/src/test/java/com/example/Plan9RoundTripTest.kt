@@ -6,6 +6,7 @@ import com.makerandreas.papirusoffice.data.DocumentBody
 import com.makerandreas.papirusoffice.data.DocumentMetadata
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OdtPackageData
+import com.makerandreas.papirusoffice.data.OfficeDocumentElement
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import com.makerandreas.papirusoffice.data.OfficeElement
 import com.makerandreas.papirusoffice.data.OfficeHeading
@@ -15,6 +16,7 @@ import com.makerandreas.papirusoffice.data.OfficeTable
 import com.makerandreas.papirusoffice.data.OfficeTableCell
 import com.makerandreas.papirusoffice.data.OfficeTableRow
 import com.makerandreas.papirusoffice.data.OfficeTextRun
+import com.makerandreas.papirusoffice.data.TableCellOccupancy
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
 import kotlinx.coroutines.runBlocking
@@ -463,6 +465,144 @@ class Plan9RoundTripTest {
             "manifest:version is the manifest format and stays 1.2:\n$manifest",
             manifest.contains("manifest:version=\"1.2\"")
         )
+    }
+
+    // ------------------------------------------------------------------
+    // Commit 3: ODT lists and tables
+    // ------------------------------------------------------------------
+
+    private fun generatedContentXml(document: OfficeDocument): String =
+        zipEntries(OdtDocumentWriter().write(document))["content.xml"]
+            ?: error("the package must contain a content.xml")
+
+    /** Counts `<text:list>` and `<text:list …>` without matching `<text:list-item>`. */
+    private fun listOpens(content: String): Int = Regex("<text:list[ >]").findAll(content).count()
+
+    @Test
+    fun consecutiveListItemsShareOneListInsteadOfOneEach() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = (1..5).map { OfficeListItem("Item $it", bullet = "$it. ") }
+            )
+        )
+        val content = generatedContentXml(document)
+        assertEquals(
+            "five consecutive items belong in one list, not five separate ones:\n$content",
+            1,
+            listOpens(content)
+        )
+        assertEquals(
+            "all five items must be written:\n$content",
+            5,
+            Regex("<text:list-item>").findAll(content).count()
+        )
+    }
+
+    @Test
+    fun nestedListLevelsProduceNestedLists() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeListItem("Top", level = 1),
+                    OfficeListItem("Nested a", level = 2),
+                    OfficeListItem("Nested b", level = 2),
+                    OfficeListItem("Back to top", level = 1)
+                )
+            )
+        )
+        val content = generatedContentXml(document)
+        assertEquals(
+            "one outer list and one nested list:\n$content",
+            2,
+            listOpens(content)
+        )
+        assertEquals(
+            "every opened list must be closed:\n$content",
+            2,
+            Regex("</text:list>").findAll(content).count()
+        )
+        assertEquals(
+            "every opened list item must be closed:\n$content",
+            4,
+            Regex("</text:list-item>").findAll(content).count()
+        )
+    }
+
+    @Test
+    fun tableCellSpansAreWrittenAndCoveredSlotsAreSkipped() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeTable(
+                        numColumns = 0,
+                        rows = listOf(
+                            OfficeTableRow(
+                                cells = listOf(
+                                    OfficeTableCell("Spans two", columnSpan = 2),
+                                    OfficeTableCell("", occupancy = TableCellOccupancy.COVERED)
+                                )
+                            ),
+                            OfficeTableRow(
+                                cells = listOf(OfficeTableCell("Left"), OfficeTableCell("Right"))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a two-column span must be written:\n$content",
+            content.contains("table:number-columns-spanned=\"2\"")
+        )
+        assertEquals(
+            "a covered slot must not become a phantom cell that shifts the columns:\n$content",
+            3,
+            Regex("<table:table-cell").findAll(content).count()
+        )
+    }
+
+    @Test
+    fun cellStyleNamesAreWritten() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeTable(
+                        numColumns = 1,
+                        rows = listOf(
+                            OfficeTableRow(cells = listOf(OfficeTableCell("Styled", styleName = "Table1.A")))
+                        )
+                    )
+                )
+            )
+        )
+        assertTrue(
+            "a cell style must be written:\n${generatedContentXml(document)}",
+            generatedContentXml(document).contains("table:style-name=\"Table1.A\"")
+        )
+    }
+
+    @Test
+    fun aFiveItemListSurvivesTheRoundTrip() = runBlocking {
+        val document = OfficeDocument(
+            body = DocumentBody(elements = (1..5).map { OfficeListItem("Item $it") })
+        )
+        val target = scratch("list-roundtrip.odt")
+        try {
+            target.writeBytes(OdtDocumentWriter().write(document))
+            val reopened = OfficeDocumentParser(context).parseDocument(target, bypassCache = true)
+            assertFalse(
+                "a generated list document must re-open: ${reopened.failureReason}",
+                reopened.isParsingFailed
+            )
+            assertEquals(
+                "all five list items must survive the round trip",
+                5,
+                reopened.elements.filterIsInstance<OfficeDocumentElement.ListItem>().size
+            )
+        } finally {
+            target.delete()
+        }
     }
 
     // ------------------------------------------------------------------

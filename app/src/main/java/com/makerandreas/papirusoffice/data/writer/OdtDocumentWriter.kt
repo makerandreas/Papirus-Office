@@ -287,9 +287,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
         val sink = DerivedStyleSink(alloc)
         val ctx = WriteContext(imageHrefs, names, sink)
         val body = StringBuilder()
-        for (element in document.body.elements) {
-            writeElement(body, element, ctx)
-        }
+        writeElements(body, document.body.elements, ctx)
 
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
@@ -425,6 +423,81 @@ class OdtDocumentWriter : DocumentFormatWriter {
         }
     }
 
+    /**
+     * Writes the body, grouping consecutive list items into one list.
+     *
+     * Section 0.1's defect: `writeElement` opened and closed a `<text:list>`
+     * around every single item, so a five-item list was written as five
+     * one-item lists and the numbering restarted at 1 on each line.
+     */
+    private fun writeElements(sb: StringBuilder, elements: List<OfficeElement>, ctx: WriteContext) {
+        var i = 0
+        while (i < elements.size) {
+            val element = elements[i]
+            if (element is OfficeListItem) {
+                var end = i + 1
+                while (end < elements.size && elements[end] is OfficeListItem) end++
+                @Suppress("UNCHECKED_CAST")
+                val run = elements.subList(i, end) as List<OfficeListItem>
+                writeListRun(sb, run, ctx)
+                i = end
+            } else {
+                writeElement(sb, element, ctx)
+                i++
+            }
+        }
+    }
+
+    /**
+     * One list for the whole run. A deeper item nests inside the previous
+     * item's `<text:list-item>`, which is deliberately left open until the
+     * level comes back up; that is how ODF expresses an outline level.
+     */
+    private fun writeListRun(sb: StringBuilder, items: List<OfficeListItem>, ctx: WriteContext) {
+        var openLists = 0
+        var currentLevel = 0
+        var previousLevel = 0
+        for (item in items) {
+            val level = if (item.level > 0) item.level else 1
+            if (openLists == 0) {
+                sb.append(listOpenTag(item))
+                openLists = 1
+                currentLevel = level
+            } else if (level > currentLevel) {
+                sb.append(listOpenTag(item))
+                openLists++
+                currentLevel = level
+            } else {
+                while (currentLevel > level && openLists > 0) {
+                    sb.append("</text:list-item></text:list>\n")
+                    openLists--
+                    currentLevel--
+                }
+                if (previousLevel >= level) sb.append("</text:list-item>\n")
+            }
+            sb.append("<text:list-item><text:p>")
+            writeRunsOrText(sb, item.text, item.runs, ctx)
+            sb.append("</text:p>")
+            previousLevel = level
+        }
+        while (openLists > 0) {
+            sb.append("</text:list-item></text:list>\n")
+            openLists--
+        }
+    }
+
+    private fun listOpenTag(item: OfficeListItem): String {
+        val styleAttr = item.styleName?.takeIf { it.isNotBlank() }
+            ?.let { " text:list-style-name=\"${escapeXml(it)}\"" } ?: ""
+        return "      <text:list$styleAttr>"
+    }
+
+    /** Columns a row really occupies, counting a spanned cell once. */
+    private fun tableSlotCount(table: OfficeTable): Int =
+        table.rows.maxOfOrNull { row ->
+            row.cells.filter { it.occupancy == TableCellOccupancy.ORIGIN }.sumOf { it.columnSpan }
+        }?.takeIf { it > 0 } ?: 1
+
     private fun writeElement(sb: StringBuilder, element: OfficeElement, ctx: WriteContext) {
         val imageHrefs = ctx.imageHrefs
         val names = ctx.names
@@ -443,19 +516,35 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 sb.append("</text:h>\n")
             }
             is OfficeListItem -> {
-                sb.append("      <text:list><text:list-item><text:p>")
-                writeRunsOrText(sb, element.text, element.runs, ctx)
-                sb.append("</text:p></text:list-item></text:list>\n")
+                // Reached only outside a run; writeElements groups runs before
+                // they get here, so this is the single-item case.
+                writeListRun(sb, listOf(element), ctx)
             }
             is OfficeTable -> {
                 val tableName = names.table
-                val cols = if (element.numColumns > 0) element.numColumns else (element.rows.maxOfOrNull { it.cells.size } ?: 1)
+                val cols = if (element.numColumns > 0) element.numColumns else tableSlotCount(element)
                 sb.append("      <table:table table:name=\"$tableName\" table:style-name=\"$tableName\">\n")
                 sb.append("        <table:table-column table:style-name=\"${names.tableColumn}\" table:number-columns-repeated=\"$cols\"/>\n")
                 for (row in element.rows) {
                     sb.append("        <table:table-row>\n")
                     for (cell in row.cells) {
-                        sb.append("          <table:table-cell office:value-type=\"string\">\n")
+                        // A covered slot belongs to a cell that already spans
+                        // it. Writing it again would add a phantom cell and
+                        // shift every column after it.
+                        if (cell.occupancy != TableCellOccupancy.ORIGIN) continue
+                        val cellAttrs = StringBuilder()
+                        if (cell.columnSpan > 1) {
+                            cellAttrs.append(" table:number-columns-spanned=\"${cell.columnSpan}\"")
+                        }
+                        if (cell.rowSpan > 1) {
+                            cellAttrs.append(" table:number-rows-spanned=\"${cell.rowSpan}\"")
+                        }
+                        // The cell style is the document's own name, so
+                        // decision D4 says it is written as it arrived.
+                        cell.styleName?.takeIf { it.isNotBlank() }?.let {
+                            cellAttrs.append(" table:style-name=\"${escapeXml(it)}\"")
+                        }
+                        sb.append("          <table:table-cell office:value-type=\"string\"$cellAttrs>\n")
                         if (cell.paragraphs.isNotEmpty()) {
                             for (p in cell.paragraphs) {
                                 sb.append("            <text:p>")
