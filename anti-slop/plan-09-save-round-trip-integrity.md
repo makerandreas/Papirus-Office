@@ -624,3 +624,35 @@ as separate PRs on the same grounds.
   **bookmarks survive a real save-and-reopen**, which is the assertion §2.1 item 7 exists for.
   **Page breaks are still not written.** They appear in §0.1's dropped table but not in §2.1's
   scope list, so they stay dropped and are recorded here rather than quietly forgotten.
+* **2026-10-15, commit 5 (the wrappers leave the write path) written.** Finding F-2, ODT side.
+  `writeElement`'s three `OfficeDocElement.ParagraphElement` / `TableElement` / `ImageElement`
+  branches are gone; `writeElements` now unwraps every element once, up front, so `writeElement`
+  only ever sees direct implementors.
+  **They could not simply be deleted, and this is the one place the plan's own wording was
+  optimistic.** §6 called this commit "mechanical; the compiler is the reviewer". It is not.
+  `DocumentTextMerger.replaceText` (`DocumentTextMerger.kt:120`) still constructs
+  `OfficeDocElement.ParagraphElement`, and its own comment says the arm is defensive because
+  runtime import paths emit direct implementors — so a wrapper reaching the writer is unlikely but
+  not impossible, and an unhandled one falls through `writeElement`'s empty `else` and **vanishes
+  from the saved file**. Deleting the branches would have turned a rare code path into silent data
+  loss, which is the exact failure this plan exists to close. Unwrapping is total over the sealed
+  class, so nothing that arrives can be dropped regardless of which arm produced it.
+  The unwrap also covers `ShapeElement`, `BookmarkElement`, `HyperlinkElement` and `FieldElement`,
+  none of which had a branch. **A wrapped hyperlink used to be lost on save; it is written now.**
+  The read paths keep their own `OfficeDocElement` handling deliberately:
+  `hasUnsupportedTableSemantics` must still recognise a wrapped table as unsupported, and
+  `collectImages` must still find a wrapped image.
+  One test, `wrappedElementsStillWriteTheirContent`, asserting a wrapped paragraph, table and
+  hyperlink all survive. Twenty-one in the file.
+  **CI run `38815868265`, head `ab2ae9d`: all twenty-one pass.** `Unit tests: 456 run, 0 failed, 0
+  errors, 0 skipped (41.97s across 83 suites)`, with `Plan9RoundTripTest | 21 | 0 | 0 | 0 | 1.48`
+  and `FixtureIdentityTest | 1 | 0 | 0 | 0`. The count went **455 → 456**, exactly the one new
+  test. **The 12-file matrix did not move for the fifth commit running**: ODT `14/23/21/10/18/20`,
+  DOCX `16/26/23/12/20/24`, every column identical to the four runs before this plan started.
+  The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`, unchanged.
+* **2026-10-15, Plan 9's ODT half is complete.** Five commits, 435 → 456 tests, two CI-caught
+  compile failures, no fixture page count moved in five consecutive runs. **A JDK handoff brief
+  lives at `anti-slop/plan-09-jdk-handoff.md`**, written for `gemini-3.8-flash` in Google AI
+  Studio. Its highest-value task is one CI structurally cannot do: **every round-trip assertion
+  here re-opens the saved file with the app's own parser, so a bug shared by the writer and the
+  parser passes both.** An independent ODF reader is the only thing that can catch that.
