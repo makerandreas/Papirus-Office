@@ -46,11 +46,12 @@ tier-1 measurement of files in this checkout or a tier-3 figure from a run id na
 | B | **The dead-code ledger re-measured: 4 dead files, of which 2 were already deleted once.** `StorageProvider.kt`, `KeyboardShortcutHandler.kt`, `FontScanner.kt`, `FontSyncService.kt`, plus `data/writer/SwTextAttr.kt` | §3, external-reference counts | No |
 | C | **`audit-023`'s "0 unused imports" does not hold.** 7 unused import lines across 6 live files, plus 1 inside a dead file. The earlier scan appears to have counted comment and string occurrences as uses | §3.2 | No |
 | D | **The 62-warning backlog is exactly as `audit-024` left it, and the tree still carries every site.** All 8 ids and their line numbers re-checked | §4 | No |
-| E | **Goldens are unblocked and still not recorded.** `goldens.yml` has **zero** runs. One tracked PNG, `greeting.png`. `verifyRoborazziDebug` still appears nowhere | §5 | **Yes, if you want Plan 9 reviewed against pixels** |
+| E | ~~**Goldens are unblocked and still not recorded.**~~ **CLOSED 2026-10-15.** Run `38754267188` recorded 13 PNGs; PR #41 merged into `main`. What remains open is narrower: `ci.yml` still *records* rather than *verifies*, so the baseline is review-only, not enforced | §5, §5.1 | No |
 | F | **The documentation drifted again.** 8 measured stale `file:line` claims, one of them citing line numbers in a file that is 150 lines shorter than the citation | §6 | No, but each one is a future wrong fix |
 | G | **The audit trail is severed.** `main` is one commit; `8796828`, `d7541f2`, `aec1672`, `912de8e`, `ef2945b`, `6b2dfea`, `c61e970`, `307f01a` all fail `git cat-file -e` | §7 | No, but it costs every future audit |
 | H | **The reminder is still write-only.** `setReminder` has one call site (`InkyModule.kt:3943`); `getReminders`, `nextReminder`, `previousReminder` and `removeReminder` have zero outside `ReminderManager.kt` | §9 | No. Plan 11 owns the UI |
 | I | **Plan 9's own pre-change gate has not been written.** `plan-04-to-09-writer-fidelity.md` § Plan 9 says "scope is firmed by a short plan document before this PR starts; do not start it from this paragraph alone", and no such document exists | §10 | **Yes. This is the real blocker** |
+| J | **The default template carries styles and no content part.** `Default.ott` (8,729 B) has `mimetype`, `META-INF/manifest.xml`, `meta.xml`, `styles.xml`, `Thumbnails/thumbnail.png` — no `content.xml`, no `settings.xml`. Its manifest declares no missing part, so it is consistent, not corrupt. `InkyModule.kt:3426` uses it as the fallback current path. Every sample file *does* have a `content.xml`, so a round-trip test built only on samples never exercises creating one | §5.1 | No, but it should shape Plan 9's test list |
 
 **The short answer to the owner's question:** the debris is real but almost none of it gates Plan
 9. Exactly two things do, and they are both cheap. Recommendation in §11.
@@ -250,7 +251,7 @@ lint 9.4.1. (Proposed replacement text is in §6.)
 
 ---
 
-## 5. Goldens: unblocked since 2026-10-09, still not recorded
+## 5. Goldens: unblocked 2026-10-09, recorded 2026-10-15 — see §5.1
 
 | Check | Result |
 |---|---|
@@ -287,6 +288,91 @@ changes an artifact and no job notices. For Plan 9 specifically, the consequence
 still real: Plan 9 rewrites the save path, whose visible output is a re-opened document, and
 "the re-opened document looks wrong" is precisely the class of failure a recorded golden catches
 and a passing unit test does not.
+
+### 5.1 What happened next: the owner dispatched it, and the run is a clean bill of health
+
+The owner dispatched the workflow from `main` on 2026-10-15. This section is the read of that
+log, and it is the evidence for Recommendation item 3 being closed and for starting Plan 9.
+
+**Run identity.** Workflow `Record Goldens` (id `379134664`), run `38754267188`, from `53d61ac`,
+runner `ubuntu-24.04` (image `20261012.334.1`), `Zulu 17.0.20+8`, Gradle `9.8.1`. Job
+`Record Roborazzi goldens` ran `2026-10-15T14:45:41Z` → `14:51:51Z`, `BUILD SUCCESSFUL in 5m 26s`,
+35 tasks executed. Artifact `recorded-goldens`, 568,162 B, id `11983850657`, 14-day retention,
+SHA256 `bec4953fe5bf994e8120d3ced0698ea894a194d4f37bd67e9e98fac8bc3ac189`. PR **#41** was opened
+from branch `goldens/record-1` and is **MERGED** into `main`. Thirteen PNGs, all `create mode
+100644` except `greeting.png`, which was re-recorded over the pre-existing file.
+
+**What the workflow actually ran.** `./gradlew testDebugUnitTest -Proborazzi.test.record=true` —
+the whole unit suite, the same command `ci.yml`'s test job runs. This matters for reading the log:
+it is a full 435-test run with test stdout, not a screenshot-only job, so its printed measurements
+are directly comparable with the CI reports on PR #39 and PR #40.
+
+**The headline is that nothing moved.** The plan 5A dump summary printed by
+`PaginationFidelityTest` is identical, column for column, in all three runs — `37860478309`
+(PR #39, the Compose upgrade head), `38750210445` (PR #40, this branch after the housekeeping
+deletions) and `38754267188` (the goldens run on `main`):
+
+| file | pages | ref | window | thin | empty | breaks | blank |
+|---|---|---|---|---|---|---|---|
+| Sample-1.odt | 14 | 15 | 12..18 | 0 | 0 | 0 | 9 |
+| Sample-1.docx | 16 | 15 | 12..18 | 0 | 0 | 0 | 9 |
+| Sample-2.odt | 23 | 23 | 18..28 | 1 | 0 | 2 | 27 |
+| Sample-2.docx | 26 | 23 | 18..28 | 0 | 0 | 0 | 29 |
+| Sample-3.odt | 21 | 22 | 18..26 | 3 | 0 | 0 | 1 |
+| Sample-3.docx | 23 | 22 | 18..26 | 2 | 0 | 0 | 1 |
+| Sample-4.odt | 10 | 11 | 9..13 | 0 | 0 | 2 | 15 |
+| Sample-4.docx | 12 | 10 | 8..12 | 2 | 0 | 0 | 19 |
+| Sample-5.odt | 18 | 19 | 15..23 | 0 | 0 | 2 | 16 |
+| Sample-5.docx | 20 | 18 | 15..21 | 1 | 0 | 0 | 19 |
+| Sample-6.odt | 20 | 22 | 17..27 | 0 | 0 | 2 | 14 |
+| Sample-6.docx | 24 | 21 | 15..26 | 1 | **1** | 0 | 18 |
+
+All twelve files stay inside their recorded windows. `Plan6cLoadingProgressTest` agrees:
+Sample-6.odt `parse=35 ms layout=75 ms pages=20`, Sample-6.docx `parse=40 ms layout=53 ms pages=24`.
+`FragmentPaginationTest`'s stress case is `backend=table pages=587 paragraphs=160 measurements=160
+elapsedMs=409`, the same 587 as before.
+
+**The one number that looked new is not new.** `Sample-6.docx` reports `empty 1`: page 2 has
+`0` elements, `first -`, `last -`, `reserved 0.0`, `leftover 930.7`, `endedBy BREAK`. That is a
+genuinely blank page in the middle of the document. It is also in PR #39's report (`37860478309`)
+with the same page count of 24 and the same thin count of 1, which means it predates the Compose
+upgrade, predates this branch and predates the goldens run. It is the recorded baseline, not a
+regression, and not something Plan 9 introduced. Whether it *should* be there is a layout question
+for whoever touches pagination; it is not a blocker.
+
+**The Robolectric SDK warning is a non-issue for this run.** The log prints
+`[Robolectric] WARN: Android SDK 36 requires Java 21 (have Java 17). Tests won't be run on SDK 36
+unless explicitly requested.` Every Robolectric test class in the project pins the SDK: all 49
+files that use `RobolectricTestRunner` carry `@Config`, and all 60 `@Config` occurrences pin
+`sdk = [34]`. No test asks for SDK 36, so no test was skipped. It goes live the moment
+`targetSdk 36` stops being theoretical or someone bumps a pin, and bumping any one of those 60 pins
+invalidates all thirteen goldens at once — they are SDK-34 goldens.
+
+**Goldens are recorded but still not enforced.** `ci.yml` passes
+`-Proborazzi.test.record=true`, which overwrites rather than compares, and `verifyRoborazziDebug`
+still does not exist in the repository (three grep hits: one in `goldens.yml`'s own comments, two
+in audit files). So the thirteen PNGs on `main` are a reference baseline for review, not a gate.
+Switching `ci.yml` to verify is a separate, deliberate commit that had to land *after* these
+goldens, and it still has not been made. Until it is, a future change that alters a screen will
+not fail CI.
+
+**One new thing the run surfaced, which belongs to Plan 9.** `testDefaultOttDiagnostic` prints
+`content.xml FAIL` and `settings.xml FAIL`. That is a printer, not a failure — the test only
+`println`s PASS/FAIL per part and asserts nothing, which is why the build stayed green. The fact
+behind it is real and measurable:
+`app/src/main/assets/templates/styles/Default.ott` (8,729 B) contains exactly five parts —
+`mimetype` 48 B, `META-INF/manifest.xml` 538 B, `meta.xml` 591 B, `styles.xml` 11,569 B,
+`Thumbnails/thumbnail.png` 5,826 B. There is no `content.xml` and no `settings.xml`. The manifest
+lists only `Thumbnails/thumbnail.png`, `styles.xml` and `meta.xml`, so it declares no part the
+package does not contain — the file is internally consistent, just styles-only.
+`InkyModule.kt:3426` is the consumer: it falls back to `templates/styles/Default.ott` as the
+current path when no document is open.
+
+The consequence for Plan 9 is concrete. Every one of the six samples has a `content.xml` to
+re-save, so a round-trip test built only on the samples never exercises *creating* one. The first
+save of a document created from the default template has to. Plan 9's round-trip test should
+therefore include a "new document → type something → save → close → reopen" case alongside the
+sample-file cases, because that is the path with no `content.xml` to fall back on.
 
 ---
 
@@ -452,7 +538,22 @@ and Plan 9, and it is a writing job, not a code job.
    place and will catch an accidental rewrite, which is the right outcome, but the plan document
    has to say where the round-trip output goes and how the manifest is updated.
 2. **The goldens.** If Plan 9 is the first PR reviewed against recorded pixels, the goldens have
-   to exist before it starts, not during it.
+   to exist before it starts, not during it. **Satisfied 2026-10-15**: the 13 PNGs are on `main`
+   via PR #41 (§5.1).
+
+**Update 2026-10-15.** Both of the things that were standing between the tree and Plan 9 are now
+closed: the plan document exists as `anti-slop/plan-09-save-round-trip-integrity.md`, and the
+goldens are recorded and merged. Two notes belong alongside that, and both came out of reading
+the goldens run (§5.1):
+
+* Plan 9's round-trip test list should gain a **new-document** case. The default template
+  `templates/styles/Default.ott` has no `content.xml` (§5.1, finding J), so "new → type → save →
+  close → reopen" is the only path where the writer has to create that part rather than update it.
+  The six samples all have one, so a test built only on samples never reaches that branch.
+* The goldens are a **baseline, not a gate**. `ci.yml` still records. Plan 9 will change what a
+  re-opened document looks like, which is exactly the thing a golden would catch — but only if
+  someone runs `verifyRoborazziDebug`. Until `ci.yml` is switched, Plan 9's visual review is a
+  manual act: compare the 13 PNGs before and after.
 
 ---
 
@@ -476,8 +577,8 @@ one is parked, and `audit-024` plus this document carry that.
 |---|---|---|---|
 | 1 | **Housekeeping** | Re-delete `StorageProvider.kt` and `KeyboardShortcutHandler.kt`; delete the 7 unused imports; delete the three unreferenced JPGs (owner's call on the last one); update `plan-01` §6 and this audit | Pure deletion, compiler is the reviewer, and it settles the "deleted twice" problem before anything else touches `data/` |
 | 2 | **Plan 9 plan document** | One file in `anti-slop/`, following the shape of `plan-3d-strings-sweep.md`: scope, files, tests, acceptance, and the two decisions in §10 | This is the actual gate. Nothing else in tier 1 is |
-| 3 | **Goldens** | Dispatch `goldens.yml` once from `main`, review the 13 PNGs it opens as a pull request, merge | Makes Group B and every later visual change reviewable. Owner-only, and it is one button |
-| 4 | **Plan 9** | As its plan document specifies | The slot after these |
+| 3 | **Goldens** — **DONE 2026-10-15** | Dispatched from `main`, run `38754267188`, 13 PNGs on `ubuntu-24.04`, opened as PR #41 and merged | Group B and every later visual change are now reviewable against pixels. Two follow-ups are *not* done: switching `ci.yml` from record to verify, and re-recording if any of the 60 `sdk = [34]` pins ever moves |
+| 4 | **Plan 9** | As its plan document specifies, plus one test case §5.1 argues for: new document → type → save → close → reopen, which is the only path that has to *create* `content.xml` | The slot after these. Everything in the first three rows is now closed |
 | after | **Warning Groups A, then B, then C** | As `audit-024` sequenced them, with Group B reviewed against the goldens | Independent of Plan 9; A and C can be prepared any time |
 
 **Two habits worth adopting, both cheap:**
@@ -494,11 +595,14 @@ one is parked, and `audit-024` plus this document carry that.
 
 * **Nothing was built, run, or linted here.** No Gradle, no Android SDK, no JDK, no Robolectric,
   no Compose, no MockK. Every build, test and lint figure is CI's and carries the run id it came
-  from: `38231653018` for the gate on HEAD, `37860478309` for the 62 warnings.
-* **The test count is not re-measured.** 435 tests across 82 suites is the PR #38 figure
-  (`37824259896`) and the PR #39 figure (`37858250791`). The re-upload changed no test source, so
-  435 is the expectation, not a measurement. A push to `main` posts no CI report, so no number for
-  `53d61ac` exists to read.
+  from: `38231653018` for the gate on HEAD, `37860478309` for the 62 warnings,
+  `38750210445` for the PR #40 gate, `38754267188` for the goldens run read in §5.1.
+* **The test count is now measured on this branch, not inherited.** PR #40's run `38750210445`
+  reports 435 tests, 0 failures, 0 errors, 0 skipped across 82 suites, and lint 9.4.1 at 0 errors
+  and 59 warnings across 7 issue ids. The goldens run `38754267188` ran the same
+  `testDebugUnitTest` task and finished `BUILD SUCCESSFUL`, so 435 is a measurement twice over.
+  No number for `53d61ac` itself exists to read: a push to `main` posts no CI report, which is why
+  §5.1 compares `main`'s behaviour through the goldens run rather than a gate on the SHA.
 * **The unused-import count is this audit's method, not the project's.** §3.1 names the three
   false-positive classes that had to be removed. A count produced by a different scanner will
   differ, and the difference will be in the method.
@@ -510,5 +614,8 @@ one is parked, and `audit-024` plus this document carry that.
   is owner-only by its own header; the other three have no such reservation but the corrections in
   §6 belong to the owner's truth pass (Plan 1B), which is still open.
 * **No pixels were seen.** The Roborazzi artifacts live on storage this sandbox cannot open, so §5
-  rests on the tracked-file list, the workflow's run history and the test sources, not on images.
+  and §5.1 rest on the run log, the tracked-file list, the workflow's run history and the test
+  sources, not on images. Nothing in §5.1 claims a golden *looks* right; it claims the run
+  succeeded, which 13 PNGs were written, and that the layout numbers in the same log match the two
+  runs before it.
 * **No device.** No Chapter 1 item has been run on hardware, and none was checked here.
