@@ -550,3 +550,18 @@ as separate PRs on the same grounds.
   conversion would break the rule it was meant to serve; it goes with the metrics work.
   Four tests added, ten in the file. **Not compiled or run before pushing** — no Gradle, Android
   SDK or JDK in this sandbox, tier 1 — so CI is the first execution.
+  **CI run `38770782845`, head `21b25d3`: all ten pass.** `Unit tests: 445 run, 0 failed, 0
+  errors, 0 skipped (39.59s across 83 suites)`, with `Plan9RoundTripTest | 10 | 0 | 0 | 0 | 0.85`
+  and `FixtureIdentityTest | 1 | 0 | 0 | 0`. The count went **441 → 445**, exactly the four new
+  tests. **The 12-file matrix did not move**: Sample-1 to Sample-6 are still ODT
+  `14/23/21/10/18/20` and DOCX `16/26/23/12/20/24`, with the thin, empty, break and blank columns
+  all identical to the three runs before this plan started. So `office:version` 1.4 and the
+  verbatim style block changed no layout, which is what §8's risk note predicted.
+  What the four new tests now pin, at evidence tier 3: the document's own `P1` keeps
+  `style:parent-style-name="Title"` in the regenerated file while the writer's fallback moves to
+  `P1_papirus_1`; **every `text:style-name` and `table:style-name` the writer emits resolves to a
+  style the package declares**, which is the direct assertion for the dangling-reference defect in
+  §0.1; a run with `colorHex` keeps its colour instead of being written as plain text; and all four
+  generated roots declare `office:version="1.4"` while `manifest:version` stays `1.2`.
+  The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`,
+  unchanged from the four runs before it.
