@@ -485,13 +485,30 @@ as separate PRs on the same grounds.
   recommendation after the six fixtures were measured — all six declare `P1` and four declare
   `Table1`, and in Sample-6 the document's `P1` is the title paragraph while the writer's is a
   body paragraph. D5 (§8): the DOCX half is deferred to Plan 9b; Plan 9 ships ODT only.
-* **2026-10-15, commit 1 (the pre-change gate) written.** `Plan9RoundTripTest.kt`, six tests:
-  the preserved-path round trip over all six ODT fixtures; the per-fixture modified-save refusal
-  measurement; two fresh-document round trips; the DOCX image-refusal pin; and the
-  fixture-directory guard. **Not compiled and not run here** — no Gradle, Android SDK or JDK in
-  the agent sandbox (`AGENTS.md` evidence ladder tier 1). CI on the PR is the first real
-  execution, and any assertion that fails is the baseline correcting this document, not a
-  regression: that is what a gate commit is for.
+* **2026-10-15, commit 1 (the pre-change gate) written and then run.** `Plan9RoundTripTest.kt`,
+  six tests: the preserved-path round trip over all six ODT fixtures; the per-fixture
+  modified-save refusal measurement; two fresh-document round trips; the DOCX image-refusal pin;
+  and the fixture-directory guard.
+  **CI run `38765790493`, head `b769276`: all six pass.** `Unit tests: 441 run, 0 failed, 0
+  errors, 0 skipped (43.57s across 83 suites)`, with `Plan9RoundTripTest | 6 | 0 | 0 | 0 | 0.69`
+  and `FixtureIdentityTest | 1 | 0 | 0 | 0`. The count moved **435 → 441**, exactly the six new
+  tests, and 82 → 83 suites.
+  One correction on the way: run `38764644308` failed to **compile**, with four
+  `Unresolved reference 'toOfficeDocument'` errors (the extension was not imported). That is the
+  gate doing its job on the first attempt and cost one commit; fixed in `b769276`.
+  **What the green run establishes.** The preserved path round-trips all six ODT fixtures with
+  element count and plain text unchanged, so the rebuilt package is a package the parser accepts
+  (§2.3 table, first two rows). The refusal measurement passed, which **confirms §2.3.1 by
+  execution rather than by reading**: every one of the six fixtures is refused for a modified
+  save, so `buildContentXml` really is unreachable through a fixture. The fresh-document tests
+  pass, so today's generated package is at least readable and text-preserving — the defects §2.1
+  fixes (dangling style references, per-item lists, lost spans) are *not* yet asserted, which is
+  what commits 2 to 4 add. The DOCX refusal is confirmed still in place.
+  The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`,
+  unchanged from the three runs before it, so the new test file added no warning.
+  Evidence tier 3 (GitHub Actions): no Gradle, Android SDK or JDK in the agent sandbox, so every
+  statement above comes from the CI report and not from a local run (`AGENTS.md` ladder, tier 1
+  for everything else in this document).
 * **2026-10-15, §2.3.1 added.** No fixture can reach `buildContentXml`: `detectSourceFeatures`
   sets `hasAdvancedTables` on *any* `<table:table>` and `hasAuthoredIndexes` on *any*
   `table-of-content`, and between them the six samples cover both. This is why the §6 gates for
