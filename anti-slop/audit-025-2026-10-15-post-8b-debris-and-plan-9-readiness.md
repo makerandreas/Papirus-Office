@@ -570,6 +570,16 @@ pass before §2.1's work and cannot tell a fixed §2.1 from a broken one. Plan 9
 §2.1 with synthetic documents and uses the samples to prove the package still round-trips and the
 page counts have not moved. Recorded in `plan-09` §2.3.1.
 
+**Run, and confirmed by execution.** `Plan9RoundTripTest.modifiedOdtSaveIsRefusedForEveryFixture`
+passes, which turns the paragraph above from a code-reading claim into a measured one: CI run
+`38765790493` on head `b769276` reports `Unit tests: 441 run, 0 failed, 0 errors, 0 skipped
+(43.57s across 83 suites)`, with `Plan9RoundTripTest | 6 | 0 | 0 | 0 | 0.69` and
+`FixtureIdentityTest | 1 | 0 | 0 | 0`, and `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`.
+The count went **435 → 441**, exactly the six new tests. One correction on the way: run
+`38764644308` failed to compile with four `Unresolved reference 'toOfficeDocument'` errors in the
+new test file, fixed in `b769276`. That is the gate working on its first attempt, and it is the
+first time this project's Plan 9 has executed anything.
+
 **A fourth, in the same place.** Plan 9's own draft recommended, for a style-name collision,
 "keep the writer's fixed one and log it". Measuring the fixtures reversed that. All six declare
 `P1` and four declare `Table1`, and in Sample-6 the document's `P1` carries
