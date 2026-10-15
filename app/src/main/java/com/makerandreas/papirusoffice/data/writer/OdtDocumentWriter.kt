@@ -180,7 +180,117 @@ class OdtDocumentWriter : DocumentFormatWriter {
         }
     }
 
+    /**
+     * The names the writer generates for itself, resolved against the names the
+     * document already declares.
+     *
+     * Plan 9 decision D4, which the owner restated as a rule: an opened
+     * document keeps the paragraph, character and other styles it arrived with,
+     * and the writer may not override them with the defaults it uses to create
+     * a new document. Every one of these used to be a hardcoded literal, so a
+     * document declaring its own `P1` had that style silently replaced. All six
+     * `tests/inky` fixtures declare `P1` and four declare `Table1`, so the
+     * collision was the normal case rather than an edge case.
+     */
+    /** Every `style:name` in a style block, so the writer never reuses one. */
+    private val STYLE_NAME_PATTERN = Regex("style:name=\"([^\"]+)\"")
+
+    private data class GeneratedStyleNames(
+        val paragraph: String,
+        val table: String,
+        val tableColumn: String,
+        val bold: String,
+        val italic: String,
+        val boldItalic: String,
+        val underline: String,
+        val boldUnderline: String,
+        val italicUnderline: String,
+        val boldItalicUnderline: String
+    )
+
+    /**
+     * Hands out style names the document is not already using. A name the
+     * source declares belongs to the source and is never handed to the writer;
+     * the writer's own name gets a `_papirus_N` suffix instead. A rename is
+     * logged at debug because it is normal bookkeeping, not a defect.
+     */
+    private class StyleNameAllocator(taken: Collection<String>) {
+        private val used = taken.toMutableSet()
+
+        fun reserve(base: String): String {
+            if (used.add(base)) return base
+            var n = 1
+            while (true) {
+                val candidate = "${base}_papirus_$n"
+                if (used.add(candidate)) {
+                    PapirusLogger.d("ODT", "STYLE_NAME_TAKEN base=$base using=$candidate")
+                    return candidate
+                }
+                n++
+            }
+        }
+    }
+
+    /**
+     * Collects derived text styles while the body is walked. Keyed by the
+     * formatting signature so two runs with the same formatting share one
+     * style instead of emitting a near-duplicate for each run.
+     */
+    private inner class DerivedStyleSink(private val alloc: StyleNameAllocator) {
+        private val byKey = HashMap<String, String>()
+        val styles = LinkedHashMap<String, String>()
+
+        fun styleFor(run: OfficeTextRun): String? {
+            val key = directFormatKey(run) ?: return null
+            byKey[key]?.let { return it }
+            val name = alloc.reserve("T_papirus")
+            byKey[key] = name
+            styles[name] = derivedTextStyleXml(name, run)
+            return name
+        }
+    }
+
+    /** Everything the element walk needs in order to write style references. */
+    private class WriteContext(
+        val imageHrefs: Map<String, String>,
+        val names: GeneratedStyleNames,
+        val sink: DerivedStyleSink
+    )
+
+    private fun allocateGeneratedNames(alloc: StyleNameAllocator) = GeneratedStyleNames(
+        paragraph = alloc.reserve("P1"),
+        table = alloc.reserve("Table1"),
+        tableColumn = alloc.reserve("Table1.Col"),
+        bold = alloc.reserve("T_Bold"),
+        italic = alloc.reserve("T_Italic"),
+        boldItalic = alloc.reserve("T_BoldItalic"),
+        underline = alloc.reserve("T_Underline"),
+        boldUnderline = alloc.reserve("T_BoldUnderline"),
+        italicUnderline = alloc.reserve("T_ItalicUnderline"),
+        boldItalicUnderline = alloc.reserve("T_BoldItalicUnderline")
+    )
+
     private fun buildContentXml(document: OfficeDocument, imageHrefs: Map<String, String> = emptyMap()): ByteArray {
+        // Decision D4: the cheapest way to guarantee a document keeps the
+        // styles it arrived with is to copy the source's own automatic-styles
+        // block through verbatim, rather than re-derive it from the resolved
+        // style model, which cannot round-trip properties it does not carry.
+        val originalContentXml = readOriginalPart(document, "content.xml")
+        val originalAutomaticStyles = extractAutomaticStyles(originalContentXml)
+        val takenNames = collectStyleNames(originalAutomaticStyles) +
+            collectStyleNames(readOriginalPart(document, "styles.xml"))
+        val alloc = StyleNameAllocator(takenNames)
+        val names = allocateGeneratedNames(alloc)
+
+        // Derived styles are collected while the body is written and emitted
+        // afterwards, because automatic-styles precedes the body in the XML.
+        val sink = DerivedStyleSink(alloc)
+        val ctx = WriteContext(imageHrefs, names, sink)
+        val body = StringBuilder()
+        for (element in document.body.elements) {
+            writeElement(body, element, ctx)
+        }
+
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
         sb.append("<office:document-content ")
@@ -191,60 +301,157 @@ class OdtDocumentWriter : DocumentFormatWriter {
         sb.append("xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:draw:1.0\" ")
         sb.append("xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\" ")
         sb.append("xmlns:xlink=\"http://www.w3.org/1999/xlink\" ")
-        sb.append("office:version=\"1.2\">\n")
+        // ODF 1.4 Part 3 section 19.390; was 1.2.
+        sb.append("office:version=\"1.4\">\n")
 
         sb.append("  <office:automatic-styles>\n")
-        sb.append("    <style:style style:name=\"P1\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"/>\n")
-        sb.append("    <style:style style:name=\"T_Bold\" style:family=\"text\"><style:text-properties fo:font-weight=\"bold\" style:font-weight-asian=\"bold\" style:font-weight-complex=\"bold\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_Italic\" style:family=\"text\"><style:text-properties fo:font-style=\"italic\" style:font-style-asian=\"italic\" style:font-style-complex=\"italic\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_BoldItalic\" style:family=\"text\"><style:text-properties fo:font-weight=\"bold\" fo:font-style=\"italic\" style:font-weight-asian=\"bold\" style:font-style-asian=\"italic\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_Underline\" style:family=\"text\"><style:text-properties style:text-underline-style=\"solid\" style:text-underline-width=\"auto\" style:text-underline-color=\"font-color\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_BoldUnderline\" style:family=\"text\"><style:text-properties fo:font-weight=\"bold\" style:text-underline-style=\"solid\" style:text-underline-width=\"auto\" style:text-underline-color=\"font-color\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_ItalicUnderline\" style:family=\"text\"><style:text-properties fo:font-style=\"italic\" style:text-underline-style=\"solid\" style:text-underline-width=\"auto\" style:text-underline-color=\"font-color\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"T_BoldItalicUnderline\" style:family=\"text\"><style:text-properties fo:font-weight=\"bold\" fo:font-style=\"italic\" style:text-underline-style=\"solid\" style:text-underline-width=\"auto\" style:text-underline-color=\"font-color\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"Table1\" style:family=\"table\"><style:table-properties style:width=\"100%\" table:align=\"margins\"/></style:style>\n")
-        sb.append("    <style:style style:name=\"Table1.Col\" style:family=\"table-column\"><style:table-column-properties style:column-width=\"auto\"/></style:style>\n")
+        if (!originalAutomaticStyles.isNullOrBlank()) {
+            sb.append(originalAutomaticStyles).append('\n')
+        }
+        sb.append(automaticStylesXml(names))
+        for ((_, styleXml) in sink.styles) sb.append(styleXml).append('\n')
         sb.append("  </office:automatic-styles>\n")
 
         sb.append("  <office:body>\n")
         sb.append("    <office:text>\n")
-
-        val elements = document.body.elements
-        for (element in elements) {
-            writeElement(sb, element, imageHrefs)
-        }
-
+        sb.append(body)
         sb.append("    </office:text>\n")
         sb.append("  </office:body>\n")
         sb.append("</office:document-content>")
         return sb.toString().toByteArray(Charsets.UTF_8)
     }
 
-    private fun writeElement(sb: StringBuilder, element: OfficeElement, imageHrefs: Map<String, String> = emptyMap()) {
+    /** The source's own package part, when the document was opened from one. */
+    private fun readOriginalPart(document: OfficeDocument, name: String): String? {
+        val data = document.odtPackageData ?: return null
+        data.entries[name]?.let { return it.toString(Charsets.UTF_8) }
+        return when (name) {
+            "content.xml" -> data.originalContentXml
+            "styles.xml" -> data.originalStylesXml
+            else -> null
+        }
+    }
+
+    /**
+     * The inner XML of the source's `<office:automatic-styles>` block, verbatim.
+     * Null when the source has none, which is the case for a document created
+     * from `templates/styles/Default.ott` (audit-025 section 5.1 finding J).
+     */
+    private fun extractAutomaticStyles(contentXml: String?): String? {
+        if (contentXml.isNullOrBlank()) return null
+        val open = contentXml.indexOf("<office:automatic-styles")
+        if (open < 0) return null
+        val contentStart = contentXml.indexOf('>', open) + 1
+        if (contentStart <= 0) return null
+        val close = contentXml.indexOf("</office:automatic-styles>", contentStart)
+        if (close < 0) return null
+        return contentXml.substring(contentStart, close)
+    }
+
+    private fun collectStyleNames(xml: String?): Set<String> =
+        if (xml.isNullOrBlank()) emptySet()
+        else STYLE_NAME_PATTERN.findAll(xml).map { it.groupValues[1] }.toSet()
+
+    private fun automaticStylesXml(names: GeneratedStyleNames): String = """    <style:style style:name="${names.paragraph}" style:family="paragraph" style:parent-style-name="Standard"/>
+    <style:style style:name="${names.bold}" style:family="text"><style:text-properties fo:font-weight="bold" style:font-weight-asian="bold" style:font-weight-complex="bold"/></style:style>
+    <style:style style:name="${names.italic}" style:family="text"><style:text-properties fo:font-style="italic" style:font-style-asian="italic" style:font-style-complex="italic"/></style:style>
+    <style:style style:name="${names.boldItalic}" style:family="text"><style:text-properties fo:font-weight="bold" fo:font-style="italic" style:font-weight-asian="bold" style:font-style-asian="italic"/></style:style>
+    <style:style style:name="${names.underline}" style:family="text"><style:text-properties style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/></style:style>
+    <style:style style:name="${names.boldUnderline}" style:family="text"><style:text-properties fo:font-weight="bold" style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/></style:style>
+    <style:style style:name="${names.italicUnderline}" style:family="text"><style:text-properties fo:font-style="italic" style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/></style:style>
+    <style:style style:name="${names.boldItalicUnderline}" style:family="text"><style:text-properties fo:font-weight="bold" fo:font-style="italic" style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/></style:style>
+    <style:style style:name="${names.table}" style:family="table"><style:table-properties style:width="100%" table:align="margins"/></style:style>
+    <style:style style:name="${names.tableColumn}" style:family="table-column"><style:table-column-properties style:column-width="auto"/></style:style>
+"""
+
+    /**
+     * Which style reference a run carries. The eight fixed combinations are
+     * preferred because they keep the output close to what the document
+     * already had; formatting they cannot express is derived instead of
+     * dropped, which is what used to happen to a coloured run.
+     */
+    private fun effectiveRunStyle(run: OfficeTextRun, ctx: WriteContext): String? {
+        val n = ctx.names
+        val bold = run.isBold == true
+        val italic = run.isItalic == true
+        val underline = run.isUnderline == true
+        val needsDerived = run.colorHex != null || run.highlight != null || run.isHidden == true
+        if (needsDerived) return ctx.sink.styleFor(run)
+        return when {
+            bold && italic && underline -> n.boldItalicUnderline
+            bold && italic -> n.boldItalic
+            bold && underline -> n.boldUnderline
+            italic && underline -> n.italicUnderline
+            bold -> n.bold
+            italic -> n.italic
+            underline -> n.underline
+            // A name the document declared is used as it is: decision D4 says
+            // the document keeps its own names.
+            !run.styleName.isNullOrEmpty() -> run.styleName
+            !run.characterStyle.isNullOrEmpty() -> run.characterStyle
+            else -> null
+        }
+    }
+
+    private fun directFormatKey(run: OfficeTextRun): String? {
+        val parts = ArrayList<String>(7)
+        if (run.isBold == true) parts += "b"
+        if (run.isItalic == true) parts += "i"
+        if (run.isUnderline == true) parts += "u"
+        run.colorHex?.takeIf { it.isNotBlank() }?.let { parts += "c$it" }
+        run.highlight?.takeIf { it.isNotBlank() }?.let { parts += "h$it" }
+        if (run.isHidden == true) parts += "v"
+        return if (parts.isEmpty()) null else parts.joinToString("-")
+    }
+
+    private fun derivedTextStyleXml(name: String, run: OfficeTextRun): String {
+        val props = ArrayList<String>(7)
+        if (run.isBold == true) {
+            props += "fo:font-weight=\"bold\" style:font-weight-asian=\"bold\" style:font-weight-complex=\"bold\""
+        }
+        if (run.isItalic == true) {
+            props += "fo:font-style=\"italic\" style:font-style-asian=\"italic\" style:font-style-complex=\"italic\""
+        }
+        if (run.isUnderline == true) {
+            props += "style:text-underline-style=\"solid\" style:text-underline-width=\"auto\" style:text-underline-color=\"font-color\""
+        }
+        run.colorHex?.takeIf { it.isNotBlank() }?.let { props += "fo:color=\"${escapeXml(it)}\"" }
+        run.highlight?.takeIf { it.isNotBlank() }?.let { props += "fo:background-color=\"${escapeXml(it)}\"" }
+        if (run.isHidden == true) props += "text:display=\"none\""
+        return if (props.isEmpty()) {
+            "    <style:style style:name=\"$name\" style:family=\"text\"/>"
+        } else {
+            "    <style:style style:name=\"$name\" style:family=\"text\"><style:text-properties ${props.joinToString(" ")}/></style:style>"
+        }
+    }
+
+    private fun writeElement(sb: StringBuilder, element: OfficeElement, ctx: WriteContext) {
+        val imageHrefs = ctx.imageHrefs
+        val names = ctx.names
         when (element) {
             is OfficeParagraph -> {
-                val styleAttr = if (!element.styleName.isNullOrEmpty()) " text:style-name=\"${escapeXml(element.styleName)}\"" else " text:style-name=\"P1\""
-                sb.append("      <text:p$styleAttr>")
-                writeRunsOrText(sb, element.text, element.runs)
+                val styleName = if (!element.styleName.isNullOrEmpty()) element.styleName else names.paragraph
+                sb.append("      <text:p text:style-name=\"${escapeXml(styleName)}\">")
+                writeRunsOrText(sb, element.text, element.runs, ctx)
                 sb.append("</text:p>\n")
             }
             is OfficeHeading -> {
                 val level = if (element.level > 0) element.level else 1
                 val styleName = if (!element.styleName.isNullOrEmpty()) element.styleName else "Heading_$level"
                 sb.append("      <text:h text:outline-level=\"$level\" text:style-name=\"${escapeXml(styleName)}\">")
-                writeRunsOrText(sb, element.text, element.runs)
+                writeRunsOrText(sb, element.text, element.runs, ctx)
                 sb.append("</text:h>\n")
             }
             is OfficeListItem -> {
                 sb.append("      <text:list><text:list-item><text:p>")
-                writeRunsOrText(sb, element.text, element.runs)
+                writeRunsOrText(sb, element.text, element.runs, ctx)
                 sb.append("</text:p></text:list-item></text:list>\n")
             }
             is OfficeTable -> {
-                val tableName = "Table1"
+                val tableName = names.table
                 val cols = if (element.numColumns > 0) element.numColumns else (element.rows.maxOfOrNull { it.cells.size } ?: 1)
                 sb.append("      <table:table table:name=\"$tableName\" table:style-name=\"$tableName\">\n")
-                sb.append("        <table:table-column table:style-name=\"Table1.Col\" table:number-columns-repeated=\"$cols\"/>\n")
+                sb.append("        <table:table-column table:style-name=\"${names.tableColumn}\" table:number-columns-repeated=\"$cols\"/>\n")
                 for (row in element.rows) {
                     sb.append("        <table:table-row>\n")
                     for (cell in row.cells) {
@@ -252,7 +459,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
                         if (cell.paragraphs.isNotEmpty()) {
                             for (p in cell.paragraphs) {
                                 sb.append("            <text:p>")
-                                writeRunsOrText(sb, p.text, p.runs)
+                                writeRunsOrText(sb, p.text, p.runs, ctx)
                                 sb.append("</text:p>\n")
                             }
                         } else {
@@ -278,13 +485,13 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 }
             }
             is OfficeDocElement.ParagraphElement -> {
-                writeElement(sb, element.paragraph, imageHrefs)
+                writeElement(sb, element.paragraph, ctx)
             }
             is OfficeDocElement.TableElement -> {
-                writeElement(sb, element.table, imageHrefs)
+                writeElement(sb, element.table, ctx)
             }
             is OfficeDocElement.ImageElement -> {
-                writeElement(sb, element.image, imageHrefs)
+                writeElement(sb, element.image, ctx)
             }
             else -> {
                 // Ignore other non-printable element types safely
@@ -292,28 +499,14 @@ class OdtDocumentWriter : DocumentFormatWriter {
         }
     }
 
-    private fun writeRunsOrText(sb: StringBuilder, plainText: String, runs: List<OfficeTextRun>) {
+    private fun writeRunsOrText(sb: StringBuilder, plainText: String, runs: List<OfficeTextRun>, ctx: WriteContext) {
         if (runs.isNotEmpty()) {
             for (run in runs) {
                 // Run flags are tri-state: only a stated property writes a span
                 // style, so a run that says nothing keeps the paragraph's style.
-                val bold = run.isBold == true
-                val italic = run.isItalic == true
-                val underline = run.isUnderline == true
-                val effectiveStyle = when {
-                    bold && italic && underline -> "T_BoldItalicUnderline"
-                    bold && italic -> "T_BoldItalic"
-                    bold && underline -> "T_BoldUnderline"
-                    italic && underline -> "T_ItalicUnderline"
-                    bold -> "T_Bold"
-                    italic -> "T_Italic"
-                    underline -> "T_Underline"
-                    !run.styleName.isNullOrEmpty() -> run.styleName
-                    !run.characterStyle.isNullOrEmpty() -> run.characterStyle
-                    else -> null
-                }
-                if (effectiveStyle != null) {
-                    sb.append("<text:span text:style-name=\"${escapeXml(effectiveStyle)}\">")
+                val styleName = effectiveRunStyle(run, ctx)
+                if (styleName != null) {
+                    sb.append("<text:span text:style-name=\"${escapeXml(styleName)}\">")
                     sb.append(escapeXml(run.text))
                     sb.append("</text:span>")
                 } else {
@@ -328,7 +521,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
     private fun buildStylesXml(document: OfficeDocument): ByteArray {
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
-            <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+            <office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.4">
               <office:styles>
                 <style:default-style style:family="paragraph">
                   <style:paragraph-properties/>
@@ -356,7 +549,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
         val author = escapeXml(document.metadata.author)
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
-            <office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.2">
+            <office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.4">
               <office:meta>
                 <dc:title>$title</dc:title>
                 <dc:creator>$author</dc:creator>
@@ -369,7 +562,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
     private fun buildSettingsXml(): ByteArray {
         val xml = """
             <?xml version="1.0" encoding="UTF-8"?>
-            <office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.2">
+            <office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.4">
               <office:settings/>
             </office:document-settings>
         """.trimIndent()

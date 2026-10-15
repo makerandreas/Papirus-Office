@@ -395,6 +395,29 @@ faces to Plan 9. §2.1 item 5 implements it.
 ### Decision D4: the collision rule. **Decided 2026-10-15: the document owns its names; the
 generator steps aside.**
 
+**The governing rule, in the owner's own words (2026-10-15), which is broader than the collision
+question it was asked about and is therefore the invariant this plan is written against:**
+
+> If you want to open the document and then edit it, make sure when you save it, the document
+> *must* use the paragraph style, character or other style that is the same as before it opened
+> (unless there is a paragraph style, character, or other style changed by the user). The
+> application *may not* carry out the style override with the default template force that is used
+> to create a new document.
+
+Read as a test obligation, that is four separate requirements, and §2.1 is scoped to satisfy all
+four rather than only the naming case that prompted it:
+
+1. **A style the document arrived with is written back unchanged.** Satisfied by copying the
+   source's own `<office:automatic-styles>` block through verbatim (§2.1 item 1).
+2. **A style the user changed is written back as changed**, and an unchanged one is not
+   silently "corrected" to a default. Both follow from (1) plus the fact that the writer only ever
+   *appends* names it generated itself.
+3. **The new-document defaults are not applied to an opened document.** The eleven hardcoded
+   names and `buildStylesXml`'s `Standard` / `Body_20_Text` / `Heading_1` template exist for a
+   document with no package behind it. They must not overwrite one that has (§2.1 items 1 and 2).
+4. **Direct formatting that is not a named style is not dropped.** A coloured run lost its colour
+   before this plan, which is the same defect seen from the run's side rather than the style's.
+
 The question: `buildContentXml` hardcodes eleven style names (`P1`, `T_Bold`, `T_Italic`,
 `T_BoldItalic`, `T_Underline`, `T_BoldUnderline`, `T_ItalicUnderline`, `T_BoldItalicUnderline`,
 `Table1`, `Table1.Col`). Once §2.1 item 1 starts emitting the document's *own* styles, what
@@ -509,7 +532,21 @@ as separate PRs on the same grounds.
   Evidence tier 3 (GitHub Actions): no Gradle, Android SDK or JDK in the agent sandbox, so every
   statement above comes from the CI report and not from a local run (`AGENTS.md` ladder, tier 1
   for everything else in this document).
-* **2026-10-15, §2.3.1 added.** No fixture can reach `buildContentXml`: `detectSourceFeatures`
-  sets `hasAdvancedTables` on *any* `<table:table>` and `hasAuthoredIndexes` on *any*
-  `table-of-content`, and between them the six samples cover both. This is why the §6 gates for
-  commits 2 to 4 are written against synthetic documents.
+* **2026-10-15, commit 2 (ODT styles) written.** `OdtDocumentWriter.buildContentXml` now reads the
+  source's own `content.xml` and `styles.xml` out of `OdtPackageData` and copies the source's
+  `<office:automatic-styles>` block through **verbatim** before appending anything the writer
+  generates. Copying the XML rather than re-deriving it from `DocumentStyles` is deliberate: the
+  resolved style model does not carry every property the source declares, so re-deriving would
+  lose exactly the things D4 says must survive. A `StyleNameAllocator` seeded with every
+  `style:name` the source declares hands out the writer's eleven names, suffixing them
+  `_papirus_N` when the document already owns one, and `GeneratedStyleNames` carries the resolved
+  names into `writeElement` and `writeRunsOrText` so the body references what was actually
+  emitted. `office:version` moves from `1.2` to `1.4` on all four generated roots
+  (`buildContentXml`, `buildStylesXml`, `buildMetaXml`, `buildSettingsXml`); `manifest:version`
+  stays `1.2`, because that is the manifest format and not the document version. Runs carrying
+  `colorHex`, `highlight` or `isHidden` now derive an appended `T_papirus_N` text style instead of
+  being written as plain text, which is requirement 4 of the owner's rule. `fontSizeSp` is
+  deliberately **not** written: it is in sp and ODF wants pt, and shipping an unverified unit
+  conversion would break the rule it was meant to serve; it goes with the metrics work.
+  Four tests added, ten in the file. **Not compiled or run before pushing** — no Gradle, Android
+  SDK or JDK in this sandbox, tier 1 — so CI is the first execution.

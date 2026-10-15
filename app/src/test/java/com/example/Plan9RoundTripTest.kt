@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.DocumentBody
 import com.makerandreas.papirusoffice.data.DocumentMetadata
 import com.makerandreas.papirusoffice.data.OfficeDocument
+import com.makerandreas.papirusoffice.data.OdtPackageData
 import com.makerandreas.papirusoffice.data.OfficeDocumentParser
 import com.makerandreas.papirusoffice.data.OfficeElement
 import com.makerandreas.papirusoffice.data.OfficeHeading
@@ -13,6 +14,7 @@ import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.OfficeTable
 import com.makerandreas.papirusoffice.data.OfficeTableCell
 import com.makerandreas.papirusoffice.data.OfficeTableRow
+import com.makerandreas.papirusoffice.data.OfficeTextRun
 import com.makerandreas.papirusoffice.data.toOfficeDocument
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
 import kotlinx.coroutines.runBlocking
@@ -66,6 +68,12 @@ class Plan9RoundTripTest {
 
     private val context: Context
         get() = ApplicationProvider.getApplicationContext()
+
+    /** `style:name="..."` on a `<style:style>` declaration. */
+    private val DECLARED_STYLE_NAME = Regex("style:name=\"([^\"]+)\"")
+
+    /** Any of the three attributes that point at a style by name. */
+    private val STYLE_REFERENCE = Regex("(?:text:style-name|table:style-name|draw:style-name)=\"([^\"]+)\"")
 
     private fun fixture(name: String): File {
         val direct = SampleMatrix.findTestFile(name)
@@ -313,6 +321,148 @@ class Plan9RoundTripTest {
         } finally {
             target.delete()
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Commit 2: ODT styles. Decision D4, the document owns its names.
+    // ------------------------------------------------------------------
+
+    /**
+     * A source `content.xml` in the shape the six fixtures actually have: an
+     * automatic `P1` that is really the document's title, and a `Table1` with
+     * the document's own width. Both names collide with the writer's hardcoded
+     * eleven, which is the normal case rather than an edge case — all six
+     * `tests/inky` fixtures declare `P1`, and four declare `Table1`.
+     */
+    private fun sourceContentXmlWithOwnStyles(): String = """
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.2">
+  <office:automatic-styles>
+    <style:style style:name="P1" style:family="paragraph" style:parent-style-name="Title"/>
+    <style:style style:name="Table1" style:family="table"><style:table-properties style:width="15.905cm" table:align="left"/></style:style>
+  </office:automatic-styles>
+  <office:body><office:text><text:p text:style-name="P1">The title</text:p></office:text></office:body>
+</office:document-content>
+    """.trimIndent()
+
+    /**
+     * Forces the generating path with a package present: `isModified` skips the
+     * byte-exact copy, and the default `OdtSourceFeatures` keeps
+     * `saveCapability` supported, which no real fixture can do.
+     */
+    private fun documentWithOwnStyles(body: List<OfficeElement>): OfficeDocument = OfficeDocument(
+        body = DocumentBody(elements = body),
+        odtPackageData = OdtPackageData(
+            entries = mapOf("content.xml" to sourceContentXmlWithOwnStyles().toByteArray(Charsets.UTF_8)),
+            originalContentXml = sourceContentXmlWithOwnStyles()
+        ),
+        isModified = true
+    )
+
+    @Test
+    fun documentStyleNamesSurviveARegeneratedContentXml() {
+        val document = documentWithOwnStyles(
+            listOf(
+                OfficeParagraph("The title", styleName = "P1"),
+                OfficeParagraph("Body text with no style of its own")
+            )
+        )
+        val content = zipEntries(OdtDocumentWriter().write(document))["content.xml"]
+            ?: error("the package must contain a content.xml")
+
+        // The document's own definition is copied through verbatim.
+        assertTrue(
+            "the document's P1 must keep its own definition:\n$content",
+            content.contains("style:name=\"P1\" style:family=\"paragraph\" style:parent-style-name=\"Title\"")
+        )
+        // The writer stepped aside rather than taking the name.
+        assertTrue(
+            "the writer must move to P1_papirus_1 rather than reuse P1:\n$content",
+            content.contains("style:name=\"P1_papirus_1\"")
+        )
+        // And each paragraph keeps pointing at the style it arrived with.
+        assertTrue(
+            "the titled paragraph must still reference the document's P1:\n$content",
+            content.contains("<text:p text:style-name=\"P1\">The title</text:p>")
+        )
+        assertTrue(
+            "an unstyled paragraph must reference the writer's moved name, not P1:\n$content",
+            content.contains("<text:p text:style-name=\"P1_papirus_1\">Body text with no style of its own</text:p>")
+        )
+    }
+
+    @Test
+    fun everyStyleReferenceInTheGeneratedContentResolvesInThePackage() {
+        val document = documentWithOwnStyles(
+            listOf(
+                OfficeParagraph("The title", styleName = "P1"),
+                OfficeParagraph("Plain body"),
+                OfficeListItem("First item"),
+                OfficeTable(
+                    rows = listOf(OfficeTableRow(cells = listOf(OfficeTableCell("a"), OfficeTableCell("b")))),
+                    numColumns = 2
+                )
+            )
+        )
+        val entries = zipEntries(OdtDocumentWriter().write(document))
+        val content = entries["content.xml"] ?: error("the package must contain a content.xml")
+        val declared = DECLARED_STYLE_NAME.findAll(content).map { it.groupValues[1] }.toSet()
+        val referenced = STYLE_REFERENCE.findAll(content).map { it.groupValues[1] }.toSet()
+        val dangling = referenced - declared
+        assertTrue(
+            "these references have no style in the package: $dangling\n--- content ---\n$content",
+            dangling.isEmpty()
+        )
+        // The table style moved aside too, because the source declares Table1.
+        assertTrue(
+            "the table must use the moved name, not the document's Table1:\n$content",
+            content.contains("style:name=\"Table1_papirus_1\"")
+        )
+    }
+
+    @Test
+    fun aColouredRunKeepsItsColourInsteadOfBeingDropped() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeParagraph(
+                        "red text",
+                        runs = listOf(OfficeTextRun("red text", colorHex = "#ff0000"))
+                    )
+                )
+            )
+        )
+        val content = zipEntries(OdtDocumentWriter().write(document))["content.xml"]
+            ?: error("the package must contain a content.xml")
+        assertTrue(
+            "a run colour was dropped on save:\n$content",
+            content.contains("fo:color=\"#ff0000\"")
+        )
+        assertTrue(
+            "the coloured run must reference a style the package declares:\n$content",
+            content.contains("<text:span text:style-name=\"T_papirus\">red text</text:span>")
+        )
+    }
+
+    @Test
+    fun generatedRootsDeclareOfficeVersion14() {
+        val document = OfficeDocument(
+            body = DocumentBody(elements = listOf(OfficeParagraph("Version check.")))
+        )
+        val entries = zipEntries(OdtDocumentWriter().write(document))
+        for (part in listOf("content.xml", "styles.xml", "meta.xml", "settings.xml")) {
+            val xml = entries[part] ?: error("the package must contain $part")
+            assertTrue(
+                "$part must declare office:version=\"1.4\" (was 1.2):\n$xml",
+                xml.contains("office:version=\"1.4\"")
+            )
+        }
+        // The manifest version is a different attribute and must not move.
+        val manifest = entries["META-INF/manifest.xml"] ?: error("the package must contain a manifest")
+        assertTrue(
+            "manifest:version is the manifest format and stays 1.2:\n$manifest",
+            manifest.contains("manifest:version=\"1.2\"")
+        )
     }
 
     // ------------------------------------------------------------------
