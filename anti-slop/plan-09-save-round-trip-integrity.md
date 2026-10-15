@@ -589,3 +589,38 @@ as separate PRs on the same grounds.
   cell; a cell style name is written; and a five-item list survives a real save-and-reopen as five
   list items, which is the round trip §2.3 asks for and the old per-item lists could not pass.
   The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`, unchanged.
+* **2026-10-15, commit 4 (font faces, sections, hyperlinks, bookmarks) written.** §2.1 items 5, 7
+  and 8. `buildFontFaceDecls` writes `<office:font-face-decls>` from `document.styles.fontFaces`
+  with `style:name`, `svg:font-family` and the generic family, pitch and charset when the source
+  declares them; the `svg` namespace is added to the root because `style:font-face` needs it, and
+  the block goes before `<office:automatic-styles>` because that is where the ODF content model
+  puts it. A document declaring no faces produces no block, so today's output is unchanged for
+  everything that never had one. `OfficeSection` had **no branch at all** and fell through to an
+  empty `else`, so a saved document lost every section it arrived with; it now writes
+  `<text:section text:name="…">` and recurses through `writeElements`. A run carrying a target is
+  wrapped in `<text:a xlink:href="…">` with the formatting span nested inside, which is the order
+  ODF requires, and the standalone `OfficeHyperlink` element is written too — it was also falling
+  through. Paragraphs, headings and list items emit `<text:bookmark-start>` /
+  `<text:bookmark-end>` pairs around their content, placed inside the paragraph where the content
+  model allows them, and a standalone `OfficeBookmark` writes `<text:bookmark>`.
+  Five tests added, twenty in the file. **Not compiled or run before pushing** — tier 1.
+  **CI run `38778398794`, head `20d6724`: all twenty pass.** `Unit tests: 455 run, 0 failed, 0
+  errors, 0 skipped (33.15s across 83 suites)`, with `Plan9RoundTripTest | 20 | 0 | 0 | 0 | 0.79`
+  and `FixtureIdentityTest | 1 | 0 | 0 | 0`. The count went **450 → 455**, exactly the five new
+  tests. **The 12-file matrix did not move for the fourth commit running**: ODT `14/23/21/10/18/20`,
+  DOCX `16/26/23/12/20/24`, every column identical to the four runs before this plan started.
+  **This commit failed before it passed.** Run `38777197677` on head `e8decbf` failed to compile
+  with 16 errors at `OdtDocumentWriter.kt:640-648`: the `OfficeHyperlink` and `OfficeBookmark`
+  branches escaped the opening quote of an attribute (`\"`) but wrote the closing one bare, which
+  ended the Kotlin string early and left the following `>` outside it. Fixed in `20d6724`. That is
+  the second compile failure this plan has shipped and CI has caught, after the missing
+  `toOfficeDocument` import in commit 1 — both in code the sandbox cannot compile, which is the
+  tier-1 limit and the reason every number here carries a run id.
+  What the five new tests pin, at tier 3: a document with declared faces writes
+  `<office:font-face-decls>` carrying `style:name` and `svg:font-family`, and one without them does
+  **not** gain the block; a section writes `<text:section text:name="…">` with its contents inside
+  and a matching close, where before it vanished entirely; a run with a target is wrapped in
+  `<text:a xlink:href="…">` and closed; the standalone hyperlink element is written at all; and
+  **bookmarks survive a real save-and-reopen**, which is the assertion §2.1 item 7 exists for.
+  **Page breaks are still not written.** They appear in §0.1's dropped table but not in §2.1's
+  scope list, so they stay dropped and are recorded here rather than quietly forgotten.
