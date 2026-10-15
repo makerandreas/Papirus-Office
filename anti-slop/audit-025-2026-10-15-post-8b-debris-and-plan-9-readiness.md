@@ -1,5 +1,17 @@
 # Audit 025 (2026-10-15): the debris left after the 8B closeout, and whether Plan 9 can start
 
+> **Partly executed, same day.** The owner approved the four steps in §11 and three of them are
+> done on `arena/20d3dfd7-papirus-office` (PR #40): the housekeeping deletion, the seven imports,
+> and Plan 9's plan document. **Gate: `ci.yml` run `38750210445` on head `ffcb277`, all three
+> jobs success, `Unit tests: 435 run, 0 failed, 0 errors, 0 skipped (46.79s across 82 suites)`
+> and `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`.** Both predicted numbers landed
+> exactly: the test count held at 435, proving the two deleted files and seven imports were dead
+> as measured, and the warning count went 62 to 59 and 8 ids to 7, the three `IconLocation` sites
+> leaving with the JPGs. The fourth step, recording the goldens, is blocked on the owner's
+> credentials rather than on the repository (§5). This file is left as the analysis of record
+> with this banner rather than being rewritten; `plan-01-master-index.md` §6 item 19 carries the
+> execution record.
+
 **Baseline:** `main` at `53d61ac` ("Add files via upload", 2026-10-12 18:42 +0900), branch
 `arena/20d3dfd7-papirus-office`. `main` carries exactly one commit, so every SHA the earlier
 audits cite is unresolvable in a fresh clone (§7). Where this document needed the pre-squash
@@ -223,7 +235,7 @@ construct the warning names.
 | `PluralsCandidate` | Warning | 6 | `strings.xml:130,184,444,600,684,793`; the file still has **0** `<plurals>` entries in 746 `<string>` entries |
 | `VectorRaster` | Warning | 6 | the six brand marks, all at `res/drawable/ic_*_logo.xml:3` plus `ic_papirus_foreground.xml:3` |
 | `ModifierParameter` | Warning | 4 | `HomeDashboard.kt:1096`, `HomeSubpages.kt:121`, `InkyViewSettingsSubpage.kt:31`, `LayoutDrivenDocumentRenderer.kt:119` |
-| `IconLocation` | Warning | 3 | the three `img_pattern_*.jpg`, 1,269,429 + 542,033 + 1,229,088 = **3,040,550 bytes**, `grep -rn img_pattern app/src` returns **0** references |
+| `IconLocation` | Warning | 3 | the three `img_pattern_*.jpg`, 1,269,429 + 542,033 + 1,229,088 = **3,040,550 bytes**, `grep -rn img_pattern app/src` returns **0** references. **Deleted since this table was read** (PR #40); the run `38750210445` lint report confirms the backlog is now **59 across 7 ids** |
 | `FrequentlyChangingValue` | Warning | 2 | `InkyModule.kt:1499,1810` |
 | `UseOfNonLambdaOffsetOverload` | Warning | 1 | `AboutScreen.kt:351` |
 | **Total** | | **62** | 34+6+6+6+4+3+2+1 = 62, across 8 ids |
