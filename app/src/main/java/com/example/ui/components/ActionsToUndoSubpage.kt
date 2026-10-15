@@ -20,8 +20,6 @@ import com.example.R
 import com.makerandreas.papirusoffice.data.undo.HistoryEntry
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.rounded.Redo
-import androidx.compose.material.icons.rounded.Undo
 
 /**
  * Standard Bottom Sheet - Actions to Undo

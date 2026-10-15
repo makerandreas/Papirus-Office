@@ -11,7 +11,6 @@ import android.print.PageRange
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
-import android.print.PrintManager
 import android.util.Log
 import java.io.FileOutputStream
 

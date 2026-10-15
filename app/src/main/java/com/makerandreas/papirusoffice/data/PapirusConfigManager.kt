@@ -3,7 +3,6 @@ package com.makerandreas.papirusoffice.data
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
 import com.example.R
