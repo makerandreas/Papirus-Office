@@ -121,6 +121,11 @@ independent and can run before, during or after. Tier 3 items are cosmetic.
 | 1 | **Write Plan 9's own plan document** (§10). `plan-04-to-09` explicitly forbids starting from its paragraph. | one document | Without it, Plan 9 has no acceptance list, no file list, and no gate to enter |
 | 2 | **Record the goldens** by dispatching `goldens.yml` once (§5). | one workflow dispatch, owner-only | Group B of the warning backlog is the one that can change what the app draws, and `audit-024` recommends reviewing it against goldens that do not exist yet |
 
+**Status of the tier 1 and tier 2 items on 2026-10-15**, recorded so the next session starts from
+here rather than re-deriving it. Items 1, 3, 4 and 6 are done on
+`arena/20d3dfd7-papirus-office` and are compiled by CI, not by this sandbox. Item 2 is blocked on
+the owner's credentials (§5). Items 5, 7, 8, 9 and 10 are untouched and none of them gates Plan 9.
+
 ### Tier 2: independent, safe to defer past Plan 9
 
 | # | Item | Size | Note |
@@ -241,10 +246,29 @@ lint 9.4.1. (Proposed replacement text is in §6.)
 | `ls app/src/test/screenshots/` | one file, `greeting.png`, 2,868 bytes |
 | `grep -rn verifyRoborazzi` across the repository | three hits, all inside `goldens.yml`'s own comments and two audit files. **No verify task exists** |
 | `ci.yml` test command | still records (`roborazzi.test.record=true`), never compares |
+| `gh api .../actions/workflows` | `Record Goldens`, id `379134664`, `state: active`. The workflow is enabled and on the default branch, so it is dispatchable today |
 
-`goldens.yml` is on `main`, so it is dispatchable today: `workflow_dispatch` needs the file on the
-default branch, which is why `audit-024` could not run it and the owner can. It opens a pull
-request rather than pushing, on purpose.
+**The dispatch was attempted here and failed on credentials, not on the workflow.**
+`gh workflow run goldens.yml --ref main -f base_branch=main` returns
+`HTTP 403: Resource not accessible by integration`. That is the sandbox token missing the
+`workflow` scope; `gh auth status` shows the same token authenticating fine for repository reads
+and for `git push`. So this step needs the owner. From a machine with a full token, or from the
+Actions tab:
+
+```bash
+gh workflow run goldens.yml --ref main -f base_branch=main
+```
+
+or open `https://github.com/makerandreas/Papirus-Office/actions/workflows/goldens.yml`, choose
+**Run workflow**, leave `base_branch` on `main`, and run it. It records on a pinned
+`ubuntu-24.04` runner, then opens a pull request named "Record Roborazzi goldens (run N)" rather
+than pushing, so the images are reviewed before they become the baseline. Do not merge that pull
+request without looking at the PNGs: whatever it shows becomes what every later
+`verifyRoborazziDebug` run is compared against.
+
+Recording from `main` is the right baseline for the Plan 9 branch. This audit's housekeeping
+commit deletes two unreachable Kotlin files, seven unused import lines and three unreferenced
+JPGs, none of which a composable draws, so it cannot move a pixel.
 
 The consequence is the one `audit-022` §2 named and that is still true: a rendering regression
 changes an artifact and no job notices. For Plan 9 specifically, the consequence is narrower and
