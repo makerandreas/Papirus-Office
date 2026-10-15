@@ -637,13 +637,13 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 sb.append("      </text:section>\n")
             }
             is OfficeHyperlink -> {
-                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}">")
+                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}\">")
                 sb.append("<text:a xlink:href=\"${escapeXml(element.targetUri)}\" xlink:type=\"simple\">")
                 sb.append(escapeXml(element.text))
                 sb.append("</text:a></text:p>\n")
             }
             is OfficeBookmark -> {
-                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}">")
+                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}\">")
                 sb.append("<text:bookmark text:name=\"${escapeXml(element.name)}\"/>")
                 sb.append("</text:p>\n")
             }
