@@ -476,14 +476,18 @@ class OdtDocumentWriter : DocumentFormatWriter {
         names.joinToString("") { "<text:bookmark-end text:name=\"${escapeXml(it)}\"/>" }
 
     private fun writeElements(sb: StringBuilder, elements: List<OfficeElement>, ctx: WriteContext) {
+        // Unwrapped once, up front, so writeElement only ever sees direct
+        // implementors. See unwrap() for why the wrappers are not simply
+        // handled in the when below.
+        val unwrapped = elements.map(::unwrap)
         var i = 0
-        while (i < elements.size) {
-            val element = elements[i]
+        while (i < unwrapped.size) {
+            val element = unwrapped[i]
             if (element is OfficeListItem) {
                 var end = i + 1
-                while (end < elements.size && elements[end] is OfficeListItem) end++
+                while (end < unwrapped.size && unwrapped[end] is OfficeListItem) end++
                 @Suppress("UNCHECKED_CAST")
-                val run = elements.subList(i, end) as List<OfficeListItem>
+                val run = unwrapped.subList(i, end) as List<OfficeListItem>
                 writeListRun(sb, run, ctx)
                 i = end
             } else {
@@ -491,6 +495,31 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 i++
             }
         }
+    }
+
+    /**
+     * Retires the deprecated `OfficeDocElement` wrappers from the write path
+     * (finding F-2) by unwrapping them rather than branching on them.
+     *
+     * They cannot simply be deleted. `DocumentTextMerger.replaceText` still
+     * constructs `ParagraphElement`, and its own comment says the arm is
+     * defensive because runtime import paths emit direct implementors — so a
+     * wrapper reaching the writer is unlikely but not impossible, and an
+     * unhandled one falls through `writeElement`'s empty else and vanishes
+     * from the saved file. Unwrapping is total over the sealed class, so
+     * nothing that arrives can be dropped. Plan 9b retires the sealed class
+     * itself once the DOCX writer stops using it.
+     */
+    @Suppress("DEPRECATION")
+    private fun unwrap(element: OfficeElement): OfficeElement = when (element) {
+        is OfficeDocElement.ParagraphElement -> element.paragraph
+        is OfficeDocElement.TableElement -> element.table
+        is OfficeDocElement.ImageElement -> element.image
+        is OfficeDocElement.ShapeElement -> element.shape
+        is OfficeDocElement.BookmarkElement -> element.bookmark
+        is OfficeDocElement.HyperlinkElement -> element.hyperlink
+        is OfficeDocElement.FieldElement -> element.field
+        else -> element
     }
 
     /**
@@ -646,15 +675,6 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}\">")
                 sb.append("<text:bookmark text:name=\"${escapeXml(element.name)}\"/>")
                 sb.append("</text:p>\n")
-            }
-            is OfficeDocElement.ParagraphElement -> {
-                writeElement(sb, element.paragraph, ctx)
-            }
-            is OfficeDocElement.TableElement -> {
-                writeElement(sb, element.table, ctx)
-            }
-            is OfficeDocElement.ImageElement -> {
-                writeElement(sb, element.image, ctx)
             }
             else -> {
                 // Ignore other non-printable element types safely

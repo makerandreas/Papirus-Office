@@ -9,6 +9,7 @@ import com.makerandreas.papirusoffice.data.OfficeHyperlink
 import com.makerandreas.papirusoffice.data.OfficeFontFace
 import com.makerandreas.papirusoffice.data.OfficeBookmark
 import com.makerandreas.papirusoffice.data.DocumentStyles
+import com.makerandreas.papirusoffice.data.OfficeDocElement
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OdtPackageData
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
@@ -760,6 +761,53 @@ class Plan9RoundTripTest {
         } finally {
             target.delete()
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Commit 5: the deprecated wrappers leave the write path
+    // ------------------------------------------------------------------
+
+    /**
+     * The wrappers cannot simply be deleted, because `DocumentTextMerger`
+     * still builds one. They are unwrapped instead, and this test is the
+     * guarantee that unwrapping loses nothing: before this commit an
+     * unhandled wrapper fell through `writeElement`'s empty else and vanished
+     * from the saved file.
+     */
+    @Test
+    @Suppress("DEPRECATION")
+    fun wrappedElementsStillWriteTheirContent() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeDocElement.ParagraphElement(OfficeParagraph("Wrapped paragraph.")),
+                    OfficeDocElement.TableElement(
+                        OfficeTable(
+                            numColumns = 1,
+                            rows = listOf(
+                                OfficeTableRow(cells = listOf(OfficeTableCell("Wrapped cell.")))
+                            )
+                        )
+                    ),
+                    OfficeDocElement.HyperlinkElement(
+                        OfficeHyperlink("Wrapped link", "https://example.org/wrapped")
+                    )
+                )
+            )
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a wrapped paragraph must still be written:\n$content",
+            content.contains("Wrapped paragraph.")
+        )
+        assertTrue(
+            "a wrapped table must still be written:\n$content",
+            content.contains("Wrapped cell.")
+        )
+        assertTrue(
+            "a wrapped hyperlink must still be written:\n$content",
+            content.contains("https://example.org/wrapped")
+        )
     }
 
     // ------------------------------------------------------------------
