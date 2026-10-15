@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.makerandreas.papirusoffice.data.DocumentBody
 import com.makerandreas.papirusoffice.data.DocumentMetadata
+import com.makerandreas.papirusoffice.data.OfficeSection
+import com.makerandreas.papirusoffice.data.OfficeHyperlink
+import com.makerandreas.papirusoffice.data.OfficeFontFace
+import com.makerandreas.papirusoffice.data.OfficeBookmark
+import com.makerandreas.papirusoffice.data.DocumentStyles
 import com.makerandreas.papirusoffice.data.OfficeDocument
 import com.makerandreas.papirusoffice.data.OdtPackageData
 import com.makerandreas.papirusoffice.data.OfficeDocumentElement
@@ -599,6 +604,158 @@ class Plan9RoundTripTest {
                 "all five list items must survive the round trip",
                 5,
                 reopened.elements.filterIsInstance<OfficeDocumentElement.ListItem>().size
+            )
+        } finally {
+            target.delete()
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Commit 4: font faces, sections, hyperlinks, bookmarks
+    // ------------------------------------------------------------------
+
+    @Test
+    fun declaredFontFacesAreWritten() {
+        val document = OfficeDocument(
+            styles = DocumentStyles(
+                fontFaces = mapOf(
+                    "Liberation Serif" to OfficeFontFace(
+                        name = "Liberation Serif",
+                        family = "Liberation Serif",
+                        genericFamily = "roman",
+                        pitch = "variable"
+                    )
+                )
+            ),
+            body = DocumentBody(elements = listOf(OfficeParagraph("Uses the declared face.")))
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a document with declared faces must write a font-face-decls block:\n$content",
+            content.contains("<office:font-face-decls>")
+        )
+        assertTrue(
+            "the face must keep its own name:\n$content",
+            content.contains("style:name=\"Liberation Serif\"")
+        )
+        assertTrue(
+            "the face must carry svg:font-family:\n$content",
+            content.contains("svg:font-family=\"Liberation Serif\"")
+        )
+        // Nothing declares a face here, so today's output must not change.
+        val without = generatedContentXml(
+            OfficeDocument(body = DocumentBody(elements = listOf(OfficeParagraph("No faces."))))
+        )
+        assertFalse(
+            "a document with no declared faces must not gain a font-face-decls block",
+            without.contains("<office:font-face-decls>")
+        )
+    }
+
+    @Test
+    fun sectionsAreWrittenInsteadOfDisappearing() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeParagraph("Before the section."),
+                    OfficeSection(
+                        name = "Section One",
+                        elements = listOf(OfficeParagraph("Inside the section."))
+                    )
+                )
+            )
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a section must be written, not dropped into an else branch:\n$content",
+            content.contains("<text:section text:name=\"Section One\">")
+        )
+        assertTrue(
+            "the section's own content must survive:\n$content",
+            content.contains("Inside the section.")
+        )
+        assertTrue(
+            "the section must be closed:\n$content",
+            content.contains("</text:section>")
+        )
+    }
+
+    @Test
+    fun hyperlinkedRunsKeepTheirTarget() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeParagraph(
+                        "Go to the guide",
+                        runs = listOf(
+                            OfficeTextRun("Go to the guide", hyperlink = "https://example.org/guide")
+                        )
+                    )
+                )
+            )
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a run with a target must be wrapped in text:a:\n$content",
+            content.contains("<text:a xlink:href=\"https://example.org/guide\"")
+        )
+        assertTrue(
+            "the link must be closed:\n$content",
+            content.contains("</text:a>")
+        )
+    }
+
+    @Test
+    fun standaloneHyperlinkElementsAreWritten() {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(OfficeHyperlink("Read the guide", "https://example.org/guide"))
+            )
+        )
+        val content = generatedContentXml(document)
+        assertTrue(
+            "a hyperlink element must be written:\n$content",
+            content.contains("<text:a xlink:href=\"https://example.org/guide\"")
+        )
+        assertTrue(
+            "the link text must survive:\n$content",
+            content.contains("Read the guide")
+        )
+    }
+
+    @Test
+    fun bookmarksSurviveTheRoundTrip() = runBlocking {
+        val document = OfficeDocument(
+            body = DocumentBody(
+                elements = listOf(
+                    OfficeParagraph(
+                        "Chapter start",
+                        bookmarks = listOf(OfficeBookmark("chapter-one"))
+                    ),
+                    OfficeParagraph("Middle"),
+                    OfficeHeading(
+                        "A heading",
+                        level = 2,
+                        bookmarks = listOf(OfficeBookmark("heading-marker"))
+                    )
+                )
+            )
+        )
+        val target = scratch("bookmarks.odt")
+        try {
+            target.writeBytes(OdtDocumentWriter().write(document))
+            val reopened = OfficeDocumentParser(context).parseDocument(target, bypassCache = true)
+            assertFalse(
+                "the bookmarked document must re-open: ${reopened.failureReason}",
+                reopened.isParsingFailed
+            )
+            assertTrue(
+                "bookmark 'chapter-one' was lost: ${reopened.bookmarks}",
+                reopened.bookmarks.contains("chapter-one")
+            )
+            assertTrue(
+                "bookmark 'heading-marker' was lost: ${reopened.bookmarks}",
+                reopened.bookmarks.contains("heading-marker")
             )
         } finally {
             target.delete()

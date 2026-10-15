@@ -298,10 +298,14 @@ class OdtDocumentWriter : DocumentFormatWriter {
         sb.append("xmlns:table=\"urn:oasis:names:tc:opendocument:xmlns:table:1.0\" ")
         sb.append("xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:draw:1.0\" ")
         sb.append("xmlns:fo=\"urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\" ")
+        // Required by style:font-face's svg:font-family (section 2.1 item 5).
+        sb.append("xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\" ")
         sb.append("xmlns:xlink=\"http://www.w3.org/1999/xlink\" ")
         // ODF 1.4 Part 3 section 19.390; was 1.2.
         sb.append("office:version=\"1.4\">\n")
 
+        // font-face-decls precedes automatic-styles in the ODF content model.
+        sb.append(buildFontFaceDecls(document))
         sb.append("  <office:automatic-styles>\n")
         if (!originalAutomaticStyles.isNullOrBlank()) {
             sb.append(originalAutomaticStyles).append('\n')
@@ -430,6 +434,47 @@ class OdtDocumentWriter : DocumentFormatWriter {
      * around every single item, so a five-item list was written as five
      * one-item lists and the numbering restarted at 1 on each line.
      */
+    /**
+     * Declared font faces, so a saved document names the fonts it uses instead
+     * of leaving the reader to substitute its own. Empty when the document
+     * declares none, which keeps today's output byte-identical for documents
+     * that never had any.
+     */
+    private fun buildFontFaceDecls(document: OfficeDocument): String {
+        val faces = document.styles.fontFaces
+        if (faces.isEmpty()) return ""
+        val sb = StringBuilder()
+        sb.append("  <office:font-face-decls>\n")
+        for ((_, face) in faces) {
+            val attrs = StringBuilder()
+            attrs.append(" style:name=\"${escapeXml(face.name)}\"")
+            attrs.append(" svg:font-family=\"${escapeXml(face.family)}\"")
+            face.genericFamily?.takeIf { it.isNotBlank() }
+                ?.let { attrs.append(" style:font-family-generic=\"${escapeXml(it)}\"") }
+            face.pitch?.takeIf { it.isNotBlank() }
+                ?.let { attrs.append(" style:font-pitch=\"${escapeXml(it)}\"") }
+            face.charset?.takeIf { it.isNotBlank() }
+                ?.let { attrs.append(" style:font-charset=\"${escapeXml(it)}\"") }
+            sb.append("    <style:font-face$attrs/>\n")
+        }
+        sb.append("  </office:font-face-decls>\n")
+        return sb.toString()
+    }
+
+    /** Distinct, non-blank bookmark names from the element's own list and field. */
+    private fun bookmarkNames(list: List<OfficeBookmark>, single: String? = null): List<String> {
+        val out = LinkedHashSet<String>()
+        single?.takeIf { it.isNotBlank() }?.let { out += it }
+        list.forEach { if (it.name.isNotBlank()) out += it.name }
+        return out.toList()
+    }
+
+    private fun bookmarkStarts(names: List<String>): String =
+        names.joinToString("") { "<text:bookmark-start text:name=\"${escapeXml(it)}\"/>" }
+
+    private fun bookmarkEnds(names: List<String>): String =
+        names.joinToString("") { "<text:bookmark-end text:name=\"${escapeXml(it)}\"/>" }
+
     private fun writeElements(sb: StringBuilder, elements: List<OfficeElement>, ctx: WriteContext) {
         var i = 0
         while (i < elements.size) {
@@ -475,8 +520,11 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 }
                 if (previousLevel >= level) sb.append("</text:list-item>\n")
             }
+            val marks = bookmarkNames(item.bookmarks)
             sb.append("<text:list-item><text:p>")
+            sb.append(bookmarkStarts(marks))
             writeRunsOrText(sb, item.text, item.runs, ctx)
+            sb.append(bookmarkEnds(marks))
             sb.append("</text:p>")
             previousLevel = level
         }
@@ -503,16 +551,24 @@ class OdtDocumentWriter : DocumentFormatWriter {
         val names = ctx.names
         when (element) {
             is OfficeParagraph -> {
+                val marks = bookmarkNames(element.bookmarks, element.bookmark)
                 val styleName = if (!element.styleName.isNullOrEmpty()) element.styleName else names.paragraph
                 sb.append("      <text:p text:style-name=\"${escapeXml(styleName)}\">")
+                // bookmark-start/end sit inside the paragraph, which is where
+                // the ODF content model allows them.
+                sb.append(bookmarkStarts(marks))
                 writeRunsOrText(sb, element.text, element.runs, ctx)
+                sb.append(bookmarkEnds(marks))
                 sb.append("</text:p>\n")
             }
             is OfficeHeading -> {
+                val marks = bookmarkNames(element.bookmarks)
                 val level = if (element.level > 0) element.level else 1
                 val styleName = if (!element.styleName.isNullOrEmpty()) element.styleName else "Heading_$level"
                 sb.append("      <text:h text:outline-level=\"$level\" text:style-name=\"${escapeXml(styleName)}\">")
+                sb.append(bookmarkStarts(marks))
                 writeRunsOrText(sb, element.text, element.runs, ctx)
+                sb.append(bookmarkEnds(marks))
                 sb.append("</text:h>\n")
             }
             is OfficeListItem -> {
@@ -573,6 +629,24 @@ class OdtDocumentWriter : DocumentFormatWriter {
                     sb.append("      </draw:frame>\n")
                 }
             }
+            is OfficeSection -> {
+                // Sections used to fall through to the empty else branch and
+                // disappear from the saved document entirely (section 0.1).
+                sb.append("      <text:section text:name=\"${escapeXml(element.name)}\">\n")
+                writeElements(sb, element.elements, ctx)
+                sb.append("      </text:section>\n")
+            }
+            is OfficeHyperlink -> {
+                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}">")
+                sb.append("<text:a xlink:href=\"${escapeXml(element.targetUri)}\" xlink:type=\"simple\">")
+                sb.append(escapeXml(element.text))
+                sb.append("</text:a></text:p>\n")
+            }
+            is OfficeBookmark -> {
+                sb.append("      <text:p text:style-name=\"${escapeXml(names.paragraph)}">")
+                sb.append("<text:bookmark text:name=\"${escapeXml(element.name)}\"/>")
+                sb.append("</text:p>\n")
+            }
             is OfficeDocElement.ParagraphElement -> {
                 writeElement(sb, element.paragraph, ctx)
             }
@@ -594,6 +668,12 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 // Run flags are tri-state: only a stated property writes a span
                 // style, so a run that says nothing keeps the paragraph's style.
                 val styleName = effectiveRunStyle(run, ctx)
+                // A run that carries a target is wrapped in text:a; the span
+                // goes inside it, which is the order ODF requires.
+                val link = run.hyperlink?.takeIf { it.isNotBlank() }
+                if (link != null) {
+                    sb.append("<text:a xlink:href=\"${escapeXml(link)}\" xlink:type=\"simple\">")
+                }
                 if (styleName != null) {
                     sb.append("<text:span text:style-name=\"${escapeXml(styleName)}\">")
                     sb.append(escapeXml(run.text))
@@ -601,6 +681,7 @@ class OdtDocumentWriter : DocumentFormatWriter {
                 } else {
                     sb.append(escapeXml(run.text))
                 }
+                if (link != null) sb.append("</text:a>")
             }
         } else {
             sb.append(escapeXml(plainText))
