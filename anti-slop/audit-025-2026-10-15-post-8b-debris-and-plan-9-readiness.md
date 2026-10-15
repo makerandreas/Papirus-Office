@@ -555,6 +555,29 @@ the goldens run (§5.1):
   someone runs `verifyRoborazziDebug`. Until `ci.yml` is switched, Plan 9's visual review is a
   manual act: compare the 13 PNGs before and after.
 
+**A third thing, found while the pre-change gate was being written and measured here.** Plan 9's
+§2.1 rewrites `OdtDocumentWriter.buildContentXml`, the function that *generates* `content.xml`.
+No fixture can reach it. `detectSourceFeatures` (`OdtImportPipeline.kt:231`) sets
+`hasAdvancedTables` on **any** `<table:table>` element and `hasAuthoredIndexes` on **any**
+`table-of-content` element, and `saveCapability` (`OdtDocumentWriter.kt:142`) refuses a modified
+save for either. Counting those elements in the six fixtures: Sample-1 has 0 TOCs and 85 tables,
+Sample-2 has 1 and 86, Sample-3 has 0 and 55, Sample-4 has 1 and 0, Sample-5 has 1 and 0,
+Sample-6 has 1 and 43. Every sample trips at least one flag.
+
+So the roadmap's "open, save, reopen preserves … for Sample-6" is reachable only through the
+*preserved* path, which copies the original `content.xml` byte-for-byte and already works. It will
+pass before §2.1's work and cannot tell a fixed §2.1 from a broken one. Plan 9 therefore proves
+§2.1 with synthetic documents and uses the samples to prove the package still round-trips and the
+page counts have not moved. Recorded in `plan-09` §2.3.1.
+
+**A fourth, in the same place.** Plan 9's own draft recommended, for a style-name collision,
+"keep the writer's fixed one and log it". Measuring the fixtures reversed that. All six declare
+`P1` and four declare `Table1`, and in Sample-6 the document's `P1` carries
+`style:parent-style-name="Title"` — it is the title paragraph — while the writer's hardcoded `P1`
+is `style:parent-style-name="Standard"`, a body paragraph. Keeping the writer's would have
+silently downgraded the title to body text on every one of the six. Recorded in `plan-09` §8 as
+decision D4, decided by the owner on 2026-10-15.
+
 ---
 
 ## 11. Recommendation

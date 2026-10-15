@@ -117,8 +117,8 @@ Ordered by how much data each item recovers.
 1. **Emit the document's own automatic styles.** Walk `OfficeDocument.styles`
    (`DocumentStyles`) and emit `<style:style>` entries for every named and automatic style the
    body references, before the fixed eleven. This is what closes the dangling-reference defect.
-   Decision: where a style name collides with one of the fixed eleven, keep the fixed one and log
-   it; do not rename silently.
+   **Collision rule: decision D4 in §8** (the document owns its names; the generator steps aside).
+   The rule this paragraph originally proposed was reversed after measurement — see D4.
 2. **Append-only derivation for formatting with no style.** Names follow the ClearPDF design note:
    `P_papirus_*` for paragraph styles and `T_papirus_*` for text styles, appended to the tail of
    `<office:automatic-styles>`, never re-indexed.
@@ -143,7 +143,12 @@ authored-index regeneration, footnotes and endnotes, fields, headers and footers
 `text:section` protection, and Change Tracking. `saveCapability` keeps refusing a modified save
 for authored indexes, and the round-trip test asserts the refusal rather than the content.
 
-### 2.2 DOCX: a real writer, and it is the larger half
+### 2.2 DOCX: a real writer, and it is the larger half — **DEFERRED to Plan 9b (decision D5)**
+
+The owner deferred this section on 2026-10-15, so Plan 9 ships the ODT half only and §0.2's
+defects stand until Plan 9b. Everything below this paragraph is Plan 9b's scope, carried here so
+the measurement is not lost. Plan 9b needs its own plan document before it starts, for the same
+reason this one did.
 
 Add `DocxDocumentWriter : DocumentFormatWriter` next to `OdtDocumentWriter`, and make
 `DocxDocumentSerializer.write` call it instead of `DocxDocumentParser.saveDocument`.
@@ -185,6 +190,63 @@ delete the temp file
 write to `context.cacheDir` and clean up in a `finally`. It must never write into `tests/inky`,
 and it must not touch `tests/inky/fixture-identities.properties`. `FixtureIdentityTest` is the
 guard that catches a mistake here; if it fires, the test is wrong, not the manifest.
+
+### 2.3.1 No fixture can reach the generated `content.xml` path
+
+**Measured, and it changes the test design.** `saveCapability`
+(`OdtDocumentWriter.kt:142`) refuses a **modified** save when
+`OdtSourceFeatures.hasAuthoredIndexes`, `.hasNamedSections` or `.hasAdvancedTables` is set. Those
+three flags come from `detectSourceFeatures` (`OdtImportPipeline.kt:231`), which scans
+`content.xml` and `styles.xml` and sets:
+
+* `indexes` on any `table-of-content`, `alphabetical-index`, `table-index`, `illustration-index`,
+  `object-index`, `user-index` or `bibliography` element — note **any**, not "a complex one";
+* `sections` on any `section` element;
+* `tables` on any `table` element — again **any** `<table:table>`, however simple.
+
+Counting those elements in the six fixtures:
+
+| fixture | `<text:table-of-content>` | `<table:table>` | refused for a modified save |
+|---|---|---|---|
+| Sample-1.odt | 0 | 85 | yes — source table structure |
+| Sample-2.odt | 1 | 86 | yes — both |
+| Sample-3.odt | 0 | 55 | yes — source table structure |
+| Sample-4.odt | 1 | 0 | yes — authored indexes |
+| Sample-5.odt | 1 | 0 | yes — authored indexes |
+| Sample-6.odt | 1 | 43 | yes — both |
+
+**All six are refused, so `buildContentXml` — the function §2.1 rewrites — is unreachable through
+any fixture.** (The flag is the coarse one here; the finer element walk at
+`OdtDocumentWriter.kt:164-179` would also refuse Sample-1 and Sample-3, whose tables carry cell,
+row and column styles and header rows.)
+
+Three consequences, all of them shaping this plan:
+
+1. **The roadmap's Sample-6 acceptance is reachable only through the preserved path**, the one
+   that copies the original `content.xml` byte-for-byte. That path already works. So "open, save,
+   reopen preserves … for Sample-6" will pass *before* §2.1's work and cannot distinguish it from
+   a broken §2.1. The acceptance has to be restated: Sample-6 proves the package survives, and
+   synthetic documents prove the generated content is faithful.
+2. **§2.1 is proven with synthetic documents, not samples.** That is arguably better: a synthetic
+   document can isolate one property at a time, where a fixture bundles eighty of them.
+3. **`detectSourceFeatures` is too coarse to be a useful gate long-term.** A document with one
+   trivial two-cell table is treated the same as one with nested spanned tables. Narrowing it is
+   not Plan 9's job — it would widen the refusal and change what Plan 7B guarantees — but it is
+   the reason §7 gains an item requiring the refusal list to be measured per fixture rather than
+   assumed.
+
+`Plan9RoundTripTest.modifiedOdtSaveIsRefusedForEveryFixture` pins this: when Plan 9 or a later
+plan narrows the refusal, that test is the thing that fails and says so.
+
+### 2.3.2 The new-document case
+
+`audit-025` §5.1 finding J: `templates/styles/Default.ott` carries `mimetype`,
+`META-INF/manifest.xml`, `meta.xml`, `styles.xml` and `Thumbnails/thumbnail.png` and **no
+`content.xml`**. `InkyModule.kt:3426` uses it as the fallback current path. Every fixture has a
+`content.xml`, so a round-trip test built only on fixtures never exercises *creating* one.
+
+`Plan9RoundTripTest.freshDocumentRoundTripProducesAReadablePackage` covers it with a synthetic
+`OfficeDocument` that has no `odtPackageData`, which forces the fresh-generation branch.
 
 What the first version asserts, and why each is assertable today:
 
@@ -231,10 +293,17 @@ Before commit 2, one commit that changes no behaviour:
 1. Add `Plan9RoundTripTest` with the assertions marked "yes" in the §2.3 table, and confirm CI is
    green with them. This records what today's writer already preserves, which is the baseline the
    rest of the plan is measured against.
-2. Add `Plan9RoundTripTest.writerNeverWritesIntoTheFixtureDirectory`, asserting the test's own
-   output path is under `cacheDir`. Cheap, and it is the guard for invariant 6.
+2. Add `Plan9RoundTripTest.roundTripOutputStaysOutOfTheFixtureDirectory`, asserting the test's own
+   output path is under `cacheDir` **and** that the fixture's SHA-256 and length are unchanged
+   afterwards. Cheap, and it is the guard for invariant 6.
 3. Record the ODT side of the current loss in a comment at the top of the test file, citing
    §0.1's table, so a reader knows why each assertion exists.
+4. Add the two measurements §2.3.1 and §2.3.2 call for, as pins rather than as features:
+   `modifiedOdtSaveIsRefusedForEveryFixture`, which proves no fixture reaches `buildContentXml`,
+   and `freshDocumentRoundTripProducesAReadablePackage` / `smallestFreshDocumentStillRoundTrips`,
+   which are the only tests that exercise the generated path at all.
+5. Pin the DOCX refusal with `docxSaveStillRefusesWhenTheDocumentCarriesImages` so Plan 9b's
+   removal of it is a measured change (D5).
 
 Gate: CI green, `FixtureIdentityTest` green, and the recorded baseline written into this
 document's §9 implementation record.
@@ -246,9 +315,9 @@ document's §9 implementation record.
 | File | Change |
 |---|---|
 | `data/writer/OdtDocumentWriter.kt` | §2.1. The largest diff |
-| `data/writer/DocxDocumentWriter.kt` | **new**, §2.2 |
-| `data/DocxDocumentParser.kt` | remove `saveDocument`'s element-flattening path (`:64`-`:74`) and the image refusal (`:56`) once the writer replaces them |
-| `data/DocumentSerializer.kt` | `DocxDocumentSerializer.write` calls `DocxDocumentWriter`; `serializeToFormat` unchanged |
+| `data/writer/DocxDocumentWriter.kt` | **not in this plan.** New file in Plan 9b (D5) |
+| `data/DocxDocumentParser.kt` | **not in this plan.** The element-flattening path (`:64`-`:74`) and the image refusal (`:56`) are Plan 9b's (D5) |
+| `data/DocumentSerializer.kt` | unchanged in this plan; `DocxDocumentSerializer.write` starts calling `DocxDocumentWriter` in Plan 9b |
 | `data/OfficeDocumentParser.kt` | retire the `OfficeDocElement` wrapper (F-2) in the final commit; `toPlainText`'s `[Image:]` line only if §3 says so |
 | `app/src/test/java/com/example/Plan9RoundTripTest.kt` | **new** |
 | `app/src/test/java/com/example/DocumentEnginesUnitTest.kt` | extend, since it already drives `OdtDocumentWriter` at twelve call sites |
@@ -259,26 +328,37 @@ document's §9 implementation record.
 
 ## 6. Delivery
 
-Six commits, each with its own gate, ordered so a regression is attributable to one commit.
+Five commits, each with its own gate, ordered so a regression is attributable to one commit.
+**ODT only** — decision D5 moved §2.2 to Plan 9b.
 
 | # | Commit | Gate |
 |---|---|---|
 | 1 | **Pre-change gate** (§4): the round-trip test with today's passing assertions, the fixture-directory guard, and the recorded baseline | CI green; `FixtureIdentityTest` green |
-| 2 | **ODT styles** (§2.1 items 1, 2, 6): emit the document's own automatic styles, append-only `P_papirus_*` / `T_papirus_*`, `office:version` to `1.4` | no paragraph or heading in the round-tripped Sample-6 ODT references a style the package does not define; all six ODT pairs still inside their `SampleMatrix` windows |
-| 3 | **ODT lists and tables** (§2.1 items 3, 4): one `<text:list>` per run, `text:list-style-name`, cell spans and cell styles | Sample-6 ODT produces 23 `text:list` elements, matching the source count; page counts unchanged |
+| 2 | **ODT styles** (§2.1 items 1, 2, 6): emit the document's own automatic styles with D4's collision rule, append-only `P_papirus_*` / `T_papirus_*`, `office:version` to `1.4` | every `text:style-name` in a round-tripped synthetic document resolves to a style the package defines; the document's own `P1` (title) and `Table1` survive as the document defined them, not as the writer's fixed ones do; all six ODT pairs still inside their `SampleMatrix` windows |
+| 3 | **ODT lists and tables** (§2.1 items 3, 4): one `<text:list>` per run, `text:list-style-name`, cell spans and cell styles | a synthetic five-item list produces one `<text:list>` with five `<text:list-item>` children, not five one-item lists; a synthetic spanned round-trip keeps its spans |
 | 4 | **ODT font faces, bookmarks, hyperlinks, sections** (§2.1 items 5, 7, 8) | `saveCapability` no longer needs to refuse for font faces alone; bookmark and hyperlink counts survive the round trip |
-| 5 | **DOCX writer** (§2.2), as its own commit and possibly two if the diff grows: (a) package preservation and runs, (b) tables, numbering, images | `DocxRunFormattingTest` still green and the round-trip test's run assertions now pass on DOCX; image refusal removed only after (b) is proven |
-| 6 | **Retire the old paths** (F-2): delete `generateDocxXmlFromElements`, the `DocxDocumentParser` flattening, and the `OfficeDocElement` wrapper | mechanical; no assertion changes; the compiler is the reviewer |
+| 5 | **Retire the ODT-side old paths**: delete the `OfficeDocElement` wrapper uses on the ODT save path | mechanical; no assertion changes; the compiler is the reviewer |
 
-Commits 2 to 4 are ODT-only and cannot change a DOCX page count. Commit 5 is DOCX-only. Keep them
-separate so the 12-file matrix tells you which one moved a number.
+Commits 2 to 4 are ODT-only and cannot change a DOCX page count. Keep them separate so the
+12-file matrix tells you which one moved a number.
+
+**Not in this plan (Plan 9b):** the DOCX writer, `DocxDocumentWriter.kt`, the
+`DocxDocumentParser.kt` flattening removal, `w:tblGrid` / numbering / image registration, and the
+removal of the image refusal at `DocxDocumentParser:56`. Plan 9b needs its own plan document
+before it starts, for the same reason this one did.
+
+**Note on how §2.1's gates are written.** Because §2.3.1 shows no fixture can reach
+`buildContentXml`, the gates for commits 2 to 4 are stated against *synthetic* documents, not
+Sample-6. Sample-6's job in every one of those commits is narrower and still real: prove the
+preserved path still round-trips and the page counts have not moved.
 
 ---
 
 ## 7. Acceptance
 
-1. `Plan9RoundTripTest` passes for **Sample-6 in both formats** on the properties in the §2.3
-   table, in CI.
+1. `Plan9RoundTripTest` passes for **Sample-6 ODT** on the properties in the §2.3 table **that are
+   marked ODT**, in CI, and for the synthetic documents that §2.3.1 and §2.3.2 require. The DOCX
+   half is Plan 9b (D5).
 2. All twelve fixtures stay inside their recorded `SampleMatrix` windows, for **re-opened**
    documents as well as originals. Record the re-opened counts in the PR body; they are a new
    measurement and become the baseline.
@@ -286,10 +366,14 @@ separate so the 12-file matrix tells you which one moved a number.
 4. `OdtDocumentWriter.saveCapability` still refuses a modified save for authored indexes, named
    sections and source table structure, and the test asserts it.
 5. Every generated ODT root declares `office:version="1.4"`; `mimetype` is still first and STORED.
-6. `DocxDocumentParser.saveDocument`'s image refusal is gone, and `Plan6ImageFoundationTest` plus
-   the round-trip image assertion prove images survive.
-7. The PR body lists which findings it closes and which it defers (§3), so the audit stays the
-   single source of truth.
+6. `DocxDocumentParser.saveDocument`'s image refusal is **still in place** and
+   `Plan9RoundTripTest.docxSaveStillRefusesWhenTheDocumentCarriesImages` proves it. Removing it is
+   Plan 9b's acceptance, not this plan's (D5).
+7. The fixture round trips still land on the preserved path for all six ODT samples, and
+   `modifiedOdtSaveIsRefusedForEveryFixture` prints the blocking features for each one. If Plan 9
+   narrows the refusal, the PR must list which sample moved and why.
+8. The PR body lists which findings it closes and which it defers (§3 and D5), so the audit stays
+   the single source of truth.
 
 ---
 
@@ -308,16 +392,81 @@ rather than treated as a failure.
 **Decision D3, carried here.** The owner reversed it on 2026-10-04 and deferred declared font
 faces to Plan 9. §2.1 item 5 implements it.
 
-**Decision needed before commit 2:** the collision rule for a document style named the same as one
-of the fixed eleven (`P1`, `T_Bold`, `T_Italic`, `T_BoldItalic`, `T_Underline`, `T_BoldUnderline`,
-`T_ItalicUnderline`, `T_BoldItalicUnderline`, `Table1`). This plan recommends keeping the fixed
-one and logging, on the grounds that the fixed names are Papirus-generated and a document style
-with that name is almost certainly a document that came from Papirus. Confirm before coding.
+### Decision D4: the collision rule. **Decided 2026-10-15: the document owns its names; the
+generator steps aside.**
 
-**Open, not blocking:** whether the DOCX half fits one PR. §2.2 is larger than §2.1, and
-`plan-04-to-09` Appendix A already treats 8A and 8B as separate PRs for the same reason. If commit
-5's diff passes roughly 600 lines, split it at the (a)/(b) boundary marked in §6 and give each
-half its own CI gate.
+The question: `buildContentXml` hardcodes eleven style names (`P1`, `T_Bold`, `T_Italic`,
+`T_BoldItalic`, `T_Underline`, `T_BoldUnderline`, `T_ItalicUnderline`, `T_BoldItalicUnderline`,
+`Table1`, `Table1.Col`). Once §2.1 item 1 starts emitting the document's *own* styles, what
+happens when the document already uses one of those names?
+
+**The collision is not hypothetical. It happens on every fixture.** Measured by unzipping the six
+`tests/inky/*.odt` and listing the `style:name` values inside `<office:automatic-styles>`:
+
+| fixture | automatic styles | collides with the fixed eleven |
+|---|---|---|
+| Sample-1.odt | 90 | `P1`, `Table1` |
+| Sample-2.odt | 132 | `P1`, `Table1` |
+| Sample-3.odt | 53 | `P1`, `Table1` |
+| Sample-4.odt | 33 | `P1` |
+| Sample-5.odt | 45 | `P1` |
+| Sample-6.odt | 75 | `P1`, `Table1` |
+
+**And the two names mean different things.** In Sample-6.odt:
+
+| name | the document's definition | the writer's hardcoded definition |
+|---|---|---|
+| `P1` | `style:parent-style-name="Title"`, `style:master-page-name="Standard"`, `style:page-number="1"` — **the title paragraph** | `style:parent-style-name="Standard"` — a body paragraph |
+| `Table1` | `style:width="15.905cm"`, `table:align="left"` | `style:width="100%"`, `table:align="margins"` |
+
+So the rule this plan originally proposed — *keep the fixed one and log it* — would, on all six
+fixtures, silently downgrade the document's title paragraph to body text and resize every table to
+full width. "Log it" means the user never sees it. That is precisely the class of silent data loss
+Plan 9 exists to close, so the recommendation is reversed.
+
+**The rule:**
+
+1. Collect every style name the document already declares, from `DocumentStyles` plus every
+   `style:name` the body references.
+2. The writer asks for names through one helper, `reserve(baseName)`. If the name is free it is
+   used unchanged; if it is taken the writer gets `baseName_papirus_1`, then `_2`, and so on.
+3. The writer never emits a `<style:style>` under a name the document already uses.
+4. Log at debug, not warn. A rename is normal bookkeeping, not a defect.
+5. If the *source* declares the same name twice, that is a malformed document (ODF forbids
+   duplicate style names): keep the first, log a warning, carry on.
+
+**Why this one and not the alternatives.** The fixed eleven are names *the writer invents*; the
+document's names are the ones the body's `text:style-name` attributes point at. Moving the
+generator costs roughly twenty lines and loses nothing, because the writer controls both sides of
+its own references. Moving the document instead would break a reference we did not create.
+Refusing the save was rejected: the collision is the writer's fault, not the document's, and
+failing closed here would refuse to save real LibreOffice files.
+
+This also keeps the ClearPDF design note's append-only rule intact — we append, and the *generator*
+is what moves rather than the document's styles being re-indexed.
+
+**Decision D5: the DOCX half is deferred. Decided by the owner 2026-10-15.** Plan 9 ships the ODT
+half only. §2.2 moves to a following plan, **Plan 9b**, alongside the roadmap acceptance line that
+depends on it.
+
+What this changes:
+
+* §6's commit 5 (DOCX writer) and the DOCX halves of the §2.3 assertion table leave this plan.
+* Roadmap §4.10 asks for "Sample-6 in both formats". This plan therefore meets **the ODT half** of
+  that acceptance and says so explicitly rather than implying both. Plan 9b closes the DOCX half.
+* Acceptance item 6 (removing `DocxDocumentParser.saveDocument`'s image refusal) moves to Plan 9b.
+  `Plan9RoundTripTest.docxSaveStillRefusesWhenTheDocumentCarriesImages` pins the refusal today so
+  its removal is a measured change rather than a claim.
+* Acceptance item 7's `OfficeDocElement` retirement (F-2) stays in Plan 9: it is a mechanical
+  deletion gated on the ODT path, and `generateDocxXmlFromElements` is still the DOCX writer
+  Plan 9b replaces, so F-2 completes there instead. Plan 9 deletes the *ODT-side* uses only.
+* §5's file table loses `DocxDocumentWriter.kt` (new) and the `DocxDocumentParser.kt` edit; both
+  reappear in Plan 9b's own plan document, which must be written before that plan starts, exactly
+  as this one was.
+
+The reasoning the owner gave is sound and worth recording: §2.2 is the larger half, and shipping
+the ODT half alone keeps each PR reviewable. `plan-04-to-09` Appendix A already treats 8A and 8B
+as separate PRs on the same grounds.
 
 ---
 
@@ -331,3 +480,19 @@ half its own CI gate.
   files the 2026-10-12 re-upload brought back were deleted again, 3,040,550 bytes of unreferenced
   `img_pattern_*.jpg` were removed, and 7 unused imports across 6 files were dropped. None of it
   touches the save path; it was done first so Plan 9's diff contains Plan 9.
+* **2026-10-15, decisions D4 and D5 closed by the owner.** D4 (§8): the collision rule is *the
+  document owns its names; the generator steps aside*, reversing this plan's original
+  recommendation after the six fixtures were measured — all six declare `P1` and four declare
+  `Table1`, and in Sample-6 the document's `P1` is the title paragraph while the writer's is a
+  body paragraph. D5 (§8): the DOCX half is deferred to Plan 9b; Plan 9 ships ODT only.
+* **2026-10-15, commit 1 (the pre-change gate) written.** `Plan9RoundTripTest.kt`, six tests:
+  the preserved-path round trip over all six ODT fixtures; the per-fixture modified-save refusal
+  measurement; two fresh-document round trips; the DOCX image-refusal pin; and the
+  fixture-directory guard. **Not compiled and not run here** — no Gradle, Android SDK or JDK in
+  the agent sandbox (`AGENTS.md` evidence ladder tier 1). CI on the PR is the first real
+  execution, and any assertion that fails is the baseline correcting this document, not a
+  regression: that is what a gate commit is for.
+* **2026-10-15, §2.3.1 added.** No fixture can reach `buildContentXml`: `detectSourceFeatures`
+  sets `hasAdvancedTables` on *any* `<table:table>` and `hasAuthoredIndexes` on *any*
+  `table-of-content`, and between them the six samples cover both. This is why the §6 gates for
+  commits 2 to 4 are written against synthetic documents.
