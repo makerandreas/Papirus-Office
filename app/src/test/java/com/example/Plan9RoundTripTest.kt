@@ -13,6 +13,7 @@ import com.makerandreas.papirusoffice.data.OfficeParagraph
 import com.makerandreas.papirusoffice.data.OfficeTable
 import com.makerandreas.papirusoffice.data.OfficeTableCell
 import com.makerandreas.papirusoffice.data.OfficeTableRow
+import com.makerandreas.papirusoffice.data.toOfficeDocument
 import com.makerandreas.papirusoffice.data.writer.OdtDocumentWriter
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
