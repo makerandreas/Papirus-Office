@@ -565,3 +565,27 @@ as separate PRs on the same grounds.
   generated roots declare `office:version="1.4"` while `manifest:version` stays `1.2`.
   The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`,
   unchanged from the four runs before it.
+* **2026-10-15, commit 3 (ODT lists and tables) written.** §2.1 items 3 and 4.
+  `writeElements` now groups consecutive `OfficeListItem`s into one run and `writeListRun` writes
+  it as a single `<text:list>`; the old code opened and closed a list per item, so a five-item list
+  became five one-item lists and numbering restarted at 1 on every line. A deeper `level` nests
+  inside the previous item's `<text:list-item>`, left open until the level comes back up, which is
+  how ODF expresses an outline level and which the old code could not represent at all.
+  `text:list-style-name` is carried from the parsed list style and written as it arrived, per D4.
+  Table cells now write `table:number-columns-spanned` and `table:number-rows-spanned` plus their
+  own `table:style-name`, and slots marked `TableCellOccupancy.COVERED` are skipped — they belong
+  to a cell that already spans them, so writing them again added a phantom cell and shifted every
+  column after it. The fallback column count sums `columnSpan` over origin cells instead of
+  counting cells, so a spanned row reports the width it really occupies.
+  Five tests added, fifteen in the file. **Not compiled or run before pushing** — tier 1.
+  **CI run `38773891798`, head `4191d9f`: all fifteen pass.** `Unit tests: 450 run, 0 failed, 0
+  errors, 0 skipped (33.31s across 83 suites)`, with `Plan9RoundTripTest | 15 | 0 | 0 | 0 | 0.73`
+  and `FixtureIdentityTest | 1 | 0 | 0 | 0`. The count went **445 → 450**, exactly the five new
+  tests. **The 12-file matrix did not move again**: ODT `14/23/21/10/18/20`, DOCX
+  `16/26/23/12/20/24`, all columns identical to the four runs before this plan started.
+  What the five new tests pin, at tier 3: five consecutive items produce one `<text:list>` and
+  five `<text:list-item>`; levels 1/2/2/1 produce exactly two nested lists with every list and
+  every item closed; a two-column span is written and the covered slot does **not** become a third
+  cell; a cell style name is written; and a five-item list survives a real save-and-reopen as five
+  list items, which is the round trip §2.3 asks for and the old per-item lists could not pass.
+  The same run's lint job reports `lint 9.4.1: 0 errors, 59 warnings across 7 issue ids`, unchanged.
