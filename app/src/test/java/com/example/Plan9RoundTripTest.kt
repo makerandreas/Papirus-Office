@@ -811,7 +811,8 @@ class Plan9RoundTripTest {
     }
 
     // ------------------------------------------------------------------
-    // DOCX: today's refusal, pinned so Plan 9b can remove it as a measurement
+    // ------------------------------------------------------------------
+    // DOCX: Plan 9b pre-change gate measurements and refusal pins
     // ------------------------------------------------------------------
 
     @Test
@@ -835,6 +836,157 @@ class Plan9RoundTripTest {
             target.delete()
         }
     }
+
+    @Test
+    fun docxSaveRefusesAllFiveFixturesWithMedia() = runBlocking {
+        val parser = OfficeDocumentParser(context)
+        val serializer = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+        val fixturesWithMedia = listOf(1, 2, 4, 5, 6)
+        for (sample in fixturesWithMedia) {
+            val name = SampleMatrix.docxName(sample)
+            val parsed = parser.parseDocument(fixture(name), bypassCache = true)
+            assertFalse("$name failed to parse: ${parsed.failureReason}", parsed.isParsingFailed)
+            val target = scratch(name)
+            try {
+                val saved = serializer.serializeToFormat(parsed.toOfficeDocument(), "DOCX", target)
+                assertFalse("$name carries images and must be refused today", saved)
+            } finally {
+                target.delete()
+            }
+        }
+    }
+
+    @Test
+    fun docxSample3RoundTripRecordsLossOfRunsAndTextPreservation() = runBlocking {
+        val parser = OfficeDocumentParser(context)
+        val name = SampleMatrix.docxName(3) // Sample-3 has 0 media
+        val source = fixture(name)
+        val original = parser.parseDocument(source, bypassCache = true)
+        assertFalse("$name failed to parse: ${original.failureReason}", original.isParsingFailed)
+
+        val originalRunsCount = original.elements.sumOf { elem ->
+            when (elem) {
+                is OfficeDocumentElement.Paragraph -> elem.runs.size
+                is OfficeDocumentElement.Heading -> elem.runs.size
+                is OfficeDocumentElement.ListItem -> elem.runs.size
+                else -> 0
+            }
+        }
+        // Sample-3 has 436 w:r tags in raw XML (390 in top-level paragraphs, 46 in tables).
+        // The parser parses 389 runs across top-level elements.
+        assertEquals("Sample-3.docx source parses 389 top-level formatted runs", 389, originalRunsCount)
+
+
+        val target = scratch(name)
+        try {
+            // Copy source to target first so target exists (in-place save test)
+            source.copyTo(target, overwrite = true)
+            val document = original.toOfficeDocument()
+            val saved = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                .serializeToFormat(document, "DOCX", target)
+            assertTrue("Sample-3.docx (no media) must save successfully", saved)
+
+            val reopened = parser.parseDocument(target, bypassCache = true)
+            assertFalse("$name re-open failed: ${reopened.failureReason}", reopened.isParsingFailed)
+            assertEquals(
+                "element count preserved across DOCX save",
+                original.elements.size,
+                reopened.elements.size
+            )
+            assertEquals(
+                "plain text preserved across DOCX save",
+                original.plainText.trim(),
+                reopened.plainText.trim()
+            )
+
+            val reopenedRunsCount = reopened.elements.sumOf { elem ->
+                when (elem) {
+                    is OfficeDocumentElement.Paragraph -> elem.runs.size
+                    is OfficeDocumentElement.Heading -> elem.runs.size
+                    is OfficeDocumentElement.ListItem -> elem.runs.size
+                    else -> 0
+                }
+            }
+            // ITEM 2: Run formatting preservation
+            assertEquals(
+                "item 2 lands: all 389 styled runs preserved across DOCX save",
+                originalRunsCount,
+                reopenedRunsCount
+            )
+            val styledRunsCount = reopened.elements.flatMap { elem ->
+                when (elem) {
+                    is OfficeDocumentElement.Paragraph -> elem.runs
+                    is OfficeDocumentElement.Heading -> elem.runs
+                    is OfficeDocumentElement.ListItem -> elem.runs
+                    else -> emptyList()
+                }
+            }.count { it.isBold == true || it.isItalic == true || it.isUnderline == true || it.colorHex != null }
+            assertTrue(
+                "item 2 lands: styled runs survive with formatting (was 0, now $styledRunsCount)",
+                styledRunsCount > 0
+            )
+
+
+
+
+            // DIRECT STRUCTURAL XML ASSERTION (mitigates parser echo-chamber bias)
+            val entries = zipEntries(target.readBytes())
+            val docXml = entries["word/document.xml"]
+            assertTrue("word/document.xml must exist in saved package", docXml != null)
+            assertTrue(
+                "item 1 lands: saved DOCX keeps source A4 size (11906 x 16838 twips) instead of hardcoded Letter",
+                docXml!!.contains("""w:w="11906"""") && docXml.contains("""w:h="16838"""")
+            )
+            assertTrue(
+                "item 1 lands: saved DOCX preserves source bottom margin 2203 twips",
+                docXml.contains("""w:bottom="2203"""")
+            )
+
+            // Application-level assertion
+            val pageStyle = reopened.toOfficeDocument().styles.defaultPageStyle
+            assertTrue("re-opened document must retain defaultPageStyle", pageStyle != null)
+            assertEquals("A4 width preserved", 793.7333f, pageStyle!!.widthDp, 1.0f)
+            assertEquals("A4 height preserved", 1122.5333f, pageStyle.heightDp, 1.0f)
+        } finally {
+            target.delete()
+        }
+
+    }
+
+    @Test
+    fun docxSaveAsToNewFileProducesPackageWithoutStylesPart() = runBlocking {
+        val parser = OfficeDocumentParser(context)
+        val name = SampleMatrix.docxName(3)
+        val parsed = parser.parseDocument(fixture(name), bypassCache = true)
+        val document = parsed.toOfficeDocument()
+
+        val target = scratch("fresh-save-as.docx")
+        try {
+            target.delete() // Ensure target does not exist before save
+            val saved = com.makerandreas.papirusoffice.data.DocumentSerializer(context)
+                .serializeToFormat(document, "DOCX", target)
+            assertTrue("Save-As to new target succeeds", saved)
+
+            // DIRECT STRUCTURAL XML ASSERTION
+            val entries = zipEntries(target.readBytes())
+            // RECORDED DEFECT: Fresh file save writes only 4 bare parts, no styles.xml
+            assertFalse(
+                "RECORDED DEFECT: fresh save writes no word/styles.xml; item 4 and 7 flip this",
+                entries.containsKey("word/styles.xml")
+            )
+            assertFalse(
+                "RECORDED DEFECT: fresh save writes no word/numbering.xml",
+                entries.containsKey("word/numbering.xml")
+            )
+            assertTrue(
+                "fresh save writes word/document.xml",
+                entries.containsKey("word/document.xml")
+            )
+        } finally {
+            target.delete()
+        }
+    }
+
 
     // ------------------------------------------------------------------
     // Invariant 6: a test must never write into the fixture directory

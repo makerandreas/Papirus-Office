@@ -101,8 +101,11 @@ class DocxDocumentParser(private val context: Context) {
         if (parsedDoc.isOdt) return@withContext officeParser.saveOdtDocument(file, parsedDoc)
         if (parsedDoc.isPptx) return@withContext officeParser.savePptxDocument(file, parsedDoc)
 
-        return@withContext saveDocxZip(file, generateDocxXmlFromElements(document.body.elements))
+        val existingSectPr = extractExistingSectPr(file)
+        val sectPr = existingSectPr ?: generateSectPr(document.styles.defaultPageStyle)
+        return@withContext saveDocxZip(file, generateDocxXmlFromElements(document.body.elements, sectPr))
     }
+
 
     suspend fun saveDocument(file: File, text: String): Boolean = withContext(Dispatchers.IO) {
         val fileName = file.name.lowercase(Locale.ROOT)
@@ -437,7 +440,45 @@ class DocxDocumentParser(private val context: Context) {
         return sb.toString().toByteArray(Charsets.UTF_8)
     }
 
-    fun generateDocxXmlFromElements(elements: List<OfficeElement>): ByteArray {
+    private fun extractExistingSectPr(file: File): String? {
+        if (!file.exists()) return null
+        return try {
+            java.util.zip.ZipInputStream(file.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (entry.name == "word/document.xml") {
+                        val buffer = java.io.ByteArrayOutputStream()
+                        zip.copyTo(buffer)
+                        val xml = buffer.toString(Charsets.UTF_8.name())
+                        val match = Regex("<w:sectPr\\b[^>]*>.*?</w:sectPr>", RegexOption.DOT_MATCHES_ALL)
+                            .findAll(xml).lastOrNull()?.value
+                        return match
+                    }
+                    zip.closeEntry()
+                    entry = zip.nextEntry
+                }
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun generateSectPr(pageStyle: PageStyleSpec?): String {
+        if (pageStyle == null) {
+            return "    <w:sectPr>\n      <w:pgSz w:w=\"12240\" w:h=\"15840\"/>\n      <w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n    </w:sectPr>"
+        }
+        val wTwips = Math.round(pageStyle.widthDp * 15f)
+        val hTwips = Math.round(pageStyle.heightDp * 15f)
+        val topTwips = Math.round(pageStyle.marginTopDp * 15f)
+        val bottomTwips = Math.round(pageStyle.marginBottomDp * 15f)
+        val leftTwips = Math.round(pageStyle.marginStartDp * 15f)
+        val rightTwips = Math.round(pageStyle.marginEndDp * 15f)
+        val orient = if (pageStyle.landscape) " w:orient=\"landscape\"" else ""
+        return "    <w:sectPr>\n      <w:pgSz w:w=\"$wTwips\" w:h=\"$hTwips\"$orient/>\n      <w:pgMar w:top=\"$topTwips\" w:right=\"$rightTwips\" w:bottom=\"$bottomTwips\" w:left=\"$leftTwips\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n    </w:sectPr>"
+    }
+
+    fun generateDocxXmlFromElements(elements: List<OfficeElement>, sectPrXml: String? = null): ByteArray {
         val sb = StringBuilder()
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
         sb.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n")
@@ -449,13 +490,89 @@ class DocxDocumentParser(private val context: Context) {
                 writeDocxElement(sb, element)
             }
         }
-        sb.append("    <w:sectPr>\n")
-        sb.append("      <w:pgSz w:w=\"12240\" w:h=\"15840\"/>\n")
-        sb.append("      <w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n")
-        sb.append("    </w:sectPr>\n")
+        if (!sectPrXml.isNullOrBlank()) {
+            sb.append(sectPrXml.trimEnd()).append("\n")
+        } else {
+            sb.append("    <w:sectPr>\n")
+            sb.append("      <w:pgSz w:w=\"12240\" w:h=\"15840\"/>\n")
+            sb.append("      <w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/>\n")
+            sb.append("    </w:sectPr>\n")
+        }
         sb.append("  </w:body>\n")
         sb.append("</w:document>")
         return sb.toString().toByteArray(Charsets.UTF_8)
+    }
+
+
+    private fun writeDocxRun(sb: StringBuilder, run: OfficeTextRun) {
+        val hasRPr = run.characterStyle != null ||
+            run.styleName != null ||
+            run.isBold != null ||
+            run.isItalic != null ||
+            run.isUnderline != null ||
+            run.colorHex != null ||
+            run.highlight != null ||
+            run.isHidden != null ||
+            run.fontSizeSp != null ||
+            run.fontFamily != null
+
+        sb.append("      <w:r>\n")
+        if (hasRPr) {
+            sb.append("        <w:rPr>")
+            val charStyle = run.styleName ?: run.characterStyle
+            if (!charStyle.isNullOrBlank()) {
+                sb.append("<w:rStyle w:val=\"${escapeXml(charStyle)}\"/>")
+            }
+            if (run.fontFamily != null) {
+                val f = escapeXml(run.fontFamily)
+                sb.append("<w:rFonts w:ascii=\"$f\" w:hAnsi=\"$f\" w:cs=\"$f\"/>")
+            }
+            when (run.isBold) {
+                true -> sb.append("<w:b/>")
+                false -> sb.append("<w:b w:val=\"0\"/>")
+                null -> {}
+            }
+            when (run.isItalic) {
+                true -> sb.append("<w:i/>")
+                false -> sb.append("<w:i w:val=\"0\"/>")
+                null -> {}
+            }
+            when (run.isUnderline) {
+                true -> sb.append("<w:u w:val=\"single\"/>")
+                false -> sb.append("<w:u w:val=\"none\"/>")
+                null -> {}
+            }
+            if (run.colorHex != null) {
+                val hex = run.colorHex.removePrefix("#")
+                sb.append("<w:color w:val=\"${escapeXml(hex)}\"/>")
+            }
+            if (run.highlight != null) {
+                sb.append("<w:highlight w:val=\"${escapeXml(run.highlight)}\"/>")
+            }
+            when (run.isHidden) {
+                true -> sb.append("<w:vanish/>")
+                false -> sb.append("<w:vanish w:val=\"0\"/>")
+                null -> {}
+            }
+            if (run.fontSizeSp != null) {
+                val halfPts = Math.round(run.fontSizeSp * 2f)
+                sb.append("<w:sz w:val=\"$halfPts\"/><w:szCs w:val=\"$halfPts\"/>")
+            }
+            sb.append("</w:rPr>\n")
+        }
+        val escapedText = escapeXml(run.text)
+        sb.append("        <w:t xml:space=\"preserve\">$escapedText</w:t>\n")
+        sb.append("      </w:r>\n")
+    }
+
+    private fun writeDocxRuns(sb: StringBuilder, runs: List<OfficeTextRun>, fallbackText: String) {
+        if (runs.isNotEmpty()) {
+            for (run in runs) {
+                writeDocxRun(sb, run)
+            }
+        } else {
+            sb.append("      <w:r><w:t xml:space=\"preserve\">${escapeXml(fallbackText)}</w:t></w:r>\n")
+        }
     }
 
     private fun writeDocxElement(sb: StringBuilder, element: OfficeElement) {
@@ -465,32 +582,49 @@ class DocxDocumentParser(private val context: Context) {
                 val style = element.styleName ?: "Heading${element.level}"
                 sb.append("    <w:p>\n")
                 sb.append("      <w:pPr><w:pStyle w:val=\"${escapeXml(style)}\"/><w:outlineLvl w:val=\"$level\"/></w:pPr>\n")
-                sb.append("      <w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r>\n")
+                writeDocxRuns(sb, element.runs, element.text)
                 sb.append("    </w:p>\n")
             }
             is OfficeParagraph -> {
                 val style = element.styleName
                 sb.append("    <w:p>\n")
-                if (!style.isNullOrBlank()) {
-                    sb.append("      <w:pPr><w:pStyle w:val=\"${escapeXml(style)}\"/>")
+                if (!style.isNullOrBlank() || element.outlineLevel > 0) {
+                    sb.append("      <w:pPr>")
+                    if (!style.isNullOrBlank()) {
+                        sb.append("<w:pStyle w:val=\"${escapeXml(style)}\"/>")
+                    }
                     if (element.outlineLevel > 0) {
                         sb.append("<w:outlineLvl w:val=\"${(element.outlineLevel - 1).coerceIn(0, 8)}\"/>")
                     }
                     sb.append("</w:pPr>\n")
                 }
-                sb.append("      <w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r>\n")
+                writeDocxRuns(sb, element.runs, element.text)
                 sb.append("    </w:p>\n")
             }
             is OfficeListItem -> {
-                sb.append("    <w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr></w:pPr>")
-                sb.append("<w:r><w:t xml:space=\"preserve\">${escapeXml(element.text)}</w:t></w:r></w:p>\n")
+                sb.append("    <w:p><w:pPr><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"1\"/></w:numPr></w:pPr>\n")
+                writeDocxRuns(sb, element.runs, element.text)
+                sb.append("    </w:p>\n")
             }
             is OfficeTable -> {
                 sb.append("    <w:tbl>\n")
                 for (row in element.rows) {
                     sb.append("      <w:tr>\n")
                     for (cell in row.cells) {
-                        sb.append("        <w:tc><w:p><w:r><w:t xml:space=\"preserve\">${escapeXml(cell.text)}</w:t></w:r></w:p></w:tc>\n")
+                        sb.append("        <w:tc>\n")
+                        if (cell.paragraphs.isNotEmpty()) {
+                            for (p in cell.paragraphs) {
+                                sb.append("          <w:p>\n")
+                                if (!p.styleName.isNullOrBlank()) {
+                                    sb.append("            <w:pPr><w:pStyle w:val=\"${escapeXml(p.styleName)}\"/></w:pPr>\n")
+                                }
+                                writeDocxRuns(sb, p.runs, p.text)
+                                sb.append("          </w:p>\n")
+                            }
+                        } else {
+                            sb.append("          <w:p><w:r><w:t xml:space=\"preserve\">${escapeXml(cell.text)}</w:t></w:r></w:p>\n")
+                        }
+                        sb.append("        </w:tc>\n")
                     }
                     sb.append("      </w:tr>\n")
                 }
@@ -507,6 +641,7 @@ class DocxDocumentParser(private val context: Context) {
             else -> { }
         }
     }
+
 
     private fun generateOdtXml(text: String): ByteArray {
         val sb = StringBuilder()
